@@ -1,15 +1,40 @@
 import { useState } from 'react'
 import Login from './pages/auth/login'
-import Dashboard from './pages/user/dashboard'
-import Navbar from './pages/user/navbar'
-import './App.css'
+import Dashboard from './pages/dashboard/dashboard'
+import Navbar from './pages/shared/navbar'
+import CDSPView from './pages/cdsp/cdsp'
+import { CDSPProvider } from './contexts/CDSPContext'
+import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
+import './styles/App.css'
+
+type Page = 'dashboard' | 'cdsp'
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [activeTab, setActiveTab] = useState('Dashboard')
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard')
 
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />
+  }
+
+  if (currentPage === 'cdsp') {
+    return (
+      <CDSPProvider>
+        <ProgramActivitiesProvider>
+          <div className="h-screen flex flex-col overflow-hidden">
+            <Navbar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onLogout={() => setIsLoggedIn(false)}
+            />
+            <div className="flex-1 overflow-hidden">
+              <CDSPView onBack={() => setCurrentPage('dashboard')} />
+            </div>
+          </div>
+        </ProgramActivitiesProvider>
+      </CDSPProvider>
+    )
   }
 
   return (
@@ -19,22 +44,11 @@ export default function App() {
         onTabChange={setActiveTab}
         onLogout={() => setIsLoggedIn(false)}
       />
-      <Dashboard onModuleClick={(id) => console.log('Module clicked:', id)} />
-
-      {/* Floating help button */}
-      <button
-        className="fixed bottom-6 right-6 w-10 h-10 text-white rounded-full flex items-center justify-center font-bold hover:scale-[1.05] transition-all"
-        style={{
-          backgroundColor: 'var(--color-brand)',
-          boxShadow: 'var(--shadow-md)',
-          fontSize: 'var(--text-md)',
+      <Dashboard
+        onModuleClick={(id) => {
+          if (id === 'cdsp') setCurrentPage('cdsp')
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-brand-dark)')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-brand)')}
-        aria-label="Help"
-      >
-        ?
-      </button>
+      />
     </div>
   )
 }

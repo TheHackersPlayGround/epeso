@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import logo1 from '../../assets/logo1.png'
-import logo2 from '../../assets/logo2.png'
+import logo2 from '../../assets/logo22.png'
 import bg from '../../assets/tangub.png'
 import Forgot from './forgot'
 

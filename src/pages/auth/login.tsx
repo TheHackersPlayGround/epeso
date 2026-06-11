@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import logo1 from '../../assets/logo1.png'
 import logo2 from '../../assets/logo2.png'
-import bg from '../../assets/bg.png'
+import bg from '../../assets/tangub.png'
+import Forgot from './forgot'
 
 interface LoginProps {
   onLogin: () => void
@@ -12,10 +13,15 @@ export default function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState<string>('')
   const [password, setPassword] = useState<string>('')
   const [showPassword, setShowPassword] = useState<boolean>(false)
+  const [showForgot, setShowForgot] = useState<boolean>(false)
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
     onLogin()
+  }
+
+  if (showForgot) {
+    return <Forgot onBack={() => setShowForgot(false)} />
   }
 
   return (
@@ -28,7 +34,7 @@ export default function Login({ onLogin }: LoginProps) {
       }}
     >
       {/* Background overlay */}
-      <div className="absolute inset-0 bg-white/30 backdrop-blur-sm pointer-events-none" />
+      <div className="absolute inset-0 bg-white/10 backdrop-blur-sm pointer-events-none" />
 
       {/* Login card */}
       <div
@@ -61,32 +67,17 @@ export default function Login({ onLogin }: LoginProps) {
         </p>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {/* Username */}
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            className="w-full px-4 py-2.5 border border-[#d1d5db] bg-white text-[#111827] placeholder-gray-400
-              focus:outline-none focus:ring-2 focus:ring-[#0046AD]/40 focus:border-[#0046AD]"
-            style={{
-              borderRadius: 'var(--radius-sm)',
-              fontSize: 'var(--text-base)',
-              transition: 'box-shadow var(--transition-base), border-color var(--transition-base)',
-            }}
-          />
-
-          {/* Password */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Username — floating label */}
           <div className="relative">
             <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              className="w-full px-4 py-2.5 pr-10 border border-[#d1d5db] bg-white text-[#111827] placeholder-gray-400
+              id="login-username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              placeholder=" "
+              className="peer w-full px-4 pt-5 pb-2 border border-[#d1d5db] bg-white text-[#111827]
                 focus:outline-none focus:ring-2 focus:ring-[#0046AD]/40 focus:border-[#0046AD]"
               style={{
                 borderRadius: 'var(--radius-sm)',
@@ -94,6 +85,49 @@ export default function Login({ onLogin }: LoginProps) {
                 transition: 'box-shadow var(--transition-base), border-color var(--transition-base)',
               }}
             />
+            <label
+              htmlFor="login-username"
+              className="absolute left-4 top-3.5 text-gray-400 pointer-events-none origin-left
+                peer-focus:-translate-y-2.5 peer-focus:scale-75 peer-focus:text-[#0046AD]
+                peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:text-[#0046AD]"
+              style={{
+                fontSize: '0.875rem',
+                transition: 'transform 0.2s ease, font-size 0.2s ease, color 0.2s ease',
+              }}
+            >
+              Username
+            </label>
+          </div>
+
+          {/* Password — floating label */}
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder=" "
+              className="peer w-full px-4 pt-5 pb-2 pr-10 border border-[#d1d5db] bg-white text-[#111827]
+                focus:outline-none focus:ring-2 focus:ring-[#0046AD]/40 focus:border-[#0046AD]"
+              style={{
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 'var(--text-base)',
+                transition: 'box-shadow var(--transition-base), border-color var(--transition-base)',
+              }}
+            />
+            <label
+              htmlFor="login-password"
+              className="absolute left-4 top-3.5 text-gray-400 pointer-events-none origin-left
+                peer-focus:-translate-y-2.5 peer-focus:scale-75 peer-focus:text-[#0046AD]
+                peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:text-[#0046AD]"
+              style={{
+                fontSize: '0.875rem',
+                transition: 'transform 0.2s ease, font-size 0.2s ease, color 0.2s ease',
+              }}
+            >
+              Password
+            </label>
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
@@ -102,6 +136,18 @@ export default function Login({ onLogin }: LoginProps) {
               style={{ background: 'none', border: 'none', padding: 0 }}
             >
               {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+            </button>
+          </div>
+
+          {/* Forgot password link */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="text-sm font-semibold hover:underline focus:outline-none"
+              style={{ color: '#0077BE', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Forgot Password?
             </button>
           </div>
 

@@ -72,7 +72,7 @@ function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confi
 }) {
   if (!isOpen) return null
   const Icon = type === 'success' ? CheckCircle : AlertCircle
-  const iconColor = type === 'success' ? 'text-green-500' : 'text-[#0077BE]'
+  const iconColor = type === 'success' ? 'text-green-500' : 'text-brand-blue'
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
@@ -83,10 +83,10 @@ function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confi
           {type === 'confirm' ? (
             <>
               <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={onConfirm} className="px-6 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5]">{confirmText}</button>
+              <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
             </>
           ) : (
-            <button onClick={onConfirm} className="px-6 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5]">OK</button>
+            <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
           )}
         </div>
       </div>
@@ -109,7 +109,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
     <div>
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-800"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
           value={docName}
           onChange={e => setDocName(e.target.value)}
@@ -118,7 +118,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
         <button
           type="button"
           onClick={addDoc}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] text-sm whitespace-nowrap"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm whitespace-nowrap"
         >
           <Upload size={15} /> Attach File
         </button>
@@ -151,17 +151,17 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: SPESApplicant; 
     </div>
   )
   const Sec = ({ num, title, gray }: { num: string; title: string; gray?: boolean }) => (
-    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-[#0077BE]'}`}>
+    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-brand-blue'}`}>
       <span className="text-white text-xs font-bold">{num}.</span>
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
   )
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Users size={18} className="text-[#0077BE]" />
+            <Users size={18} className="text-brand-blue" />
           </div>
           <div>
             <h2 className="text-gray-800 text-lg">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
@@ -268,24 +268,24 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
     onSave(formData)
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-800'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
   const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
   const sel = `${inp} bg-white`
 
   const SectionDivider = ({ num, title, gray }: { num: string; title: string; gray?: boolean }) => (
-    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-[#0077BE]'}`}>
+    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-brand-blue'}`}>
       <span className="text-white text-xs font-bold">{num}.</span>
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
   )
 
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Users size={18} className="text-[#0077BE]" />
+            <Users size={18} className="text-brand-blue" />
           </div>
           <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — SPES'}
@@ -466,7 +466,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
             <button onClick={onClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} className="px-8 py-2.5 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] text-sm">
+            <button onClick={handleSave} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
           </div>
@@ -691,8 +691,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 )
                 return planned.map(activity => (
                   <button key={activity.id} onClick={() => handleAssign(activity)}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-[#0077BE] hover:bg-blue-50 ${
-                      assignTarget.assignedActivity === activity.title ? 'border-[#0077BE] bg-blue-50' : 'border-gray-200'
+                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-brand-blue hover:bg-blue-50 ${
+                      assignTarget.assignedActivity === activity.title ? 'border-brand-blue bg-blue-50' : 'border-gray-200'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -705,7 +705,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">Planned</span>
                     </div>
-                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-[#0077BE] mt-1">Currently assigned</p>}
+                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-brand-blue mt-1">Currently assigned</p>}
                   </button>
                 ))
               })()}
@@ -732,7 +732,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
             </div>
             <div className="p-6">
               <div
-                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#0077BE] hover:bg-blue-50 transition-colors"
+                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors"
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
                 onClick={() => document.getElementById('spes-file-input')?.click()}
@@ -753,7 +753,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button disabled={!uploadedFile} onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }} className="flex-1 py-2 bg-[#0077BE] text-white rounded-lg text-sm hover:bg-[#0065A5] disabled:opacity-40">Import</button>
+              <button disabled={!uploadedFile} onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40">Import</button>
             </div>
           </div>
         </div>
@@ -769,7 +769,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
 
           <div className="bg-white rounded-xl shadow-md p-4 mb-4">
             <div className="flex gap-3">
-              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] transition-colors">
+              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
                 <Plus size={20} /><span>Add Applicant</span>
               </button>
               <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
@@ -798,7 +798,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <div className="relative flex-1 min-w-48">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#0077BE]"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue"
                     placeholder="Search by name, barangay, school, or employer..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -868,7 +868,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#0077BE]">
+                    <tr className="bg-brand-blue">
                       <th className="px-3 py-3 text-left text-white whitespace-nowrap">Name</th>
                       <th className="px-3 py-3 text-left text-white whitespace-nowrap">School</th>
                       <th className="px-3 py-3 text-left text-white whitespace-nowrap">Grade / Year Level</th>

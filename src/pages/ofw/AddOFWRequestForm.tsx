@@ -29,7 +29,7 @@ const REQUEST_TYPES = [
 
 const ELPOR_FORMS = ['ELPOR Form A', 'ELPOR Form A2', 'ELPOR Form B', 'ELPOR Form B1', 'ELPOR Form C']
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-400'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
 const sublbl = 'block text-xs uppercase tracking-wide text-gray-600 font-semibold mb-1'
 
 function AttachIcon() {
@@ -234,7 +234,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                         type="checkbox"
                         checked={form.typeOfRequest.includes(type)}
                         onChange={() => toggleRequest(type)}
-                        className="w-4 h-4 rounded border-gray-400 accent-[#0077BE]"
+                        className="w-4 h-4 rounded border-gray-400 accent-brand-blue"
                       />
                       {type}
                     </label>

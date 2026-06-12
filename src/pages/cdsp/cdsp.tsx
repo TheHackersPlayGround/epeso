@@ -102,7 +102,7 @@ function ConfirmModal({
 }) {
   if (!isOpen) return null
   const Icon = type === 'success' ? CheckCircle : AlertCircle
-  const iconColor = type === 'success' ? 'text-green-500' : type === 'error' ? 'text-red-500' : 'text-[#0077BE]'
+  const iconColor = type === 'success' ? 'text-green-500' : type === 'error' ? 'text-red-500' : 'text-brand-blue'
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
@@ -113,10 +113,10 @@ function ConfirmModal({
           {type === 'confirm' ? (
             <>
               <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">{cancelText}</button>
-              <button onClick={onConfirm} className="px-6 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5]">{confirmText}</button>
+              <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
             </>
           ) : (
-            <button onClick={onConfirm} className="px-6 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5]">OK</button>
+            <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
           )}
         </div>
       </div>
@@ -128,7 +128,7 @@ function ConfirmModal({
 
 function SectionDivider({ numeral, title, gray }: { numeral: string; title: string; gray?: boolean }) {
   return (
-    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-[#0077BE]'}`}>
+    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-brand-blue'}`}>
       <span className="text-white text-xs font-bold">{numeral}.</span>
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
@@ -148,7 +148,7 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
   )
 
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -195,7 +195,7 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
             {CLASSIFICATION_OPTIONS.map((opt) => (
               <span key={opt} className={`px-3 py-1 rounded-full text-xs border ${
                 applicant.classification.includes(opt)
-                  ? 'border-[#0077BE] bg-blue-50 text-[#0077BE]'
+                  ? 'border-brand-blue bg-blue-50 text-brand-blue'
                   : 'border-gray-200 text-gray-300'
               }`}>{opt}</span>
             ))}
@@ -221,7 +221,7 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
             {CDSP_SERVICES.map((svc) => (
               <span key={svc} className={`px-3 py-1 rounded-full text-xs border ${
                 applicant.serviceAvailed === svc
-                  ? 'border-[#0077BE] bg-blue-50 text-[#0077BE]'
+                  ? 'border-brand-blue bg-blue-50 text-brand-blue'
                   : 'border-gray-200 text-gray-300'
               }`}>{svc}</span>
             ))}
@@ -270,13 +270,13 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
                 {applicant.attachedDocuments.map((doc, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
                     <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <FileText size={14} className="text-[#0077BE]" />
+                      <FileText size={14} className="text-brand-blue" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-800">{doc.name}</p>
                       <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
                     </div>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-[#0077BE] hover:underline whitespace-nowrap">View</a>
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline whitespace-nowrap">View</a>
                   </div>
                 ))}
               </div>
@@ -318,7 +318,7 @@ function DocAttachSection({
     e.target.value = ''
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
 
   return (
     <div className="space-y-3">
@@ -327,13 +327,13 @@ function DocAttachSection({
           {documents.map((doc, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
               <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <FileText size={14} className="text-[#0077BE]" />
+                <FileText size={14} className="text-brand-blue" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-800">{doc.name}</p>
                 <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
               </div>
-              <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-[#0077BE] hover:underline">View</a>
+              <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline">View</a>
               <button onClick={() => onChange(documents.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 ml-1">
                 <X size={14} />
               </button>
@@ -348,7 +348,7 @@ function DocAttachSection({
           onChange={(e) => setPendingName(e.target.value)}
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
         />
-        <label className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg cursor-pointer hover:bg-[#0065A5] whitespace-nowrap text-sm flex-shrink-0">
+        <label className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg cursor-pointer hover:bg-brand-blue-dark whitespace-nowrap text-sm flex-shrink-0">
           <Upload size={15} />
           Attach File
           <input
@@ -396,7 +396,7 @@ function AddProfileForm({
     onSave(formData)
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-800'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
   const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
   const sel = `${inp} bg-white`
 
@@ -404,7 +404,7 @@ function AddProfileForm({
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <div
         onClick={onChange}
-        className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${checked ? 'bg-[#0077BE] border-[#0077BE]' : 'border-gray-300 bg-white'}`}
+        className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${checked ? 'bg-brand-blue border-brand-blue' : 'border-gray-300 bg-white'}`}
       >
         {checked && <span className="text-white text-xs leading-none">✓</span>}
       </div>
@@ -413,11 +413,11 @@ function AddProfileForm({
   )
 
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Users size={18} className="text-[#0077BE]" />
+            <Users size={18} className="text-brand-blue" />
           </div>
           <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — CDSP'}
@@ -547,13 +547,13 @@ function AddProfileForm({
             {CDSP_SERVICES.map((svc) => (
               <label
                 key={svc}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${formData.serviceAvailed === svc ? 'border-[#0077BE] bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${formData.serviceAvailed === svc ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
               >
-                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.serviceAvailed === svc ? 'border-[#0077BE]' : 'border-gray-300'}`}>
-                  {formData.serviceAvailed === svc && <div className="w-2 h-2 rounded-full bg-[#0077BE]" />}
+                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.serviceAvailed === svc ? 'border-brand-blue' : 'border-gray-300'}`}>
+                  {formData.serviceAvailed === svc && <div className="w-2 h-2 rounded-full bg-brand-blue" />}
                 </div>
                 <input type="radio" className="hidden" checked={formData.serviceAvailed === svc} onChange={() => set({ serviceAvailed: svc })} />
-                <span className={`text-sm ${formData.serviceAvailed === svc ? 'text-[#0077BE]' : 'text-gray-700'}`}>{svc}</span>
+                <span className={`text-sm ${formData.serviceAvailed === svc ? 'text-brand-blue' : 'text-gray-700'}`}>{svc}</span>
               </label>
             ))}
           </div>
@@ -650,7 +650,7 @@ function AddProfileForm({
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
             <button onClick={onClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} className="px-8 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] text-sm">
+            <button onClick={handleSave} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
           </div>
@@ -901,7 +901,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   <button
                     key={activity.id}
                     onClick={() => handleAssign(activity)}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-[#0077BE] hover:bg-blue-50 ${assignTarget.assignedActivity === activity.title ? 'border-[#0077BE] bg-blue-50' : 'border-gray-200'}`}
+                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-brand-blue hover:bg-blue-50 ${assignTarget.assignedActivity === activity.title ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -910,7 +910,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">Planned</span>
                     </div>
-                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-[#0077BE] mt-1">Currently assigned</p>}
+                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-brand-blue mt-1">Currently assigned</p>}
                   </button>
                 ))
               })()}
@@ -942,7 +942,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         {/* Action Buttons */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-4">
           <div className="flex gap-3">
-            <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] transition-colors">
+            <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
               <Plus size={20} /><span>Add Applicant</span>
             </button>
             <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
@@ -979,11 +979,11 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex gap-3">
-                  <button onClick={() => setImportFileType('excel')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'excel' ? 'border-[#0077BE] bg-blue-50 text-[#0077BE]' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>Excel (.xlsx)</button>
-                  <button onClick={() => setImportFileType('csv')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'csv' ? 'border-[#0077BE] bg-blue-50 text-[#0077BE]' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>CSV (.csv)</button>
+                  <button onClick={() => setImportFileType('excel')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'excel' ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>Excel (.xlsx)</button>
+                  <button onClick={() => setImportFileType('csv')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'csv' ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>CSV (.csv)</button>
                 </div>
                 <button onClick={downloadTemplate} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
-                <label className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-[#0077BE] hover:bg-blue-50 transition-colors">
+                <label className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors">
                   <Upload size={28} className="mx-auto text-gray-400 mb-2" />
                   <p className="text-sm text-gray-600">{uploadedFile ? uploadedFile.name : 'Click to upload or drag and drop'}</p>
                   <p className="text-xs text-gray-400 mt-1">{importFileType === 'excel' ? '.xlsx' : '.csv'} files only</p>
@@ -1006,7 +1006,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               </div>
               <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
                 <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-                <button onClick={handleImport} disabled={importPreview.filter((r) => r.valid).length === 0} className="flex-1 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={handleImport} disabled={importPreview.filter((r) => r.valid).length === 0} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                   Import {importPreview.filter((r) => r.valid).length > 0 ? `(${importPreview.filter((r) => r.valid).length})` : ''}
                 </button>
               </div>
@@ -1024,7 +1024,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 placeholder="Search by name, barangay, or assigned activity..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#0077BE] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue focus:border-transparent"
               />
             </div>
             <div className="relative">
@@ -1083,7 +1083,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
             <div className="overflow-x-auto cdsp-scroll">
               <table className="w-full" style={{ tableLayout: 'auto' }}>
                 <thead>
-                  <tr className="bg-[#0077BE]">
+                  <tr className="bg-brand-blue">
                     <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 180 }}>Name</th>
                     <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 130 }}>Barangay</th>
                     <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 130 }}>Classification</th>

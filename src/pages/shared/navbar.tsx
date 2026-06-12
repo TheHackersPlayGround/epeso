@@ -24,7 +24,7 @@ export default function Navbar({ activeTab, onTabChange, onLogout}: NavbarProps)
   }, [])
 
   return (
-    <nav className="bg-[#0077BE] shadow-md h-21">
+    <nav className="bg-brand-blue shadow-md h-21">
       <div className="px-6 py-2">
         <div className="flex items-center justify-between">
 

@@ -8,7 +8,7 @@ interface OFWProfileModalProps {
   onSave: (updated: OFWProfile) => void
 }
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-800'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
 const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
 
 const REQUEST_TYPES = [
@@ -91,7 +91,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Request Info */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Request Information</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Request Information</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-gray-500">Reference Number</p>
@@ -116,7 +116,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Personal Info */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Personal Information</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Personal Information</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500">Full Name</p>
@@ -137,7 +137,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Address */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Address</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Address</p>
                 <p className="text-sm text-gray-800">
                   {[profile.address, profile.barangay, profile.municipality, profile.province].filter(Boolean).join(', ')}
                 </p>
@@ -147,7 +147,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <>
                   <hr className="border-gray-100" />
                   <div>
-                    <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-2">Remarks</p>
+                    <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-2">Remarks</p>
                     <p className="text-sm text-gray-800">{profile.remarks}</p>
                   </div>
                 </>
@@ -157,7 +157,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
             <form id="ofw-edit-form" onSubmit={handleSave} className="p-6 space-y-5">
               {/* Request Info */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Request Information</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Request Information</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={lbl}>Reference Number</label>
@@ -192,7 +192,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                             type="checkbox"
                             checked={form.typeOfRequest.includes(type)}
                             onChange={() => toggleRequest(type)}
-                            className="w-4 h-4 rounded border-gray-300 accent-[#0077BE]"
+                            className="w-4 h-4 rounded border-gray-300 accent-brand-blue"
                           />
                           {type}
                         </label>
@@ -206,7 +206,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Personal Info */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Personal Information</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Personal Information</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className={lbl}>Full Name</label>
@@ -227,7 +227,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Address */}
               <div>
-                <p className="text-xs font-semibold text-[#0077BE] uppercase tracking-wide mb-3">Address</p>
+                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-3">Address</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className={lbl}>Address / Street / Purok</label>

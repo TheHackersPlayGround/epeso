@@ -75,8 +75,8 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
   }, [next])
 
   return (
-    <div className='bg-[#E6E7E8]'>
-    <div className="max-w-6xl mx-auto px-6 py-8 bg-[#E6E7E8]">
+    <div className='bg-brand-bg'>
+    <div className="max-w-6xl mx-auto px-6 py-8 bg-brand-bg">
 
       {/* Hero Carousel */}
       <div

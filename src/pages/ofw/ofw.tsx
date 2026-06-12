@@ -312,7 +312,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
           <div className="flex items-center gap-3 mb-4">
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#0065A5] transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -359,7 +359,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#0077BE] placeholder:text-gray-400"
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                 placeholder="Search by name, reference no., contact number, barangay..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -386,7 +386,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Status</p>
                       {(['All', 'Pending', 'Ongoing', 'Approved', 'Completed', 'Rejected'] as const).map(s => (
                         <label key={s} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
-                          <input type="radio" name="ofw-status-filter" checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="accent-[#0077BE]" />
+                          <input type="radio" name="ofw-status-filter" checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="accent-brand-blue" />
                           {s}
                         </label>
                       ))}
@@ -395,7 +395,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Employment Status</p>
                       {(['All', 'Employed Abroad', 'Unemployed', 'Repatriated', 'Distressed'] as const).map(s => (
                         <label key={s} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
-                          <input type="radio" name="ofw-employment-filter" checked={employmentFilter === s} onChange={() => setEmploymentFilter(s)} className="accent-[#0077BE]" />
+                          <input type="radio" name="ofw-employment-filter" checked={employmentFilter === s} onChange={() => setEmploymentFilter(s)} className="accent-brand-blue" />
                           {s}
                         </label>
                       ))}
@@ -503,7 +503,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
             </div>
             <div className="p-6">
               <div
-                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#0077BE] hover:bg-blue-50 transition-colors"
+                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors"
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
                 onClick={() => document.getElementById('ofw-file-input')?.click()}
@@ -552,7 +552,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
               <button
                 disabled={!uploadedFile}
                 onClick={handleImport}
-                className="flex-1 py-2 bg-[#0077BE] text-white rounded-lg text-sm hover:bg-[#0065A5] disabled:opacity-40 transition-colors"
+                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40 transition-colors"
               >
                 Import
               </button>

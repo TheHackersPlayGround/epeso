@@ -33,10 +33,10 @@ export default function Navbar({ activeTab, onTabChange, onLogout}: NavbarProps)
             <img src={logoImage} alt="PESO Logo" className="w-16 h-16 object-contain" />
             <div>
               <p className="text-white font-bold m-0 p-0 leading-tight" style={{ fontSize: 'var(--text-lg)' }}>
-                PESO TANGUB CITY
+                E-PESO TANGUB CITY
               </p>
               <p className="text-white/90 m-0 p-0 leading-tight" style={{ fontSize: 'var(--text-md)' }}>
-                Comprehensive Profiling System
+                Profiling Management System
               </p>
             </div>
           </div>

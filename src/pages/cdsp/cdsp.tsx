@@ -396,8 +396,8 @@ function AddProfileForm({
     onSave(formData)
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none'
-  const lbl = 'block text-xs uppercase tracking-wide text-gray-800 mb-1'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none placeholder:text-gray-800'
+  const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
   const sel = `${inp} bg-white`
 
   const CheckItem = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (

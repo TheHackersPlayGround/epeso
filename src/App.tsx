@@ -3,11 +3,17 @@ import Login from './pages/auth/login'
 import Dashboard from './pages/dashboard/dashboard'
 import Navbar from './pages/shared/navbar'
 import CDSPView from './pages/cdsp/cdsp'
+import GIPView from './pages/gip/gip'
+import SPESView from './pages/spes/spes'
+import OFWView from './pages/ofw/ofw'
 import { CDSPProvider } from './contexts/CDSPContext'
+import { GIPProvider } from './contexts/GIPContext'
+import { SPESProvider } from './contexts/SPESContext'
+import { OFWProvider } from './contexts/OFWContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import './styles/App.css'
 
-type Page = 'dashboard' | 'cdsp'
+type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw'
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -37,6 +43,61 @@ export default function App() {
     )
   }
 
+  if (currentPage === 'gip') {
+    return (
+      <GIPProvider>
+        <ProgramActivitiesProvider>
+          <div className="h-screen flex flex-col overflow-hidden">
+            <Navbar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onLogout={() => setIsLoggedIn(false)}
+            />
+            <div className="flex-1 overflow-hidden">
+              <GIPView onBack={() => setCurrentPage('dashboard')} />
+            </div>
+          </div>
+        </ProgramActivitiesProvider>
+      </GIPProvider>
+    )
+  }
+
+  if (currentPage === 'spes') {
+    return (
+      <SPESProvider>
+        <ProgramActivitiesProvider>
+          <div className="h-screen flex flex-col overflow-hidden">
+            <Navbar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onLogout={() => setIsLoggedIn(false)}
+            />
+            <div className="flex-1 overflow-hidden">
+              <SPESView onBack={() => setCurrentPage('dashboard')} />
+            </div>
+          </div>
+        </ProgramActivitiesProvider>
+      </SPESProvider>
+    )
+  }
+
+  if (currentPage === 'ofw') {
+    return (
+      <OFWProvider>
+        <div className="h-screen flex flex-col overflow-hidden">
+          <Navbar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onLogout={() => setIsLoggedIn(false)}
+          />
+          <div className="flex-1 overflow-hidden">
+            <OFWView onBack={() => setCurrentPage('dashboard')} />
+          </div>
+        </div>
+      </OFWProvider>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar
@@ -47,6 +108,9 @@ export default function App() {
       <Dashboard
         onModuleClick={(id) => {
           if (id === 'cdsp') setCurrentPage('cdsp')
+          if (id === 'gip') setCurrentPage('gip')
+          if (id === 'spes') setCurrentPage('spes')
+          if (id === 'ofw') setCurrentPage('ofw')
         }}
       />
     </div>

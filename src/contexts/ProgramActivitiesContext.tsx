@@ -12,6 +12,8 @@ export interface ProgramActivity {
   startDate?: string
   endDate?: string
   allowance?: string
+  program?: string
+  facilitator?: string
 }
 
 const SEED: ProgramActivity[] = [
@@ -49,6 +51,36 @@ const SEED: ProgramActivity[] = [
     service: 'Special Program for Employment of Students (SPES)', date: '2026-05-20',
     location: 'DepEd District Office, Tangub City', status: 'Planned',
     assignedOffice: 'DepEd District Office', startDate: '2026-05-20', endDate: '2026-06-20', allowance: '3500',
+  },
+  {
+    id: 11, title: 'Cookery NC II',
+    service: 'Skills Training', date: '2026-04-01',
+    location: 'PESO Training Center, Tangub City', status: 'Ongoing',
+    program: 'Skills Training', facilitator: 'Lourdes Reyes',
+  },
+  {
+    id: 12, title: 'Bread & Pastry Production NC II',
+    service: 'Skills Training', date: '2026-04-08',
+    location: 'PESO Training Center, Tangub City', status: 'Planned',
+    program: 'Skills Training', facilitator: 'Maricel Santos',
+  },
+  {
+    id: 13, title: 'Food & Beverage Services NC II',
+    service: 'Skills Training', date: '2026-04-12',
+    location: 'PESO Training Center, Tangub City', status: 'Planned',
+    program: 'Skills Training', facilitator: 'Isabel Navarro',
+  },
+  {
+    id: 14, title: 'Electrical Installation & Maintenance NC II',
+    service: 'Skills Training', date: '2026-04-20',
+    location: 'PESO Training Center, Tangub City', status: 'Ongoing',
+    program: 'Skills Training', facilitator: 'Ramon Cruz',
+  },
+  {
+    id: 15, title: 'Dressmaking NC II',
+    service: 'Skills Training', date: '2026-05-05',
+    location: 'PESO Training Center, Tangub City', status: 'Planned',
+    program: 'Skills Training', facilitator: 'Rosario Villanueva',
   },
 ]
 

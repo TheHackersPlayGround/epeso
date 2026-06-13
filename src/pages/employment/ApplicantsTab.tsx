@@ -1,5 +1,6 @@
 // ─── Types & constants ─────────────────────────────────────────────────────────
 
+import { useState } from "react";
 import type { Applicant } from "../../contexts/EmploymentContext";
 export type { Applicant };
 
@@ -96,9 +97,7 @@ function ApplicantsEmptyState({ isFiltered }: { isFiltered: boolean }) {
 type ApplicantsTableRowProps = {
   applicant: Applicant;
   activeFilters: string[];
-  onView: (applicant: Applicant) => void;
-  onEdit: (applicant: Applicant) => void;
-  onRefer: (applicant: Applicant) => void;
+  onToggleMenu: (e: React.MouseEvent, id: number) => void;
 };
 
 function getEmploymentStatusClass(status: string): string {
@@ -116,7 +115,7 @@ function getOFWLabel(applicant: Applicant): string {
   return "Not OFW";
 }
 
-function ApplicantsTableRow({ applicant, activeFilters, onView, onEdit, onRefer }: ApplicantsTableRowProps) {
+function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: ApplicantsTableRowProps) {
   return (
     <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors align-top">
       <td className="px-6 py-5 text-gray-800 font-semibold w-32">{applicant.name}</td>
@@ -165,29 +164,13 @@ function ApplicantsTableRow({ applicant, activeFilters, onView, onEdit, onRefer 
       )}
 
       <td className="px-6 py-5 whitespace-nowrap">
-        <div className="flex gap-4">
-          <button
-            onClick={() => onView(applicant)}
-            aria-label={`View ${applicant.name}`}
-            className="text-base text-brand-orange hover:underline transition-colors font-medium"
-          >
-            View
-          </button>
-          <button
-            onClick={() => onEdit(applicant)}
-            aria-label={`Edit ${applicant.name}`}
-            className="text-base text-brand-blue hover:underline transition-colors font-medium"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onRefer(applicant)}
-            aria-label={`Refer ${applicant.name} to a vacancy`}
-            className="text-base text-green-600 hover:underline transition-colors font-medium"
-          >
-            Refer
-          </button>
-        </div>
+        <button
+          onClick={(e) => onToggleMenu(e, applicant.id)}
+          aria-label={`Actions for ${applicant.name}`}
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors text-xl leading-none"
+        >
+          ⋯
+        </button>
       </td>
     </tr>
   );
@@ -212,44 +195,71 @@ function getFilterLabel(filterId: string): string {
 }
 
 function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer }: ApplicantsTableProps) {
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+
+  function handleToggleMenu(e: React.MouseEvent, id: number) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setOpenMenuId(openMenuId === id ? null : id);
+  }
+
+  function closeMenu() { setOpenMenuId(null); }
+
+  const menuApplicant = applicants.find(a => a.id === openMenuId) ?? null;
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-base text-left">
-        <thead>
-          <tr className="border-b-2 border-gray-200">
-            {DEFAULT_HEADERS.map((header) => (
-              <th key={header} className="px-6 py-4 text-gray-700 font-bold whitespace-nowrap">
-                {header}
-              </th>
-            ))}
-            {activeFilters.map((filterId) => (
-              <th key={filterId} className="px-6 py-4 text-gray-700 font-bold whitespace-nowrap">
-                {getFilterLabel(filterId)}
-              </th>
-            ))}
-            <th className="px-6 py-4 text-gray-700 font-bold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <ApplicantsSkeleton />
-          ) : applicants.length === 0 ? (
-            <ApplicantsEmptyState isFiltered={isFiltered} />
-          ) : (
-            applicants.map((applicant) => (
-              <ApplicantsTableRow
-                key={applicant.id}
-                applicant={applicant}
-                activeFilters={activeFilters}
-                onView={onView}
-                onEdit={onEdit}
-                onRefer={onRefer}
-              />
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full text-base text-left">
+          <thead>
+            <tr className="bg-brand-blue">
+              {DEFAULT_HEADERS.map((header) => (
+                <th key={header} className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                  {header}
+                </th>
+              ))}
+              {activeFilters.map((filterId) => (
+                <th key={filterId} className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                  {getFilterLabel(filterId)}
+                </th>
+              ))}
+              <th className="px-6 py-4 text-white font-bold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <ApplicantsSkeleton />
+            ) : applicants.length === 0 ? (
+              <ApplicantsEmptyState isFiltered={isFiltered} />
+            ) : (
+              applicants.map((applicant) => (
+                <ApplicantsTableRow
+                  key={applicant.id}
+                  applicant={applicant}
+                  activeFilters={activeFilters}
+                  onToggleMenu={handleToggleMenu}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {openMenuId !== null && menuPos && menuApplicant && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={closeMenu} />
+          <div
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
+            className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+          >
+            <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">View</button>
+            <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">Edit</button>
+            <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-brand-blue hover:bg-blue-50">Refer</button>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

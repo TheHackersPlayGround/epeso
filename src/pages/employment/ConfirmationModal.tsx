@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { X } from 'lucide-react'
 
 type ConfirmationModalProps = {
   isOpen: boolean
@@ -20,18 +21,35 @@ export default function ConfirmationModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
-        <p className="text-sm text-gray-500 mb-4">{message}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
 
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+          <button
+            type="button"
+            onClick={onBackToEdit}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Message banner */}
+        <div className="mx-6 mt-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-gray-600 text-center">
+          {message}
+        </div>
+
+        {/* Summary */}
         {summaryContent && (
-          <div className="bg-gray-50 rounded-lg p-4 mb-5 text-sm text-gray-700 max-h-48 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto mx-6 mt-4 mb-2 text-sm text-gray-700">
             {summaryContent}
           </div>
         )}
 
-        <div className="flex gap-3">
+        {/* Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
           <button
             type="button"
             onClick={onBackToEdit}
@@ -42,7 +60,7 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="flex-1 py-2.5 bg-brand-orange text-white rounded-lg text-sm hover:bg-[#d96a1e] transition-colors font-medium"
+            className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
           >
             Confirm &amp; Save
           </button>

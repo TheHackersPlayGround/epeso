@@ -118,66 +118,64 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/30" onClick={onClose} aria-hidden="true" />
-      <div className="w-full max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-brand-blue">
-          <h2 className="text-lg font-semibold text-white">Refer Applicant</h2>
-          <button onClick={onClose} aria-label="Close panel" className="text-white/80 hover:text-white transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+          <div>
+            <p className="text-xl font-bold text-gray-900">Refer Applicant to Job Vacancy</p>
+            <p className="text-sm text-gray-500 mt-0.5">Applicant: {applicant.name}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             ✕
           </button>
         </div>
-        <div className="flex-1 px-6 py-6">
+
+        <div className="px-6 py-6">
           {referred ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+            <div className="flex flex-col items-center gap-4 text-center py-4">
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">✓</div>
               <p className="text-lg font-semibold text-gray-800">Referral Submitted</p>
-              <p className="text-sm text-gray-500">
-                {applicant.name} has been referred to the selected vacancy.
-              </p>
-              <button
-                onClick={onClose}
-                className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors"
-              >
+              <p className="text-sm text-gray-500">{applicant.name} has been referred to the selected vacancy.</p>
+              <button onClick={onClose} className="mt-2 px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">
                 Done
               </button>
             </div>
           ) : (
             <form onSubmit={handleRefer} className="flex flex-col gap-5">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600">Referring applicant:</p>
-                <p className="font-semibold text-gray-800">{applicant.name}</p>
-                <p className="text-sm text-gray-500">{applicant.skills}</p>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="ef-vacancy" className="text-sm font-medium text-gray-700">
-                  Select Vacancy
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ef-vacancy" className="text-sm font-semibold text-gray-700">
+                  Select Job Vacancy <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="ef-vacancy"
                   value={vacancyId}
                   onChange={(e) => setVacancyId(e.target.value)}
                   required
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="border border-brand-blue rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue text-gray-700"
                 >
                   <option value="">Select a vacancy...</option>
-                  <option value="v1">Administrative Assistant — City Hall</option>
-                  <option value="v2">Welder — ABC Construction</option>
-                  <option value="v3">Nurse Aide — Tangub City Hospital</option>
-                  <option value="v4">IT Support — DOST Regional Office</option>
-                  <option value="v5">Cook — Tangub City Restaurant</option>
+                  <option value="v1">Accountant - ABC Corporation (3 positions)</option>
+                  <option value="v2">Teacher - XYZ School (5 positions)</option>
+                  <option value="v3">Construction Worker - BuildCo (10 positions)</option>
+                  <option value="v4">Nurse - City Hospital (2 positions)</option>
+                  <option value="v5">Administrative Assistant — City Hall</option>
+                  <option value="v6">Welder — ABC Construction</option>
+                  <option value="v7">Nurse Aide — Tangub City Hospital</option>
+                  <option value="v8">IT Support — DOST Regional Office</option>
+                  <option value="v9">Cook — Tangub City Restaurant</option>
                 </select>
               </div>
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button" onClick={onClose}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors"
+                  className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
                 >
                   Confirm Referral
                 </button>
@@ -286,7 +284,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [applicants, setApplicants] = useState<Applicant[]>(loadApplicants);
 
   useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify(applicants));
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(applicants));
+    } catch {
+      console.warn('localStorage quota exceeded — applicant data (including photos) could not be saved.');
+    }
   }, [applicants]);
 
   // ── Search / filter / pagination state ────────────────────────────

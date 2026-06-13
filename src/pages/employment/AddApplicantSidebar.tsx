@@ -143,10 +143,20 @@ interface ApplicantFormData {
   sssNo: string;
   otherProgramName: string;
   otherProgramNo: string;
-  
+
   // Documents / Attachments
   documentType: string;
   documentOtherSpecify: string;
+  savedDocuments: Array<{
+    id: string;
+    documentType: string;
+    customName?: string;
+    fileName: string;
+    fileSize: string;
+  }>;
+
+  // 2x2 ID Photo
+  profileImage?: string;
 }
 
 export type { ApplicantFormData }
@@ -164,20 +174,25 @@ interface UploadedDocument {
   id: string;
   documentType: string;
   customName?: string;
-  file: File;
+  file?: File;
+  fileName?: string;
+  fileSize?: string;
 }
 
 export default function AddApplicantSidebar({ onSave, onClose, initialData, isEditMode = false }: AddApplicantSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>(
+    initialData?.savedDocuments?.map(d => ({ id: d.id, documentType: d.documentType, customName: d.customName, fileName: d.fileName, fileSize: d.fileSize })) ?? []
+  );
   const [currentDocType, setCurrentDocType] = useState('');
   const [currentCustomName, setCurrentCustomName] = useState('');
   const [previewDocument, setPreviewDocument] = useState<UploadedDocument | null>(null);
   const [hasDisabilityStatus, setHasDisabilityStatus] = useState<'Yes' | 'No'>(
     initialData?.hasDisability && initialData.hasDisability.length > 0 ? 'Yes' : 'No'
   );
+  const [profileImage, setProfileImage] = useState<string>(initialData?.profileImage ?? '');
   const defaultFormData: ApplicantFormData = {
     surname: '',
     firstName: '',
@@ -237,6 +252,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     otherProgramNo: '',
     documentType: '',
     documentOtherSpecify: '',
+    savedDocuments: [],
   };
   const [formData, setFormData] = useState<ApplicantFormData>({
     ...defaultFormData,
@@ -263,7 +279,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
   const handleConfirmSave = () => {
     setShowConfirmation(false);
-    onSave(formData);
+    onSave({ ...formData, profileImage });
     setShowSuccess(true);
   };
 
@@ -396,10 +412,40 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       id: Date.now().toString() + Math.random().toString(36),
       documentType: currentDocType,
       customName: currentDocType === 'Others' ? currentCustomName : undefined,
-      file: file
+      file: file,
+      fileName: file.name,
+      fileSize: formatFileSize(file.size),
     };
 
-    setUploadedDocuments([...uploadedDocuments, newDocument]);
+    const nextDocs = [...uploadedDocuments, newDocument];
+    setUploadedDocuments(nextDocs);
+    setFormData(prev => ({
+      ...prev,
+      savedDocuments: nextDocs.map(d => ({
+        id: d.id,
+        documentType: d.documentType,
+        customName: d.customName,
+        fileName: d.fileName ?? d.file?.name ?? '',
+        fileSize: d.fileSize ?? formatFileSize(d.file?.size ?? 0),
+      })),
+    }));
+
+    // If the document is a 2x2 ID Picture, compress and store as base64
+    if (currentDocType === '2x2 ID Picture') {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 400;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setProfileImage(canvas.toDataURL('image/jpeg', 0.8));
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.src = objectUrl;
+    }
 
     // Reset current selection to allow uploading more documents
     setCurrentDocType('');
@@ -409,9 +455,22 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     event.target.value = '';
   };
 
-  const handleDeleteDocument = (documentId: string) => {
-    setUploadedDocuments(uploadedDocuments.filter(doc => doc.id !== documentId));
-  };
+  function handleDeleteDocument(documentId: string) {
+    const doc = uploadedDocuments.find(d => d.id === documentId);
+    if (doc?.documentType === '2x2 ID Picture') setProfileImage('');
+    const nextDocs = uploadedDocuments.filter(d => d.id !== documentId);
+    setUploadedDocuments(nextDocs);
+    setFormData(prev => ({
+      ...prev,
+      savedDocuments: nextDocs.map(d => ({
+        id: d.id,
+        documentType: d.documentType,
+        customName: d.customName,
+        fileName: d.fileName ?? d.file?.name ?? '',
+        fileSize: d.fileSize ?? formatFileSize(d.file?.size ?? 0),
+      })),
+    }));
+  }
 
   const handlePreviewDocument = (doc: UploadedDocument) => {
     setPreviewDocument(doc);
@@ -433,42 +492,46 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="bg-brand-blue text-white px-4 py-3 font-bold uppercase text-sm">
               I. PERSONAL INFORMATION
             </div>
-            
+
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Surname</label>
                 <input
+                  placeholder="Enter surname"
                   type="text"
                   value={formData.surname}
                   onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">First Name</label>
                 <input
+                  placeholder="Enter first name"
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Middle Name</label>
                 <input
+                  placeholder="Enter middle name"
                   type="text"
                   value={formData.middleName}
                   onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Suffix</label>
                 <input
+                  placeholder="Enter suffix"
                   type="text"
                   value={formData.suffix}
                   onChange={(e) => setFormData({ ...formData, suffix: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
             </div>
@@ -481,7 +544,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                   placeholder="mm/dd/yy"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
               <div>
@@ -489,7 +552,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <select
                   value={formData.sex}
                   onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 >
                   <option value=""></option>
                   <option value="Male">Male</option>
@@ -502,7 +565,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.religion}
                   onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
               <div>
@@ -510,7 +573,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <select
                   value={formData.civilStatus}
                   onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 >
                   <option value=""></option>
                   <option value="Single">Single</option>
@@ -522,10 +585,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Height</label>
                 <input
+                  placeholder="Enter Height"
                   type="text"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
               </div>
             </div>
@@ -536,10 +600,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">House No./Street</label>
                   <input
+                    placeholder="Enter house no. and street"
                     type="text"
                     value={formData.houseNo}
                     onChange={(e) => setFormData({ ...formData, houseNo: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
                 <div>
@@ -548,8 +613,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.barangay}
                     onChange={(e) => setFormData({ ...formData, barangay: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
-                    placeholder="Enter barangay"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
                 <div>
@@ -558,8 +622,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.municipality}
                     onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
-                    placeholder="Enter municipality/city"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
                 <div>
@@ -568,8 +631,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.province}
                     onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
-                    placeholder="Enter province"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
               </div>
@@ -670,7 +732,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         placeholder="Please specify"
                         value={formData.disabilityOther}
                         onChange={(e) => setFormData({ ...formData, disabilityOther: e.target.value })}
-                        className="w-full px-3 py-1 border border-gray-300 rounded text-xs italic placeholder:text-gray-800"
+                        className="w-full px-3 py-1 border border-gray-300 rounded text-xs italic text-gray-900 placeholder:text-gray-500"
                       />
                     </div>
                   )}
@@ -681,28 +743,31 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN</label>
                   <input
+                    placeholder="Enter TIN"
                     type="text"
                     value={formData.tin}
                     onChange={(e) => setFormData({ ...formData, tin: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number</label>
                   <input
+                    placeholder="Enter contact number"
                     type="text"
                     value={formData.contactNumber}
                     onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Email</label>
                   <input
+                    placeholder="Enter Email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
               </div>
@@ -741,7 +806,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.ofwCountry}
                   onChange={(e) => setFormData({ ...formData, ofwCountry: e.target.value })}
                   disabled={formData.isOFW !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.isOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.isOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
               <div>
@@ -776,7 +841,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.formerOFWCountry}
                   onChange={(e) => setFormData({ ...formData, formerOFWCountry: e.target.value })}
                   disabled={formData.isFormerOFW !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
             </div>
@@ -814,7 +879,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.householdIdNo}
                   onChange={(e) => setFormData({ ...formData, householdIdNo: e.target.value })}
                   disabled={formData.is4PsBeneficiary !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.is4PsBeneficiary !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.is4PsBeneficiary !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
               <div>
@@ -825,7 +890,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.formerOFWReturnDate}
                   onChange={(e) => setFormData({ ...formData, formerOFWReturnDate: e.target.value })}
                   disabled={formData.isFormerOFW !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
             </div>
@@ -892,7 +957,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           placeholder="Specify cities/municipalities"
                           value={pref.localCities ?? ''}
                           onChange={(e) => handleLocalCitiesChange(index, e.target.value)}
-                          className="ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
+                          className="text-black ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
                         />
                       )}
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -910,7 +975,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           placeholder="Specify countries"
                           value={pref.overseasCountries ?? ''}
                           onChange={(e) => handleOverseasCountriesChange(index, e.target.value)}
-                          className="ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
+                          className=" text-black ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
                         />
                       )}
                     </div>
@@ -953,7 +1018,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           newLanguages[index] = { ...newLanguages[index], language: e.target.value.toUpperCase() };
                           setFormData({ ...formData, languages: newLanguages });
                         }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                       />
                     )}
                   </div>
@@ -1062,16 +1127,18 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
-                  <input 
+                  <input
+                    placeholder="Enter year graduated"   
                     type="text" 
                     value={formData.elementary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
                   <input
+                    placeholder="Enter level reached"
                     type="text"
                     value={formData.elementary.levelReached}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, levelReached: e.target.value }})}
@@ -1082,6 +1149,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Last Attended</label>
                   <input
+                    placeholder="Enter year last attended"
                     type="text"
                     value={formData.elementary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, yearLastAttended: e.target.value }})}
@@ -1125,7 +1193,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     placeholder="e.g. ABM, STEM, HUMSS, TVL, GAS..." 
                     value={formData.secondary.seniorHighStrand}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, seniorHighStrand: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
                   />
                 </div>
               )}
@@ -1133,6 +1201,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <label className="flex items-center text-sm">
                   <input 
+                    placeholder="Enter year graduated"
                     type="radio" 
                     name="secondaryGraduated"
                     checked={formData.secondary.graduated === 'Yes'}
@@ -1159,12 +1228,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text" 
                     value={formData.secondary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
+                    placeholder="Enter year graduated"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
                   <input
+                    placeholder="Enter level reached"
                     type="text"
                     value={formData.secondary.levelReached}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, levelReached: e.target.value }})}
@@ -1175,6 +1246,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Last Attended</label>
                   <input
+                    placeholder="Enter year last attended"
                     type="text"
                     value={formData.secondary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, yearLastAttended: e.target.value }})}
@@ -1195,7 +1267,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   placeholder="e.g. Bachelor of Science in Nursing, BSBA, AB Communication..."
                   value={formData.tertiary.course}
                   onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, course: e.target.value }})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -1225,15 +1297,17 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                   <input 
+                    placeholder="Enter year graduated"
                     type="text" 
                     value={formData.tertiary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
                   <input
+                    placeholder="Enter level reached"
                     type="text"
                     value={formData.tertiary.levelReached}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, levelReached: e.target.value }})}
@@ -1244,6 +1318,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Last Attended</label>
                   <input
+                    placeholder="Enter year last attended"
                     type="text"
                     value={formData.tertiary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, yearLastAttended: e.target.value }})}
@@ -1267,7 +1342,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <input type="text" placeholder="e.g. Master of Arts in Education"
                     value={gs.course}
                     onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],course:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
                 </div>
                 <div className="flex items-center gap-4">
                   <label className="block text-gray-700 text-xs">Graduated?</label>
@@ -1287,7 +1362,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                     <input type="text" value={gs.yearGraduated}
                       onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],yearGraduated:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
                   </div>
                   <div>
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
@@ -1326,7 +1401,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             </div>
             
             <div className="border border-gray-300 rounded overflow-hidden">
-              <div className="grid grid-cols-5 bg-gray-200">
+              <div className="grid grid-cols-5 bg-gray-200 text-black">
                 <div className="px-3 py-2 border-r border-gray-300 font-bold uppercase text-xs">Training/Vocational Course</div>
                 <div className="px-3 py-2 border-r border-gray-300 font-bold uppercase text-xs">Hours of Training</div>
                 <div className="px-3 py-2 border-r border-gray-300 font-bold uppercase text-xs">Training Institution</div>
@@ -1345,7 +1420,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         newTrainings[index].course = e.target.value;
                         setFormData({ ...formData, trainings: newTrainings });
                       }}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                      className="text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     />
                   </div>
                   <div className="p-2 border-r border-gray-300">
@@ -1357,7 +1432,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         newTrainings[index].hoursOfTraining = e.target.value;
                         setFormData({ ...formData, trainings: newTrainings });
                       }}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                      className="text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     />
                   </div>
                   <div className="p-2 border-r border-gray-300">
@@ -1369,7 +1444,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         newTrainings[index].institution = e.target.value;
                         setFormData({ ...formData, trainings: newTrainings });
                       }}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                      className=" text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     />
                   </div>
                   <div className="p-2 border-r border-gray-300">
@@ -1381,7 +1456,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         newTrainings[index].skillsAcquired = e.target.value;
                         setFormData({ ...formData, trainings: newTrainings });
                       }}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                      className="text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     />
                   </div>
                   <div className="p-2">
@@ -1393,7 +1468,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         newTrainings[index].certificateReceived = e.target.value;
                         setFormData({ ...formData, trainings: newTrainings });
                       }}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                      className="text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -1421,8 +1496,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Eligibility Section */}
             <div className="border border-gray-300 rounded p-4">
               <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded">
-                <div className="font-bold uppercase text-xs">Eligibility (Civil Service)</div>
-                <div className="font-bold uppercase text-xs">Date Taken</div>
+                <div className="text-black font-bold uppercase text-xs">Eligibility (Civil Service)</div>
+                <div className="text-black font-bold uppercase text-xs">Date Taken</div>
               </div>
               {formData.eligibilities.map((elig, index) => (
                 <div key={index} className="grid grid-cols-2 gap-4 mb-2">
@@ -1434,7 +1509,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newEligibilities[index].eligibility = e.target.value;
                       setFormData({ ...formData, eligibilities: newEligibilities });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
                     type="date"
@@ -1444,7 +1519,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newEligibilities[index].dateTaken = e.target.value;
                       setFormData({ ...formData, eligibilities: newEligibilities });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                 </div>
               ))}
@@ -1461,8 +1536,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Professional License Section */}
             <div className="border border-gray-300 rounded p-4">
               <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded">
-                <div className="font-bold uppercase text-xs">Professional License (PRC)</div>
-                <div className="font-bold uppercase text-xs">Valid Until</div>
+                <div className="text-black font-bold uppercase text-xs">Professional License (PRC)</div>
+                <div className="text-black font-bold uppercase text-xs">Valid Until</div>
               </div>
               {formData.professionalLicenses.map((license, index) => (
                 <div key={index} className="grid grid-cols-2 gap-4 mb-2">
@@ -1474,7 +1549,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newLicenses[index].license = e.target.value;
                       setFormData({ ...formData, professionalLicenses: newLicenses });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
                     type="date"
@@ -1484,7 +1559,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newLicenses[index].validUntil = e.target.value;
                       setFormData({ ...formData, professionalLicenses: newLicenses });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                 </div>
               ))}
@@ -1508,7 +1583,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             </div>
             
             <div className="border border-gray-300 rounded p-4">
-              <div className="grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded">
+              <div className="text-black grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded">
                 <div className="font-bold uppercase text-xs">Company Name</div>
                 <div className="font-bold uppercase text-xs">Position</div>
                 <div className="font-bold uppercase text-xs">From</div>
@@ -1525,7 +1600,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newExperiences[index].companyName = e.target.value;
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
                     type="text"
@@ -1535,7 +1610,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newExperiences[index].position = e.target.value;
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
                     type="month"
@@ -1545,7 +1620,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newExperiences[index].from = e.target.value;
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
                     type="month"
@@ -1555,7 +1630,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newExperiences[index].to = e.target.value;
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <select
                     value={exp.status}
@@ -1564,7 +1639,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                       newExperiences[index].status = e.target.value;
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm bg-white"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm bg-white"
                   >
                     <option value="">Select</option>
                     <option value="FULLTIME">Full-time</option>
@@ -1629,7 +1704,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   placeholder="Please specify"
                   value={formData.otherSkillsSpecify}
                   onChange={(e) => setFormData({ ...formData, otherSkillsSpecify: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                 />
                 <button
                   type="button"
@@ -1829,7 +1904,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={currentCustomName}
                     onChange={(e) => setCurrentCustomName(e.target.value)}
                     placeholder="Enter document name"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
               )}
@@ -1848,7 +1923,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   className={`flex items-center justify-center gap-2 px-6 py-3 border-2 border-dashed rounded-lg transition-all cursor-pointer ${
                     !currentDocType || (currentDocType === 'Others (Specify)' && !currentCustomName.trim())
                       ? 'border-gray-300 bg-gray-50 text-gray-400 cursor-not-allowed'
-                      : 'border-brand-blue bg-[#FFF5F0] text-brand-blue hover:bg-[#FFE8DC]'
+                      : 'border-brand-blue bg-blue-50 text-brand-blue hover:bg-blue-100'
                   }`}
                   onClick={(e) => {
                     if (!currentDocType || (currentDocType === 'Others (Specify)' && !currentCustomName.trim())) {
@@ -1881,7 +1956,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                           onClick={() => handlePreviewDocument(doc)}
                         >
-                          <div className="flex-shrink-0 w-10 h-10 bg-[#FFF5F0] rounded-lg flex items-center justify-center">
+                          <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
                             <FileText size={20} className="text-brand-blue" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1890,15 +1965,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                                 {doc.customName || doc.documentType}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-800 truncate">{doc.file.name}</p>
-                            <p className="text-xs text-gray-500">{formatFileSize(doc.file.size)}</p>
+                            <p className="text-sm text-gray-800 truncate">{doc.file?.name ?? doc.fileName}</p>
+                            <p className="text-xs text-gray-500">{doc.file ? formatFileSize(doc.file.size) : doc.fileSize}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => handlePreviewDocument(doc)}
-                            className="flex-shrink-0 p-2 text-brand-blue hover:bg-orange-50 rounded-lg transition-colors"
+                            className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
                             title="Preview document"
                           >
                             <Eye size={18} />
@@ -1930,7 +2005,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     <div className="space-y-6">
       {/* Personal Information */}
       <div>
-        <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">I. Personal Information</h4>
+        <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">I. Personal Information</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div><span className="font-semibold">Name:</span> {formData.surname}, {formData.firstName} {formData.middleName} {formData.suffix}</div>
           <div><span className="font-semibold">Date of Birth:</span> {formData.dateOfBirth}</div>
@@ -1944,7 +2019,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       {/* Job Preference */}
       {formData.jobPreferences.length > 0 && (
         <div>
-          <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">II. Job Preference</h4>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">II. Job Preference</h4>
           {formData.jobPreferences.map((pref, idx) => (
             <div key={idx} className="mb-2 text-sm">
               <span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}
@@ -1953,9 +2028,24 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         </div>
       )}
 
+      {/* Language */}
+      {formData.languages.some(l => l.language) && (
+        <div>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">III. Language / Dialect Proficiency</h4>
+          <div className="text-sm space-y-1">
+            {formData.languages.filter(l => l.language).map((l, idx) => (
+              <div key={idx}>
+                <span className="font-semibold uppercase">{l.language}:</span>{' '}
+                {[l.read && 'Read', l.write && 'Write', l.speak && 'Speak', l.understand && 'Understand'].filter(Boolean).join(', ')}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Education */}
       <div>
-        <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">IV. Educational Background</h4>
+        <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">IV. Educational Background</h4>
         <div className="text-sm space-y-2">
           {formData.elementary.graduated && <div><span className="font-semibold">Elementary:</span> {formData.elementary.schoolName || 'School'}{formData.elementary.schoolCity ? `, ${formData.elementary.schoolCity}` : ''} â Graduated {formData.elementary.yearGraduated}</div>}
           {formData.secondary.graduated && <div><span className="font-semibold">Secondary:</span> {formData.secondary.schoolName || 'School'}{formData.secondary.schoolCity ? `, ${formData.secondary.schoolCity}` : ''} â {formData.secondary.type}{formData.secondary.seniorHighStrand ? ` (${formData.secondary.seniorHighStrand})` : ''} â Graduated {formData.secondary.yearGraduated}</div>}
@@ -1966,7 +2056,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       {/* Work Experience */}
       {formData.workExperiences.length > 0 && (
         <div>
-          <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">VII. Work Experience</h4>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">VII. Work Experience</h4>
           {formData.workExperiences.map((exp, idx) => (
             exp.companyName && (
               <div key={idx} className="mb-2 text-sm">
@@ -1980,7 +2070,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       {/* Referred Program */}
       {formData.referredProgram && (
         <div>
-          <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">IX. Referred Program</h4>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">IX. Referred Program</h4>
           <div className="text-sm">
             <span className="font-semibold">Program:</span> {formData.referredProgram}
           </div>
@@ -1990,11 +2080,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       {/* Documents / Attachments */}
       {uploadedDocuments.length > 0 && (
         <div>
-          <h4 className="text-sm font-bold text-gray-800 mb-3 bg-brand-blue text-white px-3 py-2 uppercase">X. Documents / Attachments</h4>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. Documents / Attachments</h4>
           <div className="text-sm space-y-1">
             {uploadedDocuments.map((doc, idx) => (
               <div key={doc.id}>
-                <span className="font-semibold">{idx + 1}. {doc.customName || doc.documentType}:</span> {doc.file.name} ({formatFileSize(doc.file.size)})
+                <span className="font-semibold">{idx + 1}. {doc.customName || doc.documentType}:</span> {doc.file?.name ?? doc.fileName} ({doc.file ? formatFileSize(doc.file.size) : doc.fileSize})
               </div>
             ))}
           </div>
@@ -2111,7 +2201,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <h3 className="text-lg font-semibold text-gray-800">
                   {previewDocument.customName || previewDocument.documentType}
                 </h3>
-                <p className="text-sm text-gray-500">{previewDocument.file.name}</p>
+                <p className="text-sm text-gray-500">{previewDocument.file?.name ?? previewDocument.fileName}</p>
               </div>
               <button
                 onClick={() => setPreviewDocument(null)}
@@ -2123,7 +2213,17 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
             {/* Preview Content */}
             <div className="flex-1 overflow-auto p-4 bg-gray-50">
-              {previewDocument.file.type.startsWith('image/') ? (
+              {!previewDocument.file && previewDocument.documentType === '2x2 ID Picture' && profileImage ? (
+                <div className="flex items-center justify-center h-full">
+                  <img src={profileImage} alt="2x2 ID photo" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                </div>
+              ) : !previewDocument.file ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <FileText size={64} className="mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">File not available for preview</p>
+                  <p className="text-sm">This document was uploaded in a previous session.</p>
+                </div>
+              ) : previewDocument.file.type.startsWith('image/') ? (
                 <div className="flex items-center justify-center h-full">
                   <img
                     src={URL.createObjectURL(previewDocument.file)}

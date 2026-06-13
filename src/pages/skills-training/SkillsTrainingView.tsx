@@ -53,7 +53,7 @@ function SectionDivider({ numeral, title, gray }: { numeral: string; title: stri
   )
 }
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none placeholder:text-gray-400'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none placeholder:text-gray-900'
 const inpFocus = `${inp} focus:ring-[#0077BE]`
 const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
 
@@ -173,6 +173,39 @@ function ViewProfilePanel({ profile, onClose }: { profile: SkillsTrainingProfile
   )
 }
 
+// ─── Other Specify Field (must be outside AddProfileForm to keep stable identity) ─
+function OtherSpecifyField({
+  values,
+  placeholder,
+  onUpdate,
+}: {
+  values: string[]
+  placeholder: string
+  onUpdate: (newValues: string[]) => void
+}) {
+  const list = values.length === 0 ? [''] : values
+  return (
+    <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+      <label className="block text-xs font-medium text-gray-600 mb-2">Others, please specify:</label>
+      <div className="space-y-2">
+        {list.map((val, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <input
+              type="text" value={val}
+              onChange={e => { const u = [...list]; u[idx] = e.target.value; onUpdate(u) }}
+              className={`${inpFocus} flex-1`} placeholder={placeholder}
+            />
+            {values.length > 1 && (
+              <button type="button" onClick={() => onUpdate(values.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={() => onUpdate([...list, ''])} className="text-xs mt-1 hover:underline" style={{ color: BRAND }}>+ Add another</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Add / Edit Profile Form ───────────────────────────────────────────────────
 function AddProfileForm({
   onClose,
@@ -201,42 +234,6 @@ function AddProfileForm({
   const handleSave = () => {
     if (!formData.lastName || !formData.firstName) { alert('Please fill in Last Name and First Name.'); return }
     onSave(formData)
-  }
-
-  const OtherSpecifyField = ({
-    field,
-    otherField,
-    placeholder,
-  }: {
-    field: 'classificationOther' | 'qualificationOther' | 'purposeOther'
-    otherField: keyof Pick<typeof formData, 'classificationOther' | 'qualificationOther' | 'purposeOther'>
-    placeholder: string
-  }) => {
-    const values = formData[otherField] as string[]
-    const list = values.length === 0 ? [''] : values
-    return (
-      <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
-        <label className="block text-xs font-medium text-gray-600 mb-2">Others, please specify:</label>
-        <div className="space-y-2">
-          {list.map((val, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                type="text" value={val}
-                onChange={e => {
-                  const u = [...list]; u[idx] = e.target.value
-                  set({ [field]: u } as Partial<Omit<SkillsTrainingProfile, 'id'>>)
-                }}
-                className={`${inpFocus} flex-1`} placeholder={placeholder}
-              />
-              {values.length > 1 && (
-                <button type="button" onClick={() => set({ [field]: values.filter((_, i) => i !== idx) } as Partial<Omit<SkillsTrainingProfile, 'id'>>)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={() => set({ [field]: [...list, ''] } as Partial<Omit<SkillsTrainingProfile, 'id'>>)} className="text-xs mt-1 hover:underline" style={{ color: BRAND }}>+ Add another</button>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -319,7 +316,7 @@ function AddProfileForm({
               <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleArr('classification', opt)} />
             ))}
           </div>
-          <OtherSpecifyField field="classificationOther" otherField="classificationOther" placeholder="Specify other classification..." />
+          <OtherSpecifyField values={formData.classificationOther} placeholder="Specify other classification..." onUpdate={vals => set({ classificationOther: vals })} />
 
           {/* III. Desired Qualification */}
           <SectionDivider numeral="III" title="Desired Qualification" />
@@ -329,7 +326,7 @@ function AddProfileForm({
               <CheckItem key={opt} label={opt} checked={formData.desiredQualification.includes(opt)} onChange={() => toggleArr('desiredQualification', opt)} />
             ))}
           </div>
-          <OtherSpecifyField field="qualificationOther" otherField="qualificationOther" placeholder="Specify other qualification..." />
+          <OtherSpecifyField values={formData.qualificationOther} placeholder="Specify other qualification..." onUpdate={vals => set({ qualificationOther: vals })} />
 
           {/* IV. Purpose of Training */}
           <SectionDivider numeral="IV" title="Purpose of Training" />
@@ -339,7 +336,7 @@ function AddProfileForm({
               <CheckItem key={opt} label={opt} checked={formData.purposeOfTraining.includes(opt)} onChange={() => toggleArr('purposeOfTraining', opt)} />
             ))}
           </div>
-          <OtherSpecifyField field="purposeOther" otherField="purposeOther" placeholder="Specify other purpose..." />
+          <OtherSpecifyField values={formData.purposeOther} placeholder="Specify other purpose..." onUpdate={vals => set({ purposeOther: vals })} />
 
           {/* V. Attached Documents */}
           <SectionDivider numeral="V" title="Attached Documents" />

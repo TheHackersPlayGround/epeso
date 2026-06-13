@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Applicant } from "./ApplicantsTab";
-import { AVAILABLE_FILTERS, ITEMS_PER_PAGE } from "./ApplicantsTab";
+import { ITEMS_PER_PAGE } from "./ApplicantsTab";
 import { SEED } from "../../contexts/EmploymentContext";
 import ApplicantsTab from "./ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
@@ -12,6 +12,7 @@ import EmployersTab from "./EmployersTab";
 import AddApplicantSidebar from "./AddApplicantSidebar";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
+import ViewApplicantSidebar from "./ViewApplicantSidebar";
 
 const LS_KEY = "ef_applicants";
 
@@ -40,66 +41,6 @@ const TABS: { id: TabType; label: string }[] = [
   { id: "employers", label: "Employers" },
 ];
 
-// ─── View applicant slide-over panel ──────────────────────────────────────────
-
-type ViewApplicantPanelProps = {
-  applicant: Applicant;
-  onClose: () => void;
-};
-
-function ViewApplicantPanel({ applicant, onClose }: ViewApplicantPanelProps) {
-  type FieldRow = { label: string; value: string };
-  const fields: FieldRow[] = [
-    { label: "Full Name", value: applicant.name },
-    { label: "Sex", value: applicant.gender },
-    { label: "Age", value: String(applicant.age) },
-    { label: "Civil Status", value: applicant.civilStatus ?? "N/A" },
-    { label: "Educational Background", value: applicant.education },
-    { label: "Skills", value: applicant.skills },
-    { label: "Employment Status", value: applicant.employmentStatus },
-    { label: "Job Preference", value: applicant.jobPreference ?? "N/A" },
-    { label: "Language", value: applicant.language ?? "N/A" },
-    { label: "Contact Number", value: applicant.contactNumber },
-    { label: "Email", value: applicant.email },
-    { label: "Address", value: applicant.address },
-    { label: "PWD / Disability", value: applicant.hasDisability ? "Yes" : "No" },
-    { label: "OFW Status", value: applicant.isOFW ? "Active OFW" : applicant.isFormerOFW ? "Former OFW" : "Not OFW" },
-    { label: "4Ps Beneficiary", value: applicant.is4PsBeneficiary ? "Yes" : "No" },
-  ];
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/30" onClick={onClose} aria-hidden="true" />
-      <div className="w-full max-w-lg bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-brand-blue">
-          <h2 className="text-lg font-semibold text-white">Applicant Profile</h2>
-          <button onClick={onClose} aria-label="Close panel" className="text-white/80 hover:text-white transition-colors">
-            ✕
-          </button>
-        </div>
-        <div className="flex-1 px-6 py-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-brand-blue text-2xl font-bold">
-              {applicant.name.charAt(0)}
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-gray-800">{applicant.name}</p>
-              <p className="text-sm text-gray-500">{applicant.employmentStatus}</p>
-            </div>
-          </div>
-          <dl className="grid grid-cols-1 gap-3">
-            {fields.map(({ label, value }) => (
-              <div key={label} className="flex gap-3 py-2 border-b border-gray-100 last:border-0">
-                <dt className="text-sm text-gray-500 w-44 flex-shrink-0">{label}</dt>
-                <dd className="text-sm text-gray-800 font-medium">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Refer applicant slide-over panel ─────────────────────────────────────────
 
@@ -248,6 +189,8 @@ function toApplicantData(a: Applicant): ApplicantData {
     formerOFWReturnDate: (fd.formerOFWReturnDate as string) ?? '',
     is4PsBeneficiary:    (fd.is4PsBeneficiary    as string) ?? '',
     householdIdNo:(fd.householdIdNo as string) ?? '',
+    jobPrefEmploymentType: (fd.jobPrefEmploymentType as string[]) ?? [],
+    jobPrefWorkLocation:   (fd.jobPrefWorkLocation   as string[]) ?? [],
     jobPreferences:   (fd.jobPreferences   as ApplicantData['jobPreferences'])   ?? [],
     languages:        (fd.languages        as ApplicantData['languages'])        ?? [],
     currentlyInSchool:(fd.currentlyInSchool as string) ?? '',
@@ -260,7 +203,7 @@ function toApplicantData(a: Applicant): ApplicantData {
     professionalLicenses:(fd.professionalLicenses as ApplicantData['professionalLicenses']) ?? [],
     workExperiences:     (fd.workExperiences     as ApplicantData['workExperiences'])     ?? [],
     otherSkills:         (fd.otherSkills         as string[]) ?? (a.skills ? a.skills.split(', ') : []),
-    otherSkillsSpecify:  (fd.otherSkillsSpecify  as string) ?? '',
+    otherSkillsSpecify:  (fd.otherSkillsSpecify  as string[]) ?? [],
     referredProgram: (fd.referredProgram as string) ?? '',
     cdspPrograms:    (fd.cdspPrograms    as string[]) ?? [],
     projectIdNumber: (fd.projectIdNumber as string) ?? '',
@@ -497,6 +440,18 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     );
   }
 
+  // ── Full-page view ────────────────────────────────────────────────
+  if (viewingApplicant) {
+    return (
+      <div className="h-full bg-brand-bg p-6 overflow-y-auto">
+        <ViewApplicantSidebar
+          applicant={viewingApplicant}
+          onClose={() => setViewingApplicant(null)}
+        />
+      </div>
+    );
+  }
+
   if (isResumeMakerOpen) {
     return (
       <ResumeMaker
@@ -579,9 +534,6 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       </div>
 
       {/* Overlay panels */}
-      {viewingApplicant && (
-        <ViewApplicantPanel applicant={viewingApplicant} onClose={() => setViewingApplicant(null)} />
-      )}
       {referringApplicant && (
         <ReferApplicantPanel applicant={referringApplicant} onClose={() => setReferringApplicant(null)} />
       )}

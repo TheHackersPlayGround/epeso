@@ -117,7 +117,7 @@ export const SEED: Applicant[] = [
         },
       ],
       otherSkills: ["Caregiving", "Healthcare", "Patient Assessment", "Vital Signs Monitoring"],
-      otherSkillsSpecify: "",
+      otherSkillsSpecify: [],
       jobPreferences: [
         {
           occupation: "Nurse",
@@ -233,7 +233,7 @@ export const SEED: Applicant[] = [
         },
       ],
       otherSkills: ["Accounting", "MS Excel", "Bookkeeping", "QuickBooks", "Financial Analysis"],
-      otherSkillsSpecify: "",
+      otherSkillsSpecify: [],
       jobPreferences: [
         {
           occupation: "Accountant",
@@ -348,7 +348,7 @@ export const SEED: Applicant[] = [
       professionalLicenses: [],
       workExperiences: [],
       otherSkills: ["Cooking", "Customer Service", "Food Preparation", "Barista"],
-      otherSkillsSpecify: "",
+      otherSkillsSpecify: [],
       jobPreferences: [
         {
           occupation: "Food Service Worker",
@@ -478,7 +478,7 @@ export const SEED: Applicant[] = [
         },
       ],
       otherSkills: ["Network Administration", "IT Support", "Computer Literacy", "Web Development", "Database Management"],
-      otherSkillsSpecify: "",
+      otherSkillsSpecify: [],
       jobPreferences: [
         {
           occupation: "IT Manager",
@@ -601,7 +601,7 @@ export const SEED: Applicant[] = [
         },
       ],
       otherSkills: ["Caregiving", "Healthcare", "Patient Care", "Medication Administration", "Wound Care"],
-      otherSkillsSpecify: "",
+      otherSkillsSpecify: [],
       jobPreferences: [
         {
           occupation: "Registered Nurse",

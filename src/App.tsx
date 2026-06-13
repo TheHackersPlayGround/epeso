@@ -7,16 +7,18 @@ import GIPView from './pages/gip/gip'
 import SPESView from './pages/spes/spes'
 import OFWView from './pages/ofw/ofw'
 import EmploymentFacilitation from './pages/employment/EmploymentFacilitation'
+import DocumentsView from './pages/documents/DocumentsView'
 import SkillsTrainingView from './pages/skills-training/SkillsTrainingView'
 import { CDSPProvider } from './contexts/CDSPContext'
 import { GIPProvider } from './contexts/GIPContext'
 import { SPESProvider } from './contexts/SPESContext'
 import { OFWProvider } from './contexts/OFWContext'
 import { SkillsTrainingProvider } from './contexts/SkillsTrainingContext'
+import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import './styles/App.css'
 
-type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills'
+type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents'
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -116,6 +118,23 @@ export default function App() {
     )
   }
 
+  if (currentPage === 'documents') {
+    return (
+      <DocumentsProvider>
+        <div className="h-screen flex flex-col overflow-hidden">
+          <Navbar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            onLogout={() => setIsLoggedIn(false)}
+          />
+          <div className="flex-1 overflow-hidden">
+            <DocumentsView onBack={() => setCurrentPage('dashboard')} />
+          </div>
+        </div>
+      </DocumentsProvider>
+    )
+  }
+
   if (currentPage === 'skills') {
     return (
       <SkillsTrainingProvider>
@@ -150,6 +169,7 @@ export default function App() {
           if (id === 'ofw') setCurrentPage('ofw')
           if (id === 'employment') setCurrentPage('employment')
           if (id === 'skills') setCurrentPage('skills')
+          if (id === 'documents') setCurrentPage('documents')
         }}
       />
     </div>

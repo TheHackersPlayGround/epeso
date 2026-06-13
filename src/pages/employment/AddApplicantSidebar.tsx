@@ -31,12 +31,12 @@ interface ApplicantFormData {
   householdIdNo: string;
   
   // Job Preference
+  jobPrefEmploymentType: string[];
+  jobPrefWorkLocation: string[];
   jobPreferences: Array<{
     occupation: string;
-    employmentType: string[];
-    workLocation: string[];
-    localCities?: string;       // cities text shown when "Local" is checked
-    overseasCountries?: string; // countries text shown when "Overseas" is checked
+    localCity: string;
+    overseasCountry: string;
   }>;
   
   // Language Proficiency
@@ -121,7 +121,7 @@ interface ApplicantFormData {
   
   // Other Skills
   otherSkills: string[];
-  otherSkillsSpecify: string;
+  otherSkillsSpecify: string[];
   
   // Referred Program
   referredProgram: string;
@@ -219,7 +219,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     formerOFWReturnDate: '',
     is4PsBeneficiary: 'No',
     householdIdNo: '',
-    jobPreferences: [{ occupation: '', employmentType: [], workLocation: [], localCities: '', overseasCountries: '' }],
+    jobPrefEmploymentType: [],
+    jobPrefWorkLocation: [],
+    jobPreferences: [
+      { occupation: '', localCity: '', overseasCountry: '' },
+      { occupation: '', localCity: '', overseasCountry: '' },
+      { occupation: '', localCity: '', overseasCountry: '' },
+    ],
     languages: [
       { language: 'ENGLISH', read: false, write: false, speak: false, understand: false },
       { language: 'FILIPINO', read: false, write: false, speak: false, understand: false },
@@ -235,7 +241,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     professionalLicenses: [],
     workExperiences: [],
     otherSkills: [],
-    otherSkillsSpecify: '',
+    otherSkillsSpecify: [''],
     referredProgram: '',
     cdspPrograms: [],
     livelihoodPrograms: [],
@@ -254,9 +260,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     documentOtherSpecify: '',
     savedDocuments: [],
   };
-  const [formData, setFormData] = useState<ApplicantFormData>({
-    ...defaultFormData,
-    ...initialData
+  const [formData, setFormData] = useState<ApplicantFormData>(() => {
+    const merged = { ...defaultFormData, ...initialData };
+    // Guard: old saved data may have otherSkillsSpecify as a plain string
+    if (!Array.isArray(merged.otherSkillsSpecify)) {
+      merged.otherSkillsSpecify = merged.otherSkillsSpecify
+        ? [merged.otherSkillsSpecify as unknown as string]
+        : [''];
+    }
+    return merged;
   });
 
   const sections = [
@@ -299,7 +311,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     return currentIndex === sections.length - 1;
   };
 
-  type CheckboxField = 'hasDisability' | 'otherSkills';
+  type CheckboxField = 'hasDisability' | 'otherSkills' | 'cdspPrograms' | 'livelihoodPrograms' | 'dileepPrograms';
   const toggleCheckbox = (field: CheckboxField, value: string) => {
     const current = formData[field];
     setFormData({
@@ -309,43 +321,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         : [...current, value],
     });
   };
-
-  const addJobPreferenceRow = () => {
-    setFormData({
-      ...formData,
-      jobPreferences: [...formData.jobPreferences, { occupation: '', employmentType: [], workLocation: [], localCities: '', overseasCountries: '' }]
-    });
-  };
-
-  function handleEmploymentTypeChange(index: number, type: string) {
-    const newPrefs = [...formData.jobPreferences];
-    newPrefs[index] = { ...newPrefs[index], employmentType: [type] };
-    setFormData({ ...formData, jobPreferences: newPrefs });
-  }
-
-  function handleWorkLocationToggle(index: number, location: string) {
-    const newPrefs = [...formData.jobPreferences];
-    const current = newPrefs[index].workLocation;
-    newPrefs[index] = {
-      ...newPrefs[index],
-      workLocation: current.includes(location)
-        ? current.filter(l => l !== location)
-        : [...current, location],
-    };
-    setFormData({ ...formData, jobPreferences: newPrefs });
-  }
-
-  function handleLocalCitiesChange(index: number, value: string) {
-    const newPrefs = [...formData.jobPreferences];
-    newPrefs[index] = { ...newPrefs[index], localCities: value };
-    setFormData({ ...formData, jobPreferences: newPrefs });
-  }
-
-  function handleOverseasCountriesChange(index: number, value: string) {
-    const newPrefs = [...formData.jobPreferences];
-    newPrefs[index] = { ...newPrefs[index], overseasCountries: value };
-    setFormData({ ...formData, jobPreferences: newPrefs });
-  }
 
   const addLanguageRow = () => {
     setFormData({
@@ -899,91 +874,90 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
       case 'jobPreference':
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="bg-brand-blue text-white px-4 py-3 font-bold uppercase text-sm">
               II. JOB PREFERENCE
             </div>
 
-            <div className="border border-gray-300 rounded">
-              <div className="grid grid-cols-2 bg-brand-blue text-white">
-                <div className="px-4 py-3 border-r border-white font-bold uppercase text-xs text-center">
-                  Preferred Occupation
-                </div>
-                <div className="px-4 py-3 font-bold uppercase text-xs text-center">
-                  Preferred Work Location
-                </div>
-              </div>
-
-              {formData.jobPreferences.map((pref, index) => (
-                <div key={index} className="grid grid-cols-2 border-t border-gray-300">
-                  <div className="p-4 border-r border-gray-300">
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`employment-type-${index}`}
-                          className="accent-brand-blue"
-                          checked={pref.employmentType.includes('Part-time')}
-                          onChange={() => handleEmploymentTypeChange(index, 'Part-time')}
+            <div className="border border-gray-300 overflow-hidden">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 bg-gray-50 px-4 py-3 text-center font-bold uppercase text-xs text-gray-900" style={{ width: '38%' }}>
+                      Preferred Occupation
+                    </th>
+                    <th className="border border-gray-300 bg-gray-50 px-4 py-3 text-center font-bold uppercase text-xs text-gray-900" colSpan={2}>
+                      Preferred Work Location
+                    </th>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <div className="flex items-center gap-6">
+                        {['Part-time', 'Full-time'].map(type => (
+                          <label key={type} className="flex items-center gap-2 cursor-pointer text-sm select-none text-gray-900">
+                            <input type="checkbox"
+                              checked={formData.jobPrefEmploymentType[0] === type}
+                              onChange={() => setFormData({ ...formData, jobPrefEmploymentType: formData.jobPrefEmploymentType[0] === type ? [] : [type] })}
+                            />
+                            {type}
+                          </label>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm select-none text-gray-900">
+                        <input type="checkbox"
+                          checked={formData.jobPrefWorkLocation[0] === 'Local'}
+                          onChange={() => setFormData({ ...formData, jobPrefWorkLocation: formData.jobPrefWorkLocation[0] === 'Local' ? [] : ['Local'] })}
                         />
-                        <span>Part-time</span>
+                        Local (specify cities/municipalities)
                       </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`employment-type-${index}`}
-                          className="accent-brand-blue"
-                          checked={pref.employmentType.includes('Full-time')}
-                          onChange={() => handleEmploymentTypeChange(index, 'Full-time')}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-3">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm select-none text-gray-900">
+                        <input type="checkbox"
+                          checked={formData.jobPrefWorkLocation[0] === 'Overseas'}
+                          onChange={() => setFormData({ ...formData, jobPrefWorkLocation: formData.jobPrefWorkLocation[0] === 'Overseas' ? [] : ['Overseas'] })}
                         />
-                        <span>Full-time</span>
+                        Overseas, (specify countries):
                       </label>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="accent-brand-blue"
-                          checked={pref.workLocation.includes('Local')}
-                          onChange={() => handleWorkLocationToggle(index, 'Local')}
-                        />
-                        <span>Local (specify cities/ municipalities)</span>
-                      </label>
-                      {pref.workLocation.includes('Local') && (
-                        <input
-                          type="text"
-                          placeholder="Specify cities/municipalities"
-                          value={pref.localCities ?? ''}
-                          onChange={(e) => handleLocalCitiesChange(index, e.target.value)}
-                          className="text-black ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
-                        />
-                      )}
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="accent-brand-blue"
-                          checked={pref.workLocation.includes('Overseas')}
-                          onChange={() => handleWorkLocationToggle(index, 'Overseas')}
-                        />
-                        <span>Overseas (specify countries)</span>
-                      </label>
-                      {pref.workLocation.includes('Overseas') && (
-                        <input
-                          type="text"
-                          placeholder="Specify countries"
-                          value={pref.overseasCountries ?? ''}
-                          onChange={(e) => handleOverseasCountriesChange(index, e.target.value)}
-                          className=" text-black ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.jobPreferences.map((row, idx) => (
+                    <tr key={idx}>
+                      {(['occupation', 'localCity', 'overseasCountry'] as const).map(field => (
+                        <td key={field} className="border border-gray-300 px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-900 text-xs flex-shrink-0">{idx + 1}.</span>
+                            <input
+                              type="text"
+                              value={row[field]}
+                              onChange={e => {
+                                const rows = [...formData.jobPreferences];
+                                rows[idx] = { ...rows[idx], [field]: e.target.value };
+                                setFormData({ ...formData, jobPreferences: rows });
+                              }}
+                              className="flex-1 border-0 border-b border-gray-300 focus:border-brand-blue focus:outline-none text-sm text-gray-900 py-1 bg-transparent"
+                            />
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, jobPreferences: [...formData.jobPreferences, { occupation: '', localCity: '', overseasCountry: '' }] })}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded hover:opacity-90 transition-opacity text-sm"
+            >
+              <Plus size={16} />
+              Add Row
+            </button>
           </div>
         );
 
@@ -1689,30 +1663,57 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <span>{skill}</span>
                 </label>
               ))}
-              <div className="col-span-2 flex items-center gap-2">
-                <label className="flex items-center text-sm">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2"
-                    checked={formData.otherSkills.includes('OTHERS')}
-                    onChange={() => toggleCheckbox('otherSkills', 'OTHERS')}
+              <div className="col-span-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center text-sm flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={formData.otherSkills.includes('OTHERS')}
+                      onChange={() => toggleCheckbox('otherSkills', 'OTHERS')}
+                    />
+                    <span>OTHERS:</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Please specify"
+                    value={formData.otherSkillsSpecify[0] ?? ''}
+                    onChange={e => {
+                      const updated = [...formData.otherSkillsSpecify];
+                      updated[0] = e.target.value;
+                      setFormData({ ...formData, otherSkillsSpecify: updated });
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
-                  <span>OTHERS:</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Please specify"
-                  value={formData.otherSkillsSpecify}
-                  onChange={(e) => setFormData({ ...formData, otherSkillsSpecify: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                />
-                <button
-                  type="button"
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded hover:bg-[#01a0ff] transition-colors text-sm"
-                >
-                  <Plus size={16} />
-                  Add Another Input
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, otherSkillsSpecify: [...formData.otherSkillsSpecify, ''] })}
+                    className="flex items-center gap-2 px-4 py-2 border border-brand-blue text-brand-blue rounded hover:bg-blue-50 transition-colors text-sm whitespace-nowrap"
+                  >
+                    <Plus size={16} />
+                    Add Another Input
+                  </button>
+                </div>
+                {formData.otherSkillsSpecify.slice(1).map((val, i) => (
+                  <div key={i + 1} className="flex items-center gap-2 pl-[calc(1rem+0.5rem+6ch)]">
+                    <input
+                      type="text"
+                      placeholder="Please specify"
+                      value={val}
+                      onChange={e => {
+                        const updated = [...formData.otherSkillsSpecify];
+                        updated[i + 1] = e.target.value;
+                        setFormData({ ...formData, otherSkillsSpecify: updated });
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, otherSkillsSpecify: formData.otherSkillsSpecify.filter((_, j) => j !== i + 1) })}
+                      className="text-red-400 hover:text-red-600 text-lg leading-none px-1"
+                    >×</button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -2017,12 +2018,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       </div>
 
       {/* Job Preference */}
-      {formData.jobPreferences.length > 0 && (
+      {(formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0 || formData.jobPreferences.some(p => p.occupation)) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">II. Job Preference</h4>
-          {formData.jobPreferences.map((pref, idx) => (
-            <div key={idx} className="mb-2 text-sm">
+          {formData.jobPrefEmploymentType.length > 0 && <div className="mb-1 text-sm"><span className="font-semibold">Type:</span> {formData.jobPrefEmploymentType.join(', ')}</div>}
+          {formData.jobPrefWorkLocation.length > 0 && <div className="mb-2 text-sm"><span className="font-semibold">Location:</span> {formData.jobPrefWorkLocation.join(', ')}</div>}
+          {formData.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
+            <div key={idx} className="mb-1 text-sm">
               <span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}
+              {pref.localCity && <span className="text-gray-600"> · Local: {pref.localCity}</span>}
+              {pref.overseasCountry && <span className="text-gray-600"> · Overseas: {pref.overseasCountry}</span>}
             </div>
           ))}
         </div>
@@ -2053,6 +2058,49 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         </div>
       </div>
 
+      {/* Technical/Vocational Training */}
+      {formData.trainings.length > 0 && (
+        <div>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">V. Technical/Vocational and Other Training</h4>
+          <div className="text-sm space-y-1">
+            {formData.trainings.map((t, idx) => (
+              t.course && (
+                <div key={idx}>
+                  <span className="font-semibold">{t.course}</span>
+                  {t.institution && <span className="text-gray-600"> · {t.institution}</span>}
+                  {t.hoursOfTraining && <span className="text-gray-600"> · {t.hoursOfTraining} hrs</span>}
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Eligibility / Professional License */}
+      {(formData.eligibilities.length > 0 || formData.professionalLicenses.length > 0) && (
+        <div>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">VI. Eligibility / Professional License</h4>
+          <div className="text-sm space-y-1">
+            {formData.eligibilities.map((e, idx) => (
+              e.eligibility && (
+                <div key={idx}>
+                  <span className="font-semibold">{e.eligibility}</span>
+                  {e.dateTaken && <span className="text-gray-600"> · {e.dateTaken}</span>}
+                </div>
+              )
+            ))}
+            {formData.professionalLicenses.map((l, idx) => (
+              l.license && (
+                <div key={idx}>
+                  <span className="font-semibold">{l.license}</span>
+                  {l.validUntil && <span className="text-gray-600"> · Valid until {l.validUntil}</span>}
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Work Experience */}
       {formData.workExperiences.length > 0 && (
         <div>
@@ -2064,6 +2112,21 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               </div>
             )
           ))}
+        </div>
+      )}
+
+      {/* Other Skills */}
+      {(formData.otherSkills.length > 0 || formData.otherSkillsSpecify.some(v => v)) && (
+        <div>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">VIII. Other Skills Acquired Without Certificate</h4>
+          <div className="text-sm space-y-1">
+            {formData.otherSkills.filter(s => s !== 'OTHERS').map((s, idx) => (
+              <div key={idx}>{s}</div>
+            ))}
+            {formData.otherSkills.includes('OTHERS') && formData.otherSkillsSpecify.filter(v => v).map((v, idx) => (
+              <div key={idx}><span className="font-semibold">Others:</span> {v}</div>
+            ))}
+          </div>
         </div>
       )}
 

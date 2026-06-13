@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -31,12 +31,12 @@ export interface ApplicantData {
   formerOFWReturnDate: string;
   is4PsBeneficiary: string;
   householdIdNo: string;
+  jobPrefEmploymentType?: string[];
+  jobPrefWorkLocation?: string[];
   jobPreferences: Array<{
     occupation: string;
-    employmentType: string[];
-    workLocation: string[];
-    localCities?: string;
-    overseasCountries?: string;
+    localCity: string;
+    overseasCountry: string;
   }>;
   languages: Array<{
     language: string;
@@ -109,7 +109,7 @@ export interface ApplicantData {
     status: string;
   }>;
   otherSkills: string[];
-  otherSkillsSpecify: string;
+  otherSkillsSpecify: string[];
   referredProgram: string;         // which PESO referral program the applicant came from
   cdspPrograms: string[];          // Comprehensive Disability Support Program categories selected
   projectIdNumber: string;         // government project tracking ID (e.g. DOLE project)
@@ -234,7 +234,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   function isFieldAvailable(field: keyof FieldSelection): boolean {
     if (!selectedApplicant) return false;
     switch (field) {
-      case 'profilePicture': return true;
+      case 'profilePicture': return !!selectedApplicant.profileImage;
       case 'fullName':       return !!(selectedApplicant.firstName || selectedApplicant.surname);
       // age and dateOfBirth share the same source field; 'N/A' means it was never entered
       case 'age':
@@ -504,20 +504,14 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                     {/* Header with Photo */}
                     <div className="pb-4 mb-5 border-b-4 border-brand-blue">
                       <div className="flex gap-5 items-start">
-                        {selectedFields.profilePicture && (
+                        {selectedFields.profilePicture && isFieldAvailable('profilePicture') && (
                           <div className="flex-shrink-0">
                             <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
-                              {selectedApplicant.profileImage ? (
-                                <img
-                                  src={selectedApplicant.profileImage}
-                                  alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <svg aria-hidden="true" className="w-20 h-20 fill-brand-blue" viewBox="0 0 24 24">
-                                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                </svg>
-                              )}
+                              <img
+                                src={selectedApplicant.profileImage!}
+                                alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           </div>
                         )}
@@ -671,11 +665,17 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                         <div className="mt-6">
                           <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Employment Preferences</h2>
                           <div className="space-y-3">
-                            {selectedApplicant.jobPreferences.map((pref, idx) => (
-                              <div key={idx}>
+                            {selectedApplicant.jobPrefEmploymentType && selectedApplicant.jobPrefEmploymentType.length > 0 && (
+                              <div className="text-sm text-gray-700"><span className="font-semibold">Type:</span> {selectedApplicant.jobPrefEmploymentType.join(', ')}</div>
+                            )}
+                            {selectedApplicant.jobPrefWorkLocation && selectedApplicant.jobPrefWorkLocation.length > 0 && (
+                              <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Preferred Location:</span> {selectedApplicant.jobPrefWorkLocation.join(', ')}</div>
+                            )}
+                            {selectedApplicant.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
+                              <div key={idx} className="mt-2">
                                 <div className="font-bold text-base text-gray-900">{pref.occupation}</div>
-                                {pref.employmentType?.length > 0 && <div className="text-sm mt-1 text-gray-700"><span className="font-semibold">Type:</span> {pref.employmentType.join(', ')}</div>}
-                                {pref.workLocation?.length > 0 && <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Preferred Location:</span> {pref.workLocation.join(', ')}</div>}
+                                {pref.localCity && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Local:</span> {pref.localCity}</div>}
+                                {pref.overseasCountry && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
                               </div>
                             ))}
                           </div>

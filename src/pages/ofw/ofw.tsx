@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import { Upload, Download, ChevronDown, X } from 'lucide-react'
+import { Plus, Upload, Download, ChevronDown, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { OFWProfile } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
@@ -307,32 +307,30 @@ export default function OFWView({ onBack }: OFWViewProps) {
         </div>
 
         {/* Toolbar card */}
-        <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+        <div className="bg-white rounded-xl shadow-md p-3 mb-4">
           {/* Action buttons */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus size={16} />
               <span>Add Profile</span>
             </button>
 
             {/* Import */}
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
             >
-              <Upload size={20} /><span>Import</span>
+              <Upload size={16} /><span>Import</span>
             </button>
 
             {/* Export dropdown */}
             <div className="relative">
               <button
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
               >
                 <Download size={20} /><span>Export</span><ChevronDown size={16} />
               </button>
@@ -359,7 +357,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
                 placeholder="Search by name, reference no., contact number, barangay..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}

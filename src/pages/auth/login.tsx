@@ -144,7 +144,7 @@ export default function Login({ onLogin }: LoginProps) {
                 textTransform: 'uppercase',
               }}
             >
-              Public Employment<br />Service Office
+              Electronic <br />Public Employment<br />Service Office
             </p>
           </div>
 
@@ -180,7 +180,7 @@ export default function Login({ onLogin }: LoginProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '28px', height: '3px', background: '#0065A5', borderRadius: '2px' }} />
               <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.82rem', fontWeight: 500 }}>
-                Sign in to your account
+                Sign in to your E-PESO Account
               </p>
             </div>
           </div>

@@ -335,7 +335,50 @@ Tailwind has a design system built in. Use it before reaching for custom values 
 <div className="w-80 mt-3 text-blue-800">
 ```
 
-### 4.6 Group Classes Logically
+### 4.6 Use Tailwind Classes — Never Inline `style` for Colors or Spacing
+
+Always use Tailwind classes instead of inline `style` props for colors, spacing, borders, and typography. Inline styles bypass the design system, break consistency, and are harder to scan.
+
+The only acceptable use of `style` is for values that have no Tailwind equivalent — such as custom `fontFamily`, non-standard `fontSize`, or precise `letterSpacing` values.
+
+```tsx
+// ✗ Avoid — inline styles bypass the design system
+<div style={{ color: 'rgb(17,24,39)', backgroundColor: '#0077BE', border: '2px solid #0077BE' }}>
+
+// ✓ Use Tailwind and brand classes
+<div className="text-gray-900 bg-brand-blue border-2 border-brand-blue">
+
+// ✗ Avoid — hardcoded color hex in SVG attributes
+<svg fill="#0077BE">
+
+// ✓ Use fill utility class
+<svg className="fill-brand-blue">
+
+// ✓ Acceptable — no Tailwind equivalent exists for these
+<h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', letterSpacing: '0.1em' }}>
+```
+
+**Brand color classes available in this project:**
+
+| Class | Color |
+|---|---|
+| `text-brand-blue` / `bg-brand-blue` / `border-brand-blue` / `fill-brand-blue` | `#0077BE` |
+| `text-brand-blue-dark` / `bg-brand-blue-dark` | `#0065A5` |
+| `text-brand-orange` / `bg-brand-orange` | `#F47C2C` |
+
+**Common Tailwind color replacements for gray shades:**
+
+| Inline style | Tailwind class |
+|---|---|
+| `color: 'rgb(17,24,39)'` | `text-gray-900` |
+| `color: 'rgb(31,41,55)'` | `text-gray-800` |
+| `color: 'rgb(55,65,81)'` | `text-gray-700` |
+| `color: 'rgb(75,85,99)'` | `text-gray-600` |
+| `color: 'rgb(107,114,128)'` | `text-gray-500` |
+| `backgroundColor: 'rgb(229,231,235)'` | `bg-gray-200` |
+| `border: '1px solid rgb(229,231,235)'` | `border border-gray-200` |
+
+### 4.7 Group Classes Logically
 
 Long class strings are hard to scan. Order them: layout → spacing → typography → color → interaction.
 
@@ -736,6 +779,8 @@ Before outputting any code, the AI agent must verify:
 * \[ ] No `any` types — use real types or `unknown`
 * \[ ] Event handlers are named functions, not inline logic
 * \[ ] Tailwind classes follow Bootstrap-equivalent patterns where possible
+* \[ ] No inline `style` props for color, spacing, or borders — use Tailwind/brand classes instead
+* \[ ] `style` prop used only for values with no Tailwind equivalent (e.g. custom `fontFamily`, `fontSize`)
 * \[ ] Classes are ordered: layout → spacing → typography → color → states
 * \[ ] `className` used (not `class`)
 * \[ ] Components follow the 6-step anatomy (imports → types → function → state → handlers → return)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { ArrowLeft } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Applicant } from "./ApplicantsTab";
 import { AVAILABLE_FILTERS, ITEMS_PER_PAGE } from "./ApplicantsTab";
@@ -508,20 +509,14 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     <div className="h-full flex flex-col overflow-hidden bg-brand-bg">
       {/* Title row */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4">
-        <button
-          onClick={onBack}
-          aria-label="Back to dashboard"
-          className="text-gray-500 hover:text-gray-700 transition-colors text-2xl font-bold leading-none"
-        >
-          ←
-        </button>
+        <button onClick={onBack} aria-label="Back to dashboard" className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
         <p className="text-2xl font-bold text-gray-800 m-0 p-0 leading-tight">
           Employment Facilitation
         </p>
       </div>
 
       {/* Tabs card */}
-      <div className="flex-shrink-0 px-8 pb-5">
+      <div className="flex-shrink-0 px-7.5 pb-2">
         <div className="bg-white rounded-xl shadow-sm px-6">
           <nav role="tablist" aria-label="Employment Facilitation tabs" className="flex gap-0">
             {TABS.map((tab) => (

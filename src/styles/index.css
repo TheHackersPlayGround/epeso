@@ -167,3 +167,28 @@ button, a, [role="button"] {
     opacity        var(--transition-base);
 }
 
+/* ============================================================
+   RESUME PREVIEW
+   Scoped to #resume-preview so these fonts never leak into
+   the rest of the app. Georgia for body copy, Arial for
+   headings — matches a classic formal resume layout.
+   ============================================================ */
+#resume-preview {
+  font-family: Georgia, serif;
+  padding: 48px 60px;
+}
+
+#resume-preview .resume-name {
+  font-family: Arial, sans-serif;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px 0;
+  color: #0077BE;
+}
+
+#resume-preview .resume-section-heading {
+  font-family: Arial, sans-serif;
+  color: #0077BE;
+}
+

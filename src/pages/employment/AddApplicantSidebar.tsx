@@ -35,6 +35,8 @@ interface ApplicantFormData {
     occupation: string;
     employmentType: string[];
     workLocation: string[];
+    localCities?: string;       // cities text shown when "Local" is checked
+    overseasCountries?: string; // countries text shown when "Overseas" is checked
   }>;
   
   // Language Proficiency
@@ -202,7 +204,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     formerOFWReturnDate: '',
     is4PsBeneficiary: 'No',
     householdIdNo: '',
-    jobPreferences: [{ occupation: '', employmentType: [], workLocation: [] }],
+    jobPreferences: [{ occupation: '', employmentType: [], workLocation: [], localCities: '', overseasCountries: '' }],
     languages: [
       { language: 'ENGLISH', read: false, write: false, speak: false, understand: false },
       { language: 'FILIPINO', read: false, write: false, speak: false, understand: false },
@@ -295,9 +297,39 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const addJobPreferenceRow = () => {
     setFormData({
       ...formData,
-      jobPreferences: [...formData.jobPreferences, { occupation: '', employmentType: [], workLocation: [] }]
+      jobPreferences: [...formData.jobPreferences, { occupation: '', employmentType: [], workLocation: [], localCities: '', overseasCountries: '' }]
     });
   };
+
+  function handleEmploymentTypeChange(index: number, type: string) {
+    const newPrefs = [...formData.jobPreferences];
+    newPrefs[index] = { ...newPrefs[index], employmentType: [type] };
+    setFormData({ ...formData, jobPreferences: newPrefs });
+  }
+
+  function handleWorkLocationToggle(index: number, location: string) {
+    const newPrefs = [...formData.jobPreferences];
+    const current = newPrefs[index].workLocation;
+    newPrefs[index] = {
+      ...newPrefs[index],
+      workLocation: current.includes(location)
+        ? current.filter(l => l !== location)
+        : [...current, location],
+    };
+    setFormData({ ...formData, jobPreferences: newPrefs });
+  }
+
+  function handleLocalCitiesChange(index: number, value: string) {
+    const newPrefs = [...formData.jobPreferences];
+    newPrefs[index] = { ...newPrefs[index], localCities: value };
+    setFormData({ ...formData, jobPreferences: newPrefs });
+  }
+
+  function handleOverseasCountriesChange(index: number, value: string) {
+    const newPrefs = [...formData.jobPreferences];
+    newPrefs[index] = { ...newPrefs[index], overseasCountries: value };
+    setFormData({ ...formData, jobPreferences: newPrefs });
+  }
 
   const addLanguageRow = () => {
     setFormData({
@@ -409,7 +441,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.surname}
                   onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
               <div>
@@ -418,7 +450,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
               <div>
@@ -427,7 +459,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.middleName}
                   onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
               <div>
@@ -436,7 +468,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.suffix}
                   onChange={(e) => setFormData({ ...formData, suffix: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
             </div>
@@ -449,7 +481,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                   placeholder="mm/dd/yy"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
               <div>
@@ -457,7 +489,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <select
                   value={formData.sex}
                   onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 >
                   <option value=""></option>
                   <option value="Male">Male</option>
@@ -470,7 +502,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.religion}
                   onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
               <div>
@@ -478,7 +510,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <select
                   value={formData.civilStatus}
                   onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 >
                   <option value=""></option>
                   <option value="Single">Single</option>
@@ -493,7 +525,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   type="text"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
               </div>
             </div>
@@ -507,7 +539,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.houseNo}
                     onChange={(e) => setFormData({ ...formData, houseNo: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                   />
                 </div>
                 <div>
@@ -516,7 +548,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.barangay}
                     onChange={(e) => setFormData({ ...formData, barangay: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                     placeholder="Enter barangay"
                   />
                 </div>
@@ -526,7 +558,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.municipality}
                     onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                     placeholder="Enter municipality/city"
                   />
                 </div>
@@ -536,7 +568,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.province}
                     onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                     placeholder="Enter province"
                   />
                 </div>
@@ -638,7 +670,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                         placeholder="Please specify"
                         value={formData.disabilityOther}
                         onChange={(e) => setFormData({ ...formData, disabilityOther: e.target.value })}
-                        className="w-full px-3 py-1 border border-gray-300 rounded text-xs italic"
+                        className="w-full px-3 py-1 border border-gray-300 rounded text-xs italic placeholder:text-gray-800"
                       />
                     </div>
                   )}
@@ -652,7 +684,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.tin}
                     onChange={(e) => setFormData({ ...formData, tin: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                   />
                 </div>
                 <div>
@@ -661,7 +693,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text"
                     value={formData.contactNumber}
                     onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                   />
                 </div>
                 <div>
@@ -670,7 +702,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                   />
                 </div>
               </div>
@@ -744,7 +776,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.formerOFWCountry}
                   onChange={(e) => setFormData({ ...formData, formerOFWCountry: e.target.value })}
                   disabled={formData.isFormerOFW !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
             </div>
@@ -793,7 +825,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   value={formData.formerOFWReturnDate}
                   onChange={(e) => setFormData({ ...formData, formerOFWReturnDate: e.target.value })}
                   disabled={formData.isFormerOFW !== 'Yes'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800 ${formData.isFormerOFW !== 'Yes' ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''}`}
                 />
               </div>
             </div>
@@ -806,7 +838,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="bg-brand-blue text-white px-4 py-3 font-bold uppercase text-sm">
               II. JOB PREFERENCE
             </div>
-            
+
             <div className="border border-gray-300 rounded">
               <div className="grid grid-cols-2 bg-brand-blue text-white">
                 <div className="px-4 py-3 border-r border-white font-bold uppercase text-xs text-center">
@@ -816,42 +848,28 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   Preferred Work Location
                 </div>
               </div>
-              
+
               {formData.jobPreferences.map((pref, index) => (
                 <div key={index} className="grid grid-cols-2 border-t border-gray-300">
                   <div className="p-4 border-r border-gray-300">
                     <div className="space-y-2">
-                      <label className="flex items-center text-sm">
-                        <input 
-                          type="checkbox" 
-                          className="mr-2"
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`employment-type-${index}`}
+                          className="accent-brand-blue"
                           checked={pref.employmentType.includes('Part-time')}
-                          onChange={() => {
-                            const newPrefs = [...formData.jobPreferences];
-                            if (newPrefs[index].employmentType.includes('Part-time')) {
-                              newPrefs[index].employmentType = newPrefs[index].employmentType.filter(t => t !== 'Part-time');
-                            } else {
-                              newPrefs[index].employmentType = [...newPrefs[index].employmentType, 'Part-time'];
-                            }
-                            setFormData({ ...formData, jobPreferences: newPrefs });
-                          }}
+                          onChange={() => handleEmploymentTypeChange(index, 'Part-time')}
                         />
                         <span>Part-time</span>
                       </label>
-                      <label className="flex items-center text-sm">
-                        <input 
-                          type="checkbox" 
-                          className="mr-2"
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`employment-type-${index}`}
+                          className="accent-brand-blue"
                           checked={pref.employmentType.includes('Full-time')}
-                          onChange={() => {
-                            const newPrefs = [...formData.jobPreferences];
-                            if (newPrefs[index].employmentType.includes('Full-time')) {
-                              newPrefs[index].employmentType = newPrefs[index].employmentType.filter(t => t !== 'Full-time');
-                            } else {
-                              newPrefs[index].employmentType = [...newPrefs[index].employmentType, 'Full-time'];
-                            }
-                            setFormData({ ...formData, jobPreferences: newPrefs });
-                          }}
+                          onChange={() => handleEmploymentTypeChange(index, 'Full-time')}
                         />
                         <span>Full-time</span>
                       </label>
@@ -859,54 +877,48 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   </div>
                   <div className="p-4">
                     <div className="space-y-2">
-                      <label className="flex items-center text-sm">
-                        <input 
-                          type="checkbox" 
-                          className="mr-2"
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="accent-brand-blue"
                           checked={pref.workLocation.includes('Local')}
-                          onChange={() => {
-                            const newPrefs = [...formData.jobPreferences];
-                            if (newPrefs[index].workLocation.includes('Local')) {
-                              newPrefs[index].workLocation = newPrefs[index].workLocation.filter(l => l !== 'Local');
-                            } else {
-                              newPrefs[index].workLocation = [...newPrefs[index].workLocation, 'Local'];
-                            }
-                            setFormData({ ...formData, jobPreferences: newPrefs });
-                          }}
+                          onChange={() => handleWorkLocationToggle(index, 'Local')}
                         />
                         <span>Local (specify cities/ municipalities)</span>
                       </label>
-                      <label className="flex items-center text-sm">
-                        <input 
-                          type="checkbox" 
-                          className="mr-2"
-                          checked={pref.workLocation.includes('Services')}
-                          onChange={() => {
-                            const newPrefs = [...formData.jobPreferences];
-                            if (newPrefs[index].workLocation.includes('Services')) {
-                              newPrefs[index].workLocation = newPrefs[index].workLocation.filter(l => l !== 'Services');
-                            } else {
-                              newPrefs[index].workLocation = [...newPrefs[index].workLocation, 'Services'];
-                            }
-                            setFormData({ ...formData, jobPreferences: newPrefs });
-                          }}
+                      {pref.workLocation.includes('Local') && (
+                        <input
+                          type="text"
+                          placeholder="Specify cities/municipalities"
+                          value={pref.localCities ?? ''}
+                          onChange={(e) => handleLocalCitiesChange(index, e.target.value)}
+                          className="ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
                         />
-                        <span>Services (specify countries)</span>
+                      )}
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="accent-brand-blue"
+                          checked={pref.workLocation.includes('Overseas')}
+                          onChange={() => handleWorkLocationToggle(index, 'Overseas')}
+                        />
+                        <span>Overseas (specify countries)</span>
                       </label>
+                      {pref.workLocation.includes('Overseas') && (
+                        <input
+                          type="text"
+                          placeholder="Specify countries"
+                          value={pref.overseasCountries ?? ''}
+                          onChange={(e) => handleOverseasCountriesChange(index, e.target.value)}
+                          className="ml-5 w-[calc(100%-1.25rem)] px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-500"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={addJobPreferenceRow}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded hover:bg-[#01a0ff] transition-colors text-sm"
-            >
-              <Plus size={16} />
-              Add Row
-            </button>
           </div>
         );
 
@@ -941,7 +953,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           newLanguages[index] = { ...newLanguages[index], language: e.target.value.toUpperCase() };
                           setFormData({ ...formData, languages: newLanguages });
                         }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                       />
                     )}
                   </div>
@@ -1054,7 +1066,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text" 
                     value={formData.elementary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
                   />
                 </div>
                 <div>
@@ -1113,7 +1125,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     placeholder="e.g. ABM, STEM, HUMSS, TVL, GAS..." 
                     value={formData.secondary.seniorHighStrand}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, seniorHighStrand: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
                   />
                 </div>
               )}
@@ -1147,7 +1159,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text" 
                     value={formData.secondary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
                   />
                 </div>
                 <div>
@@ -1183,7 +1195,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   placeholder="e.g. Bachelor of Science in Nursing, BSBA, AB Communication..."
                   value={formData.tertiary.course}
                   onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, course: e.target.value }})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -1216,7 +1228,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="text" 
                     value={formData.tertiary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" 
                   />
                 </div>
                 <div>
@@ -1255,7 +1267,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <input type="text" placeholder="e.g. Master of Arts in Education"
                     value={gs.course}
                     onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],course:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" />
                 </div>
                 <div className="flex items-center gap-4">
                   <label className="block text-gray-700 text-xs">Graduated?</label>
@@ -1275,7 +1287,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                     <input type="text" value={gs.yearGraduated}
                       onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],yearGraduated:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800" />
                   </div>
                   <div>
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
@@ -1617,7 +1629,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   placeholder="Please specify"
                   value={formData.otherSkillsSpecify}
                   onChange={(e) => setFormData({ ...formData, otherSkillsSpecify: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                 />
                 <button
                   type="button"
@@ -1817,7 +1829,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={currentCustomName}
                     onChange={(e) => setCurrentCustomName(e.target.value)}
                     placeholder="Enter document name"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
                   />
                 </div>
               )}

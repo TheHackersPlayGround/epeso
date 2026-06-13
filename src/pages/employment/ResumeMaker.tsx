@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import ResumeCheckbox from './ResumeCheckbox';
 
 export interface ApplicantData {
   id: number;
@@ -34,6 +35,8 @@ export interface ApplicantData {
     occupation: string;
     employmentType: string[];
     workLocation: string[];
+    localCities?: string;
+    overseasCountries?: string;
   }>;
   languages: Array<{
     language: string;
@@ -107,9 +110,9 @@ export interface ApplicantData {
   }>;
   otherSkills: string[];
   otherSkillsSpecify: string;
-  referredProgram: string;
-  cdspPrograms: string[];
-  projectIdNumber: string;
+  referredProgram: string;         // which PESO referral program the applicant came from
+  cdspPrograms: string[];          // Comprehensive Disability Support Program categories selected
+  projectIdNumber: string;         // government project tracking ID (e.g. DOLE project)
   projectLocation: string;
   projectRegion: string;
   projectCity: string;
@@ -119,9 +122,9 @@ export interface ApplicantData {
     wayOfImplementation: string[];
     nameOfProject: string;
   };
-  pagIbigNo: string;
-  philHealthNo: string;
-  sssNo: string;
+  pagIbigNo: string;               // Pag-IBIG Fund ID (Philippine housing benefit)
+  philHealthNo: string;            // PhilHealth ID (Philippine national health insurance)
+  sssNo: string;                   // SSS number (Philippine Social Security System)
   otherProgramName: string;
   otherProgramNo: string;
   uploadedDocuments?: Array<{
@@ -167,19 +170,6 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<ApplicantData | null>(null);
-  const resumeRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const [selectedFields, setSelectedFields] = useState<FieldSelection>({
     profilePicture: true,
     fullName: true,
@@ -203,6 +193,18 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     eligibilities: false,
     languages: false,
   });
+  const resumeRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const filteredApplicants = searchQuery.trim() === ''
     ? applicants
@@ -213,9 +215,15 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
           `${a.firstName} ${a.surname}`.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
+  // Builds the full display name shown in the search box after selecting an applicant
+  function buildFullName(applicant: ApplicantData): string {
+    const middle = applicant.middleName ? applicant.middleName + ' ' : '';
+    return `${applicant.firstName} ${middle}${applicant.surname}`;
+  }
+
   function handleApplicantSelect(applicant: ApplicantData) {
     setSelectedApplicant(applicant);
-    setSearchQuery(`${applicant.firstName} ${applicant.middleName ? applicant.middleName + ' ' : ''}${applicant.surname}`);
+    setSearchQuery(buildFullName(applicant));
     setShowDropdown(false);
   }
 
@@ -228,6 +236,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     switch (field) {
       case 'profilePicture': return true;
       case 'fullName':       return !!(selectedApplicant.firstName || selectedApplicant.surname);
+      // age and dateOfBirth share the same source field; 'N/A' means it was never entered
       case 'age':
       case 'dateOfBirth':    return !!selectedApplicant.dateOfBirth && selectedApplicant.dateOfBirth !== 'N/A';
       case 'sex':            return !!selectedApplicant.sex && selectedApplicant.sex !== 'N/A';
@@ -236,10 +245,12 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
       case 'address':        return !!(selectedApplicant.houseNo || selectedApplicant.barangay || selectedApplicant.municipality);
       case 'contactNumber':  return !!selectedApplicant.contactNumber && selectedApplicant.contactNumber !== 'N/A';
       case 'email':          return !!selectedApplicant.email && selectedApplicant.email !== 'N/A';
+      // Education sections are only available if the applicant actually graduated (form value = 'Yes')
       case 'elementary':     return !!selectedApplicant.elementary?.graduated && selectedApplicant.elementary.graduated === 'Yes';
       case 'highSchool':     return !!selectedApplicant.secondary?.graduated && selectedApplicant.secondary.graduated === 'Yes';
       case 'college':        return !!selectedApplicant.tertiary?.course && selectedApplicant.tertiary.course !== 'N/A';
       case 'graduateStudies':return selectedApplicant.graduateStudies?.length > 0;
+      // workExperience2 needs at least 2 entries in the array
       case 'workExperience1':return selectedApplicant.workExperiences?.length > 0;
       case 'workExperience2':return selectedApplicant.workExperiences?.length > 1;
       case 'skillsCompetencies': return selectedApplicant.otherSkills?.length > 0;
@@ -297,45 +308,42 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     }
   }
 
-  const ResumeCheckbox = ({ field, label }: { field: keyof FieldSelection; label: string }) => {
-    const available = isFieldAvailable(field);
-    return (
-      <label className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-all ${available ? 'hover:bg-blue-50' : 'opacity-40 cursor-not-allowed'}`}>
-        <input
-          type="checkbox"
-          checked={selectedFields[field] && available}
-          onChange={() => available && toggleField(field)}
-          disabled={!available}
-          className="w-4 h-4 text-brand-blue border-gray-300 rounded focus:ring-brand-blue disabled:opacity-50 flex-shrink-0"
-        />
-        <span className={`text-sm ${available ? 'text-gray-800' : 'text-gray-400'}`}>{label}</span>
-      </label>
-    );
-  };
+  function handleSearchChange(e: ChangeEvent<HTMLInputElement>) {
+    setSearchQuery(e.target.value);
+    setShowDropdown(true);
+  }
+
+  function handleToggleDropdown() {
+    setShowDropdown((prev) => !prev);
+  }
+
+  function handleOpenDropdown() {
+    setShowDropdown(true);
+  }
 
   return (
     <>
       <div className="min-h-full bg-gray-200">
         {/* Top bar */}
-        <div className="flex-shrink-0 px-6 py-3">
+        <div className="flex-shrink-0 px-6 py-3 bg-white">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-sm text-brand-blue hover:text-brand-blue-dark transition-colors"
+            className="flex items-center gap-1.5 text-md text-brand-blue hover:text-brand-blue-dark transition-colors"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={20} />
             Back to Applicants
           </button>
         </div>
 
-        <div className="flex flex-col gap-3 px-5 py-4">
+        <div className="flex flex-col gap-3 px-5 py-2">
           {/* Title card */}
-          <div className="flex-shrink-0 bg-white rounded-2xl shadow px-5 py-3 border border-gray-200">
+          <div className="flex-shrink-0 bg-white rounded-2xl shadow px-5 py-5 border border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
                 <FileText size={18} className="text-brand-blue" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800 m-0">Resume Builder</p>
+                <p className="text-lg font-semibold text-gray-800 m-0">Resume Builder</p>
                 <p className="text-xs text-gray-500 m-0">Select applicant and customize resume fields</p>
               </div>
             </div>
@@ -344,9 +352,9 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
           {/* Main panels */}
           <div className="flex gap-4 items-start">
             {/* Left panel — unified card */}
-            <div className="w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-5rem)] bg-white rounded-2xl shadow border border-gray-200 flex flex-col overflow-hidden">
+            <div className="w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-5rem)] bg-white rounded-2xl shadow border border-gray-200 flex flex-col">
               {/* Step 1 */}
-              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 overflow-visible">
                 <p className="mb-2 text-base font-bold text-gray-800">Step 1: Select Applicant</p>
                 <label className="block mb-1 text-sm text-gray-500">Search or select applicant:</label>
                 <div className="relative" ref={dropdownRef}>
@@ -356,25 +364,24 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                       type="text"
                       placeholder="Type to search..."
                       value={searchQuery}
-                      onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
-                      onClick={() => setShowDropdown(true)}
-                      onFocus={() => setShowDropdown(true)}
-                      className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                      onChange={handleSearchChange}
+                      onClick={handleOpenDropdown}
+                      onFocus={handleOpenDropdown}
+                      className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-xl bg-white text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
                     />
                     <button
-                      onClick={() => setShowDropdown((p) => !p)}
+                      onClick={handleToggleDropdown}
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      style={{ transform: showDropdown ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}
+                      aria-label="Toggle applicant dropdown"
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-transform flex items-center justify-center ${showDropdown ? 'rotate-180' : ''}`}
                     >
-                      <ChevronDown size={15} />
+                      <ChevronDown size={16} />
                     </button>
                   </div>
 
                   {showDropdown && (
                     <div
-                      className="absolute left-0 right-0 z-[9999] mt-1 bg-white border-2 border-brand-blue rounded-lg shadow-2xl"
-                      style={{ maxHeight: '260px', overflowY: 'auto' }}
+                      className="absolute left-0 right-0 z-[9999] mt-1 bg-white border-2 border-brand-blue rounded-lg shadow-2xl max-h-[260px] overflow-y-auto w-full"
                     >
                       {filteredApplicants.length > 0 ? filteredApplicants.map((a) => (
                         <button
@@ -409,49 +416,49 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
               {/* Step 2 or placeholder */}
               {selectedApplicant ? (
-                <>
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <div className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200">
                     <p className="text-sm font-bold text-gray-800">Step 2: Select Fields to Include</p>
                   </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
                     <div>
                       <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Personal Information</p>
                       <div>
-                        <ResumeCheckbox field="profilePicture" label="Profile Picture" />
-                        <ResumeCheckbox field="fullName" label="Full Name" />
-                        <ResumeCheckbox field="age" label="Age" />
-                        <ResumeCheckbox field="sex" label="Sex" />
-                        <ResumeCheckbox field="civilStatus" label="Civil Status" />
-                        <ResumeCheckbox field="dateOfBirth" label="Date of Birth" />
-                        <ResumeCheckbox field="placeOfBirth" label="Place of Birth" />
-                        <ResumeCheckbox field="address" label="Address" />
-                        <ResumeCheckbox field="contactNumber" label="Contact Number" />
-                        <ResumeCheckbox field="email" label="Email Address" />
+                        <ResumeCheckbox label="Profile Picture" isAvailable={isFieldAvailable('profilePicture')} isChecked={selectedFields.profilePicture} onToggle={() => toggleField('profilePicture')} />
+                        <ResumeCheckbox label="Full Name" isAvailable={isFieldAvailable('fullName')} isChecked={selectedFields.fullName} onToggle={() => toggleField('fullName')} />
+                        <ResumeCheckbox label="Age" isAvailable={isFieldAvailable('age')} isChecked={selectedFields.age} onToggle={() => toggleField('age')} />
+                        <ResumeCheckbox label="Sex" isAvailable={isFieldAvailable('sex')} isChecked={selectedFields.sex} onToggle={() => toggleField('sex')} />
+                        <ResumeCheckbox label="Civil Status" isAvailable={isFieldAvailable('civilStatus')} isChecked={selectedFields.civilStatus} onToggle={() => toggleField('civilStatus')} />
+                        <ResumeCheckbox label="Date of Birth" isAvailable={isFieldAvailable('dateOfBirth')} isChecked={selectedFields.dateOfBirth} onToggle={() => toggleField('dateOfBirth')} />
+                        <ResumeCheckbox label="Place of Birth" isAvailable={isFieldAvailable('placeOfBirth')} isChecked={selectedFields.placeOfBirth} onToggle={() => toggleField('placeOfBirth')} />
+                        <ResumeCheckbox label="Address" isAvailable={isFieldAvailable('address')} isChecked={selectedFields.address} onToggle={() => toggleField('address')} />
+                        <ResumeCheckbox label="Contact Number" isAvailable={isFieldAvailable('contactNumber')} isChecked={selectedFields.contactNumber} onToggle={() => toggleField('contactNumber')} />
+                        <ResumeCheckbox label="Email Address" isAvailable={isFieldAvailable('email')} isChecked={selectedFields.email} onToggle={() => toggleField('email')} />
                       </div>
                     </div>
                     <div>
                       <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Education</p>
                       <div>
-                        <ResumeCheckbox field="elementary" label="Elementary" />
-                        <ResumeCheckbox field="highSchool" label="High School" />
-                        <ResumeCheckbox field="college" label="College" />
-                        {isFieldAvailable('graduateStudies') && <ResumeCheckbox field="graduateStudies" label="Graduate Studies" />}
+                        <ResumeCheckbox label="Elementary" isAvailable={isFieldAvailable('elementary')} isChecked={selectedFields.elementary} onToggle={() => toggleField('elementary')} />
+                        <ResumeCheckbox label="High School" isAvailable={isFieldAvailable('highSchool')} isChecked={selectedFields.highSchool} onToggle={() => toggleField('highSchool')} />
+                        <ResumeCheckbox label="College" isAvailable={isFieldAvailable('college')} isChecked={selectedFields.college} onToggle={() => toggleField('college')} />
+                        {isFieldAvailable('graduateStudies') && <ResumeCheckbox label="Graduate Studies" isAvailable={isFieldAvailable('graduateStudies')} isChecked={selectedFields.graduateStudies} onToggle={() => toggleField('graduateStudies')} />}
                       </div>
                     </div>
                     <div>
                       <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Professional</p>
                       <div>
-                        {isFieldAvailable('workExperience1') && <ResumeCheckbox field="workExperience1" label="Work Experience 1" />}
-                        {isFieldAvailable('workExperience2') && <ResumeCheckbox field="workExperience2" label="Work Experience 2" />}
-                        <ResumeCheckbox field="skillsCompetencies" label="Skills & Competencies" />
-                        {isFieldAvailable('employmentStatus') && <ResumeCheckbox field="employmentStatus" label="Employment Preferences" />}
-                        {isFieldAvailable('trainings') && <ResumeCheckbox field="trainings" label="Trainings & Certifications" />}
-                        {isFieldAvailable('eligibilities') && <ResumeCheckbox field="eligibilities" label="Eligibilities" />}
-                        {isFieldAvailable('languages') && <ResumeCheckbox field="languages" label="Language Proficiency" />}
+                        {isFieldAvailable('workExperience1') && <ResumeCheckbox label="Work Experience 1" isAvailable={isFieldAvailable('workExperience1')} isChecked={selectedFields.workExperience1} onToggle={() => toggleField('workExperience1')} />}
+                        {isFieldAvailable('workExperience2') && <ResumeCheckbox label="Work Experience 2" isAvailable={isFieldAvailable('workExperience2')} isChecked={selectedFields.workExperience2} onToggle={() => toggleField('workExperience2')} />}
+                        <ResumeCheckbox label="Skills & Competencies" isAvailable={isFieldAvailable('skillsCompetencies')} isChecked={selectedFields.skillsCompetencies} onToggle={() => toggleField('skillsCompetencies')} />
+                        {isFieldAvailable('employmentStatus') && <ResumeCheckbox label="Employment Preferences" isAvailable={isFieldAvailable('employmentStatus')} isChecked={selectedFields.employmentStatus} onToggle={() => toggleField('employmentStatus')} />}
+                        {isFieldAvailable('trainings') && <ResumeCheckbox label="Trainings & Certifications" isAvailable={isFieldAvailable('trainings')} isChecked={selectedFields.trainings} onToggle={() => toggleField('trainings')} />}
+                        {isFieldAvailable('eligibilities') && <ResumeCheckbox label="Eligibilities" isAvailable={isFieldAvailable('eligibilities')} isChecked={selectedFields.eligibilities} onToggle={() => toggleField('eligibilities')} />}
+                        {isFieldAvailable('languages') && <ResumeCheckbox label="Language Proficiency" isAvailable={isFieldAvailable('languages')} isChecked={selectedFields.languages} onToggle={() => toggleField('languages')} />}
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="flex-1 flex items-center justify-center px-4 text-center">
                   <p className="text-sm text-gray-400">Select an applicant to customize resume fields</p>
@@ -480,11 +487,11 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
             </div>
 
             {/* Right panel — Resume Preview */}
-            <div className="flex-1 bg-white rounded-2xl shadow border border-gray-200 flex flex-col">
+            <div className="flex-1 bg-white rounded-2xl shadow border border-gray-200 flex flex-col overflow-hidden">
               <div className="flex-shrink-0 px-5 py-3 border-b border-gray-200">
                 <p className="text-sm font-semibold text-gray-700 m-0">Resume Preview</p>
               </div>
-              <div className="p-5 bg-gray-100 rounded-b-2xl">
+              <div className="flex-1 overflow-y-auto p-8 bg-gray-100">
                 {!selectedApplicant ? (
                   <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                     <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -493,37 +500,37 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                     <p className="text-sm text-gray-500">Select an applicant to preview resume</p>
                   </div>
                 ) : (
-                  <div className="flex justify-center">
-                    <div
-                      id="resume-preview"
-                      ref={resumeRef}
-                      className="w-full max-w-[210mm] shadow-xl p-12 space-y-6"
-                      style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(31,41,55)', backgroundColor: 'rgb(255,255,255)', border: '1px solid rgb(229,231,235)' }}
-                    >
-                      {/* Resume header */}
-                      <div className="flex gap-6 pb-6" style={{ borderBottom: '4px solid rgb(0,119,190)' }}>
+                  <div id="resume-preview" ref={resumeRef} className="w-full max-w-[210mm] mx-auto shadow-xl text-gray-800 bg-white border border-gray-200">
+                    {/* Header with Photo */}
+                    <div className="pb-4 mb-5 border-b-4 border-brand-blue">
+                      <div className="flex gap-5 items-start">
                         {selectedFields.profilePicture && (
                           <div className="flex-shrink-0">
-                            <div className="w-32 h-32 rounded-lg overflow-hidden" style={{ backgroundColor: 'rgb(229,231,235)', border: '4px solid rgb(0,119,190)' }}>
-                              <img
-                                src={selectedApplicant.profileImage || `https://ui-avatars.com/api/?name=${selectedApplicant.firstName}+${selectedApplicant.surname}&size=200&background=0077BE&color=fff&bold=true`}
-                                alt="Profile"
-                                className="w-full h-full object-cover"
-                                crossOrigin="anonymous"
-                              />
+                            <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
+                              {selectedApplicant.profileImage ? (
+                                <img
+                                  src={selectedApplicant.profileImage}
+                                  alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <svg aria-hidden="true" className="w-20 h-20 fill-brand-blue" viewBox="0 0 24 24">
+                                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                </svg>
+                              )}
                             </div>
                           </div>
                         )}
-                        <div className="flex-1">
+                        <div className="flex-1 flex flex-col justify-center min-h-32">
                           {selectedFields.fullName && isFieldAvailable('fullName') && (
-                            <h1 className="text-3xl font-bold mb-2 uppercase tracking-wide" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(17,24,39)' }}>
+                            <h1 className="resume-name font-bold uppercase text-brand-blue">
                               {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}
                             </h1>
                           )}
-                          <div className="space-y-1 text-sm" style={{ color: 'rgb(0,119,190)' }}>
+                          <div className="space-y-1 text-sm text-gray-700 leading-relaxed">
                             {selectedFields.address && isFieldAvailable('address') && (
                               <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'rgb(0,119,190)' }}>
+                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                                 </svg>
                                 <span>{[selectedApplicant.houseNo, selectedApplicant.barangay, selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span>
@@ -531,7 +538,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                             )}
                             {selectedFields.contactNumber && isFieldAvailable('contactNumber') && (
                               <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'rgb(0,119,190)' }}>
+                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
                                   <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                                 </svg>
                                 <span>{selectedApplicant.contactNumber}</span>
@@ -539,7 +546,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                             )}
                             {selectedFields.email && isFieldAvailable('email') && (
                               <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'rgb(0,119,190)' }}>
+                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
                                   <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                                   <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                                 </svg>
@@ -549,26 +556,27 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                           </div>
                         </div>
                       </div>
+                    </div>
 
                       {/* Personal Information */}
                       {(selectedFields.age || selectedFields.sex || selectedFields.civilStatus || selectedFields.dateOfBirth || selectedFields.placeOfBirth) && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Personal Information</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Personal Information</h2>
                           <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                             {selectedFields.age && isFieldAvailable('age') && (
-                              <div><span className="font-semibold" style={{ color: 'rgb(31,41,55)' }}>Age:</span>{' '}<span style={{ color: 'rgb(55,65,81)' }}>{calculateAge(selectedApplicant.dateOfBirth)} years old</span></div>
+                              <div><span className="font-semibold text-gray-800">Age:</span>{' '}<span className="text-gray-700">{calculateAge(selectedApplicant.dateOfBirth)} years old</span></div>
                             )}
                             {selectedFields.sex && isFieldAvailable('sex') && (
-                              <div><span className="font-semibold" style={{ color: 'rgb(31,41,55)' }}>Sex:</span>{' '}<span style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.sex}</span></div>
+                              <div><span className="font-semibold text-gray-800">Sex:</span>{' '}<span className="text-gray-700">{selectedApplicant.sex}</span></div>
                             )}
                             {selectedFields.civilStatus && isFieldAvailable('civilStatus') && (
-                              <div><span className="font-semibold" style={{ color: 'rgb(31,41,55)' }}>Civil Status:</span>{' '}<span style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.civilStatus}</span></div>
+                              <div><span className="font-semibold text-gray-800">Civil Status:</span>{' '}<span className="text-gray-700">{selectedApplicant.civilStatus}</span></div>
                             )}
                             {selectedFields.dateOfBirth && isFieldAvailable('dateOfBirth') && (
-                              <div><span className="font-semibold" style={{ color: 'rgb(31,41,55)' }}>Date of Birth:</span>{' '}<span style={{ color: 'rgb(55,65,81)' }}>{formatDate(selectedApplicant.dateOfBirth)}</span></div>
+                              <div><span className="font-semibold text-gray-800">Date of Birth:</span>{' '}<span className="text-gray-700">{formatDate(selectedApplicant.dateOfBirth)}</span></div>
                             )}
                             {selectedFields.placeOfBirth && isFieldAvailable('placeOfBirth') && (
-                              <div><span className="font-semibold" style={{ color: 'rgb(31,41,55)' }}>Place of Birth:</span>{' '}<span style={{ color: 'rgb(55,65,81)' }}>{[selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span></div>
+                              <div><span className="font-semibold text-gray-800">Place of Birth:</span>{' '}<span className="text-gray-700">{[selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span></div>
                             )}
                           </div>
                         </div>
@@ -576,49 +584,49 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Educational Background */}
                       {(selectedFields.elementary || selectedFields.highSchool || selectedFields.college || selectedFields.graduateStudies) && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Educational Background</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Educational Background</h2>
                           <div className="space-y-3">
                             {selectedFields.college && isFieldAvailable('college') && selectedApplicant.tertiary?.course && (
                               <div>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{selectedApplicant.tertiary.course}</div>
-                                {selectedApplicant.tertiary.schoolName && <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.tertiary.schoolName}</div>}
-                                <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
+                                <div className="font-bold text-base text-gray-900">{selectedApplicant.tertiary.course}</div>
+                                {selectedApplicant.tertiary.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.tertiary.schoolName}</div>}
+                                <div className="text-sm mt-1 text-gray-900">
                                   {[selectedApplicant.tertiary.schoolCity, selectedApplicant.tertiary.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.tertiary.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.tertiary.yearGraduated}</div>}
+                                {selectedApplicant.tertiary.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.tertiary.yearGraduated}</div>}
                               </div>
                             )}
                             {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant.graduateStudies?.map((study, idx) => (
                               <div key={idx}>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{study.course}</div>
-                                {study.schoolName && <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{study.schoolName}</div>}
-                                <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
+                                <div className="font-bold text-base text-gray-900">{study.course}</div>
+                                {study.schoolName && <div className="text-sm mt-1 text-gray-700">{study.schoolName}</div>}
+                                <div className="text-sm mt-1 text-gray-900">
                                   {[study.schoolCity, study.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {study.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{study.yearGraduated}</div>}
+                                {study.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{study.yearGraduated}</div>}
                               </div>
                             ))}
                             {selectedFields.highSchool && isFieldAvailable('highSchool') && (
                               <div>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>
-                                  High School{selectedApplicant.secondary?.seniorHighStrand ? ` — ${selectedApplicant.secondary.seniorHighStrand} Strand` : ''}
+                                <div className="font-bold text-base text-gray-900">
+                                   High School{selectedApplicant.secondary?.seniorHighStrand ? (' — ' + selectedApplicant.secondary.seniorHighStrand + ' Strand') : ''}
                                 </div>
-                                {selectedApplicant.secondary?.schoolName && <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.secondary.schoolName}</div>}
-                                <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
+                                {selectedApplicant.secondary?.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.secondary.schoolName}</div>}
+                                <div className="text-sm mt-1 text-gray-900">
                                   {[selectedApplicant.secondary?.schoolCity, selectedApplicant.secondary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.secondary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.secondary.yearGraduated}</div>}
+                                {selectedApplicant.secondary?.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.secondary.yearGraduated}</div>}
                               </div>
                             )}
                             {selectedFields.elementary && isFieldAvailable('elementary') && (
                               <div>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>Elementary</div>
-                                {selectedApplicant.elementary?.schoolName && <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.elementary.schoolName}</div>}
-                                <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
+                                <div className="font-bold text-base text-gray-900">Elementary</div>
+                                {selectedApplicant.elementary?.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.elementary.schoolName}</div>}
+                                <div className="text-sm mt-1 text-gray-900">
                                   {[selectedApplicant.elementary?.schoolCity, selectedApplicant.elementary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.elementary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.elementary.yearGraduated}</div>}
+                                {selectedApplicant.elementary?.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.elementary.yearGraduated}</div>}
                               </div>
                             )}
                           </div>
@@ -627,21 +635,21 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Work Experience */}
                       {(selectedFields.workExperience1 || selectedFields.workExperience2) && selectedApplicant.workExperiences?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Work Experience</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Work Experience</h2>
                           <div className="space-y-4">
                             {selectedFields.workExperience1 && selectedApplicant.workExperiences[0] && (
                               <div>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{selectedApplicant.workExperiences[0].position}</div>
-                                <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.workExperiences[0].companyName}</div>
-                                <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.workExperiences[0].from} - {selectedApplicant.workExperiences[0].to}</div>
+                                <div className="font-bold text-base text-gray-900">{selectedApplicant.workExperiences[0].position}</div>
+                                <div className="text-sm mt-1 text-gray-700">{selectedApplicant.workExperiences[0].companyName}</div>
+                                <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.workExperiences[0].from}{' - '}{selectedApplicant.workExperiences[0].to}</div>
                               </div>
                             )}
                             {selectedFields.workExperience2 && selectedApplicant.workExperiences[1] && (
                               <div>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{selectedApplicant.workExperiences[1].position}</div>
-                                <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{selectedApplicant.workExperiences[1].companyName}</div>
-                                <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.workExperiences[1].from} - {selectedApplicant.workExperiences[1].to}</div>
+                                <div className="font-bold text-base text-gray-900">{selectedApplicant.workExperiences[1].position}</div>
+                                <div className="text-sm mt-1 text-gray-700">{selectedApplicant.workExperiences[1].companyName}</div>
+                                <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.workExperiences[1].from}{' - '}{selectedApplicant.workExperiences[1].to}</div>
                               </div>
                             )}
                           </div>
@@ -650,9 +658,9 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Skills */}
                       {selectedFields.skillsCompetencies && isFieldAvailable('skillsCompetencies') && selectedApplicant.otherSkills?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Skills & Competencies</h2>
-                          <div className="text-sm leading-relaxed" style={{ color: 'rgb(55,65,81)' }}>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Skills & Competencies</h2>
+                          <div className="text-sm leading-relaxed text-gray-700">
                             {selectedApplicant.otherSkills.join(' • ')}
                           </div>
                         </div>
@@ -660,14 +668,14 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Employment Preferences */}
                       {selectedFields.employmentStatus && isFieldAvailable('employmentStatus') && selectedApplicant.jobPreferences?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Employment Preferences</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Employment Preferences</h2>
                           <div className="space-y-3">
                             {selectedApplicant.jobPreferences.map((pref, idx) => (
                               <div key={idx}>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{pref.occupation}</div>
-                                {pref.employmentType?.length > 0 && <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}><span className="font-semibold">Type:</span> {pref.employmentType.join(', ')}</div>}
-                                {pref.workLocation?.length > 0 && <div className="text-sm mt-1" style={{ color: 'rgb(75,85,99)' }}><span className="font-semibold">Preferred Location:</span> {pref.workLocation.join(', ')}</div>}
+                                <div className="font-bold text-base text-gray-900">{pref.occupation}</div>
+                                {pref.employmentType?.length > 0 && <div className="text-sm mt-1 text-gray-700"><span className="font-semibold">Type:</span> {pref.employmentType.join(', ')}</div>}
+                                {pref.workLocation?.length > 0 && <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Preferred Location:</span> {pref.workLocation.join(', ')}</div>}
                               </div>
                             ))}
                           </div>
@@ -676,14 +684,14 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Trainings */}
                       {selectedFields.trainings && isFieldAvailable('trainings') && selectedApplicant.trainings?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Trainings & Certifications</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Trainings & Certifications</h2>
                           <div className="space-y-3">
                             {selectedApplicant.trainings.map((t, idx) => (
                               <div key={idx}>
-                                <div className="font-bold text-base" style={{ color: 'rgb(17,24,39)' }}>{t.course}</div>
-                                <div className="text-sm mt-1" style={{ color: 'rgb(55,65,81)' }}>{t.institution}</div>
-                                <div className="text-sm mt-1" style={{ color: 'rgb(75,85,99)' }}>{t.hoursOfTraining} hours • {t.skillsAcquired}</div>
+                                <div className="font-bold text-base text-gray-900">{t.course}</div>
+                                <div className="text-sm mt-1 text-gray-700">{t.institution}</div>
+                                <div className="text-sm mt-1 text-gray-600">{t.hoursOfTraining}{' hours • '}{t.skillsAcquired}</div>
                               </div>
                             ))}
                           </div>
@@ -692,12 +700,12 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Eligibilities */}
                       {selectedFields.eligibilities && isFieldAvailable('eligibilities') && selectedApplicant.eligibilities?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Professional Eligibility</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Professional Eligibility</h2>
                           <div className="space-y-2">
                             {selectedApplicant.eligibilities.map((e, idx) => (
-                              <div key={idx} className="text-sm" style={{ color: 'rgb(55,65,81)' }}>
-                                <span className="font-semibold">{e.eligibility}</span> - {formatDate(e.dateTaken)}
+                              <div key={idx} className="text-sm text-gray-700">
+                                <span className="font-semibold">{e.eligibility}</span>{' - '}{formatDate(e.dateTaken)}
                               </div>
                             ))}
                           </div>
@@ -706,13 +714,13 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Languages */}
                       {selectedFields.languages && isFieldAvailable('languages') && selectedApplicant.languages?.length > 0 && (
-                        <div>
-                          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider pb-2" style={{ fontFamily: 'Arial, sans-serif', color: 'rgb(0,119,190)', borderBottom: '2px solid rgb(0,119,190)' }}>Language Proficiency</h2>
+                        <div className="mt-6">
+                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Language Proficiency</h2>
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             {selectedApplicant.languages
                               .filter((lang) => lang.read || lang.write || lang.speak || lang.understand)
                               .map((lang, idx) => (
-                                <div key={idx} style={{ color: 'rgb(55,65,81)' }}>
+                                <div key={idx} className="text-gray-700">
                                   <span className="font-semibold">{lang.language}</span>{' - '}
                                   {[lang.read && 'Read', lang.write && 'Write', lang.speak && 'Speak', lang.understand && 'Understand'].filter(Boolean).join(', ')}
                                 </div>
@@ -722,11 +730,10 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                       )}
 
                       {/* Footer */}
-                      <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid rgb(209,213,219)' }}>
-                        <p className="text-xs" style={{ color: 'rgb(0,119,190)' }}>Generated by PESO Tangub City - Comprehensive Profiling System</p>
-                        <p className="text-xs" style={{ color: 'rgb(0,119,190)' }}>Public Employment Service Office | Tangub City, Misamis Occidental</p>
+                      <div className="mt-12 pt-6 text-center border-t border-gray-300">
+                        <p className="text-xs text-gray-600">Generated by PESO Tangub City {'–'} Comprehensive Profiling System</p>
+                        <p className="text-xs text-gray-600">Public Employment Service Office | Tangub City, Misamis Occidental</p>
                       </div>
-                    </div>
                   </div>
                 )}
               </div>

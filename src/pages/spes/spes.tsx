@@ -767,17 +767,17 @@ export default function SPESView({ onBack }: SPESViewProps) {
             <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>Special Program for Employment of Students (SPES)</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-4 mb-4">
-            <div className="flex gap-3">
-              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
-                <Plus size={20} /><span>Add Applicant</span>
+          <div className="bg-white rounded-xl shadow-md p-3 mb-4">
+            <div className="flex gap-2">
+              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm">
+                <Plus size={16} /><span>Add Applicant</span>
               </button>
-              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-                <Upload size={20} /><span>Import</span>
+              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+                <Upload size={16} /><span>Import</span>
               </button>
               <div className="relative">
-                <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-                  <Download size={20} /><span>Export</span><ChevronDown size={16} />
+                <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+                  <Download size={16} /><span>Export</span><ChevronDown size={14} />
                 </button>
                 {isExportDropdownOpen && (
                   <>
@@ -798,7 +798,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <div className="relative flex-1 min-w-48">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
                     placeholder="Search by name, barangay, school, or employer..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}

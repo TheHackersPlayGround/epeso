@@ -414,7 +414,7 @@ function ApplicantsSearchBar({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by name, barangay, skills, occupation..."
           aria-label="Search applicants"
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-base text-gray-700 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-base text-gray-700 placeholder:text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
         />
       </div>
 

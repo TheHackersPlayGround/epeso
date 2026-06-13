@@ -16,7 +16,6 @@ interface SkillsTrainingViewProps {
 }
 
 const BRAND = '#0077BE'
-const BRAND_DARK = '#0077BE'
 
 const BATCH_OPTIONS = ['BATCH-001', 'BATCH-002', 'BATCH-003']
 const CLASSIFICATION_OPTIONS = ['Student', 'Out of School Youth', 'Women', 'PWD', 'Employed', 'Unemployed']
@@ -419,7 +418,7 @@ function AddProfileForm({
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
             <button onClick={onClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} className="px-8 py-2 text-white rounded-lg text-sm" style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
+            <button onClick={handleSave} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
           </div>
@@ -642,14 +641,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   // ── Main list view ──────────────────────────────────────────────────────────
   return (
     <>
-      <style>{`
-        .st-scroll::-webkit-scrollbar { height: 10px; }
-        .st-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 5px; }
-        .st-scroll::-webkit-scrollbar-thumb { background: #8B5CF6; border-radius: 5px; }
-        .st-scroll::-webkit-scrollbar-thumb:hover { background: #7C3AED; }
-      `}</style>
-
-      <ConfirmModal
+<ConfirmModal
         isOpen={deleteConfirm.open} type="confirm"
         title="Delete Profile"
         message="Are you sure you want to delete this profile? This action cannot be undone."
@@ -730,7 +722,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               {assigningProfile.assignedTrainingId && (
                 <button onClick={handleUnassignTraining} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">Remove Assigned Activity</button>
               )}
-              <button onClick={() => { setAssigningProfile(null); setAssignSearch('') }} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+              <button onClick={() => { setAssigningProfile(null); setAssignSearch('') }} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
             </div>
           </div>
         </div>
@@ -793,17 +785,17 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
           </div>
 
           {/* Action Buttons */}
-          <div className="bg-white rounded-xl shadow-md p-4 mb-4">
-            <div className="flex gap-3">
-              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors" style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
-                <Plus size={20} /><span>Add Profile</span>
+          <div className="bg-white rounded-xl shadow-md p-3 mb-4">
+            <div className="flex gap-2">
+              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm">
+                <Plus size={16} /><span>Add Profile</span>
               </button>
-              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-                <Upload size={20} /><span>Import</span>
+              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm">
+                <Upload size={16} /><span>Import</span>
               </button>
               <div className="relative">
-                <button onClick={() => setIsExportDropdownOpen(v => !v)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-                  <Download size={20} /><span>Export</span>
+                <button onClick={() => setIsExportDropdownOpen(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm">
+                  <Download size={16} /><span>Export</span><ChevronDown size={14} />
                 </button>
                 {isExportDropdownOpen && (
                   <>
@@ -818,17 +810,18 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             </div>
           </div>
 
-          {/* Search + Filter */}
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          {/* Search + Filter + Table */}
+          <div className="bg-white rounded-xl shadow-md p-4">
+            <div className="mb-4">
             <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <div className="relative flex-1 min-w-48">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
                   placeholder="Search by name, classification, batch, or qualification..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent outline-none"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
                 />
               </div>
               <div className="relative">
@@ -855,12 +848,12 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 {activeFilters.map(filterId => {
                   const filter = availableFilters.find(f => f.id === filterId)
                   return (
-                    <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-full">
-                      <span className="text-sm text-purple-700 font-medium">{filter?.label}:</span>
-                      <select value={filterValues[filterId] || ''} onChange={e => setFilterValues(prev => ({ ...prev, [filterId]: e.target.value }))} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-purple-700 font-medium pr-1 cursor-pointer">
+                    <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                      <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
+                      <select value={filterValues[filterId] || ''} onChange={e => setFilterValues(prev => ({ ...prev, [filterId]: e.target.value }))} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
                         {filter?.options.map(opt => <option key={opt}>{opt}</option>)}
                       </select>
-                      <button onClick={() => handleRemoveFilter(filterId)} className="text-purple-700 hover:text-purple-900"><X size={14} /></button>
+                      <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900"><X size={14} /></button>
                     </div>
                   )
                 })}
@@ -868,96 +861,94 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             )}
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            {filteredProfiles.length === 0 ? (
-              <div className="text-center py-20">
-                <Users size={48} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-gray-600 text-lg">No profiles found</p>
-                <p className="text-gray-400 text-sm mt-1">
-                  {profiles.length === 0 ? 'Click "Add Profile" to register the first applicant.' : 'Try adjusting your search or filters.'}
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto st-scroll">
-                <table className="w-full" style={{ tableLayout: 'auto' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: BRAND }}>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 180 }}>Applicant Name</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 130 }}>Classification</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 160 }}>Desired Qualification</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 200 }}>Purpose of Training</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 200 }}>Assigned Training</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 100 }}>Status</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 110 }}>Date Applied</th>
-                      <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 80 }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProfiles.map(profile => (
-                      <tr key={profile.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="text-gray-800 font-medium text-sm">{profile.lastName}, {profile.firstName}{profile.middleName ? ` ${profile.middleName.charAt(0)}.` : ''}</p>
-                          <p className="text-gray-400 text-xs">{profile.sex}{profile.age ? ` · ${profile.age} yrs` : ''}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {profile.classification.slice(0, 1).map(c => <span key={c} className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">{c}</span>)}
-                            {(profile.classification.length + profile.classificationOther.filter(Boolean).length) > 1 && (
-                              <span className="px-1.5 py-0.5 bg-purple-50 text-purple-500 rounded text-xs">+{profile.classification.length + profile.classificationOther.filter(Boolean).length - 1}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {profile.desiredQualification.slice(0, 1).map(q => <span key={q} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{q}</span>)}
-                            {(profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length) > 1 && (
-                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length - 1}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {profile.purposeOfTraining.slice(0, 1).map(pt => <span key={pt} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-xs max-w-[120px] truncate inline-block">{pt}</span>)}
-                            {profile.purposeOfTraining.length > 1 && <span className="px-1.5 py-0.5 bg-green-50 text-green-500 rounded text-xs">+{profile.purposeOfTraining.length - 1}</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {profile.assignedTrainingId ? (
-                            <div>
-                              <p className="text-sm text-gray-800 line-clamp-1">{getTrainingName(profile.assignedTrainingId)}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                {profile.trainingBatchNo && <span className="text-xs text-gray-400">{profile.trainingBatchNo}</span>}
-                                {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-1.5 py-0.5 rounded-full text-xs ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
+          {filteredProfiles.length === 0 ? (
+            <div className="text-center py-20">
+              <Users size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-600 text-lg">No profiles found</p>
+              <p className="text-gray-400 text-sm mt-1">
+                {profiles.length === 0 ? 'Click "Add Profile" to register the first applicant.' : 'Try adjusting your search or filters.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-brand-blue">
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Applicant Name</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Classification</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Desired Qualification</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Purpose of Training</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Training</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Date Applied</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProfiles.map(profile => (
+                    <tr key={profile.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <p className="text-gray-800 font-medium">{profile.lastName}, {profile.firstName}{profile.middleName ? ` ${profile.middleName.charAt(0)}.` : ''}</p>
+                        <p className="text-gray-400">{profile.sex}{profile.age ? ` · ${profile.age} yrs` : ''}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {profile.classification.slice(0, 1).map(c => <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{c}</span>)}
+                          {(profile.classification.length + profile.classificationOther.filter(Boolean).length) > 1 && (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{profile.classification.length + profile.classificationOther.filter(Boolean).length - 1}</span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
-                        <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">{profile.dateApplicationReceived || '—'}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={e => {
-                              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                              const showAbove = window.innerHeight - rect.bottom < 148
-                              setMenuPos({ top: showAbove ? rect.top - 148 : rect.bottom + 4, right: window.innerWidth - rect.right })
-                              setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {profile.desiredQualification.slice(0, 1).map(q => <span key={q} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{q}</span>)}
+                          {(profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length) > 1 && (
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length - 1}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {profile.purposeOfTraining.slice(0, 1).map(pt => <span key={pt} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded max-w-[120px] truncate inline-block">{pt}</span>)}
+                          {profile.purposeOfTraining.length > 1 && <span className="px-1.5 py-0.5 bg-green-50 text-green-500 rounded">+{profile.purposeOfTraining.length - 1}</span>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {profile.assignedTrainingId ? (
+                          <div>
+                            <p className="text-gray-800 line-clamp-1">{getTrainingName(profile.assignedTrainingId)}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {profile.trainingBatchNo && <span className="text-gray-400">{profile.trainingBatchNo}</span>}
+                              {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-1.5 py-0.5 rounded-full ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
+                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{profile.dateApplicationReceived || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <button
+                          onClick={e => {
+                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                            const showAbove = window.innerHeight - rect.bottom < 148
+                            setMenuPos({ top: showAbove ? rect.top - 148 : rect.bottom + 4, right: window.innerWidth - rect.right })
+                            setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+      </div>
       </div>
 
       {/* Action dropdown menu (portal) */}

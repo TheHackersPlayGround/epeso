@@ -855,14 +855,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
   return (
     <>
-      <style>{`
-        .cdsp-scroll::-webkit-scrollbar { height: 10px; }
-        .cdsp-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 5px; }
-        .cdsp-scroll::-webkit-scrollbar-thumb { background: #0077BE; border-radius: 5px; }
-        .cdsp-scroll::-webkit-scrollbar-thumb:hover { background: #0065A5; }
-      `}</style>
-
-      <ConfirmModal
+<ConfirmModal
         isOpen={deleteConfirm.open} type="confirm"
         title="Delete Applicant Profile"
         message="Are you sure you want to delete this applicant's profile? This action cannot be undone."
@@ -940,17 +933,17 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-white rounded-xl shadow-md p-4 mb-4">
-          <div className="flex gap-3">
-            <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
-              <Plus size={20} /><span>Add Applicant</span>
+        <div className="bg-white rounded-xl shadow-md p-3 mb-4">
+          <div className="flex gap-2">
+            <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm">
+              <Plus size={16} /><span>Add Applicant</span>
             </button>
-            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-              <Upload size={20} /><span>Import</span>
+            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+              <Upload size={16} /><span>Import</span>
             </button>
             <div className="relative">
-              <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors">
-                <Download size={20} /><span>Export</span>
+              <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+                <Download size={16} /><span>Export</span><ChevronDown size={14} />
               </button>
               {isExportDropdownOpen && (
                 <>
@@ -1014,17 +1007,18 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
           </div>
         )}
 
-        {/* Search & Filter */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        {/* Search & Filter + Table */}
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <div className="mb-4">
           <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 type="text"
                 placeholder="Search by name, barangay, or assigned activity..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
               />
             </div>
             <div className="relative">
@@ -1067,10 +1061,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               })}
             </div>
           )}
-        </div>
+          </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {filtered.length === 0 ? (
             <div className="text-center py-20">
               <Users size={48} className="mx-auto text-gray-300 mb-3" />
@@ -1080,43 +1072,43 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto cdsp-scroll">
-              <table className="w-full" style={{ tableLayout: 'auto' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-brand-blue">
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 180 }}>Name</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 130 }}>Barangay</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 130 }}>Classification</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 220 }}>Service Availed</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 240 }}>Assigned Activity</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 90 }}>Status</th>
-                    <th className="px-4 py-3 text-left text-white font-semibold text-xs whitespace-nowrap" style={{ minWidth: 80 }}>Actions</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Name</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Barangay</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Classification</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Service Availed</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Activity</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((applicant) => (
-                    <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="text-gray-800 font-medium text-sm">{applicant.lastName}, {applicant.firstName}{applicant.middleName ? ` ${applicant.middleName.charAt(0)}.` : ''}</p>
-                        <p className="text-gray-400 text-xs">{applicant.sex} · {applicant.age} yrs</p>
+                    <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName}{applicant.middleName ? ` ${applicant.middleName.charAt(0)}.` : ''}</p>
+                        <p className="text-gray-400">{applicant.sex} · {applicant.age} yrs</p>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 text-sm">{applicant.barangay || '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 text-gray-600">{applicant.barangay || '—'}</td>
+                      <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {applicant.classification.slice(0, 1).map((c) => (
-                            <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
+                            <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{c}</span>
                           ))}
                           {applicant.classification.length > 1 && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
+                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{applicant.classification.length - 1}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs whitespace-nowrap">{applicant.serviceAvailed || '—'}</span>
+                      <td className="px-3 py-2">
+                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded whitespace-nowrap">{applicant.serviceAvailed || '—'}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 text-sm">{applicant.assignedActivity || '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-3 py-2 text-gray-600">{applicant.assignedActivity || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()

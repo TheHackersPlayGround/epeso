@@ -520,7 +520,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                               {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}
                             </h1>
                           )}
-                          <div className="space-y-1 text-sm" style={{ color: 'rgb(55,65,81)' }}>
+                          <div className="space-y-1 text-sm" style={{ color: 'rgb(0,119,190)' }}>
                             {selectedFields.address && isFieldAvailable('address') && (
                               <div className="flex items-center gap-2">
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" style={{ color: 'rgb(0,119,190)' }}>
@@ -586,7 +586,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                                 <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
                                   {[selectedApplicant.tertiary.schoolCity, selectedApplicant.tertiary.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.tertiary.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(107,114,128)' }}>{selectedApplicant.tertiary.yearGraduated}</div>}
+                                {selectedApplicant.tertiary.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.tertiary.yearGraduated}</div>}
                               </div>
                             )}
                             {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant.graduateStudies?.map((study, idx) => (
@@ -596,7 +596,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                                 <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
                                   {[study.schoolCity, study.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {study.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(107,114,128)' }}>{study.yearGraduated}</div>}
+                                {study.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{study.yearGraduated}</div>}
                               </div>
                             ))}
                             {selectedFields.highSchool && isFieldAvailable('highSchool') && (
@@ -608,7 +608,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                                 <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
                                   {[selectedApplicant.secondary?.schoolCity, selectedApplicant.secondary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.secondary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(107,114,128)' }}>{selectedApplicant.secondary.yearGraduated}</div>}
+                                {selectedApplicant.secondary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.secondary.yearGraduated}</div>}
                               </div>
                             )}
                             {selectedFields.elementary && isFieldAvailable('elementary') && (
@@ -618,7 +618,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                                 <div className="text-sm mt-1" style={{ color: 'rgb(0,119,190)' }}>
                                   {[selectedApplicant.elementary?.schoolCity, selectedApplicant.elementary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
                                 </div>
-                                {selectedApplicant.elementary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(107,114,128)' }}>{selectedApplicant.elementary.yearGraduated}</div>}
+                                {selectedApplicant.elementary?.yearGraduated && <div className="text-sm italic mt-1" style={{ color: 'rgb(0,119,190)' }}>{selectedApplicant.elementary.yearGraduated}</div>}
                               </div>
                             )}
                           </div>
@@ -723,8 +723,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
                       {/* Footer */}
                       <div className="mt-12 pt-6 text-center" style={{ borderTop: '1px solid rgb(209,213,219)' }}>
-                        <p className="text-xs" style={{ color: 'rgb(107,114,128)' }}>Generated by PESO Tangub City - Comprehensive Profiling System</p>
-                        <p className="text-xs" style={{ color: 'rgb(107,114,128)' }}>Public Employment Service Office | Tangub City, Misamis Occidental</p>
+                        <p className="text-xs" style={{ color: 'rgb(0,119,190)' }}>Generated by PESO Tangub City - Comprehensive Profiling System</p>
+                        <p className="text-xs" style={{ color: 'rgb(0,119,190)' }}>Public Employment Service Office | Tangub City, Misamis Occidental</p>
                       </div>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
-import ConfirmationModal from './ConfirmationModal';
+import ApplicantReviewModal from './ApplicantReviewModal';
 
 interface ApplicantFormData {
   // Personal Information
@@ -125,6 +125,7 @@ interface ApplicantFormData {
   
   // Referred Program
   referredProgram: string;
+  referredProgramOther: string;
   cdspPrograms: string[];
   livelihoodPrograms: string[];
   dileepPrograms: string[];
@@ -243,6 +244,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     otherSkills: [],
     otherSkillsSpecify: [''],
     referredProgram: '',
+    referredProgramOther: '',
     cdspPrograms: [],
     livelihoodPrograms: [],
     dileepPrograms: [],
@@ -284,8 +286,31 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     { id: 'documents' as Section, label: 'X. DOCUMENTS / ATTACHMENTS' },
   ];
 
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+
+  const requiredKeys = ['firstName', 'surname', 'dateOfBirth', 'sex', 'civilStatus', 'contactNumber', 'barangay', 'municipality', 'province'] as const;
+
+  function hasRequiredErrors() {
+    return requiredKeys.some(k => !String(formData[k] ?? '').trim());
+  }
+
+  function fieldError(key: typeof requiredKeys[number]) {
+    return showFieldErrors && !String(formData[key] ?? '').trim();
+  }
+
+  const inputClass = (key: typeof requiredKeys[number]) =>
+    `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors ${
+      fieldError(key)
+        ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300'
+        : 'border-gray-300 focus:ring-brand-blue'
+    }`;
+
+  const ErrorMsg = ({ k }: { k: typeof requiredKeys[number] }) =>
+    fieldError(k) ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasRequiredErrors()) { setShowFieldErrors(true); setActiveSection('personalInfo'); return; }
     setShowConfirmation(true);
   };
 
@@ -298,10 +323,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const handleNext = () => {
     const currentIndex = sections.findIndex(s => s.id === activeSection);
     if (currentIndex < sections.length - 1) {
-      // Move to next section
+      if (activeSection === 'personalInfo' && hasRequiredErrors()) {
+        setShowFieldErrors(true);
+        return;
+      }
       setActiveSection(sections[currentIndex + 1].id);
     } else {
-      // Last section, show confirmation
+      if (hasRequiredErrors()) { setShowFieldErrors(true); setActiveSection('personalInfo'); return; }
       setShowConfirmation(true);
     }
   };
@@ -470,24 +498,26 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
             <div className="grid grid-cols-4 gap-4">
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Surname</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Surname <span className="text-red-500">*</span></label>
                 <input
                   placeholder="Enter surname"
                   type="text"
                   value={formData.surname}
                   onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  className={inputClass('surname')}
                 />
+                <ErrorMsg k="surname" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">First Name</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">First Name <span className="text-red-500">*</span></label>
                 <input
                   placeholder="Enter first name"
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  className={inputClass('firstName')}
                 />
+                <ErrorMsg k="firstName" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Middle Name</label>
@@ -513,26 +543,27 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
             <div className="grid grid-cols-5 gap-4">
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                  placeholder="mm/dd/yy"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  className={inputClass('dateOfBirth')}
                 />
+                <ErrorMsg k="dateOfBirth" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Sex</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Sex <span className="text-red-500">*</span></label>
                 <select
                   value={formData.sex}
                   onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  className={inputClass('sex')}
                 >
                   <option value=""></option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                 </select>
+                <ErrorMsg k="sex" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Religion</label>
@@ -544,11 +575,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Civil Status</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Civil Status <span className="text-red-500">*</span></label>
                 <select
                   value={formData.civilStatus}
                   onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  className={inputClass('civilStatus')}
                 >
                   <option value=""></option>
                   <option value="Single">Single</option>
@@ -556,6 +587,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <option value="Widowed">Widowed</option>
                   <option value="Separated">Separated</option>
                 </select>
+                <ErrorMsg k="civilStatus" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Height</label>
@@ -583,31 +615,34 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay</label>
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.barangay}
                     onChange={(e) => setFormData({ ...formData, barangay: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    className={inputClass('barangay')}
                   />
+                  <ErrorMsg k="barangay" />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">Municipality/City</label>
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">Municipality/City <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.municipality}
                     onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    className={inputClass('municipality')}
                   />
+                  <ErrorMsg k="municipality" />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">Province</label>
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">Province <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.province}
                     onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    className={inputClass('province')}
                   />
+                  <ErrorMsg k="province" />
                 </div>
               </div>
             </div>
@@ -726,14 +761,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number</label>
+                  <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
                   <input
                     placeholder="Enter contact number"
                     type="text"
                     value={formData.contactNumber}
                     onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    className={inputClass('contactNumber')}
                   />
+                  <ErrorMsg k="contactNumber" />
                 </div>
                 <div>
                   <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Email</label>
@@ -1833,14 +1869,34 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <span className="font-semibold">SPES</span>
                 </label>
                 <label className="flex items-center text-sm">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="mr-2"
                     checked={formData.referredProgram === 'Skills Training'}
                     onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Skills Training' : '' })}
                   />
                   <span className="font-semibold">Skills Training</span>
                 </label>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    className="mr-2"
+                    checked={formData.referredProgram === 'Others'}
+                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Others' : '', referredProgramOther: '' })}
+                  />
+                  <span className="font-semibold">Others</span>
+                </label>
+                {formData.referredProgram === 'Others' && (
+                  <div className="ml-6">
+                    <input
+                      type="text"
+                      value={formData.referredProgramOther}
+                      onChange={(e) => setFormData({ ...formData, referredProgramOther: e.target.value })}
+                      placeholder="Please specify"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -2219,7 +2275,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           </div>
       </div>
 
-      <ConfirmationModal
+
+      <ApplicantReviewModal
         isOpen={showConfirmation}
         title={isEditMode ? "Confirm Update" : "Confirm Applicant Details"}
         message={isEditMode ? "Please review the changes before saving. Are all details correct?" : "Please review the information before saving. Are all details correct?"}

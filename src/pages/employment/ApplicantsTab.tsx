@@ -1,6 +1,7 @@
 // ─── Types & constants ─────────────────────────────────────────────────────────
 
 import { useState } from "react";
+import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
 import type { Applicant } from "../../contexts/EmploymentContext";
 export type { Applicant };
 
@@ -42,9 +43,9 @@ function ApplicantsSkeleton() {
   return (
     <>
       {Array.from({ length: SKELETON_ROW_COUNT }).map((_, rowIdx) => (
-        <tr key={rowIdx} className="border-b border-gray-200">
+        <tr key={rowIdx} className="border-b border-gray-100">
           {Array.from({ length: 8 }).map((_, colIdx) => (
-            <td key={colIdx} className="px-6 py-5">
+            <td key={colIdx} className="px-4 py-3">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
           ))}
@@ -117,59 +118,59 @@ function getOFWLabel(applicant: Applicant): string {
 
 function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: ApplicantsTableRowProps) {
   return (
-    <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors align-top">
-      <td className="px-6 py-5 text-gray-800 font-semibold w-32">{applicant.name}</td>
-      <td className="px-6 py-5 text-gray-600 whitespace-nowrap">{applicant.age}</td>
-      <td className="px-6 py-5 text-gray-600 whitespace-nowrap">{applicant.gender}</td>
-      <td className="px-6 py-5 text-gray-600">{applicant.education}</td>
-      <td className="px-6 py-5 text-gray-600">{applicant.skills}</td>
-      <td className="px-6 py-5 text-gray-600 whitespace-nowrap">General Program</td>
+    <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+      <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{applicant.name}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.gender}</td>
+      <td className="px-4 py-3 text-gray-600">{applicant.education}</td>
+      <td className="px-4 py-3 text-gray-600">{applicant.skills}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">General Program</td>
 
       {activeFilters.includes("disability") && (
-        <td className="px-6 py-5 text-gray-600 whitespace-nowrap">
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
           {applicant.hasDisability ? "Yes" : "No"}
         </td>
       )}
       {activeFilters.includes("civilStatus") && (
-        <td className="px-6 py-5 text-gray-600 whitespace-nowrap">
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
           {applicant.civilStatus || "N/A"}
         </td>
       )}
       {activeFilters.includes("ofw") && (
-        <td className="px-6 py-5 text-gray-600 whitespace-nowrap">
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
           {getOFWLabel(applicant)}
         </td>
       )}
       {activeFilters.includes("4ps") && (
-        <td className="px-6 py-5 text-gray-600 whitespace-nowrap">
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
           {applicant.is4PsBeneficiary ? "Yes" : "No"}
         </td>
       )}
       {activeFilters.includes("jobPreference") && (
-        <td className="px-6 py-5 text-gray-600">
+        <td className="px-4 py-3 text-gray-600">
           {applicant.jobPreference || "N/A"}
         </td>
       )}
       {activeFilters.includes("employmentStatus") && (
-        <td className="px-6 py-5 whitespace-nowrap">
-          <span className={`px-3 py-1 rounded-full text-sm ${getEmploymentStatusClass(applicant.employmentStatus)}`}>
+        <td className="px-4 py-3 whitespace-nowrap">
+          <span className={`px-2 py-0.5 rounded-full text-xs ${getEmploymentStatusClass(applicant.employmentStatus)}`}>
             {applicant.employmentStatus}
           </span>
         </td>
       )}
       {activeFilters.includes("language") && (
-        <td className="px-6 py-5 text-gray-600 whitespace-nowrap">
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
           {applicant.language || "N/A"}
         </td>
       )}
 
-      <td className="px-6 py-5 whitespace-nowrap">
+      <td className="px-4 py-3 whitespace-nowrap">
         <button
           onClick={(e) => onToggleMenu(e, applicant.id)}
           aria-label={`Actions for ${applicant.name}`}
-          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors text-xl leading-none"
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
         >
-          ⋯
+          <MoreHorizontal size={16} />
         </button>
       </td>
     </tr>
@@ -211,20 +212,20 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-base text-left">
+        <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-blue">
               {DEFAULT_HEADERS.map((header) => (
-                <th key={header} className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                <th key={header} className="px-4 py-3 text-left text-white whitespace-nowrap">
                   {header}
                 </th>
               ))}
               {activeFilters.map((filterId) => (
-                <th key={filterId} className="px-6 py-4 text-white font-bold whitespace-nowrap">
+                <th key={filterId} className="px-4 py-3 text-left text-white whitespace-nowrap">
                   {getFilterLabel(filterId)}
                 </th>
               ))}
-              <th className="px-6 py-4 text-white font-bold">Actions</th>
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -251,11 +252,11 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
             style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
           >
-            <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">Edit</button>
-            <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-4 py-3 text-left text-sm font-medium text-brand-blue hover:bg-blue-50">Refer</button>
+            <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
+            <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
+            <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
           </div>
         </>
       )}
@@ -356,16 +357,17 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
         return (
           <div
             key={filterId}
-            className="flex items-center gap-1 px-3 py-1 bg-blue-50 border border-brand-blue rounded-full"
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full"
           >
-            <span className="text-xs font-medium text-brand-blue whitespace-nowrap">
+            <span className="text-sm text-blue-700 font-medium whitespace-nowrap">
               {filter?.label ?? filterId}:
             </span>
             <select
               value={filterValues[filterId] ?? ""}
               onChange={(e) => onFilterValueChange(filterId, e.target.value)}
               aria-label={`Select value for ${filter?.label ?? filterId} filter`}
-              className="text-xs text-gray-700 bg-transparent border-none outline-none cursor-pointer pr-1"
+              className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
+              onClick={(e) => e.stopPropagation()}
             >
               <option value="">All</option>
               {(filter?.options ?? []).map((opt) => (
@@ -375,9 +377,9 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
             <button
               onClick={() => onRemoveFilter(filterId)}
               aria-label={`Remove ${filter?.label ?? filterId} filter`}
-              className="ml-1 text-gray-400 hover:text-red-500 transition-colors text-xs leading-none"
+              className="text-blue-700 hover:text-blue-900 transition-colors"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         );
@@ -410,72 +412,49 @@ function ApplicantsSearchBar({
   const unselectedFilters = AVAILABLE_FILTERS.filter((f) => !activeFilters.includes(f.id));
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      <div className="relative flex-1 min-w-0">
-        <svg
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
-        </svg>
+    <div className="flex flex-wrap gap-3">
+      <div className="relative flex-1 min-w-48">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search by name, barangay, skills, occupation..."
           aria-label="Search applicants"
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-base text-gray-700 placeholder:text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
       </div>
 
-      <div className="relative flex-shrink-0">
+      <div className="relative">
         <button
           onClick={onToggleFilterDropdown}
           aria-expanded={isFilterDropdownOpen}
           aria-haspopup="listbox"
-          className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-lg text-base text-gray-600 bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus size={16} />
           Filter By
-          {activeFilters.length > 0 && (
-            <span className="bg-brand-blue text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {activeFilters.length}
-            </span>
-          )}
-          <svg
-            className={`w-4 h-4 transition-transform ${isFilterDropdownOpen ? "rotate-180" : ""}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <ChevronDown size={14} className="text-gray-500" />
         </button>
 
         {isFilterDropdownOpen && (
           <>
             <div className="fixed inset-0 z-10" aria-hidden="true" onClick={onCloseFilterDropdown} />
-            <ul
-              role="listbox"
-              aria-label="Filter options"
-              className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[200px] py-1"
-            >
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
               {unselectedFilters.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</li>
+                <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
               ) : (
                 unselectedFilters.map((filter) => (
-                  <li
+                  <button
                     key={filter.id}
-                    role="option"
-                    aria-selected={false}
                     onClick={() => onAddFilter(filter.id)}
-                    className="px-4 py-2 text-sm text-gray-700 cursor-pointer hover:bg-blue-50 hover:text-brand-blue transition-colors"
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                   >
                     {filter.label}
-                  </li>
+                  </button>
                 ))
               )}
-            </ul>
+            </div>
           </>
         )}
       </div>
@@ -507,14 +486,14 @@ function ApplicantsToolbar({
   onShowResumeMaker,
 }: ApplicantsToolbarProps) {
   return (
-    <div className="flex flex-wrap gap-3 items-center justify-between">
-      <div className="flex flex-wrap gap-3 items-center">
+    <div className="flex items-center justify-between">
+      <div className="flex gap-2">
         <button
           onClick={onAddApplicant}
           aria-label="Add new applicant"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium whitespace-nowrap text-base text-white bg-brand-blue hover:bg-brand-blue-dark transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Applicant
@@ -523,9 +502,9 @@ function ApplicantsToolbar({
         <button
           onClick={onImportClick}
           aria-label="Import applicants"
-          className="flex items-center gap-2 px-5 py-2.5 text-base text-gray-600 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />
           </svg>
           Import
@@ -537,18 +516,13 @@ function ApplicantsToolbar({
             aria-expanded={isExportDropdownOpen}
             aria-haspopup="menu"
             aria-label="Export applicants"
-            className="flex items-center gap-2 px-5 py-2.5 text-base text-gray-600 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 8l4-4m0 0l4 4m-4-4v12" />
             </svg>
             Export
-            <svg
-              className={`w-4 h-4 transition-transform ${isExportDropdownOpen ? "rotate-180" : ""}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <ChevronDown size={14} />
           </button>
 
           {isExportDropdownOpen && (
@@ -574,9 +548,9 @@ function ApplicantsToolbar({
       <button
         onClick={onShowResumeMaker}
         aria-label="Open Resume Builder"
-        className="flex items-center gap-2 px-5 py-2.5 text-base text-brand-blue border border-brand-blue rounded-lg bg-white hover:bg-blue-50 transition-colors whitespace-nowrap"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-brand-blue border border-brand-blue rounded-md bg-white hover:bg-blue-50 transition-colors whitespace-nowrap"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         Resume Builder
@@ -645,8 +619,8 @@ export default function ApplicantsTab({
   onPageChange,
 }: ApplicantsTabProps) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
+      <div className="bg-white rounded-xl shadow-md p-3">
         <ApplicantsToolbar
           isExportDropdownOpen={isExportDropdownOpen}
           onAddApplicant={onAddApplicant}
@@ -657,26 +631,32 @@ export default function ApplicantsTab({
           onCloseExportDropdown={onCloseExportDropdown}
           onShowResumeMaker={onShowResumeMaker}
         />
-
-        <ApplicantsSearchBar
-          searchQuery={searchQuery}
-          activeFilters={activeFilters}
-          isFilterDropdownOpen={isFilterDropdownOpen}
-          onSearchChange={onSearchChange}
-          onToggleFilterDropdown={onToggleFilterDropdown}
-          onAddFilter={onAddFilter}
-          onCloseFilterDropdown={onCloseFilterDropdown}
-        />
-
-        <ApplicantsFilterBadges
-          activeFilters={activeFilters}
-          filterValues={filterValues}
-          onFilterValueChange={onFilterValueChange}
-          onRemoveFilter={onRemoveFilter}
-        />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="mb-4">
+          <ApplicantsSearchBar
+            searchQuery={searchQuery}
+            activeFilters={activeFilters}
+            isFilterDropdownOpen={isFilterDropdownOpen}
+            onSearchChange={onSearchChange}
+            onToggleFilterDropdown={onToggleFilterDropdown}
+            onAddFilter={onAddFilter}
+            onCloseFilterDropdown={onCloseFilterDropdown}
+          />
+
+          {activeFilters.length > 0 && (
+            <div className="mt-3">
+              <ApplicantsFilterBadges
+                activeFilters={activeFilters}
+                filterValues={filterValues}
+                onFilterValueChange={onFilterValueChange}
+                onRemoveFilter={onRemoveFilter}
+              />
+            </div>
+          )}
+        </div>
+
         <ApplicantsTable
           applicants={paginatedApplicants}
           activeFilters={activeFilters}

@@ -760,7 +760,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
       )}
 
       {/* Main List */}
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto bg-brand-bg">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="mb-6 flex items-center gap-4">
             <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>

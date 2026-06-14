@@ -72,6 +72,30 @@ body {
   background: #f9fafb;
 }
 
+/* Minimal blue scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0077BE;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0065A5;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #0077BE transparent;
+}
+
 h1,
 h2 {
   font-family: var(--heading);

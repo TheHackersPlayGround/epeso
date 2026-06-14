@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 
-type ConfirmationModalProps = {
+type ApplicantReviewModalProps = {
   isOpen: boolean
   title: string
   message: string
@@ -10,14 +10,14 @@ type ConfirmationModalProps = {
   onConfirm: () => void
 }
 
-export default function ConfirmationModal({
+export default function ApplicantReviewModal({
   isOpen,
   title,
   message,
   summaryContent,
   onBackToEdit,
   onConfirm,
-}: ConfirmationModalProps) {
+}: ApplicantReviewModalProps) {
   if (!isOpen) return null
 
   return (

@@ -86,7 +86,7 @@ function ViewProfilePanel({ profile, onClose }: { profile: SkillsTrainingProfile
   const fullName = `${profile.lastName}, ${profile.firstName}${profile.middleName ? ' ' + profile.middleName : ''}`.trim()
 
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EDE9FE' }}>
@@ -237,7 +237,7 @@ function AddProfileForm({
   }
 
   return (
-    <div className="h-full bg-[#E6E7E8] flex flex-col">
+    <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EDE9FE' }}>
@@ -768,7 +768,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       )}
 
       {/* Main scrollable content */}
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto bg-brand-bg">
         <div className="max-w-7xl mx-auto px-6 py-8">
 
           {/* Header */}

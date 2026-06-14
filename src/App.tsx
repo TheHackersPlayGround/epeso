@@ -155,23 +155,25 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
       <Navbar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onLogout={() => setIsLoggedIn(false)}
       />
-      <Dashboard
-        onModuleClick={(id) => {
-          if (id === 'cdsp') setCurrentPage('cdsp')
-          if (id === 'gip') setCurrentPage('gip')
-          if (id === 'spes') setCurrentPage('spes')
-          if (id === 'ofw') setCurrentPage('ofw')
-          if (id === 'employment') setCurrentPage('employment')
-          if (id === 'skills') setCurrentPage('skills')
-          if (id === 'documents') setCurrentPage('documents')
-        }}
-      />
+      <div className="flex-1 overflow-y-auto">
+        <Dashboard
+          onModuleClick={(id) => {
+            if (id === 'cdsp') setCurrentPage('cdsp')
+            if (id === 'gip') setCurrentPage('gip')
+            if (id === 'spes') setCurrentPage('spes')
+            if (id === 'ofw') setCurrentPage('ofw')
+            if (id === 'employment') setCurrentPage('employment')
+            if (id === 'skills') setCurrentPage('skills')
+            if (id === 'documents') setCurrentPage('documents')
+          }}
+        />
+      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Applicant } from "./ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./ApplicantsTab";
@@ -49,33 +49,57 @@ type ReferApplicantPanelProps = {
   onClose: () => void;
 };
 
-function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
-  const [vacancyId, setVacancyId] = useState("");
-  const [referred, setReferred] = useState(false);
+function loadVacanciesForRefer(): Array<{ id: number; jobTitle: string; employer: string; vacanciesCount: number }> {
+  try {
+    const raw = localStorage.getItem('ef_vacancies')
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return []
+}
 
-  function handleRefer(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setReferred(true);
+function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
+  const vacancies = loadVacanciesForRefer().filter(v => (v as any).status !== 'Closed')
+  const [search, setSearch] = useState("")
+  const [selected, setSelected] = useState<{ id: number; label: string } | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [referred, setReferred] = useState(false)
+
+  const filtered = vacancies.filter(v =>
+    `${v.jobTitle} ${v.employer}`.toLowerCase().includes(search.toLowerCase())
+  )
+
+  function handleSelect(v: typeof vacancies[number]) {
+    setSelected({ id: v.id, label: `${v.jobTitle} – ${v.employer} (${v.vacanciesCount} slots)` })
+    setSearch("")
+    setIsOpen(false)
+  }
+
+  function handleConfirm() {
+    if (!selected) return
+    setReferred(true)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        {/* Header */}
         <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <div>
             <p className="text-xl font-bold text-gray-900">Refer Applicant to Job Vacancy</p>
             <p className="text-sm text-gray-500 mt-0.5">Applicant: {applicant.name}</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            ✕
+            <X size={18} />
           </button>
         </div>
 
         <div className="px-6 py-6">
           {referred ? (
             <div className="flex flex-col items-center gap-4 text-center py-4">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">✓</div>
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
               <p className="text-lg font-semibold text-gray-800">Referral Submitted</p>
               <p className="text-sm text-gray-500">{applicant.name} has been referred to the selected vacancy.</p>
               <button onClick={onClose} className="mt-2 px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">
@@ -83,45 +107,61 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleRefer} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="ef-vacancy" className="text-sm font-semibold text-gray-700">
+                <label className="text-sm font-semibold text-gray-700">
                   Select Job Vacancy <span className="text-red-500">*</span>
                 </label>
-                <select
-                  id="ef-vacancy"
-                  value={vacancyId}
-                  onChange={(e) => setVacancyId(e.target.value)}
-                  required
-                  className="border border-brand-blue rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue text-gray-700"
-                >
-                  <option value="">Select a vacancy...</option>
-                  <option value="v1">Accountant - ABC Corporation (3 positions)</option>
-                  <option value="v2">Teacher - XYZ School (5 positions)</option>
-                  <option value="v3">Construction Worker - BuildCo (10 positions)</option>
-                  <option value="v4">Nurse - City Hospital (2 positions)</option>
-                  <option value="v5">Administrative Assistant — City Hall</option>
-                  <option value="v6">Welder — ABC Construction</option>
-                  <option value="v7">Nurse Aide — Tangub City Hospital</option>
-                  <option value="v8">IT Support — DOST Regional Office</option>
-                  <option value="v9">Cook — Tangub City Restaurant</option>
-                </select>
+
+                <div className="relative">
+                  {isOpen && (
+                    <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+                  )}
+                  <div
+                    className={`flex items-center border rounded-lg px-3 py-2.5 gap-2 cursor-text ${isOpen ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-brand-blue'}`}
+                    onClick={() => setIsOpen(true)}
+                  >
+                    <input
+                      type="text"
+                      value={isOpen ? search : (selected?.label ?? '')}
+                      onChange={e => { setSearch(e.target.value); setIsOpen(true) }}
+                      onFocus={() => setIsOpen(true)}
+                      placeholder="Select a vacancy..."
+                      className="flex-1 text-sm outline-none bg-transparent text-gray-700 placeholder:text-gray-400"
+                    />
+                    <ChevronDown size={16} className={`text-gray-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-52 overflow-y-auto">
+                      {filtered.length === 0 ? (
+                        <p className="px-4 py-3 text-sm text-gray-400">No vacancies found</p>
+                      ) : (
+                        filtered.map(v => (
+                          <button key={v.id} type="button"
+                            onClick={() => handleSelect(v)}
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors border-b border-gray-100 last:border-b-0">
+                            <span className="font-medium">{v.jobTitle}</span>
+                            <span className="text-gray-400"> – {v.employer} ({v.vacanciesCount} slots)</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button" onClick={onClose}
-                  className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-                >
+                <button type="button" onClick={onClose}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
-                >
+                <button type="button" onClick={handleConfirm} disabled={!selected}
+                  className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                   Confirm Referral
                 </button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
@@ -426,32 +466,6 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     setIsExportDropdownOpen(false);
   }
 
-  // ── Full-page form (add / edit) ───────────────────────────────────
-  if (isAddModalOpen || editingApplicant) {
-    return (
-      <div className="h-full bg-brand-bg p-6 overflow-y-auto">
-        <AddApplicantSidebar
-          onClose={handleCloseSidebar}
-          onSave={handleSaveApplicant}
-          initialData={editingApplicant?.fullFormData as ApplicantFormData | undefined}
-          isEditMode={!!editingApplicant}
-        />
-      </div>
-    );
-  }
-
-  // ── Full-page view ────────────────────────────────────────────────
-  if (viewingApplicant) {
-    return (
-      <div className="h-full bg-brand-bg p-6 overflow-y-auto">
-        <ViewApplicantSidebar
-          applicant={viewingApplicant}
-          onClose={() => setViewingApplicant(null)}
-        />
-      </div>
-    );
-  }
-
   if (isResumeMakerOpen) {
     return (
       <ResumeMaker
@@ -463,9 +477,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
   // ── Tab layout ────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-brand-bg">
+    <div className="min-h-full flex flex-col bg-brand-bg">
       {/* Title row */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4">
+      <div className="px-8 pt-7 pb-5 flex items-center gap-4">
         <button onClick={onBack} aria-label="Back to dashboard" className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
         <p className="text-2xl font-bold text-gray-800 m-0 p-0 leading-tight">
           Employment Facilitation
@@ -473,7 +487,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       </div>
 
       {/* Tabs card */}
-      <div className="flex-shrink-0 px-7.5 pb-2">
+      <div className="px-7.5 pb-2">
         <div className="bg-white rounded-xl shadow-sm px-6">
           <nav role="tablist" aria-label="Employment Facilitation tabs" className="flex gap-0">
             {TABS.map((tab) => (
@@ -496,36 +510,50 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="p-6">
         {activeTab === "applicants" && (
-          <ApplicantsTab
-            paginatedApplicants={paginatedApplicants}
-            filteredCount={filteredApplicants.length}
-            activeFilters={activeFilters}
-            filterValues={filterValues}
-            searchQuery={searchQuery}
-            currentPage={currentPage}
-            isFilterDropdownOpen={isFilterDropdownOpen}
-            isExportDropdownOpen={isExportDropdownOpen}
-            isFiltered={isFiltered}
-            onAddApplicant={() => setIsAddModalOpen(true)}
-            onEditApplicant={setEditingApplicant}
-            onViewApplicant={setViewingApplicant}
-            onReferApplicant={setReferringApplicant}
-            onImportClick={() => setIsImportModalOpen(true)}
-            onShowResumeMaker={() => setIsResumeMakerOpen(true)}
-            onSearchChange={handleSearchChange}
-            onToggleFilterDropdown={() => setIsFilterDropdownOpen((p) => !p)}
-            onCloseFilterDropdown={() => setIsFilterDropdownOpen(false)}
-            onAddFilter={handleAddFilter}
-            onRemoveFilter={handleRemoveFilter}
-            onFilterValueChange={handleFilterValueChange}
-            onToggleExportDropdown={() => setIsExportDropdownOpen((p) => !p)}
-            onCloseExportDropdown={() => setIsExportDropdownOpen(false)}
-            onExportExcel={handleExportExcel}
-            onExportCsv={handleExportCsv}
-            onPageChange={setCurrentPage}
-          />
+          (isAddModalOpen || editingApplicant) ? (
+            <AddApplicantSidebar
+              onClose={handleCloseSidebar}
+              onSave={handleSaveApplicant}
+              initialData={editingApplicant?.fullFormData as ApplicantFormData | undefined}
+              isEditMode={!!editingApplicant}
+            />
+          ) : viewingApplicant ? (
+            <ViewApplicantSidebar
+              applicant={viewingApplicant}
+              onClose={() => setViewingApplicant(null)}
+            />
+          ) : (
+            <ApplicantsTab
+              paginatedApplicants={paginatedApplicants}
+              filteredCount={filteredApplicants.length}
+              activeFilters={activeFilters}
+              filterValues={filterValues}
+              searchQuery={searchQuery}
+              currentPage={currentPage}
+              isFilterDropdownOpen={isFilterDropdownOpen}
+              isExportDropdownOpen={isExportDropdownOpen}
+              isFiltered={isFiltered}
+              onAddApplicant={() => setIsAddModalOpen(true)}
+              onEditApplicant={setEditingApplicant}
+              onViewApplicant={setViewingApplicant}
+              onReferApplicant={setReferringApplicant}
+              onImportClick={() => setIsImportModalOpen(true)}
+              onShowResumeMaker={() => setIsResumeMakerOpen(true)}
+              onSearchChange={handleSearchChange}
+              onToggleFilterDropdown={() => setIsFilterDropdownOpen((p) => !p)}
+              onCloseFilterDropdown={() => setIsFilterDropdownOpen(false)}
+              onAddFilter={handleAddFilter}
+              onRemoveFilter={handleRemoveFilter}
+              onFilterValueChange={handleFilterValueChange}
+              onToggleExportDropdown={() => setIsExportDropdownOpen((p) => !p)}
+              onCloseExportDropdown={() => setIsExportDropdownOpen(false)}
+              onExportExcel={handleExportExcel}
+              onExportCsv={handleExportCsv}
+              onPageChange={setCurrentPage}
+            />
+          )
         )}
         {activeTab === "vacancies" && <VacanciesTab />}
         {activeTab === "referrals" && <ReferralsTab />}

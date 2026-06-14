@@ -19,6 +19,64 @@ export type Applicant = {
   fullFormData?: Record<string, unknown>;
 };
 
+export type Employer = {
+  id: number
+  companyName: string
+  industry: string
+  industryOther: string
+  companySize: string
+  businessType: string
+  yearsInOperation: string
+  tinNumber: string
+  contactPersonName: string
+  position: string
+  contactNumber: string
+  email: string
+  buildingNo: string
+  street: string
+  barangay: string
+  city: string
+  province: string
+  region: string
+  jobOpenings: Array<{ jobName: string; slots: string }>
+  status: 'Active' | 'Inactive'
+  dateRegistered: string
+  remarks: string
+}
+
+export const EMPLOYER_SEED: Employer[] = [
+  { id: 1, companyName: 'ABC Corporation', industry: 'Manufacturing', industryOther: '', companySize: 'Large (201+ employees)', businessType: 'Corporation', yearsInOperation: '15', tinNumber: '123-456-789-000', contactPersonName: 'Maria Santos', position: 'HR Manager', contactNumber: '09123456789', email: 'hr@abccorp.com', buildingNo: '1', street: 'Rizal St', barangay: 'Poblacion', city: 'Tangub City', province: 'Misamis Occidental', region: 'Region X', jobOpenings: [{ jobName: 'Accountant', slots: '3' }], status: 'Active', dateRegistered: '2020-01-15', remarks: '' },
+  { id: 2, companyName: 'TechHub Solutions', industry: 'Information Technology', industryOther: '', companySize: 'Medium (51-200 employees)', businessType: 'Corporation', yearsInOperation: '8', tinNumber: '234-567-890-000', contactPersonName: 'John Reyes', position: 'CEO', contactNumber: '09234567890', email: 'jobs@techhub.com', buildingNo: '2', street: 'Mabini St', barangay: 'Mantic', city: 'Tangub City', province: 'Misamis Occidental', region: 'Region X', jobOpenings: [{ jobName: 'IT Support', slots: '2' }], status: 'Active', dateRegistered: '2021-03-10', remarks: '' },
+  { id: 3, companyName: 'Green Valley Farm', industry: 'Agriculture', industryOther: '', companySize: 'Small (1-50 employees)', businessType: 'Sole Proprietorship', yearsInOperation: '20', tinNumber: '345-678-901-000', contactPersonName: 'Rosa Garcia', position: 'Owner', contactNumber: '09345678901', email: 'hr@greenvalley.ph', buildingNo: '3', street: 'National Highway', barangay: 'Maloro', city: 'Tangub City', province: 'Misamis Occidental', region: 'Region X', jobOpenings: [{ jobName: 'Farm Worker', slots: '10' }], status: 'Active', dateRegistered: '2019-06-01', remarks: '' },
+  { id: 4, companyName: 'City Hospital', industry: 'Healthcare', industryOther: '', companySize: 'Large (201+ employees)', businessType: 'Corporation', yearsInOperation: '30', tinNumber: '456-789-012-000', contactPersonName: 'Dr. Pedro Lim', position: 'Administrator', contactNumber: '09456789012', email: 'admin@cityhospital.gov.ph', buildingNo: '1', street: 'Hospital Road', barangay: 'Poblacion', city: 'Tangub City', province: 'Misamis Occidental', region: 'Region X', jobOpenings: [{ jobName: 'Nurse', slots: '2' }, { jobName: 'Nurse Aide', slots: '3' }], status: 'Active', dateRegistered: '2018-01-01', remarks: '' },
+  { id: 5, companyName: 'XYZ School', industry: 'Education', industryOther: '', companySize: 'Medium (51-200 employees)', businessType: 'Corporation', yearsInOperation: '25', tinNumber: '567-890-123-000', contactPersonName: 'Ana Cruz', position: 'Principal', contactNumber: '09567890123', email: 'hr@xyzschool.edu.ph', buildingNo: '10', street: 'School St', barangay: 'Banglay', city: 'Tangub City', province: 'Misamis Occidental', region: 'Region X', jobOpenings: [{ jobName: 'Teacher', slots: '5' }], status: 'Active', dateRegistered: '2019-08-01', remarks: '' },
+]
+
+export type Vacancy = {
+  id: number
+  jobTitle: string
+  employer: string
+  vacanciesCount: number
+  industry: string
+  jobType: string
+  salaryRange: string
+  description: string
+  requirements: string
+  status: 'Open' | 'Closed'
+}
+
+export const VACANCY_SEED: Vacancy[] = [
+  { id: 1, jobTitle: 'Accountant',           employer: 'ABC Corporation',       vacanciesCount: 3,  industry: 'Manufacturing',          jobType: 'Full-time', salaryRange: '₱20,000 - ₱30,000', description: 'Responsible for financial records and reporting.', requirements: 'BS Accountancy graduate, CPA preferred.', status: 'Open' },
+  { id: 2, jobTitle: 'Teacher',              employer: 'XYZ School',            vacanciesCount: 5,  industry: 'Education',              jobType: 'Full-time', salaryRange: '₱18,000 - ₱25,000', description: 'Teach core subjects to elementary students.', requirements: 'LET passer, BS Education graduate.', status: 'Open' },
+  { id: 3, jobTitle: 'Construction Worker',  employer: 'BuildCo',               vacanciesCount: 10, industry: 'Construction',           jobType: 'Contract',  salaryRange: '₱12,000 - ₱18,000', description: 'Assist in building construction projects.', requirements: 'With experience in construction work.', status: 'Open' },
+  { id: 4, jobTitle: 'Nurse',               employer: 'City Hospital',          vacanciesCount: 2,  industry: 'Healthcare',             jobType: 'Full-time', salaryRange: '₱22,000 - ₱28,000', description: 'Provide patient care and medical assistance.', requirements: 'RN licensed, at least 1 year experience.', status: 'Open' },
+  { id: 5, jobTitle: 'Administrative Asst', employer: 'City Hall',              vacanciesCount: 1,  industry: 'Government',             jobType: 'Full-time', salaryRange: '₱15,000 - ₱20,000', description: 'Provide administrative support to the office.', requirements: 'College graduate, computer literate.', status: 'Open' },
+  { id: 6, jobTitle: 'Welder',              employer: 'ABC Construction',       vacanciesCount: 4,  industry: 'Construction',           jobType: 'Contract',  salaryRange: '₱15,000 - ₱22,000', description: 'Perform welding tasks on construction sites.', requirements: 'NC II holder in welding, with experience.', status: 'Open' },
+  { id: 7, jobTitle: 'Nurse Aide',          employer: 'Tangub City Hospital',   vacanciesCount: 3,  industry: 'Healthcare',             jobType: 'Part-time', salaryRange: '₱10,000 - ₱14,000', description: 'Assist nurses in patient care duties.', requirements: 'Nursing aide certificate, willing to work shifts.', status: 'Open' },
+  { id: 8, jobTitle: 'IT Support',          employer: 'DOST Regional Office',   vacanciesCount: 2,  industry: 'Information Technology', jobType: 'Full-time', salaryRange: '₱20,000 - ₱28,000', description: 'Provide technical support and maintain IT systems.', requirements: 'BS Computer Science or IT graduate.', status: 'Open' },
+  { id: 9, jobTitle: 'Cook',               employer: 'Tangub City Restaurant', vacanciesCount: 6,  industry: 'Hospitality',            jobType: 'Full-time', salaryRange: '₱12,000 - ₱16,000', description: 'Prepare and cook meals for restaurant service.', requirements: 'With experience in food preparation, TESDA NC II preferred.', status: 'Open' },
+]
+
 export const SEED: Applicant[] = [
   {
     id: 1,

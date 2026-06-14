@@ -920,7 +920,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         </div>
       )}
 
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto bg-brand-bg">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">

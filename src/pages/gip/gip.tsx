@@ -790,7 +790,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
       {/* Main Content */}
       <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         <div className="mb-6 flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
           <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>Government Internship Program (GIP)</p>
@@ -897,54 +897,54 @@ export default function GIPView({ onBack }: GIPViewProps) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-brand-blue">
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Name</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Barangay</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Classification</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Office</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Position</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Allowance</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Activity</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Name</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Office</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Position</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Allowance</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Activity</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(applicant => (
                     <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
-                        <p className="text-gray-400">{applicant.sex} &middot; {applicant.age} yrs</p>
+                        <p className="text-gray-400 text-xs">{applicant.sex} &middot; {applicant.age} yrs</p>
                         {activeFilters.includes('civilStatus') && applicant.civilStatus && (
-                          <p className="text-gray-400">{applicant.civilStatus}</p>
+                          <p className="text-gray-400 text-xs">{applicant.civilStatus}</p>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-gray-600">{applicant.barangay}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 text-gray-600">{applicant.barangay}</td>
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {applicant.classification.slice(0, 1).map(c => (
-                            <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{c}</span>
+                            <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
                           ))}
                           {applicant.classification.length > 1 && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{applicant.classification.length - 1}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         <p>{applicant.assignedOffice || '—'}</p>
-                        {applicant.department && <p className="text-gray-400">{applicant.department}</p>}
+                        {applicant.department && <p className="text-gray-400 text-xs">{applicant.department}</p>}
                       </td>
-                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{applicant.position || '—'}</td>
-                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.position || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         {applicant.allowance ? `₱${applicant.allowance}` : '—'}
                       </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[160px]">
+                      <td className="px-4 py-3 text-gray-600 max-w-[160px]">
                         <span className="line-clamp-2">{applicant.assignedActivity || '—'}</span>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()

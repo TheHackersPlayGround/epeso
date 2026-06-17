@@ -5,14 +5,14 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useSPES } from '../../contexts/SPESContext'
-import type { SPESApplicant } from '../../contexts/SPESContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
+import type { SPESApplicant, SPESBatch, SPESBatchAssignment } from '../../contexts/SPESContext'
 import AddressFields from '../../components/AddressFields'
 
 interface SPESViewProps {
   onBack: () => void
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCHOOL_TYPE_OPTIONS = [
   'Junior High School',
@@ -30,8 +30,7 @@ const GRADE_YEAR_LEVEL_OPTIONS = [
 ]
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated']
-const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Completed', 'Dropped', 'Suspended']
-const WORKING_HOURS_OPTIONS = ['4', '6', '8']
+const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Inactive']
 
 const emptyForm: Omit<SPESApplicant, 'id'> = {
   lastName: '', firstName: '', middleName: '',
@@ -40,25 +39,37 @@ const emptyForm: Omit<SPESApplicant, 'id'> = {
   streetPurok: '', barangay: '', cityMunicipality: 'Tangub City', province: 'Misamis Occidental', region: 'Region X',
   schoolName: '', schoolType: '', gradeYearLevel: '', course: '',
   annualFamilyIncome: '', numberOfDependents: 0,
-  employer: '', employerDepartment: '', position: '',
-  workStartDate: '', workEndDate: '', stipend: '3,500', workingHoursPerDay: '4',
   assignedActivity: '',
+  assignedBatchId: null,
+  assignmentHistory: [],
   attachedDocuments: [],
   dateApplicationReceived: '', receivedBy: '',
-  status: 'Active', remarks: '',
+  status: 'Inactive', remarks: '',
 }
 
-// ─── Status Badge ────────────────────────────────────────────────────────────
+// ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: SPESApplicant['status'] }) {
   const colors: Record<string, string> = {
     Active: 'bg-blue-100 text-blue-700',
-    Completed: 'bg-green-100 text-green-700',
-    Dropped: 'bg-red-100 text-red-600',
-    Suspended: 'bg-yellow-100 text-yellow-700',
+    Inactive: 'bg-gray-100 text-gray-500',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {status}
+    </span>
+  )
+}
+
+function BatchStatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    Ongoing: 'bg-green-100 text-green-700',
+    Completed: 'bg-blue-100 text-blue-700',
+    Open: 'bg-sky-50 text-sky-600',
+    Closed: 'bg-gray-100 text-gray-500',
+  }
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-500'}`}>
       {status}
     </span>
   )
@@ -109,7 +120,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
     <div>
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
           value={docName}
           onChange={e => setDocName(e.target.value)}
@@ -143,7 +154,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
 
 // ─── View Panel ───────────────────────────────────────────────────────────────
 
-function ViewApplicantPanel({ applicant, onClose }: { applicant: SPESApplicant; onClose: () => void }) {
+function ViewApplicantPanel({ applicant, spesBatches, onClose }: { applicant: SPESApplicant; spesBatches: SPESBatch[]; onClose: () => void }) {
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
     <div>
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
@@ -207,19 +218,46 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: SPESApplicant; 
             <Field label="Annual Family Income" value={applicant.annualFamilyIncome ? `₱${applicant.annualFamilyIncome}` : ''} />
             <Field label="Number of Dependents" value={applicant.numberOfDependents} />
           </div>
-          <Sec num="V" title="Employment Details" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Employer / Agency" value={applicant.employer} />
-            <Field label="Department / Office" value={applicant.employerDepartment} />
-            <Field label="Position / Job Title" value={applicant.position} />
-            <Field label="Stipend" value={applicant.stipend ? `₱${applicant.stipend}` : ''} />
-            <Field label="Work Start Date" value={applicant.workStartDate} />
-            <Field label="Work End Date" value={applicant.workEndDate} />
-            <Field label="Working Hours / Day" value={applicant.workingHoursPerDay ? `${applicant.workingHoursPerDay} hrs` : ''} />
-          </div>
-          <Sec num="VI" title="Assignment" />
-          <Field label="Assigned Activity" value={applicant.assignedActivity} />
-          <Sec num="VII" title="Attached Documents" />
+          <Sec num="V" title="Assignments" />
+          {applicant.assignmentHistory && applicant.assignmentHistory.length > 0 ? (
+            <div className="space-y-3">
+              {applicant.assignmentHistory.map((entry, i) => {
+                const batch = spesBatches.find(b => b.id === entry.batchId)
+                const batchStatus = batch?.status ?? 'Completed'
+                const isCurrent = applicant.assignedBatchId === entry.batchId
+                const statusStyles: Record<string, string> = {
+                  Completed: 'bg-blue-100 text-blue-700 border border-blue-200',
+                  Ongoing:   'bg-green-100 text-green-700 border border-green-200',
+                  Open:      'bg-sky-50 text-sky-600 border border-sky-200',
+                  Closed:    'bg-gray-100 text-gray-500 border border-gray-200',
+                }
+                return (
+                  <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.batchName}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Date Assigned: {entry.assignedDate || '—'}</p>
+                      {entry.completedDate && (
+                        <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyles[batchStatus] ?? statusStyles.Closed}`}>
+                        {batchStatus}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue font-semibold">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No batch assignments on record.</p>
+          )}
+          <Sec num="VI" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
               {applicant.attachedDocuments.map((doc, i) => (
@@ -231,12 +269,11 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: SPESApplicant; 
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VIII" title="For PESO Office Only" gray />
+          <Sec num="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Application Received" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
-            <Field label="Status" value={applicant.status} />
-            <Field label="Remarks" value={applicant.remarks} />
+            <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
           </div>
         </div>
       </div>
@@ -252,6 +289,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
   onSave: (data: Omit<SPESApplicant, 'id'>) => void
   onClose: () => void
 }) {
+  const { spesBatches } = useSPES()
   const [formData, setFormData] = useState(initial)
   const set = (patch: Partial<Omit<SPESApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
 
@@ -260,16 +298,19 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
     set({ birthdate: date, age })
   }
 
+  // Status is derived — Active if a batch is currently assigned, Inactive otherwise
+  const derivedStatus: SPESApplicant['status'] = formData.assignedBatchId !== null ? 'Active' : 'Inactive'
+
   const handleSave = () => {
     if (!formData.lastName.trim() || !formData.firstName.trim()) {
       alert('Please fill in Last Name and First Name.')
       return
     }
-    onSave(formData)
+    onSave({ ...formData, status: derivedStatus })
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
-  const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
+  const lbl = 'block text-xs uppercase tracking-wide text-gray-400 mb-1'
   const sel = `${inp} bg-white`
 
   const SectionDivider = ({ num, title, gray }: { num: string; title: string; gray?: boolean }) => (
@@ -287,17 +328,21 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
           </div>
-          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
+          <h2 className="text-gray-800 text-lg">
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — SPES'}
-          </p>
+          </h2>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        <div className="flex items-center gap-3">
+          <StatusBadge status={derivedStatus} />
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        </div>
       </div>
 
       {/* Scrollable Form */}
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
 
+          {/* I. Personal Information */}
           <SectionDivider num="I" title="Personal Information" />
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
@@ -347,6 +392,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
+          {/* II. Address */}
           <SectionDivider num="II" title="Address" />
           <AddressFields
             value={{
@@ -361,6 +407,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             labelClass={lbl}
           />
 
+          {/* III. Educational Information */}
           <SectionDivider num="III" title="Educational Information" />
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="col-span-2">
@@ -389,6 +436,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             )}
           </div>
 
+          {/* IV. Family / Economic Information */}
           <SectionDivider num="IV" title="Family / Economic Information" />
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
@@ -401,40 +449,48 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="V" title="Employment Details" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="col-span-2">
-              <label className={lbl}>Employer / Agency</label>
-              <input className={inp} value={formData.employer} onChange={e => set({ employer: e.target.value })} placeholder="e.g. City Hall" />
+          {/* V. Assignments (read-only history) */}
+          <SectionDivider num="V" title="Assignments" />
+          {formData.assignmentHistory && formData.assignmentHistory.length > 0 ? (
+            <div className="space-y-3 mb-2">
+              {formData.assignmentHistory.map((entry: SPESBatchAssignment, i: number) => {
+                const batch = spesBatches.find(b => b.id === entry.batchId)
+                const batchStatus = batch?.status ?? 'Completed'
+                const isCurrent = formData.assignedBatchId === entry.batchId
+                const statusStyles: Record<string, string> = {
+                  Completed: 'bg-blue-100 text-blue-700 border border-blue-200',
+                  Ongoing:   'bg-green-100 text-green-700 border border-green-200',
+                  Open:      'bg-sky-50 text-sky-600 border border-sky-200',
+                  Closed:    'bg-gray-100 text-gray-500 border border-gray-200',
+                }
+                return (
+                  <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.batchName}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Date Assigned: {entry.assignedDate || '—'}</p>
+                      {entry.completedDate && (
+                        <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyles[batchStatus] ?? statusStyles.Closed}`}>
+                        {batchStatus}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue font-semibold">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-            <div>
-              <label className={lbl}>Department / Office</label>
-              <input className={inp} value={formData.employerDepartment} onChange={e => set({ employerDepartment: e.target.value })} placeholder="e.g. MIS / IT Department" />
-            </div>
-            <div>
-              <label className={lbl}>Position / Job Title</label>
-              <input className={inp} value={formData.position} onChange={e => set({ position: e.target.value })} placeholder="e.g. IT Assistant" />
-            </div>
-            <div>
-              <label className={lbl}>Stipend (₱)</label>
-              <input className={inp} value={formData.stipend} onChange={e => set({ stipend: e.target.value })} placeholder="e.g. 3,500" />
-            </div>
-            <div>
-              <label className={lbl}>Working Hours / Day</label>
-              <select className={sel} value={formData.workingHoursPerDay} onChange={e => set({ workingHoursPerDay: e.target.value })}>
-                {WORKING_HOURS_OPTIONS.map(o => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Work Start Date</label>
-              <input type="date" className={inp} value={formData.workStartDate} onChange={e => set({ workStartDate: e.target.value })} />
-            </div>
-            <div>
-              <label className={lbl}>Work End Date</label>
-              <input type="date" className={inp} value={formData.workEndDate} onChange={e => set({ workEndDate: e.target.value })} />
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-gray-400 mb-2">No batch assignments yet. Use "Assign Batch" from the applicant list.</p>
+          )}
 
+          {/* VI. Attached Documents */}
           <SectionDivider num="VI" title="Attached Documents" />
           <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. school ID, certificate of enrollment). This section is optional / if applicable.</p>
           <AttachedDocsEditor
@@ -442,6 +498,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             onChange={docs => set({ attachedDocuments: docs })}
           />
 
+          {/* VII. For PESO Office Only */}
           <SectionDivider num="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -452,18 +509,13 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
               <label className={lbl}>Received By</label>
               <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Staff name" />
             </div>
-            <div>
-              <label className={lbl}>Status</label>
-              <select className={sel} value={formData.status} onChange={e => set({ status: e.target.value as SPESApplicant['status'] })}>
-                {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className={lbl}>Remarks</label>
               <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
             <button onClick={onClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
@@ -480,9 +532,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
 // ─── Main SPESView ────────────────────────────────────────────────────────────
 
 export default function SPESView({ onBack }: SPESViewProps) {
-  const { applicants, setApplicants } = useSPES()
-  const { getActivitiesByProgram } = useProgramActivities()
-  const spesActivities = getActivitiesByProgram('SPES') as ProgramActivity[]
+  const { applicants, setApplicants, spesBatches } = useSPES()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
@@ -518,6 +568,11 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [editingApplicant, setEditingApplicant] = useState<SPESApplicant | null>(null)
   const [viewingApplicant, setViewingApplicant] = useState<SPESApplicant | null>(null)
   const [assignTarget, setAssignTarget] = useState<SPESApplicant | null>(null)
+  const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
+  const [confirmingBatch, setConfirmingBatch] = useState<SPESBatch | null>(null)
+  const [viewingAssignedBatchFor, setViewingAssignedBatchFor] = useState<SPESApplicant | null>(null)
+  const [confirmUnassignId, setConfirmUnassignId] = useState<number | null>(null)
+  const [batchSearch, setBatchSearch] = useState('')
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -534,7 +589,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
       fullName.includes(searchQuery.toLowerCase()) ||
       a.barangay.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.schoolName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.employer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.assignedActivity.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilters = activeFilters.every(filterId => {
       const val = filterValues[filterId]
@@ -567,18 +621,33 @@ export default function SPESView({ onBack }: SPESViewProps) {
     setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
   }
 
-  const handleAssign = (activity: ProgramActivity) => {
+  const handleAssign = (batch: SPESBatch) => {
     if (!assignTarget) return
-    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? { ...a, assignedActivity: activity.title } : a))
+    const today = new Date().toISOString().split('T')[0]
+    setApplicants(prev => prev.map(a => {
+      if (a.id !== assignTarget.id) return a
+      const alreadyInHistory = a.assignmentHistory.some(h => h.batchId === batch.id)
+      const updatedHistory: SPESBatchAssignment[] = alreadyInHistory
+        ? a.assignmentHistory
+        : [...a.assignmentHistory, { batchId: batch.id, batchName: batch.batchName, assignedDate: today }]
+      return { ...a, assignedActivity: batch.batchName, assignedBatchId: batch.id, assignmentHistory: updatedHistory, status: 'Active' }
+    }))
     setAssignTarget(null)
-    setSuccessModal({ open: true, message: `Assigned to "${activity.title}" successfully.` })
+    setSelectedBatch(null)
+    setConfirmingBatch(null)
+    setBatchSearch('')
+    setSuccessModal({ open: true, message: `Assigned to "${batch.batchName}" successfully.` })
   }
 
-  const handleUnassign = () => {
-    if (!assignTarget) return
-    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? { ...a, assignedActivity: '' } : a))
+  const handleUnassign = (targetId?: number) => {
+    const id = targetId ?? assignTarget?.id
+    if (!id) return
+    setApplicants(prev => prev.map(a => a.id === id ? { ...a, assignedActivity: '', assignedBatchId: null, status: 'Inactive' } : a))
     setAssignTarget(null)
-    setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
+    setSelectedBatch(null)
+    setViewingAssignedBatchFor(null)
+    setBatchSearch('')
+    setSuccessModal({ open: true, message: 'Assigned batch has been removed.' })
   }
 
   const exportToExcel = () => {
@@ -590,10 +659,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
       'School Name': a.schoolName, 'School Type': a.schoolType,
       'Grade / Year Level': a.gradeYearLevel, 'Course': a.course,
       'Annual Family Income': a.annualFamilyIncome, 'Number of Dependents': a.numberOfDependents,
-      'Employer': a.employer, 'Department': a.employerDepartment, 'Position': a.position,
-      'Work Start Date': a.workStartDate, 'Work End Date': a.workEndDate,
-      'Stipend': a.stipend, 'Working Hours / Day': a.workingHoursPerDay,
-      'Assigned Activity': a.assignedActivity,
+      'Assigned Batch': a.assignedActivity,
       'Status': a.status, 'Remarks': a.remarks,
       'Date Received': a.dateApplicationReceived, 'Received By': a.receivedBy,
     }))
@@ -608,8 +674,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
     const data = filtered.map(a => ({
       'Last Name': a.lastName, 'First Name': a.firstName,
       'School': a.schoolName, 'Grade / Year Level': a.gradeYearLevel,
-      'Employer': a.employer, 'Stipend': a.stipend,
-      'Assigned Activity': a.assignedActivity, 'Status': a.status,
+      'Assigned Batch': a.assignedActivity, 'Status': a.status,
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const csv = XLSX.utils.sheet_to_csv(ws)
@@ -645,12 +710,13 @@ export default function SPESView({ onBack }: SPESViewProps) {
 
   // Full-page form for edit
   if (editingApplicant) {
-    const { id: _id, ...rest } = editingApplicant
+    const { id, ...rest } = editingApplicant
     return <ApplicantForm initial={rest} mode="edit" onSave={handleEditSave} onClose={() => setEditingApplicant(null)} />
   }
 
-  // Full-page view
-  if (viewingApplicant) return <ViewApplicantPanel applicant={viewingApplicant} onClose={() => setViewingApplicant(null)} />
+  // Full-page view — always use live data from applicants array
+  const liveViewingApplicant = viewingApplicant ? (applicants.find(a => a.id === viewingApplicant.id) ?? viewingApplicant) : null
+  if (liveViewingApplicant) return <ViewApplicantPanel applicant={liveViewingApplicant} spesBatches={spesBatches} onClose={() => setViewingApplicant(null)} />
 
   return (
     <>
@@ -669,58 +735,242 @@ export default function SPESView({ onBack }: SPESViewProps) {
         onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
 
-      {/* Assign Activity Modal */}
-      {assignTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div>
-                <h3 className="text-gray-800">Assign Activity</h3>
-                <p className="text-sm text-gray-400 mt-0.5">{assignTarget.firstName} {assignTarget.lastName}</p>
-              </div>
-              <button onClick={() => setAssignTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+      {/* Assign Batch — detail modal (step 2) */}
+      {assignTarget && selectedBatch && (() => {
+        const isAssigned = assignTarget.assignedBatchId === selectedBatch.id
+        const statusColor =
+          selectedBatch.status === 'Ongoing'   ? 'bg-green-100 text-green-700' :
+          selectedBatch.status === 'Completed' ? 'bg-blue-100 text-blue-700'  :
+          selectedBatch.status === 'Open'      ? 'bg-blue-50 text-blue-600'   :
+                                                  'bg-gray-100 text-gray-600'
+        const Row = ({ label, value }: { label: string; value?: string | number }) =>
+          value ? (
+            <div className="flex gap-3 py-2.5 border-b border-gray-100 last:border-0">
+              <span className="text-xs text-gray-400 w-40 flex-shrink-0 pt-0.5">{label}</span>
+              <span className="text-sm text-gray-800 font-medium">{value}</span>
             </div>
-            <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
-              {(() => {
-                const planned = spesActivities.filter(a => a.status === 'Planned')
-                if (planned.length === 0) return (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-gray-400">No planned SPES activities available.</p>
-                    <p className="text-xs text-gray-300 mt-1">Only planned activities can be assigned to applicants.</p>
+          ) : null
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+                <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                  <div>
+                    <h3 className="text-white m-0 text-base font-semibold">Assign Batch</h3>
+                    <p className="text-white/80 text-sm mt-0.5">{assignTarget.lastName}, {assignTarget.firstName} {assignTarget.middleName}</p>
                   </div>
-                )
-                return planned.map(activity => (
-                  <button key={activity.id} onClick={() => handleAssign(activity)}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-brand-blue hover:bg-blue-50 ${
-                      assignTarget.assignedActivity === activity.title ? 'border-brand-blue bg-blue-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-800">{activity.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {activity.assignedOffice && `${activity.assignedOffice} · `}{activity.startDate} – {activity.endDate}
-                        </p>
-                        {activity.allowance && <p className="text-xs text-gray-400">Stipend: ₱{activity.allowance}</p>}
-                      </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">Planned</span>
+                  <button onClick={() => setSelectedBatch(null)} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
+                </div>
+                <div className="overflow-y-auto flex-1 p-6">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-lg font-semibold text-gray-800">{selectedBatch.batchName}</p>
+                      {selectedBatch.description && <p className="text-sm text-gray-500 mt-1">{selectedBatch.description}</p>}
+                      {isAssigned && <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full text-xs font-semibold">Currently Assigned</span>}
                     </div>
-                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-brand-blue mt-1">Currently assigned</p>}
-                  </button>
-                ))
-              })()}
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${statusColor}`}>{selectedBatch.status}</span>
+                  </div>
+                  <div className="mt-4">
+                    <Row label="Employer / Agency" value={selectedBatch.employer} />
+                    <Row label="Deployment Location" value={selectedBatch.deploymentLocation} />
+                    <Row label="Program Coordinator" value={selectedBatch.coordinator} />
+                    <Row label="Supervisor" value={selectedBatch.supervisor} />
+                    <Row label="Application Period" value={selectedBatch.applicationStartDate && selectedBatch.applicationEndDate ? `${selectedBatch.applicationStartDate} – ${selectedBatch.applicationEndDate}` : ''} />
+                    <Row label="Program Start Date" value={selectedBatch.programStartDate} />
+                    <Row label="Program End Date" value={selectedBatch.programEndDate} />
+                    <Row label="Available Slots" value={selectedBatch.availableSlots} />
+                    {selectedBatch.targetBeneficiaries && <Row label="Target Beneficiaries" value={selectedBatch.targetBeneficiaries} />}
+                    <Row label="Funding Source" value={selectedBatch.fundingSource === 'Other' ? `Other — ${selectedBatch.fundingSourceOther}` : selectedBatch.fundingSource} />
+                  </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                  <button onClick={() => setSelectedBatch(null)} className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium">Change Batch</button>
+                  <button onClick={() => setConfirmingBatch(selectedBatch)} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium">{isAssigned ? 'Re-assign' : 'Assign'}</button>
+                </div>
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2">
-              {assignTarget.assignedActivity && (
-                <button onClick={handleUnassign} className="w-full py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  Remove Assigned Activity
-                </button>
-              )}
-              <button onClick={() => setAssignTarget(null)} className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <ConfirmModal
+              isOpen={!!confirmingBatch}
+              type="confirm"
+              title="Confirm Assignment"
+              message={`Assign "${selectedBatch.batchName}" to ${assignTarget.firstName} ${assignTarget.lastName}?`}
+              confirmText="Yes, Assign"
+              onConfirm={() => handleAssign(selectedBatch)}
+              onCancel={() => setConfirmingBatch(null)}
+            />
+          </>
+        )
+      })()}
+
+      {/* View Assigned Batch modal */}
+      {viewingAssignedBatchFor && (() => {
+        const batch = spesBatches.find(b => b.id === viewingAssignedBatchFor.assignedBatchId)
+        const close = () => setViewingAssignedBatchFor(null)
+        const statusColor = (s: string) =>
+          s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
+          s === 'Completed' ? 'bg-blue-100 text-blue-700'  :
+          s === 'Open'      ? 'bg-blue-50 text-blue-600'   :
+                              'bg-gray-100 text-gray-600'
+        const Row = ({ label, value }: { label: string; value?: string | number }) =>
+          value ? (
+            <div className="flex gap-3 py-2.5 border-b border-gray-100 last:border-0">
+              <span className="text-xs text-gray-400 w-40 flex-shrink-0 pt-0.5">{label}</span>
+              <span className="text-sm text-gray-800 font-medium">{value}</span>
+            </div>
+          ) : null
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+              <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-white m-0 text-base">Assigned Batch</h3>
+                  <p className="text-white/80 text-sm mt-0.5">{viewingAssignedBatchFor.lastName}, {viewingAssignedBatchFor.firstName} {viewingAssignedBatchFor.middleName}</p>
+                </div>
+                <button onClick={close} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-6">
+                {batch ? (
+                  <>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-semibold text-gray-800">{batch.batchName}</p>
+                        {batch.description && <p className="text-sm text-gray-500 mt-1">{batch.description}</p>}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${statusColor(batch.status)}`}>{batch.status}</span>
+                    </div>
+                    <div>
+                      <Row label="Employer / Agency" value={batch.employer} />
+                      <Row label="Deployment Location" value={batch.deploymentLocation} />
+                      <Row label="Program Coordinator" value={batch.coordinator} />
+                      <Row label="Supervisor" value={batch.supervisor} />
+                      <Row label="Application Period" value={batch.applicationStartDate && batch.applicationEndDate ? `${batch.applicationStartDate} – ${batch.applicationEndDate}` : ''} />
+                      <Row label="Program Start Date" value={batch.programStartDate} />
+                      <Row label="Program End Date" value={batch.programEndDate} />
+                      <Row label="Available Slots" value={batch.availableSlots} />
+                      {batch.targetBeneficiaries && <Row label="Target Beneficiaries" value={batch.targetBeneficiaries} />}
+                      <Row label="Funding Source" value={batch.fundingSource === 'Other' ? `Other — ${batch.fundingSourceOther}` : batch.fundingSource} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-sm font-medium text-gray-700 mb-1">{viewingAssignedBatchFor.assignedActivity}</p>
+                    <p className="text-xs text-gray-400">Batch details not found. It may have been deleted in Maintenance.</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                <button onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)} className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium">Unassign</button>
+                <button onClick={() => { close(); setAssignTarget(viewingAssignedBatchFor) }} className="px-4 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium">Change Batch</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
+
+      {/* Assign Batch — selection modal (step 1) */}
+      {assignTarget && !selectedBatch && (() => {
+        const currentBatch = assignTarget.assignedBatchId
+          ? spesBatches.find(b => b.id === assignTarget.assignedBatchId) ?? null
+          : null
+        const filteredBatches = spesBatches
+          .filter(b => b.status === 'Open' || b.status === 'Ongoing')
+          .filter(b =>
+            batchSearch === '' ||
+            b.batchName.toLowerCase().includes(batchSearch.toLowerCase()) ||
+            b.employer.toLowerCase().includes(batchSearch.toLowerCase()) ||
+            b.coordinator.toLowerCase().includes(batchSearch.toLowerCase())
+          )
+        const scBadge = (s: string) =>
+          s === 'Open'    ? 'bg-blue-50 text-blue-600 font-medium'   :
+          s === 'Ongoing' ? 'bg-green-100 text-green-700 font-medium' :
+                            'bg-gray-100 text-gray-600 font-medium'
+        const close = () => { setAssignTarget(null); setBatchSearch('') }
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+              <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-white m-0 text-base font-semibold">Assign Batch</h3>
+                  <p className="text-white/80 text-sm mt-0.5">{assignTarget.firstName} {assignTarget.lastName}</p>
+                </div>
+                <button onClick={close} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
+              </div>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search batches..."
+                    value={batchSearch}
+                    onChange={e => setBatchSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1 px-1">
+                  <AlertCircle size={11} className="flex-shrink-0" />
+                  Only Open and Ongoing batches are shown
+                </p>
+              </div>
+              {currentBatch && (
+                <div className="mx-4 mb-2 bg-blue-50 border border-orange-100 rounded-xl px-4 py-3 flex items-start justify-between gap-3 flex-shrink-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-brand-blue uppercase tracking-widest mb-1">Currently Assigned</p>
+                    <p className="text-sm font-semibold text-gray-800 truncate">{currentBatch.batchName}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {currentBatch.employer && <span className="text-xs text-gray-500">{currentBatch.employer}</span>}
+                      <BatchStatusBadge status={currentBatch.status} />
+                    </div>
+                  </div>
+                  <button onClick={() => setConfirmUnassignId(assignTarget.id)} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0">Unassign</button>
+                </div>
+              )}
+              <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
+                {filteredBatches.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
+                    <p className="text-gray-400 text-sm">{batchSearch ? 'No batches match your search.' : 'No Open or Ongoing SPES batches available.'}</p>
+                    <p className="text-gray-400 text-xs mt-1">Add batches in Maintenance → SPES first.</p>
+                  </div>
+                ) : filteredBatches.map(batch => {
+                  const isCurrent = assignTarget.assignedBatchId === batch.id
+                  return (
+                    <button
+                      key={batch.id}
+                      onClick={() => setSelectedBatch(batch)}
+                      className={`w-full px-4 py-3.5 text-left rounded-xl border transition-all hover:border-blue-200 hover:bg-blue-50 ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-semibold text-gray-800">{batch.batchName}</span>
+                            {isCurrent && <span className="text-xs px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full font-medium">Current</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500 flex-wrap">
+                            {batch.employer && <span>{batch.employer}</span>}
+                            {batch.coordinator && <><span>·</span><span>{batch.coordinator}</span></>}
+                          </div>
+                          {(batch.programStartDate || batch.programEndDate) && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                              {batch.programStartDate && batch.programEndDate
+                                ? <span>{batch.programStartDate} – {batch.programEndDate}</span>
+                                : <span>{batch.programStartDate || batch.programEndDate}</span>}
+                              {batch.availableSlots && <><span>·</span><span>{batch.availableSlots} slots</span></>}
+                            </div>
+                          )}
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5 ${scBadge(batch.status)}`}>{batch.status}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="px-4 py-3 border-t border-gray-100 flex-shrink-0">
+                <button onClick={close} className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Import Modal */}
       {isImportModalOpen && (
@@ -761,7 +1011,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
 
       {/* Main List */}
       <div className="h-full overflow-y-auto bg-brand-bg">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="w-full px-6 py-8">
           <div className="mb-6 flex items-center gap-4">
             <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
             <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>Special Program for Employment of Students (SPES)</p>
@@ -799,7 +1049,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
-                    placeholder="Search by name, barangay, school, or employer..."
+                    placeholder="Search by name, barangay, school, or assigned batch..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />
@@ -866,43 +1116,42 @@ export default function SPESView({ onBack }: SPESViewProps) {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-brand-blue">
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Name</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">School</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Grade / Year Level</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Employer</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Allowance</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Activity</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
-                      <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Name</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">School</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Grade / Year Level</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Batch</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map(applicant => (
                       <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="px-3 py-2 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
-                          <p className="text-gray-400">{applicant.sex} · {applicant.age} yrs</p>
+                          <p className="text-gray-400 text-xs">{applicant.sex} · {applicant.age} yrs</p>
                         </td>
-                        <td className="px-3 py-2 text-gray-600">
+                        <td className="px-4 py-3 text-gray-600">
                           <p className="whitespace-nowrap">{applicant.schoolName || '—'}</p>
-                          {applicant.schoolType && <p className="text-gray-400">{applicant.schoolType}</p>}
+                          {applicant.schoolType && <p className="text-gray-400 text-xs">{applicant.schoolType}</p>}
                         </td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{applicant.gradeYearLevel || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600">
-                          <p className="whitespace-nowrap">{applicant.employer || '—'}</p>
-                          {applicant.employerDepartment && <p className="text-gray-400">{applicant.employerDepartment}</p>}
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.gradeYearLevel || '—'}</td>
+                        <td className="px-4 py-3 text-gray-600 max-w-[200px]">
+                          {applicant.assignedActivity ? (
+                            <div>
+                              <p className="line-clamp-2 leading-snug mb-1">{applicant.assignedActivity}</p>
+                              {(() => {
+                                const batch = spesBatches.find(b => b.id === applicant.assignedBatchId)
+                                return batch ? <BatchStatusBadge status={batch.status} /> : null
+                              })()}
+                            </div>
+                          ) : <span>—</span>}
                         </td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                          {applicant.stipend ? `₱${applicant.stipend}` : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-gray-600 max-w-[160px]">
-                          <span className="line-clamp-2">{applicant.assignedActivity || '—'}</span>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
-                        <td className="px-3 py-2 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <button
                             onClick={e => {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
@@ -938,17 +1187,32 @@ export default function SPESView({ onBack }: SPESViewProps) {
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div
               style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-              className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+              className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
             >
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
-              <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
+              {applicant.assignedBatchId ? (
+                <button onClick={() => { setViewingAssignedBatchFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue font-medium hover:bg-blue-50">View Assigned Batch</button>
+              ) : (
+                <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Batch</button>
+              )}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
             </div>
           </>
         )
       })()}
+
+      {/* Unassign confirmation — rendered last so it appears above all other modals */}
+      <ConfirmModal
+        isOpen={confirmUnassignId !== null}
+        type="confirm"
+        title="Remove Batch Assignment"
+        message="Are you sure you want to remove the assigned batch from this applicant?"
+        confirmText="Yes, Remove"
+        onConfirm={() => { if (confirmUnassignId !== null) { handleUnassign(confirmUnassignId); setConfirmUnassignId(null) } }}
+        onCancel={() => setConfirmUnassignId(null)}
+      />
     </>
   )
 }

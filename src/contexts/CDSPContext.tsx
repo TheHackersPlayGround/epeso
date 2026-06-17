@@ -45,7 +45,7 @@ export interface CDSPApplicant {
   dateApplicationReceived: string
   receivedBy: string
   counselorName: string
-  status: 'Active' | 'Completed' | 'Referred' | 'Dropped'
+  status: 'Active' | 'Inactive' | 'Completed' | 'Referred' | 'Dropped'
   remarks: string
   attachedDocuments: { name: string; file: File; url: string }[]
 }

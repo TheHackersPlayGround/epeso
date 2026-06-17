@@ -40,17 +40,6 @@ const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Underemployed', 'Unemployed', 'S
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
 
-const COACHING_TYPE_OPTIONS = [
-  'Career Path Planning', 'Career Assessment / Profiling', 'Career Counseling',
-  'Resume / Application Letter Writing', 'Career Change Guidance', 'Entrepreneurial Counseling',
-]
-
-const INDUSTRIES_OPTIONS = [
-  'Information Technology (IT)', 'Healthcare / Medical', 'Business Process Outsourcing (BPO)',
-  'Manufacturing', 'Construction', 'Agriculture', 'Education', 'Government Service',
-  'Hospitality & Tourism', 'Finance & Banking', 'Retail & Commerce',
-  'Transportation & Logistics', 'Overseas Employment',
-]
 
 const emptyForm: Omit<CDSPApplicant, 'id'> = {
   lastName: '', firstName: '', middleName: '',
@@ -70,11 +59,20 @@ const emptyForm: Omit<CDSPApplicant, 'id'> = {
   attachedDocuments: [],
 }
 
+// ─── Activity status badge ─────────────────────────────────────────────────────
+
+function activityStatusBadge(status: string) {
+  if (status === 'Ongoing')   return 'bg-green-100 text-green-700'
+  if (status === 'Completed') return 'bg-blue-100 text-blue-700'
+  return 'bg-yellow-100 text-yellow-700'
+}
+
 // ─── Status badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: CDSPApplicant['status'] }) {
   const colors: Record<string, string> = {
     Active: 'bg-blue-100 text-blue-700',
+    Inactive: 'bg-gray-100 text-gray-500',
     Completed: 'bg-green-100 text-green-700',
     Referred: 'bg-yellow-100 text-yellow-700',
     Dropped: 'bg-red-100 text-red-700',
@@ -228,44 +226,9 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
           </div>
           <Field label="Assigned Activity" value={applicant.assignedActivity} />
 
-          {applicant.serviceAvailed && (
-            <>
-              <SectionDivider numeral="VII" title="Service Details" />
-              {applicant.serviceAvailed === 'Career Coaching' && (
-                <div className="grid grid-cols-2 gap-5">
-                  <Field label="Career Goal" value={applicant.careerGoal} />
-                  <Field label="Type of Coaching" value={applicant.coachingType} />
-                  <div className="col-span-2"><Field label="Assessment Result / Recommendation" value={applicant.careerAssessmentResult} /></div>
-                </div>
-              )}
-              {applicant.serviceAvailed === 'Pre-Employment Coaching' && (
-                <div className="grid grid-cols-1 gap-4">
-                  <Field label="Target Job" value={applicant.targetJob} />
-                  {applicant.industriesOfInterest.length > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Industries of Interest</p>
-                      <div className="flex flex-wrap gap-1">
-                        {applicant.industriesOfInterest.map((i) => (
-                          <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs">{i}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {applicant.serviceAvailed === 'Labor Employment for Graduating Students' && (
-                <div className="grid grid-cols-2 gap-5">
-                  <Field label="Course / Program" value={applicant.courseProgram} />
-                  <Field label="Year Level" value={applicant.yearLevel} />
-                  <Field label="Expected Graduation" value={applicant.expectedGraduation} />
-                </div>
-              )}
-            </>
-          )}
-
           {(applicant.attachedDocuments?.length ?? 0) > 0 && (
             <>
-              <SectionDivider numeral="VIII" title="Attached Documents" />
+              <SectionDivider numeral="VII" title="Attached Documents" />
               <div className="space-y-2">
                 {applicant.attachedDocuments.map((doc, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
@@ -283,7 +246,7 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; 
             </>
           )}
 
-          <SectionDivider numeral="IX" title="For PESO Office Only" gray />
+          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Received" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -558,68 +521,13 @@ function AddProfileForm({
             ))}
           </div>
 
-          {/* VII. Service Details (conditional) */}
-          {formData.serviceAvailed && (
-            <>
-              <SectionDivider numeral="VII" title="Service Details" />
-              {formData.serviceAvailed === 'Career Coaching' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className={lbl}>Career Goal</label>
-                    <textarea className={inp} rows={2} value={formData.careerGoal} onChange={(e) => set({ careerGoal: e.target.value })} placeholder="Career goal..." />
-                  </div>
-                  <div>
-                    <label className={lbl}>Type of Coaching</label>
-                    <select className={sel} value={formData.coachingType} onChange={(e) => set({ coachingType: e.target.value })}>
-                      <option value="">Select</option>
-                      {COACHING_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-              {formData.serviceAvailed === 'Pre-Employment Coaching' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className={lbl}>Target Job</label>
-                    <input className={inp} value={formData.targetJob} onChange={(e) => set({ targetJob: e.target.value })} placeholder="e.g. Customer Service Rep" />
-                  </div>
-                  <div>
-                    <label className={lbl}>Industries of Interest</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      {INDUSTRIES_OPTIONS.map((ind) => (
-                        <CheckItem key={ind} label={ind} checked={formData.industriesOfInterest.includes(ind)} onChange={() => toggleArr('industriesOfInterest', ind)} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {formData.serviceAvailed === 'Labor Employment for Graduating Students' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>Course / Program</label>
-                    <input className={inp} value={formData.courseProgram} onChange={(e) => set({ courseProgram: e.target.value })} placeholder="e.g. BS Nursing" />
-                  </div>
-                  <div>
-                    <label className={lbl}>Year Level</label>
-                    <select className={sel} value={formData.yearLevel} onChange={(e) => set({ yearLevel: e.target.value })}>
-                      <option value="">Select</option>
-                      {['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'Graduating'].map((y) => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* VIII. Attached Documents */}
-          <SectionDivider numeral="VIII" title="Attached Documents" />
+          {/* VII. Attached Documents */}
+          <SectionDivider numeral="VII" title="Attached Documents" />
           <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
           <DocAttachSection documents={formData.attachedDocuments} onChange={(docs) => set({ attachedDocuments: docs })} />
 
-          {/* IX. PESO Office Only */}
-          <SectionDivider numeral="IX" title="For PESO Office Only" gray />
+          {/* VIII. PESO Office Only */}
+          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Received</label>
@@ -637,6 +545,7 @@ function AddProfileForm({
               <label className={lbl}>Status</label>
               <select className={sel} value={formData.status} onChange={(e) => set({ status: e.target.value as CDSPApplicant['status'] })}>
                 <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
                 <option value="Completed">Completed</option>
                 <option value="Referred">Referred</option>
                 <option value="Dropped">Dropped</option>
@@ -675,7 +584,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
   const availableFilters = [
     { id: 'service', label: 'Service', options: CDSP_SERVICES },
-    { id: 'status', label: 'Status', options: ['Active', 'Completed', 'Referred', 'Dropped'] },
+    { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed', 'Referred', 'Dropped'] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
     { id: 'civilStatus', label: 'Civil Status', options: CIVIL_STATUS_OPTIONS },
   ]
@@ -709,6 +618,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<ProgramActivity | null>(null)
+  const [confirmingActivity, setConfirmingActivity] = useState<ProgramActivity | null>(null)
+  const [viewingAssignedFor, setViewingAssignedFor] = useState<CDSPApplicant | null>(null)
+  const [confirmUnassignId, setConfirmUnassignId] = useState<number | null>(null)
 
   const filtered = applicants.filter((a) => {
     const fullName = `${a.lastName} ${a.firstName} ${a.middleName}`.toLowerCase()
@@ -746,14 +659,24 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   }
   const handleAssign = (activity: ProgramActivity) => {
     if (!assignTarget) return
-    setApplicants((prev) => prev.map((a) => a.id === assignTarget.id ? { ...a, assignedActivity: activity.title } : a))
+    setApplicants((prev) => prev.map((a) =>
+      a.id === assignTarget.id ? { ...a, assignedActivity: activity.title, status: 'Active' as const } : a
+    ))
     setAssignTarget(null)
+    setSelectedActivity(null)
+    setConfirmingActivity(null)
     setSuccessModal({ open: true, message: `Assigned to "${activity.title}" successfully.` })
   }
-  const handleUnassign = () => {
-    if (!assignTarget) return
-    setApplicants((prev) => prev.map((a) => a.id === assignTarget.id ? { ...a, assignedActivity: '' } : a))
+  const handleUnassign = (targetId?: number) => {
+    const id = targetId ?? assignTarget?.id
+    if (!id) return
+    setApplicants((prev) => prev.map((a) =>
+      a.id === id ? { ...a, assignedActivity: '', status: 'Inactive' as const } : a
+    ))
     setAssignTarget(null)
+    setSelectedActivity(null)
+    setViewingAssignedFor(null)
+    setConfirmUnassignId(null)
     setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
   }
 
@@ -836,7 +759,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       id: Date.now() + Math.random(),
       lastName: row.lastName, firstName: row.firstName,
       serviceAvailed: CDSP_SERVICES.includes(row.service) ? row.service : '',
-      status: (['Active', 'Completed', 'Referred', 'Dropped'].includes(row.status) ? row.status : 'Active') as CDSPApplicant['status'],
+      status: (['Active', 'Inactive', 'Completed', 'Referred', 'Dropped'].includes(row.status) ? row.status : 'Active') as CDSPApplicant['status'],
     }))])
     setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([])
     alert(`Successfully imported ${valid.length} applicant(s)!`)
@@ -870,58 +793,249 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
 
-      {/* Assign Activity Modal */}
-      {assignTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div>
-                <p className="text-gray-800 font-semibold">Assign Activity</p>
-                <p className="text-sm text-gray-400 mt-0.5">{assignTarget.firstName} {assignTarget.lastName}</p>
+      {/* View Assigned Activity Modal */}
+      {viewingAssignedFor && (() => {
+        const activity = cdspActivities.find(a => a.title === viewingAssignedFor.assignedActivity)
+        const close = () => setViewingAssignedFor(null)
+        const scBadge = (s: string) =>
+          s === 'Ongoing' ? 'bg-green-100 text-green-700' :
+          s === 'Completed' ? 'bg-blue-100 text-blue-700' :
+          'bg-yellow-100 text-yellow-700'
+        const Row = ({ label, value }: { label: string; value?: string | number }) =>
+          value ? (
+            <div className="flex gap-3 py-2.5 border-b border-gray-100 last:border-0">
+              <span className="text-xs text-gray-400 w-36 flex-shrink-0 pt-0.5">{label}</span>
+              <span className="text-sm text-gray-800 font-medium">{value}</span>
+            </div>
+          ) : null
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+              <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-white m-0 text-base font-semibold">Assigned Activity</h3>
+                  <p className="text-white/80 text-sm mt-0.5">{viewingAssignedFor.lastName}, {viewingAssignedFor.firstName} {viewingAssignedFor.middleName}</p>
+                </div>
+                <button onClick={close} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
               </div>
-              <button onClick={() => setAssignTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
-              {(() => {
-                const planned = cdspActivities.filter((a) => a.status === 'Planned')
-                if (planned.length === 0) return (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-gray-400">No planned CDSP activities available.</p>
-                    <p className="text-xs text-gray-300 mt-1">Only planned activities can be assigned.</p>
-                  </div>
-                )
-                return planned.map((activity) => (
-                  <button
-                    key={activity.id}
-                    onClick={() => handleAssign(activity)}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-brand-blue hover:bg-blue-50 ${assignTarget.assignedActivity === activity.title ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
+              <div className="overflow-y-auto flex-1 p-6">
+                {activity ? (
+                  <>
+                    <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-800">{activity.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{activity.service} · {activity.date} · {activity.location}</p>
+                        <p className="text-lg font-semibold text-gray-800">{activity.title}</p>
                       </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">Planned</span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${scBadge(activity.status)}`}>{activity.status}</span>
                     </div>
-                    {assignTarget.assignedActivity === activity.title && <p className="text-xs text-brand-blue mt-1">Currently assigned</p>}
-                  </button>
-                ))
-              })()}
+                    <div>
+                      <Row label="Service" value={activity.service} />
+                      <Row label="Date" value={activity.date} />
+                      <Row label="Start Date" value={activity.startDate} />
+                      <Row label="End Date" value={activity.endDate} />
+                      <Row label="Location / Venue" value={activity.location} />
+                      <Row label="Assigned Office" value={activity.assignedOffice} />
+                      <Row label="Facilitator" value={activity.facilitator} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-sm font-medium text-gray-700 mb-1">{viewingAssignedFor.assignedActivity}</p>
+                    <p className="text-xs text-gray-400">Activity details not found.</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                {(!activity || (activity.status !== 'Completed' && activity.status !== 'Ongoing')) && (
+                  <button
+                    onClick={() => setConfirmUnassignId(viewingAssignedFor.id)}
+                    className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium"
+                  >Unassign</button>
+                )}
+                {(!activity || (activity.status !== 'Completed' && activity.status !== 'Ongoing')) && (
+                  <button
+                    onClick={() => { close(); setAssignTarget(viewingAssignedFor) }}
+                    className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium"
+                  >Change Activity</button>
+                )}
+                <button onClick={close} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium">Close</button>
+              </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2">
-              {assignTarget.assignedActivity && (
-                <button onClick={handleUnassign} className="w-full py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  Remove Assigned Activity
-                </button>
-              )}
-              <button onClick={() => setAssignTarget(null)} className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-            </div>
+            <ConfirmModal
+              isOpen={confirmUnassignId !== null}
+              type="confirm"
+              title="Remove Assignment"
+              message="Are you sure you want to remove the assigned activity from this applicant?"
+              confirmText="Yes, Remove"
+              cancelText="Cancel"
+              onConfirm={() => { if (confirmUnassignId !== null) handleUnassign(confirmUnassignId) }}
+              onCancel={() => setConfirmUnassignId(null)}
+            />
           </div>
-        </div>
-      )}
+        )
+      })()}
+
+      {/* Assign Activity Modal — Step 1: Select */}
+      {assignTarget && !selectedActivity && (() => {
+        const currentActivity = assignTarget.assignedActivity
+          ? cdspActivities.find(a => a.title === assignTarget.assignedActivity) ?? null
+          : null
+        const available = cdspActivities.filter(a =>
+          (a.status === 'Planned' || a.status === 'Ongoing') &&
+          (!assignTarget.serviceAvailed || a.service === assignTarget.serviceAvailed)
+        )
+        const scBadge = (s: string) => s === 'Ongoing' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+              <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-white m-0 text-base font-semibold">Assign Activity</h3>
+                  <p className="text-white/80 text-sm mt-0.5">{assignTarget.firstName} {assignTarget.lastName}</p>
+                </div>
+                <button onClick={() => setAssignTarget(null)} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
+              </div>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input placeholder="Search activities..." className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" readOnly />
+                </div>
+                {assignTarget.serviceAvailed && (
+                  <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1 px-1">
+                    <AlertCircle size={11} className="flex-shrink-0" />
+                    Showing <span className="font-semibold text-brand-blue mx-1">{assignTarget.serviceAvailed}</span> activities only
+                  </p>
+                )}
+              </div>
+              {currentActivity && (
+                <div className="mx-4 mb-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start justify-between gap-3 flex-shrink-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-brand-blue uppercase tracking-widest mb-1">Currently Assigned</p>
+                    <p className="text-sm font-semibold text-gray-800 truncate">{currentActivity.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {currentActivity.service && <span className="text-xs text-gray-500">{currentActivity.service}</span>}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${scBadge(currentActivity.status)}`}>{currentActivity.status}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setConfirmUnassignId(assignTarget.id)} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0">Unassign</button>
+                </div>
+              )}
+              <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
+                {available.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
+                    <p className="text-gray-400 text-sm">
+                      No Planned or Ongoing activities found{assignTarget.serviceAvailed && ` for "${assignTarget.serviceAvailed}"`}.
+                    </p>
+                  </div>
+                ) : available.map(activity => {
+                  const isCurrent = assignTarget.assignedActivity === activity.title
+                  return (
+                    <button
+                      key={activity.id}
+                      onClick={() => setSelectedActivity(activity)}
+                      className={`w-full px-4 py-3.5 text-left rounded-xl border transition-all hover:border-blue-200 hover:bg-blue-50 ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-semibold text-gray-800">{activity.title}</span>
+                            {isCurrent && <span className="text-xs px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full font-medium">Current</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500 flex-wrap">
+                            {activity.service && <span>{activity.service}</span>}
+                            {activity.date && <><span>·</span><span>{activity.date}</span></>}
+                            {activity.location && <><span>·</span><span>{activity.location}</span></>}
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5 font-medium ${scBadge(activity.status)}`}>{activity.status}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="px-4 py-3 border-t border-gray-100 flex-shrink-0">
+                <button onClick={() => setAssignTarget(null)} className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </div>
+            <ConfirmModal
+              isOpen={confirmUnassignId !== null}
+              type="confirm"
+              title="Remove Assignment"
+              message="Are you sure you want to remove the assigned activity from this applicant?"
+              confirmText="Yes, Remove"
+              cancelText="Cancel"
+              onConfirm={() => { if (confirmUnassignId !== null) handleUnassign(confirmUnassignId) }}
+              onCancel={() => setConfirmUnassignId(null)}
+            />
+          </div>
+        )
+      })()}
+
+      {/* Assign Activity Modal — Step 2: Confirm */}
+      {assignTarget && selectedActivity && (() => {
+        const isAssigned = assignTarget.assignedActivity === selectedActivity.title
+        const statusColor =
+          selectedActivity.status === 'Ongoing' ? 'bg-green-100 text-green-700' :
+          selectedActivity.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
+          'bg-yellow-100 text-yellow-700'
+        const Row = ({ label, value }: { label: string; value?: string | number }) =>
+          value ? (
+            <div className="flex gap-3 py-2.5 border-b border-gray-100 last:border-0">
+              <span className="text-xs text-gray-400 w-36 flex-shrink-0 pt-0.5">{label}</span>
+              <span className="text-sm text-gray-800 font-medium">{value}</span>
+            </div>
+          ) : null
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[85vh]">
+                <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                  <div>
+                    <h3 className="text-white m-0 text-base font-semibold">Assign Activity</h3>
+                    <p className="text-white/80 text-sm mt-0.5">{assignTarget.lastName}, {assignTarget.firstName} {assignTarget.middleName}</p>
+                  </div>
+                  <button onClick={() => setSelectedActivity(null)} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
+                </div>
+                <div className="overflow-y-auto flex-1 p-6">
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-lg font-semibold text-gray-800">{selectedActivity.title}</p>
+                      {isAssigned && <span className="inline-block mt-1.5 px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full text-xs font-semibold">Currently Assigned</span>}
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${statusColor}`}>{selectedActivity.status}</span>
+                  </div>
+                  <div>
+                    <Row label="Service" value={selectedActivity.service} />
+                    <Row label="Date" value={selectedActivity.date} />
+                    <Row label="Start Date" value={selectedActivity.startDate} />
+                    <Row label="End Date" value={selectedActivity.endDate} />
+                    <Row label="Location / Venue" value={selectedActivity.location} />
+                    <Row label="Assigned Office" value={selectedActivity.assignedOffice} />
+                    <Row label="Facilitator" value={selectedActivity.facilitator} />
+                  </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                  <button onClick={() => setSelectedActivity(null)} className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium">Change Activity</button>
+                  <button onClick={() => setConfirmingActivity(selectedActivity)} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium">{isAssigned ? 'Re-assign' : 'Assign'}</button>
+                </div>
+              </div>
+            </div>
+            <ConfirmModal
+              isOpen={!!confirmingActivity}
+              type="confirm"
+              title="Confirm Assignment"
+              message={`Assign "${selectedActivity.title}" to ${assignTarget.firstName} ${assignTarget.lastName}?`}
+              confirmText="Yes, Assign"
+              cancelText="Cancel"
+              onConfirm={() => handleAssign(selectedActivity)}
+              onCancel={() => setConfirmingActivity(null)}
+            />
+          </>
+        )
+      })()}
 
       <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -1073,42 +1187,52 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-brand-blue">
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Name</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Barangay</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Classification</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Service Availed</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Activity</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Name</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Service Availed</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Activity</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((applicant) => (
                     <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName}{applicant.middleName ? ` ${applicant.middleName.charAt(0)}.` : ''}</p>
-                        <p className="text-gray-400">{applicant.sex} · {applicant.age} yrs</p>
+                        <p className="text-gray-400 text-xs">{applicant.sex} · {applicant.age} yrs</p>
                       </td>
-                      <td className="px-3 py-2 text-gray-600">{applicant.barangay || '—'}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 text-gray-600">{applicant.barangay || '—'}</td>
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {applicant.classification.slice(0, 1).map((c) => (
-                            <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{c}</span>
+                            <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
                           ))}
                           {applicant.classification.length > 1 && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{applicant.classification.length - 1}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
-                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded whitespace-nowrap">{applicant.serviceAvailed || '—'}</span>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded whitespace-nowrap text-xs">{applicant.serviceAvailed || '—'}</span>
                       </td>
-                      <td className="px-3 py-2 text-gray-600">{applicant.assignedActivity || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3">
+                        {applicant.assignedActivity ? (() => {
+                          const act = cdspActivities.find(a => a.title === applicant.assignedActivity)
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm text-gray-800 line-clamp-1">{applicant.assignedActivity}</span>
+                              {act && <span className={`self-start px-1.5 py-0.5 rounded-full text-xs font-medium ${activityStatusBadge(act.status)}`}>{act.status}</span>}
+                            </div>
+                          )
+                        })() : <span className="text-gray-400 text-xs italic">Not assigned</span>}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={(e) => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
@@ -1141,7 +1265,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
             <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
-              <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
+              {applicant.assignedActivity
+                ? <button onClick={() => { setViewingAssignedFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50">View Assigned Activity</button>
+                : <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
+              }
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
             </div>

@@ -769,7 +769,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
       {/* Main scrollable content */}
       <div className="h-full overflow-y-auto bg-brand-bg">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="w-full px-6 py-8">
 
           {/* Header */}
           <div className="mb-6 flex items-center gap-4">
@@ -868,64 +868,64 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-brand-blue">
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Applicant Name</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Classification</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Desired Qualification</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Purpose of Training</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Assigned Training</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Status</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Date Applied</th>
-                    <th className="px-3 py-3 text-left text-white whitespace-nowrap">Actions</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Applicant Name</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Desired Qualification</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Purpose of Training</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Training</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProfiles.map(profile => (
                     <tr key={profile.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <p className="text-gray-800 font-medium">{profile.lastName}, {profile.firstName}{profile.middleName ? ` ${profile.middleName.charAt(0)}.` : ''}</p>
-                        <p className="text-gray-400">{profile.sex}{profile.age ? ` · ${profile.age} yrs` : ''}</p>
+                        <p className="text-gray-400 text-xs">{profile.sex}{profile.age ? ` · ${profile.age} yrs` : ''}</p>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {profile.classification.slice(0, 1).map(c => <span key={c} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{c}</span>)}
+                          {profile.classification.slice(0, 1).map(c => <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>)}
                           {(profile.classification.length + profile.classificationOther.filter(Boolean).length) > 1 && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{profile.classification.length + profile.classificationOther.filter(Boolean).length - 1}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{profile.classification.length + profile.classificationOther.filter(Boolean).length - 1}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {profile.desiredQualification.slice(0, 1).map(q => <span key={q} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">{q}</span>)}
+                          {profile.desiredQualification.slice(0, 1).map(q => <span key={q} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{q}</span>)}
                           {(profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length) > 1 && (
-                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">+{profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length - 1}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length - 1}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {profile.purposeOfTraining.slice(0, 1).map(pt => <span key={pt} className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded max-w-[120px] truncate inline-block">{pt}</span>)}
-                          {profile.purposeOfTraining.length > 1 && <span className="px-1.5 py-0.5 bg-green-50 text-green-500 rounded">+{profile.purposeOfTraining.length - 1}</span>}
+                          {profile.purposeOfTraining.slice(0, 1).map(pt => <span key={pt} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs max-w-[140px] truncate inline-block">{pt}</span>)}
+                          {profile.purposeOfTraining.length > 1 && <span className="px-2 py-0.5 bg-green-50 text-green-500 rounded text-xs">+{profile.purposeOfTraining.length - 1}</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         {profile.assignedTrainingId ? (
                           <div>
                             <p className="text-gray-800 line-clamp-1">{getTrainingName(profile.assignedTrainingId)}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              {profile.trainingBatchNo && <span className="text-gray-400">{profile.trainingBatchNo}</span>}
-                              {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-1.5 py-0.5 rounded-full ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
+                              {profile.trainingBatchNo && <span className="text-gray-400 text-xs">{profile.trainingBatchNo}</span>}
+                              {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-2 py-0.5 rounded-full text-xs ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
                             </div>
                           </div>
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
-                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{profile.dateApplicationReceived || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateApplicationReceived || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()

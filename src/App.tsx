@@ -21,31 +21,37 @@ import './styles/App.css'
 
 type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance'
 
-export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+function AppContent() {
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
 
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />
+  const nav = (id: string) => {
+    if (id === 'cdsp') setCurrentPage('cdsp')
+    if (id === 'gip') setCurrentPage('gip')
+    if (id === 'spes') setCurrentPage('spes')
+    if (id === 'ofw') setCurrentPage('ofw')
+    if (id === 'employment') setCurrentPage('employment')
+    if (id === 'skills') setCurrentPage('skills')
+    if (id === 'documents') setCurrentPage('documents')
+    if (id === 'maintenance') setCurrentPage('maintenance')
   }
+
+  const navbar = (
+    <Navbar
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onLogout={() => setCurrentPage('dashboard')}
+    />
+  )
 
   if (currentPage === 'cdsp') {
     return (
-      <CDSPProvider>
-        <ProgramActivitiesProvider>
-          <div className="h-screen flex flex-col overflow-hidden">
-            <Navbar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onLogout={() => setIsLoggedIn(false)}
-            />
-            <div className="flex-1 overflow-hidden">
-              <CDSPView onBack={() => setCurrentPage('dashboard')} />
-            </div>
-          </div>
-        </ProgramActivitiesProvider>
-      </CDSPProvider>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-hidden">
+          <CDSPView onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
     )
   }
 
@@ -54,11 +60,7 @@ export default function App() {
       <GIPProvider>
         <ProgramActivitiesProvider>
           <div className="h-screen flex flex-col overflow-hidden">
-            <Navbar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onLogout={() => setIsLoggedIn(false)}
-            />
+            {navbar}
             <div className="flex-1 overflow-hidden">
               <GIPView onBack={() => setCurrentPage('dashboard')} />
             </div>
@@ -70,20 +72,12 @@ export default function App() {
 
   if (currentPage === 'spes') {
     return (
-      <SPESProvider>
-        <ProgramActivitiesProvider>
-          <div className="h-screen flex flex-col overflow-hidden">
-            <Navbar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onLogout={() => setIsLoggedIn(false)}
-            />
-            <div className="flex-1 overflow-hidden">
-              <SPESView onBack={() => setCurrentPage('dashboard')} />
-            </div>
-          </div>
-        </ProgramActivitiesProvider>
-      </SPESProvider>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-hidden">
+          <SPESView onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
     )
   }
 
@@ -91,11 +85,7 @@ export default function App() {
     return (
       <OFWProvider>
         <div className="h-screen flex flex-col overflow-hidden">
-          <Navbar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onLogout={() => setIsLoggedIn(false)}
-          />
+          {navbar}
           <div className="flex-1 overflow-hidden">
             <OFWView onBack={() => setCurrentPage('dashboard')} />
           </div>
@@ -107,11 +97,7 @@ export default function App() {
   if (currentPage === 'employment') {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
-        <Navbar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onLogout={() => setIsLoggedIn(false)}
-        />
+        {navbar}
         <div className="flex-1 overflow-y-auto">
           <EmploymentFacilitation onBack={() => setCurrentPage('dashboard')} />
         </div>
@@ -123,11 +109,7 @@ export default function App() {
     return (
       <DocumentsProvider>
         <div className="h-screen flex flex-col overflow-hidden">
-          <Navbar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onLogout={() => setIsLoggedIn(false)}
-          />
+          {navbar}
           <div className="flex-1 overflow-hidden">
             <DocumentsView onBack={() => setCurrentPage('dashboard')} />
           </div>
@@ -136,33 +118,12 @@ export default function App() {
     )
   }
 
-  if (currentPage === 'maintenance') {
-    return (
-      <SPESProvider>
-        <div className="h-screen flex flex-col overflow-hidden">
-          <Navbar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onLogout={() => setIsLoggedIn(false)}
-          />
-          <div className="flex-1 overflow-y-auto">
-            <Maintenance onBack={() => setCurrentPage('dashboard')} />
-          </div>
-        </div>
-      </SPESProvider>
-    )
-  }
-
   if (currentPage === 'skills') {
     return (
       <SkillsTrainingProvider>
         <ProgramActivitiesProvider>
           <div className="h-screen flex flex-col overflow-hidden">
-            <Navbar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              onLogout={() => setIsLoggedIn(false)}
-            />
+            {navbar}
             <div className="flex-1 overflow-hidden">
               <SkillsTrainingView onBack={() => setCurrentPage('dashboard')} />
             </div>
@@ -172,27 +133,44 @@ export default function App() {
     )
   }
 
+  if (currentPage === 'maintenance') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-y-auto">
+          <Maintenance onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
+    )
+  }
+
+  // Dashboard
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-      <Navbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onLogout={() => setIsLoggedIn(false)}
-      />
+      {navbar}
       <div className="flex-1 overflow-y-auto">
-        <Dashboard
-          onModuleClick={(id) => {
-            if (id === 'cdsp') setCurrentPage('cdsp')
-            if (id === 'gip') setCurrentPage('gip')
-            if (id === 'spes') setCurrentPage('spes')
-            if (id === 'ofw') setCurrentPage('ofw')
-            if (id === 'employment') setCurrentPage('employment')
-            if (id === 'skills') setCurrentPage('skills')
-            if (id === 'documents') setCurrentPage('documents')
-            if (id === 'maintenance') setCurrentPage('maintenance')
-          }}
-        />
+        <Dashboard onModuleClick={nav} />
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  if (!isLoggedIn) {
+    return <Login onLogin={() => setIsLoggedIn(true)} />
+  }
+
+  // CDSPProvider, ProgramActivitiesProvider and SPESProvider are lifted here so their
+  // state survives navigation between the CDSP module, SPES module, and Maintenance.
+  return (
+    <CDSPProvider>
+      <SPESProvider>
+        <ProgramActivitiesProvider>
+          <AppContent />
+        </ProgramActivitiesProvider>
+      </SPESProvider>
+    </CDSPProvider>
   )
 }

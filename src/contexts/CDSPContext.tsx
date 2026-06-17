@@ -45,7 +45,7 @@ export interface CDSPApplicant {
   dateApplicationReceived: string
   receivedBy: string
   counselorName: string
-  status: 'Active' | 'Inactive' | 'Completed' | 'Referred' | 'Dropped'
+  status: 'Active' | 'Inactive'
   remarks: string
   attachedDocuments: { name: string; file: File; url: string }[]
 }
@@ -100,7 +100,7 @@ const SEED: CDSPApplicant[] = [
     school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-15', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
-    status: 'Completed', remarks: '', attachedDocuments: [],
+    status: 'Inactive', remarks: '', attachedDocuments: [],
   },
   {
     id: 4, lastName: 'Santos', firstName: 'Maria', middleName: 'L.',
@@ -151,7 +151,7 @@ const SEED: CDSPApplicant[] = [
     school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-22', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
-    status: 'Referred', remarks: 'Referred to DepEd Tangub', attachedDocuments: [],
+    status: 'Inactive', remarks: 'Referred to DepEd Tangub', attachedDocuments: [],
   },
 ]
 

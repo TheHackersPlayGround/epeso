@@ -14,14 +14,18 @@ export interface ProgramActivity {
   allowance?: string
   program?: string
   facilitator?: string
+  description?: string
+  participants?: number
+  counselor?: string
+  sessionDuration?: string
 }
 
 const SEED: ProgramActivity[] = [
-  { id: 1, title: 'Career Coaching Batch 1 – March 2026', service: 'Career Coaching', date: '2026-03-10', location: 'PESO Office, Tangub City', status: 'Planned' },
-  { id: 2, title: 'LEGS Orientation – March 2026', service: 'Labor Employment for Graduating Students', date: '2026-03-15', location: 'PESO Office, Tangub City', status: 'Planned' },
-  { id: 3, title: 'Pre-Employment Coaching – April 2026', service: 'Pre-Employment Coaching', date: '2026-04-05', location: 'PESO Office, Tangub City', status: 'Planned' },
-  { id: 4, title: 'LEGS Orientation – April 2026', service: 'Labor Employment for Graduating Students', date: '2026-04-12', location: 'PESO Office, Tangub City', status: 'Planned' },
-  { id: 5, title: 'Career Coaching Batch 2 – May 2026', service: 'Career Coaching', date: '2026-05-08', location: 'PESO Office, Tangub City', status: 'Planned' },
+  { id: 1, program: 'CDSP', title: 'Career Coaching Batch 1 – March 2026', service: 'Career Coaching', date: '2026-03-10', startDate: '2026-03-10', endDate: '2026-03-28', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Career coaching batch for fresh graduates and unemployed individuals seeking career direction.' },
+  { id: 2, program: 'CDSP', title: 'LEGS Orientation – March 2026', service: 'Labor Employment for Graduating Students', date: '2026-03-15', startDate: '2026-03-15', endDate: '2026-03-15', location: 'PESO Main Office, Tangub City', facilitator: 'Ms. Santos', participants: 30, status: 'Planned', description: 'Orientation for graduating students on labor employment opportunities and requirements.' },
+  { id: 3, program: 'CDSP', title: 'Pre-Employment Coaching – April 2026', service: 'Pre-Employment Coaching', date: '2026-04-05', startDate: '2026-04-05', endDate: '2026-04-19', location: 'PESO Main Office, Tangub City', facilitator: 'Mr. Cruz', participants: 25, status: 'Planned', description: 'Pre-employment coaching covering resume writing, interview skills, and job application techniques.' },
+  { id: 4, program: 'CDSP', title: 'LEGS Orientation – April 2026', service: 'Labor Employment for Graduating Students', date: '2026-04-15', startDate: '2026-04-15', endDate: '2026-04-15', location: 'Tangub City College, Main Hall', facilitator: 'Ms. Santos', participants: 45, status: 'Planned', description: 'Second batch orientation for graduating students preparing to enter the workforce.' },
+  { id: 5, program: 'CDSP', title: 'Career Coaching Batch 2 – May 2026', service: 'Career Coaching', date: '2026-05-08', startDate: '2026-05-08', endDate: '2026-05-22', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Second career coaching batch focusing on career path planning and goal setting.' },
   {
     id: 6, title: 'Government Internship Program - Batch 1',
     service: 'Government Internship Program (GIP)', date: '2026-01-06',
@@ -95,8 +99,13 @@ const ProgramActivitiesContext = createContext<ActivitiesContextValue | null>(nu
 export function ProgramActivitiesProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<ProgramActivity[]>(SEED)
 
-  const getActivitiesByProgram = (program: string) =>
-    activities.filter((a) => a.service.toLowerCase().includes(program.toLowerCase()) || program === 'CDSP')
+  const CDSP_SEED_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
+  const getActivitiesByProgram = (program: string) => {
+    if (program === 'CDSP') {
+      return activities.filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
+    }
+    return activities.filter((a) => a.service.toLowerCase().includes(program.toLowerCase()))
+  }
 
   return (
     <ProgramActivitiesContext.Provider value={{ activities, setActivities, getActivitiesByProgram }}>

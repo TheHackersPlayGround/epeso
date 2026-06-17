@@ -9,6 +9,7 @@ import {
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch } from '../../contexts/SPESContext'
 import SPESMaintenanceForm from './SPESMaintenanceForm'
+import CDSPMaintenanceForm from './CDSPMaintenanceForm'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ function ComingSoon({ tab }: { tab: string }) {
 function MaintenanceInner({ onBack }: MaintenanceProps) {
   const { spesBatches, setSpesBatches, updateSpesBatch, applicants: spesApplicants, setApplicants } = useSPES()
 
-  const [activeTab, setActiveTab] = useState<MaintenanceTab>('SPES')
+  const [activeTab, setActiveTab] = useState<MaintenanceTab>('CDSP')
   const [spesAction, setSpesAction] = useState<SPESAction>('')
   const [spesBatchAction, setSpesBatchAction] = useState<SPESBatchAction>('')
   const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
@@ -252,9 +253,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           </button>
         )}
         <div>
-          <h2 className="text-gray-800 m-0">Maintenance</h2>
+          <h2 className="m-0" style={{ fontWeight: 700, color: '#111827' }}>Maintenance</h2>
           <p className="text-gray-500 text-sm mt-0.5">
-            Manage {activeTab} program projects and services
+            {activeTab === 'CDSP'
+              ? 'Manage Career Development and Skills Program activities and services'
+              : `Manage ${activeTab} program projects and services`}
           </p>
         </div>
       </div>
@@ -276,8 +279,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         ))}
       </div>
 
-      {/* Non-SPES tabs: coming soon */}
-      {activeTab !== 'SPES' && <ComingSoon tab={activeTab} />}
+      {/* CDSP tab */}
+      {activeTab === 'CDSP' && <CDSPMaintenanceForm />}
+
+      {/* Non-SPES, Non-CDSP tabs: coming soon */}
+      {activeTab !== 'SPES' && activeTab !== 'CDSP' && <ComingSoon tab={activeTab} />}
 
       {/* SPES tab content */}
       {activeTab === 'SPES' && (

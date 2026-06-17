@@ -58,39 +58,47 @@ const SEED: ProgramActivity[] = [
   },
   {
     id: 11, title: 'Cookery NC II',
-    service: 'Skills Training', date: '2026-04-01',
+    service: 'BATCH-001', date: '2026-04-01',
     location: 'PESO Training Center, Tangub City', status: 'Ongoing',
-    program: 'Skills Training', facilitator: 'Lourdes Reyes',
+    program: 'Skills Training', facilitator: 'Lourdes Reyes', participants: 20,
+    description: 'TESDA-certified cookery training program',
   },
   {
     id: 12, title: 'Bread & Pastry Production NC II',
-    service: 'Skills Training', date: '2026-04-08',
-    location: 'PESO Training Center, Tangub City', status: 'Planned',
-    program: 'Skills Training', facilitator: 'Maricel Santos',
+    service: 'BATCH-001', date: '2026-04-08',
+    location: 'PESO Training Center, Tangub City', status: 'Completed',
+    program: 'Skills Training', facilitator: 'Maricel Santos', participants: 25,
+    description: 'Professional bread and pastry production course',
   },
   {
     id: 13, title: 'Food & Beverage Services NC II',
-    service: 'Skills Training', date: '2026-04-12',
-    location: 'PESO Training Center, Tangub City', status: 'Planned',
-    program: 'Skills Training', facilitator: 'Isabel Navarro',
+    service: 'BATCH-002', date: '2026-04-12',
+    location: 'Hotel Training Facility, Ozamiz City', status: 'Planned',
+    program: 'Skills Training', facilitator: 'Isabel Navarro', participants: 18,
+    description: 'Hospitality and food service training',
   },
   {
     id: 14, title: 'Electrical Installation & Maintenance NC II',
-    service: 'Skills Training', date: '2026-04-20',
-    location: 'PESO Training Center, Tangub City', status: 'Ongoing',
-    program: 'Skills Training', facilitator: 'Ramon Cruz',
+    service: 'BATCH-001', date: '2026-03-18',
+    location: 'TESDA Training Center, Tangub City', status: 'Ongoing',
+    program: 'Skills Training', facilitator: 'Ramon Cruz', participants: 22,
+    description: 'TESDA qualification for electrical work',
   },
   {
     id: 15, title: 'Dressmaking NC II',
-    service: 'Skills Training', date: '2026-05-05',
+    service: 'BATCH-003', date: '2026-05-05',
     location: 'PESO Training Center, Tangub City', status: 'Planned',
-    program: 'Skills Training', facilitator: 'Rosario Villanueva',
+    program: 'Skills Training', facilitator: 'Rosario Villanueva', participants: 15,
+    description: 'Dressmaking and fashion design certification',
   },
 ]
 
 interface ActivitiesContextValue {
   activities: ProgramActivity[]
   setActivities: React.Dispatch<React.SetStateAction<ProgramActivity[]>>
+  addActivity: (activity: ProgramActivity) => void
+  updateActivity: (id: number, activity: ProgramActivity) => void
+  deleteActivity: (id: number) => void
   getActivitiesByProgram: (program: string) => ProgramActivity[]
 }
 
@@ -98,6 +106,15 @@ const ProgramActivitiesContext = createContext<ActivitiesContextValue | null>(nu
 
 export function ProgramActivitiesProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<ProgramActivity[]>(SEED)
+
+  const addActivity = (activity: ProgramActivity) =>
+    setActivities(prev => [...prev, activity])
+
+  const updateActivity = (id: number, activity: ProgramActivity) =>
+    setActivities(prev => prev.map(a => a.id === id ? activity : a))
+
+  const deleteActivity = (id: number) =>
+    setActivities(prev => prev.filter(a => a.id !== id))
 
   const CDSP_SEED_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
   const getActivitiesByProgram = (program: string) => {
@@ -108,7 +125,7 @@ export function ProgramActivitiesProvider({ children }: { children: ReactNode })
   }
 
   return (
-    <ProgramActivitiesContext.Provider value={{ activities, setActivities, getActivitiesByProgram }}>
+    <ProgramActivitiesContext.Provider value={{ activities, setActivities, addActivity, updateActivity, deleteActivity, getActivitiesByProgram }}>
       {children}
     </ProgramActivitiesContext.Provider>
   )

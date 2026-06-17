@@ -1,6 +1,13 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
+export interface GIPAssignmentHistory {
+  batchId: number
+  batchName: string
+  assignedDate: string
+  completedDate?: string
+}
+
 export interface GIPApplicant {
   id: number
   lastName: string
@@ -23,22 +30,44 @@ export interface GIPApplicant {
   schoolName: string
   course: string
   yearGraduated: string
-  assignedOffice: string
-  department: string
-  position: string
-  supervisorName: string
-  startDate: string
-  endDate: string
-  allowance: string
-  assignedActivity: string
+  assignedBatchId: number | null
+  assignmentHistory: GIPAssignmentHistory[]
   attachedDocuments: string[]
   dateApplicationReceived: string
   receivedBy: string
-  status: 'Active' | 'Completed' | 'Withdrawn' | 'On Hold'
+  status: 'Active' | 'Inactive'
   remarks: string
 }
 
-const SEED: GIPApplicant[] = [
+export interface GIPBatchDocument {
+  name: string
+  url: string
+  fileType: string
+}
+
+export interface GIPBatch {
+  id: number
+  batchName: string
+  batchCode: string
+  description: string
+  assignedOffice: string
+  deploymentLocation: string
+  coordinator: string
+  supervisor: string
+  slots: string
+  fundingSource: string
+  fundingSourceOther: string
+  startDate: string
+  endDate: string
+  allowance: string
+  status: 'Planned' | 'Ongoing' | 'Completed'
+  documents: GIPBatchDocument[]
+  isDraft?: boolean
+}
+
+// ─── Seed applicants ──────────────────────────────────────────────────────────
+
+const mockApplicants: GIPApplicant[] = [
   {
     id: 1, lastName: 'Madera', firstName: 'Carlo', middleName: 'V.',
     sex: 'Male', birthdate: '2002-03-15', age: 23, civilStatus: 'Single',
@@ -48,10 +77,10 @@ const SEED: GIPApplicant[] = [
     classification: ['Fresh Graduate'], classificationOther: '',
     highestEducation: 'College Graduate', schoolName: 'Tangub City College',
     course: 'BS Public Administration', yearGraduated: '2024',
-    assignedOffice: 'City Hall', department: 'Human Resources Department',
-    position: 'Administrative Intern', supervisorName: 'Mr. Santos',
-    startDate: '2026-04-15', endDate: '2026-07-15', allowance: '5000',
-    assignedActivity: 'Government Internship Program - Batch 2',
+    assignedBatchId: 2,
+    assignmentHistory: [
+      { batchId: 2, batchName: 'Government Internship Program - Batch 2', assignedDate: '2026-04-10' }
+    ],
     attachedDocuments: [],
     dateApplicationReceived: '2026-04-10', receivedBy: 'Admin',
     status: 'Active', remarks: '',
@@ -65,10 +94,10 @@ const SEED: GIPApplicant[] = [
     classification: ['Fresh Graduate'], classificationOther: '',
     highestEducation: 'College Graduate', schoolName: 'Tangub City College',
     course: 'BS Accountancy', yearGraduated: '2025',
-    assignedOffice: 'City Hall', department: 'Finance Department',
-    position: 'Accounting Intern', supervisorName: 'Ms. Reyes',
-    startDate: '2026-04-15', endDate: '2026-07-15', allowance: '5000',
-    assignedActivity: 'Government Internship Program - Batch 2',
+    assignedBatchId: 2,
+    assignmentHistory: [
+      { batchId: 2, batchName: 'Government Internship Program - Batch 2', assignedDate: '2026-04-10' }
+    ],
     attachedDocuments: [],
     dateApplicationReceived: '2026-04-10', receivedBy: 'Admin',
     status: 'Active', remarks: '',
@@ -81,13 +110,13 @@ const SEED: GIPApplicant[] = [
     province: 'Misamis Occidental', region: 'Region X',
     classification: ['Fresh Graduate', 'Underemployed'], classificationOther: '',
     highestEducation: 'College Graduate', schoolName: '', course: 'BS Civil Engineering', yearGraduated: '2023',
-    assignedOffice: 'Municipal Office', department: 'Engineering Department',
-    position: 'Engineering Intern', supervisorName: 'Engr. Cruz',
-    startDate: '2026-01-06', endDate: '2026-04-06', allowance: '5000',
-    assignedActivity: 'Government Internship Program - Batch 1',
+    assignedBatchId: null,
+    assignmentHistory: [
+      { batchId: 1, batchName: 'Government Internship Program - Batch 1', assignedDate: '2026-01-06', completedDate: '2026-04-06' }
+    ],
     attachedDocuments: [],
     dateApplicationReceived: '2026-01-02', receivedBy: 'Admin',
-    status: 'Completed', remarks: '',
+    status: 'Inactive', remarks: '',
   },
   {
     id: 4, lastName: 'Abella', firstName: 'Kristine', middleName: 'T.',
@@ -97,10 +126,10 @@ const SEED: GIPApplicant[] = [
     province: 'Misamis Occidental', region: 'Region X',
     classification: ['Fresh Graduate', 'Women'], classificationOther: '',
     highestEducation: 'College Graduate', schoolName: '', course: 'BS Social Work', yearGraduated: '2025',
-    assignedOffice: 'Municipal Hall', department: 'Social Welfare & Development Office',
-    position: 'Social Work Intern', supervisorName: 'Ms. Garcia',
-    startDate: '2026-04-15', endDate: '2026-07-15', allowance: '5000',
-    assignedActivity: 'Government Internship Program - Batch 2',
+    assignedBatchId: 2,
+    assignmentHistory: [
+      { batchId: 2, batchName: 'Government Internship Program - Batch 2', assignedDate: '2026-04-11' }
+    ],
     attachedDocuments: [],
     dateApplicationReceived: '2026-04-11', receivedBy: 'Admin',
     status: 'Active', remarks: '',
@@ -113,26 +142,116 @@ const SEED: GIPApplicant[] = [
     province: 'Misamis Occidental', region: 'Region X',
     classification: ['Fresh Graduate'], classificationOther: '',
     highestEducation: 'College Graduate', schoolName: '', course: 'BS Agriculture', yearGraduated: '2024',
-    assignedOffice: 'Municipal Agriculture Office', department: 'Crops & Livestock Division',
-    position: 'Agriculture Intern', supervisorName: 'Mr. Dela Rosa',
-    startDate: '2026-01-06', endDate: '2026-04-06', allowance: '5000',
-    assignedActivity: 'Government Internship Program - Batch 1',
+    assignedBatchId: null,
+    assignmentHistory: [
+      { batchId: 1, batchName: 'Government Internship Program - Batch 1', assignedDate: '2026-01-06', completedDate: '2026-04-06' }
+    ],
     attachedDocuments: [],
     dateApplicationReceived: '2026-01-03', receivedBy: 'Admin',
-    status: 'Withdrawn', remarks: 'Personal reasons',
+    status: 'Inactive', remarks: 'Personal reasons',
   },
 ]
+
+// ─── Seed batches ─────────────────────────────────────────────────────────────
+
+const mockBatches: GIPBatch[] = [
+  {
+    id: 1,
+    batchName: 'Government Internship Program - Batch 1',
+    batchCode: 'GIP-2026-001',
+    description: 'First batch of the Government Internship Program for 2026.',
+    assignedOffice: 'Various City & Municipal Offices',
+    deploymentLocation: 'Tangub City Hall and Partner Agencies',
+    coordinator: 'Maria Santos',
+    supervisor: 'Engr. Cruz',
+    slots: '20',
+    fundingSource: 'DOLE',
+    fundingSourceOther: '',
+    startDate: '2026-01-06',
+    endDate: '2026-04-06',
+    allowance: '5000',
+    status: 'Completed',
+    documents: [],
+  },
+  {
+    id: 2,
+    batchName: 'Government Internship Program - Batch 2',
+    batchCode: 'GIP-2026-002',
+    description: 'Second batch of the Government Internship Program for 2026.',
+    assignedOffice: 'Various City & Municipal Offices',
+    deploymentLocation: 'Tangub City Hall and Partner Agencies',
+    coordinator: 'Carlo Bautista',
+    supervisor: 'Ms. Reyes',
+    slots: '25',
+    fundingSource: 'DOLE',
+    fundingSourceOther: '',
+    startDate: '2026-04-15',
+    endDate: '2026-07-15',
+    allowance: '5000',
+    status: 'Ongoing',
+    documents: [],
+  },
+  {
+    id: 3,
+    batchName: 'Government Internship Program - Batch 3',
+    batchCode: 'GIP-2026-003',
+    description: 'Third batch of the Government Internship Program for 2026.',
+    assignedOffice: 'Various City & Municipal Offices',
+    deploymentLocation: 'Tangub City Hall and Partner Agencies',
+    coordinator: 'Anna Rodriguez',
+    supervisor: '',
+    slots: '30',
+    fundingSource: 'DOLE',
+    fundingSourceOther: '',
+    startDate: '2026-07-20',
+    endDate: '2026-10-20',
+    allowance: '5000',
+    status: 'Planned',
+    documents: [],
+  },
+]
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 interface GIPContextValue {
   applicants: GIPApplicant[]
   setApplicants: React.Dispatch<React.SetStateAction<GIPApplicant[]>>
+  gipBatches: GIPBatch[]
+  setGipBatches: React.Dispatch<React.SetStateAction<GIPBatch[]>>
+  updateGipBatch: (updated: GIPBatch) => void
 }
 
 const GIPContext = createContext<GIPContextValue | null>(null)
 
 export function GIPProvider({ children }: { children: ReactNode }) {
-  const [applicants, setApplicants] = useState<GIPApplicant[]>(SEED)
-  return <GIPContext.Provider value={{ applicants, setApplicants }}>{children}</GIPContext.Provider>
+  const [applicants, setApplicants] = useState<GIPApplicant[]>(mockApplicants)
+  const [gipBatches, setGipBatches] = useState<GIPBatch[]>(mockBatches)
+
+  const updateGipBatch = (updated: GIPBatch) => {
+    if (updated.status === 'Completed') {
+      setApplicants(prev => prev.map(a =>
+        a.assignedBatchId === updated.id
+          ? {
+              ...a,
+              status: 'Inactive' as const,
+              assignedBatchId: null,
+              assignmentHistory: a.assignmentHistory.map(h =>
+                h.batchId === updated.id && !h.completedDate
+                  ? { ...h, completedDate: updated.endDate || new Date().toISOString().split('T')[0] }
+                  : h
+              ),
+            }
+          : a
+      ))
+    }
+    setGipBatches(prev => prev.map(b => b.id === updated.id ? updated : b))
+  }
+
+  return (
+    <GIPContext.Provider value={{ applicants, setApplicants, gipBatches, setGipBatches, updateGipBatch }}>
+      {children}
+    </GIPContext.Provider>
+  )
 }
 
 export function useGIP() {

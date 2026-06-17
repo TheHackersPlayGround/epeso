@@ -2,20 +2,26 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import {
   ArrowLeft, Plus, FolderOpen, PlusCircle, MoreHorizontal,
-  Edit2, Trash2, CheckCircle, PlayCircle, Lock, RefreshCw, ClipboardList,
-  Wrench, Users,
+  Edit2, Trash2, CheckCircle, PlayCircle, RefreshCw, ClipboardList,
+  Wrench, Users, Search,
 } from 'lucide-react'
 
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch } from '../../contexts/SPESContext'
+import { useGIP } from '../../contexts/GIPContext'
+import type { GIPBatch } from '../../contexts/GIPContext'
 import SPESMaintenanceForm from './SPESMaintenanceForm'
+import SkillsTrainingMaintenanceForm from './SkillsTrainingMaintenanceForm'
 import CDSPMaintenanceForm from './CDSPMaintenanceForm'
+import GIPMaintenanceForm from './GIPMaintenanceForm'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MaintenanceTab = 'CDSP' | 'GIP' | 'SPES' | 'Livelihood' | 'Skills Training'
 type SPESAction = '' | 'add_batch' | 'view_batches'
 type SPESBatchAction = '' | 'view_batch' | 'edit_batch' | 'view_participants'
+type GIPAction = '' | 'add_batch' | 'view_batches'
+type GIPBatchAction = '' | 'view_batch' | 'edit_batch' | 'view_participants'
 
 interface MaintenanceProps {
   onBack?: () => void
@@ -23,7 +29,7 @@ interface MaintenanceProps {
 
 // ─── Status badge colors ──────────────────────────────────────────────────────
 
-const BATCH_STATUS_COLORS: Record<SPESBatch['status'], string> = {
+const SPES_BATCH_STATUS_COLORS: Record<SPESBatch['status'], string> = {
   Open:      'bg-blue-100 text-blue-700',
   Closed:    'bg-gray-100 text-gray-600',
   Ongoing:   'bg-green-100 text-green-700',
@@ -31,9 +37,20 @@ const BATCH_STATUS_COLORS: Record<SPESBatch['status'], string> = {
 }
 
 const APPLICANT_STATUS_COLORS: Record<string, string> = {
-  Active:   'bg-blue-100 text-blue-700',
-  Inactive: 'bg-gray-100 text-gray-500',
+  Active:    'bg-blue-100 text-blue-700',
+  Inactive:  'bg-gray-100 text-gray-500',
+  Completed: 'bg-green-100 text-green-700',
+  Withdrawn: 'bg-red-100 text-red-600',
+  'On Hold': 'bg-yellow-100 text-yellow-700',
 }
+
+const GIP_BATCH_STATUS_COLORS: Record<GIPBatch['status'], string> = {
+  Planned:   'bg-yellow-100 text-yellow-700',
+  Ongoing:   'bg-green-100 text-green-700',
+  Completed: 'bg-gray-100 text-gray-600',
+}
+
+const GIP_CONFIRM_COLOR = '#0077BE'
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
 
@@ -65,25 +82,32 @@ function ComingSoon({ tab }: { tab: string }) {
 
 function MaintenanceInner({ onBack }: MaintenanceProps) {
   const { spesBatches, setSpesBatches, updateSpesBatch, applicants: spesApplicants, setApplicants } = useSPES()
-
+  const { gipBatches, setGipBatches, updateGipBatch, applicants: gipApplicants, setApplicants: setGipApplicants } = useGIP()
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('CDSP')
+
+  // ── SPES state ─────────────────────────────────────────────────────────────
   const [spesAction, setSpesAction] = useState<SPESAction>('')
   const [spesBatchAction, setSpesBatchAction] = useState<SPESBatchAction>('')
   const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
-
-  // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
-
-  // Status change confirm
   const [statusConfirm, setStatusConfirm] = useState<{
-    batch: SPESBatch
-    nextStatus: SPESBatch['status']
-    action: string
+    batch: SPESBatch; nextStatus: SPESBatch['status']; action: string
   } | null>(null)
-
-  // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+
+  // ── GIP state ──────────────────────────────────────────────────────────────
+  const [gipAction, setGipAction] = useState<GIPAction>('')
+  const [gipBatchAction, setGipBatchAction] = useState<GIPBatchAction>('')
+  const [selectedGipBatch, setSelectedGipBatch] = useState<GIPBatch | null>(null)
+  const [gipOpenMenuId, setGipOpenMenuId] = useState<number | null>(null)
+  const [gipMenuPos, setGipMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const [gipStatusConfirm, setGipStatusConfirm] = useState<{
+    batch: GIPBatch; nextStatus: GIPBatch['status']; action: string
+  } | null>(null)
+  const [gipDeleteConfirm, setGipDeleteConfirm] = useState<number | null>(null)
+  const [gipSearch, setGipSearch] = useState('')
+  const [gipStatusFilter, setGipStatusFilter] = useState('All')
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -93,12 +117,19 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     setSelectedBatch(null)
   }
 
+  const resetGipState = () => {
+    setGipAction('')
+    setGipBatchAction('')
+    setSelectedGipBatch(null)
+  }
+
   const handleTabChange = (tab: MaintenanceTab) => {
     setActiveTab(tab)
     resetSpesState()
+    resetGipState()
   }
 
-  // ── SPES: Add Batch ────────────────────────────────────────────────────────
+  // ── SPES handlers ──────────────────────────────────────────────────────────
 
   const handleAddBatch = (data: Omit<SPESBatch, 'id'>, isDraft?: boolean) => {
     setSpesBatches(prev => [...prev, { ...data, id: Date.now(), isDraft: isDraft ?? false }])
@@ -111,8 +142,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       confirmButtonColor: '#0077BE',
     })
   }
-
-  // ── SPES: Update Batch ─────────────────────────────────────────────────────
 
   const handleUpdateBatch = (updated: SPESBatch) => {
     updateSpesBatch(updated)
@@ -127,24 +156,82 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     })
   }
 
-  // ── SPES: Status change ────────────────────────────────────────────────────
-
-  // (status change is handled by the inline modal below)
-
-  // ── SPES: Delete ───────────────────────────────────────────────────────────
-
   const confirmDelete = () => {
     if (deleteConfirm === null) return
     const batchId = deleteConfirm
     setApplicants(prev => prev.map(a => {
       if (a.assignedBatchId !== batchId) return a
-      return { ...a, assignedBatchId: null, assignedActivity: '', status: 'Inactive' as const }
+      return { ...a, assignedBatchId: null, status: 'Inactive' as const }
     }))
     setSpesBatches(prev => prev.filter(b => b.id !== batchId))
     setDeleteConfirm(null)
   }
 
-  // ── SPES: Render batch form (add/view/edit) ────────────────────────────────
+  // ── GIP handlers ───────────────────────────────────────────────────────────
+
+  const handleAddGipBatch = (data: Omit<GIPBatch, 'id'>, isDraft?: boolean) => {
+    setGipBatches(prev => [...prev, { ...data, id: Date.now(), isDraft: isDraft ?? false }])
+    setGipAction('')
+    Swal.fire({
+      icon: 'success',
+      title: isDraft ? 'Draft Saved' : 'Batch Added',
+      text: isDraft ? 'Draft saved successfully.' : 'New GIP batch has been added successfully.',
+      confirmButtonText: 'OK',
+      confirmButtonColor: GIP_CONFIRM_COLOR,
+    })
+  }
+
+  const handleUpdateGipBatch = (updated: GIPBatch) => {
+    updateGipBatch(updated)
+    setGipBatchAction('')
+    setSelectedGipBatch(null)
+    Swal.fire({
+      icon: 'success',
+      title: 'Batch Updated',
+      text: 'Batch details have been saved successfully.',
+      confirmButtonText: 'OK',
+      confirmButtonColor: GIP_CONFIRM_COLOR,
+    })
+  }
+
+  const confirmGipDelete = () => {
+    if (gipDeleteConfirm === null) return
+    const batchId = gipDeleteConfirm
+    setGipApplicants(prev => prev.map(a => {
+      if (a.assignedBatchId !== batchId) return a
+      const today = new Date().toISOString().split('T')[0]
+      return {
+        ...a,
+        assignedBatchId: null,
+        status: 'Inactive' as const,
+        assignmentHistory: a.assignmentHistory.map(h =>
+          h.batchId === batchId && !h.completedDate ? { ...h, completedDate: today } : h
+        ),
+      }
+    }))
+    setGipBatches(prev => prev.filter(b => b.id !== batchId))
+    setGipDeleteConfirm(null)
+    Swal.fire({
+      icon: 'success',
+      title: 'Batch Deleted',
+      text: 'GIP batch has been deleted.',
+      confirmButtonText: 'OK',
+      confirmButtonColor: GIP_CONFIRM_COLOR,
+    })
+  }
+
+  // ── GIP filtered batches ────────────────────────────────────────────────────
+
+  const filteredGipBatches = gipBatches.filter(b => {
+    const matchSearch = !gipSearch ||
+      b.batchName.toLowerCase().includes(gipSearch.toLowerCase()) ||
+      b.batchCode.toLowerCase().includes(gipSearch.toLowerCase()) ||
+      b.assignedOffice.toLowerCase().includes(gipSearch.toLowerCase())
+    const matchStatus = gipStatusFilter === 'All' || b.status === gipStatusFilter
+    return matchSearch && matchStatus
+  })
+
+  // ── Early return: SPES sub-views ───────────────────────────────────────────
 
   if (activeTab === 'SPES' && (spesBatchAction === 'view_batch' || spesBatchAction === 'edit_batch')) {
     const mode = spesBatchAction === 'view_batch' ? 'batch-view' : 'batch-edit'
@@ -169,8 +256,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     )
   }
 
-  // ── SPES: View Participants sub-view ───────────────────────────────────────
-
   if (activeTab === 'SPES' && spesBatchAction === 'view_participants' && selectedBatch) {
     const participants = spesApplicants.filter(a =>
       a.assignedBatchId === selectedBatch.id ||
@@ -193,7 +278,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               {participants.length} participant{participants.length !== 1 ? 's' : ''} found
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${BATCH_STATUS_COLORS[selectedBatch.status]}`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${SPES_BATCH_STATUS_COLORS[selectedBatch.status]}`}>
             {selectedBatch.status}
           </span>
         </div>
@@ -240,6 +325,95 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     )
   }
 
+  // ── Early return: GIP sub-views ────────────────────────────────────────────
+
+  if (activeTab === 'GIP' && (gipBatchAction === 'view_batch' || gipBatchAction === 'edit_batch')) {
+    return (
+      <div className="w-full px-6 py-8">
+        <div className="mb-4">
+          <button
+            onClick={() => { setGipBatchAction(''); setSelectedGipBatch(null) }}
+            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
+          >
+            <ArrowLeft size={16} /> Back to Batches
+          </button>
+        </div>
+        <GIPMaintenanceForm
+          mode={gipBatchAction === 'view_batch' ? 'batch-view' : 'batch-edit'}
+          initialBatch={selectedGipBatch ?? undefined}
+          onSaveBatch={handleAddGipBatch}
+          onUpdateBatch={handleUpdateGipBatch}
+          onCancel={() => { setGipBatchAction(''); setSelectedGipBatch(null) }}
+        />
+      </div>
+    )
+  }
+
+  if (activeTab === 'GIP' && gipBatchAction === 'view_participants' && selectedGipBatch) {
+    const participants = gipApplicants.filter(
+      a => a.assignedBatchId === selectedGipBatch.id
+    )
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-4">
+          <button
+            onClick={() => { setGipBatchAction(''); setSelectedGipBatch(null) }}
+            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
+          >
+            <ArrowLeft size={16} /> Back to Batches
+          </button>
+        </div>
+        <div className="rounded-xl px-6 py-4 mb-4 flex items-center justify-between" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
+          <div>
+            <h3 className="text-white text-base font-semibold">{selectedGipBatch.batchName}</h3>
+            <p className="text-white/80 text-sm mt-0.5">
+              {participants.length} participant{participants.length !== 1 ? 's' : ''} found
+            </p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${GIP_BATCH_STATUS_COLORS[selectedGipBatch.status]}`}>
+            {selectedGipBatch.status}
+          </span>
+        </div>
+        {participants.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+            <p className="text-gray-500 text-sm">No participants assigned to this batch yet.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Full Name</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Gender</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Contact Number</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Email</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Barangay</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participants.map((a, i) => (
+                  <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <td className="px-4 py-3 font-medium text-gray-800">{a.lastName}, {a.firstName} {a.middleName}</td>
+                    <td className="px-4 py-3 text-gray-600">{a.sex || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{a.contactNumber || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{a.email || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{a.barangay || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${APPLICANT_STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {a.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Main layout ────────────────────────────────────────────────────────────
 
   return (
@@ -256,7 +430,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           <h2 className="m-0" style={{ fontWeight: 700, color: '#111827' }}>Maintenance</h2>
           <p className="text-gray-500 text-sm mt-0.5">
             {activeTab === 'CDSP'
-              ? 'Manage Career Development and Skills Program activities and services'
+              ? 'Manage CDSP activities and services'
               : `Manage ${activeTab} program projects and services`}
           </p>
         </div>
@@ -282,10 +456,281 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       {/* CDSP tab */}
       {activeTab === 'CDSP' && <CDSPMaintenanceForm />}
 
-      {/* Non-SPES, Non-CDSP tabs: coming soon */}
-      {activeTab !== 'SPES' && activeTab !== 'CDSP' && <ComingSoon tab={activeTab} />}
+      {/* Livelihood: coming soon */}
+      {activeTab === 'Livelihood' && <ComingSoon tab={activeTab} />}
 
-      {/* SPES tab content */}
+      {/* ── Skills Training tab ──────────────────────────────────────────────── */}
+      {activeTab === 'Skills Training' && <SkillsTrainingMaintenanceForm />}
+
+      {/* ── GIP tab ─────────────────────────────────────────────────────────── */}
+      {activeTab === 'GIP' && (
+        <>
+          {/* Action cards */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <p className="text-gray-500 mb-5">
+              Select an action for <span className="font-medium" style={{ color: GIP_CONFIRM_COLOR }}>GIP</span>
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {[
+                { key: 'add_batch' as GIPAction, label: 'Add Batch', icon: <PlusCircle size={32} />, desc: 'Create a new GIP deployment batch' },
+                { key: 'view_batches' as GIPAction, label: 'View Batches', icon: <FolderOpen size={32} />, desc: 'Browse all GIP batches' },
+              ].map(action => (
+                <button
+                  key={action.key}
+                  onClick={() => setGipAction(action.key)}
+                  className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+                    gipAction === action.key
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
+                  }`}
+                >
+                  <div
+                    className="p-4 rounded-2xl"
+                    style={gipAction === action.key
+                      ? { backgroundColor: GIP_CONFIRM_COLOR, color: 'white' }
+                      : { backgroundColor: '#f3f4f6' }
+                    }
+                  >
+                    {action.icon}
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium">{action.label}</p>
+                    <p className="text-xs text-gray-400 mt-1">{action.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Idle state */}
+          {gipAction === '' && (
+            <div className="bg-white rounded-xl shadow-md py-20 text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FolderOpen size={32} style={{ color: GIP_CONFIRM_COLOR }} />
+              </div>
+              <h3 className="text-gray-700 mb-2">GIP Program Maintenance</h3>
+              <p className="text-gray-400 text-center px-8">
+                Select an action above to manage batches for the Government Internship Program.
+              </p>
+            </div>
+          )}
+
+          {/* Add Batch form */}
+          {gipAction === 'add_batch' && (
+            <GIPMaintenanceForm
+              mode="batch"
+              onSaveBatch={handleAddGipBatch}
+              onCancel={() => setGipAction('')}
+            />
+          )}
+
+          {/* View Batches table */}
+          {gipAction === 'view_batches' && (
+            <>
+              {/* Search + filter bar */}
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={gipSearch}
+                    onChange={e => setGipSearch(e.target.value)}
+                    placeholder="Search by batch name, code, or office..."
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                  />
+                </div>
+                <select
+                  value={gipStatusFilter}
+                  onChange={e => setGipStatusFilter(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                >
+                  <option value="All">All Status</option>
+                  <option value="Planned">Planned</option>
+                  <option value="Ongoing">Ongoing</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                {/* Table header */}
+                <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
+                  <div>
+                    <h3 className="text-white m-0">GIP Batches</h3>
+                    <p className="text-white/70 text-sm">{filteredGipBatches.length} batch(es) found</p>
+                  </div>
+                  <button
+                    onClick={() => setGipAction('add_batch')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                  >
+                    <Plus size={16} /> Add Batch
+                  </button>
+                </div>
+
+                {filteredGipBatches.length === 0 ? (
+                  <div className="text-center py-16">
+                    <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
+                    <p className="text-gray-500">No GIP batches found.</p>
+                    <button
+                      onClick={() => setGipAction('add_batch')}
+                      className="mt-4 px-6 py-2 text-white rounded-lg transition-colors text-sm"
+                      style={{ backgroundColor: GIP_CONFIRM_COLOR }}
+                    >
+                      Add First Batch
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Name</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Code</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Assigned Office</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Slots</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Period</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Status</th>
+                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap w-20">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredGipBatches.map(b => {
+                          const participantCount = gipApplicants.filter(a => a.assignedBatchId === b.id).length
+                          return (
+                            <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="px-6 py-4">
+                                <span className="text-gray-800 font-medium">{b.batchName}</span>
+                                {b.isDraft && (
+                                  <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">Draft</span>
+                                )}
+                                {b.description && (
+                                  <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
+                                )}
+                                {participantCount > 0 && (
+                                  <span className="inline-flex items-center gap-1 text-xs mt-1" style={{ color: GIP_CONFIRM_COLOR }}>
+                                    <Users size={11} /> {participantCount} participant{participantCount !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-gray-600 font-mono text-sm">{b.batchCode || '—'}</td>
+                              <td className="px-6 py-4 text-gray-600 max-w-[180px]">
+                                <p className="line-clamp-1">{b.assignedOffice || '—'}</p>
+                                {b.deploymentLocation && (
+                                  <p className="text-xs text-gray-400 line-clamp-1">{b.deploymentLocation}</p>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-gray-600 text-center">{b.slots || '—'}</td>
+                              <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
+                                {b.startDate && b.endDate ? `${b.startDate} – ${b.endDate}` : '—'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${GIP_BATCH_STATUS_COLORS[b.status]}`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <button
+                                  onClick={e => {
+                                    const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                                    const dropdownW = 200
+                                    const dropdownH = 220
+                                    const left = Math.min(rect.right - dropdownW, window.innerWidth - dropdownW - 8)
+                                    const spaceBelow = window.innerHeight - rect.bottom - 8
+                                    const top = spaceBelow >= dropdownH ? rect.bottom + 4 : rect.top - dropdownH - 4
+                                    setGipMenuPos({ top: Math.max(8, top), left: Math.max(8, left) })
+                                    setGipOpenMenuId(gipOpenMenuId === b.id ? null : b.id)
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                >
+                                  <MoreHorizontal size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* GIP batch action menu */}
+              {gipOpenMenuId !== null && gipMenuPos && (() => {
+                const b = gipBatches.find(x => x.id === gipOpenMenuId)
+                if (!b) return null
+                return (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setGipOpenMenuId(null)} />
+                    <div
+                      style={{ position: 'fixed', top: gipMenuPos.top, left: gipMenuPos.left }}
+                      className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+                    >
+                      <button
+                        onClick={() => { setSelectedGipBatch(b); setGipBatchAction('view_batch'); setGipOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      >
+                        <FolderOpen size={15} style={{ color: GIP_CONFIRM_COLOR }} />
+                        View Batch Details
+                      </button>
+                      <button
+                        onClick={() => { setSelectedGipBatch(b); setGipBatchAction('view_participants'); setGipOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      >
+                        <ClipboardList size={15} className="text-gray-500" />
+                        View Participants
+                      </button>
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        onClick={() => { setSelectedGipBatch(b); setGipBatchAction('edit_batch'); setGipOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5"
+                      >
+                        <Edit2 size={15} className="text-blue-500" />
+                        Edit
+                      </button>
+                      {b.status === 'Planned' && (
+                        <button
+                          onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Ongoing', action: 'Mark as Ongoing' }); setGipOpenMenuId(null) }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                        >
+                          <PlayCircle size={15} className="text-green-600" />
+                          Mark as Ongoing
+                        </button>
+                      )}
+                      {b.status === 'Ongoing' && (
+                        <button
+                          onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Completed', action: 'Mark as Completed' }); setGipOpenMenuId(null) }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                        >
+                          <CheckCircle size={15} className="text-green-600" />
+                          Mark as Completed
+                        </button>
+                      )}
+                      {b.status === 'Completed' && (
+                        <button
+                          onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Planned', action: 'Reopen Batch' }); setGipOpenMenuId(null) }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                        >
+                          <RefreshCw size={15} style={{ color: GIP_CONFIRM_COLOR }} />
+                          Reopen Batch
+                        </button>
+                      )}
+                      <div className="my-1 border-t border-gray-100" />
+                      <button
+                        onClick={() => { setGipDeleteConfirm(b.id); setGipOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
+                      >
+                        <Trash2 size={15} className="text-red-500" />
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )
+              })()}
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── SPES tab ──────────────────────────────────────────────────────────── */}
       {activeTab === 'SPES' && (
         <>
           {/* Action cards */}
@@ -332,7 +777,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             </div>
           )}
 
-          {/* Add Batch form — inline below action cards */}
+          {/* Add Batch form */}
           {spesAction === 'add_batch' && (
             <SPESMaintenanceForm
               mode="batch"
@@ -421,7 +866,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                               {b.fundingSource || '—'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${BATCH_STATUS_COLORS[b.status]}`}>
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${SPES_BATCH_STATUS_COLORS[b.status]}`}>
                                 {b.status}
                               </span>
                             </td>
@@ -450,7 +895,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 )}
               </div>
 
-              {/* Batch action menu portal */}
+              {/* SPES batch action menu */}
               {openMenuId !== null && menuPos && (() => {
                 const b = spesBatches.find(x => x.id === openMenuId)
                 if (!b) return null
@@ -488,7 +933,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Closed', action: 'Close Batch' }); setOpenMenuId(null) }}
                           className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                         >
-                          <Lock size={15} className="text-gray-500" />
+                          <Users size={15} className="text-gray-500" />
                           Close Batch
                         </button>
                       )}
@@ -536,7 +981,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         </>
       )}
 
-      {/* Status change confirmation modal */}
+      {/* ── SPES status change modal ───────────────────────────────────────────── */}
       {statusConfirm !== null && (() => {
         const { batch, nextStatus, action } = statusConfirm
         const stepOrder: SPESBatch['status'][] = ['Open', 'Closed', 'Ongoing', 'Completed']
@@ -562,12 +1007,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         const connectorClass = (i: number) =>
           isForward && i + 1 <= nextIdx ? 'bg-blue-400' : 'bg-gray-200'
 
-        const actionIcon =
-          action === 'Close Batch' ? <Lock size={20} className="text-gray-600" /> :
-          action === 'Mark as Ongoing' ? <PlayCircle size={20} className="text-blue-600" /> :
-          action === 'Mark as Completed' ? <CheckCircle size={20} className="text-green-600" /> :
-          <RefreshCw size={20} className="text-brand-blue" />
-
         const confirmBtnClass =
           nextStatus === 'Completed' ? 'bg-green-600 hover:bg-green-700 text-white' :
           'bg-blue-600 hover:bg-blue-700 text-white'
@@ -580,12 +1019,13 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-5">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                  {actionIcon}
+                  {nextStatus === 'Completed' ? <CheckCircle size={20} className="text-green-600" /> :
+                   nextStatus === 'Ongoing'   ? <PlayCircle size={20} className="text-blue-600" /> :
+                   <RefreshCw size={20} className="text-brand-blue" />}
                 </div>
                 <h3 className="text-gray-800 m-0 text-lg">{action}</h3>
               </div>
 
-              {/* Progress stepper */}
               <div className="relative flex items-start justify-between mb-6 px-2">
                 <div className="absolute top-4 left-10 right-10 flex">
                   {[0, 1, 2].map(i => (
@@ -640,7 +1080,110 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         )
       })()}
 
-      {/* Delete confirmation modal */}
+      {/* ── GIP status change modal ────────────────────────────────────────────── */}
+      {gipStatusConfirm !== null && (() => {
+        const { batch, nextStatus, action } = gipStatusConfirm
+        const stepOrder: GIPBatch['status'][] = ['Planned', 'Ongoing', 'Completed']
+        const currentIdx = stepOrder.indexOf(batch.status)
+        const nextIdx = stepOrder.indexOf(nextStatus)
+        const isForward = nextIdx > currentIdx
+
+        const circleStyle = (step: GIPBatch['status']) => {
+          const idx = stepOrder.indexOf(step)
+          if (isForward) {
+            if (idx < nextIdx) return { bg: GIP_CONFIRM_COLOR, ring: 'text-white', label: { color: GIP_CONFIRM_COLOR, fontWeight: '600' } }
+            if (idx === nextIdx) return nextStatus === 'Completed'
+              ? { bg: '#16a34a', ring: 'text-white', label: { color: '#16a34a', fontWeight: '600' } }
+              : { bg: GIP_CONFIRM_COLOR, ring: 'text-white', label: { color: GIP_CONFIRM_COLOR, fontWeight: '600' } }
+            return { bg: '#e5e7eb', ring: 'text-gray-400', label: { color: '#9ca3af' } }
+          } else {
+            if (idx === currentIdx) return { bg: GIP_CONFIRM_COLOR, ring: 'text-white', label: { color: GIP_CONFIRM_COLOR, fontWeight: '600' } }
+            if (idx === nextIdx) return { bg: GIP_CONFIRM_COLOR, ring: 'text-white', label: { color: GIP_CONFIRM_COLOR, fontWeight: '600' } }
+            return { bg: '#e5e7eb', ring: 'text-gray-400', label: { color: '#9ca3af' } }
+          }
+        }
+
+        const connectorBg = (i: number) =>
+          isForward && i + 1 <= nextIdx ? GIP_CONFIRM_COLOR : '#e5e7eb'
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-5">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  {nextStatus === 'Completed' ? <CheckCircle size={20} className="text-green-600" /> :
+                   nextStatus === 'Ongoing'   ? <PlayCircle size={20} style={{ color: GIP_CONFIRM_COLOR }} /> :
+                   <RefreshCw size={20} style={{ color: GIP_CONFIRM_COLOR }} />}
+                </div>
+                <h3 className="text-gray-800 m-0 text-lg">{action}</h3>
+              </div>
+
+              {/* 3-step stepper */}
+              <div className="relative flex items-start justify-between mb-6 px-2">
+                <div className="absolute top-4 left-10 right-10 flex">
+                  {[0, 1].map(i => (
+                    <div
+                      key={i}
+                      className="flex-1 h-0.5"
+                      style={{ backgroundColor: connectorBg(i) }}
+                    />
+                  ))}
+                </div>
+                {stepOrder.map((step, i) => {
+                  const s = circleStyle(step)
+                  return (
+                    <div key={step} className="flex flex-col items-center gap-1.5 relative z-10 w-20">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${s.ring}`}
+                        style={{ backgroundColor: s.bg }}
+                      >
+                        {i + 1}
+                      </div>
+                      <span className="text-xs text-center leading-tight" style={s.label}>{step}</span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <p className="text-gray-600 text-sm mb-6">
+                Change <span className="font-semibold text-gray-800">{batch.batchName}</span> status from{' '}
+                <span className="font-semibold" style={{ color: GIP_CONFIRM_COLOR }}>{batch.status}</span> to{' '}
+                <span className="font-semibold" style={{ color: nextStatus === 'Completed' ? '#16a34a' : GIP_CONFIRM_COLOR }}>
+                  {nextStatus}
+                </span>?
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setGipStatusConfirm(null)}
+                  className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    updateGipBatch({ ...batch, status: nextStatus })
+                    setGipStatusConfirm(null)
+                    Swal.fire({
+                      icon: 'success',
+                      title: 'Status Updated',
+                      text: `Batch status changed to ${nextStatus}.`,
+                      confirmButtonText: 'OK',
+                      confirmButtonColor: GIP_CONFIRM_COLOR,
+                    })
+                  }}
+                  className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white"
+                  style={{ backgroundColor: nextStatus === 'Completed' ? '#16a34a' : GIP_CONFIRM_COLOR }}
+                >
+                  {action}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── SPES delete modal ─────────────────────────────────────────────────── */}
       {deleteConfirm !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
@@ -661,6 +1204,37 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 </button>
                 <button
                   onClick={confirmDelete}
+                  className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GIP delete modal ─────────────────────────────────────────────────── */}
+      {gipDeleteConfirm !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-gray-800 mb-2">Delete GIP Batch</h3>
+              <p className="text-gray-600 mb-6 text-sm">
+                Are you sure you want to delete this batch? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setGipDeleteConfirm(null)}
+                  className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmGipDelete}
                   className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                 >
                   Delete

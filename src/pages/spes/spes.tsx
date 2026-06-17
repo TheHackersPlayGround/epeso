@@ -175,7 +175,7 @@ function ViewApplicantPanel({ applicant, spesBatches, onClose }: { applicant: SP
             <Users size={18} className="text-brand-blue" />
           </div>
           <div>
-            <h2 className="text-gray-800 text-lg">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
+            <h2 className="text-gray-900 text-lg font-semibold">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
             <p className="text-sm text-gray-400">SPES Applicant Profile</p>
           </div>
         </div>
@@ -309,7 +309,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
     onSave({ ...formData, status: derivedStatus })
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
   const lbl = 'block text-xs uppercase tracking-wide text-gray-400 mb-1'
   const sel = `${inp} bg-white`
 
@@ -328,7 +328,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
           </div>
-          <h2 className="text-gray-800 text-lg">
+          <h2 className="text-gray-900 text-lg font-semibold">
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — SPES'}
           </h2>
         </div>

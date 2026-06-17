@@ -713,7 +713,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     setAssignTarget(null)
     setSelectedActivity(null)
     setViewingAssignedFor(null)
-    setConfirmUnassignId(null)
     Swal.fire({
       icon: 'success',
       title: 'Removed',

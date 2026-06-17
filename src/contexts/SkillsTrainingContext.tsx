@@ -1,6 +1,21 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
+export interface SkillsTrainingBatch {
+  id: number
+  batchName: string
+  status: 'Planned' | 'Ongoing' | 'Completed'
+  startDate?: string
+  endDate?: string
+  description?: string
+}
+
+const SEED_BATCHES: SkillsTrainingBatch[] = [
+  { id: 1, batchName: 'BATCH-001', status: 'Completed', startDate: '2026-01-10', endDate: '2026-03-10' },
+  { id: 2, batchName: 'BATCH-002', status: 'Ongoing',   startDate: '2026-03-15', endDate: '2026-05-15' },
+  { id: 3, batchName: 'BATCH-003', status: 'Planned',   startDate: '2026-06-01', endDate: '2026-08-01' },
+]
+
 export interface SkillsTrainingProfile {
   id: number
   lastName: string
@@ -108,14 +123,26 @@ const SEED: SkillsTrainingProfile[] = [
 interface SkillsTrainingContextValue {
   profiles: SkillsTrainingProfile[]
   setProfiles: React.Dispatch<React.SetStateAction<SkillsTrainingProfile[]>>
+  skillsTrainingBatches: SkillsTrainingBatch[]
+  setSkillsTrainingBatches: React.Dispatch<React.SetStateAction<SkillsTrainingBatch[]>>
+  updateSkillsTrainingBatch: (updated: SkillsTrainingBatch) => void
 }
 
 const SkillsTrainingContext = createContext<SkillsTrainingContextValue | null>(null)
 
 export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<SkillsTrainingProfile[]>(SEED)
+  const [skillsTrainingBatches, setSkillsTrainingBatches] = useState<SkillsTrainingBatch[]>(SEED_BATCHES)
+
+  const updateSkillsTrainingBatch = (updated: SkillsTrainingBatch) => {
+    setSkillsTrainingBatches(prev => prev.map(b => b.id === updated.id ? updated : b))
+  }
+
   return (
-    <SkillsTrainingContext.Provider value={{ profiles, setProfiles }}>
+    <SkillsTrainingContext.Provider value={{
+      profiles, setProfiles,
+      skillsTrainingBatches, setSkillsTrainingBatches, updateSkillsTrainingBatch,
+    }}>
       {children}
     </SkillsTrainingContext.Provider>
   )

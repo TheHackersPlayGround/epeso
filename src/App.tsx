@@ -57,16 +57,12 @@ function AppContent() {
 
   if (currentPage === 'gip') {
     return (
-      <GIPProvider>
-        <ProgramActivitiesProvider>
-          <div className="h-screen flex flex-col overflow-hidden">
-            {navbar}
-            <div className="flex-1 overflow-hidden">
-              <GIPView onBack={() => setCurrentPage('dashboard')} />
-            </div>
-          </div>
-        </ProgramActivitiesProvider>
-      </GIPProvider>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-hidden">
+          <GIPView onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
     )
   }
 
@@ -120,16 +116,12 @@ function AppContent() {
 
   if (currentPage === 'skills') {
     return (
-      <SkillsTrainingProvider>
-        <ProgramActivitiesProvider>
-          <div className="h-screen flex flex-col overflow-hidden">
-            {navbar}
-            <div className="flex-1 overflow-hidden">
-              <SkillsTrainingView onBack={() => setCurrentPage('dashboard')} />
-            </div>
-          </div>
-        </ProgramActivitiesProvider>
-      </SkillsTrainingProvider>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-hidden">
+          <SkillsTrainingView onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
     )
   }
 
@@ -162,15 +154,18 @@ export default function App() {
     return <Login onLogin={() => setIsLoggedIn(true)} />
   }
 
-  // CDSPProvider, ProgramActivitiesProvider and SPESProvider are lifted here so their
-  // state survives navigation between the CDSP module, SPES module, and Maintenance.
+  // Providers lifted here so their state survives navigation between modules and Maintenance.
   return (
     <CDSPProvider>
-      <SPESProvider>
-        <ProgramActivitiesProvider>
-          <AppContent />
-        </ProgramActivitiesProvider>
-      </SPESProvider>
+      <GIPProvider>
+        <SPESProvider>
+          <SkillsTrainingProvider>
+            <ProgramActivitiesProvider>
+              <AppContent />
+            </ProgramActivitiesProvider>
+          </SkillsTrainingProvider>
+        </SPESProvider>
+      </GIPProvider>
     </CDSPProvider>
   )
 }

@@ -2,12 +2,11 @@ import { useState } from 'react'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, CheckCircle, Upload, Download, ChevronDown, MoreHorizontal,
+  ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useGIP } from '../../contexts/GIPContext'
-import type { GIPApplicant } from '../../contexts/GIPContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
+import type { GIPApplicant, GIPBatch } from '../../contexts/GIPContext'
 import AddressFields from '../../components/AddressFields'
 
 interface GIPViewProps {
@@ -33,7 +32,12 @@ const EDUCATION_OPTIONS = [
 ]
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
-const STATUS_OPTIONS: GIPApplicant['status'][] = ['Active', 'Completed', 'Withdrawn', 'On Hold']
+
+const BATCH_STATUS_COLORS: Record<GIPBatch['status'], string> = {
+  Planned:   'bg-yellow-100 text-yellow-700',
+  Ongoing:   'bg-green-100 text-green-700',
+  Completed: 'bg-gray-100 text-gray-500',
+}
 
 const emptyForm: Omit<GIPApplicant, 'id'> = {
   lastName: '', firstName: '', middleName: '',
@@ -42,22 +46,28 @@ const emptyForm: Omit<GIPApplicant, 'id'> = {
   streetPurok: '', barangay: '', cityMunicipality: 'Tangub City', province: 'Misamis Occidental', region: 'Region X',
   classification: [], classificationOther: '',
   highestEducation: '', schoolName: '', course: '', yearGraduated: '',
-  assignedOffice: '', department: '', position: '', supervisorName: '',
-  startDate: '', endDate: '', allowance: '',
-  assignedActivity: '',
+  assignedBatchId: null,
+  assignmentHistory: [],
   attachedDocuments: [],
   dateApplicationReceived: '', receivedBy: '',
-  status: 'Active', remarks: '',
+  status: 'Inactive', remarks: '',
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function deriveStatus(applicant: Omit<GIPApplicant, 'id'>, batches: GIPBatch[]): GIPApplicant['status'] {
+  if (!applicant.assignedBatchId) return 'Inactive'
+  const batch = batches.find(b => b.id === applicant.assignedBatchId)
+  if (!batch || batch.status === 'Completed') return 'Inactive'
+  return 'Active'
 }
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: GIPApplicant['status'] }) {
   const colors: Record<string, string> = {
-    Active: 'bg-blue-100 text-blue-700',
-    Completed: 'bg-green-100 text-green-700',
-    Withdrawn: 'bg-red-100 text-red-600',
-    'On Hold': 'bg-yellow-100 text-yellow-700',
+    Active:   'bg-green-100 text-green-700',
+    Inactive: 'bg-gray-100 text-gray-500',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -111,7 +121,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
     <div>
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
           value={docName}
           onChange={e => setDocName(e.target.value)}
@@ -143,9 +153,53 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
   )
 }
 
+// ─── Assignment Cards ──────────────────────────────────────────────────────────
+
+function AssignmentCards({ history, batches, currentBatchId }: {
+  history: GIPApplicant['assignmentHistory']
+  batches: GIPBatch[]
+  currentBatchId: number | null
+}) {
+  if (history.length === 0) {
+    return <p className="text-sm text-gray-400">No assignment history.</p>
+  }
+  return (
+    <div className="space-y-2">
+      {[...history].reverse().map((h, i) => {
+        const batch = batches.find(b => b.id === h.batchId)
+        const displayStatus: GIPBatch['status'] = h.completedDate ? 'Completed' : (batch?.status ?? 'Planned')
+        const isCurrent = currentBatchId === h.batchId && !h.completedDate
+        return (
+          <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 border rounded-lg ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200 bg-white'}`}>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-800">{h.batchName}</p>
+                {isCurrent && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-brand-blue text-white font-semibold">Current</span>
+                )}
+              </div>
+              <p className="text-xs text-brand-blue mt-0.5">Date Assigned: {h.assignedDate || '—'}</p>
+              {h.completedDate && (
+                <p className="text-xs text-brand-blue">Date Completed: {h.completedDate}</p>
+              )}
+            </div>
+            <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold flex-shrink-0 mt-0.5 ${BATCH_STATUS_COLORS[displayStatus]}`}>
+              {displayStatus}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── View Panel ────────────────────────────────────────────────────────────────
 
-function ViewApplicantPanel({ applicant, onClose }: { applicant: GIPApplicant; onClose: () => void }) {
+function ViewApplicantPanel({ applicant, batches, onClose }: {
+  applicant: GIPApplicant
+  batches: GIPBatch[]
+  onClose: () => void
+}) {
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
     <div>
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
@@ -158,6 +212,9 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: GIPApplicant; o
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
   )
+
+  void batches.find(b => b.id === applicant.assignedBatchId)
+
   return (
     <div className="h-full bg-brand-bg flex flex-col">
       <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
@@ -210,19 +267,9 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: GIPApplicant; o
             <Field label="Course / Degree" value={applicant.course} />
             <Field label="Year Graduated" value={applicant.yearGraduated} />
           </div>
-          <Sec num="V" title="Internship Details" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Assigned Office" value={applicant.assignedOffice} />
-            <Field label="Department / Division" value={applicant.department} />
-            <Field label="Position / Designation" value={applicant.position} />
-            <Field label="Supervisor Name" value={applicant.supervisorName} />
-            <Field label="Start Date" value={applicant.startDate} />
-            <Field label="End Date" value={applicant.endDate} />
-            <Field label="Monthly Allowance" value={applicant.allowance ? `₱${applicant.allowance}` : ''} />
-          </div>
-          <Sec num="VI" title="Assignment" />
-          <Field label="Assigned Activity" value={applicant.assignedActivity} />
-          <Sec num="VII" title="Attached Documents" />
+          <Sec num="V" title="Assignment" />
+          <AssignmentCards history={applicant.assignmentHistory} batches={batches} currentBatchId={applicant.assignedBatchId} />
+          <Sec num="VI" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
               {applicant.attachedDocuments.map((doc, i) => (
@@ -234,7 +281,7 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: GIPApplicant; o
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VIII" title="For PESO Office Only" gray />
+          <Sec num="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Received" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -249,9 +296,10 @@ function ViewApplicantPanel({ applicant, onClose }: { applicant: GIPApplicant; o
 
 // ─── Applicant Form ────────────────────────────────────────────────────────────
 
-function ApplicantForm({ initial, mode, onSave, onClose }: {
+function ApplicantForm({ initial, mode, batches, onSave, onClose }: {
   initial: Omit<GIPApplicant, 'id'>
   mode: 'add' | 'edit'
+  batches: GIPBatch[]
   onSave: (data: Omit<GIPApplicant, 'id'>) => void
   onClose: () => void
 }) {
@@ -420,37 +468,8 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="V" title="Internship Details" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="col-span-2">
-              <label className={lbl}>Assigned Office</label>
-              <input className={inp} value={formData.assignedOffice} onChange={e => set({ assignedOffice: e.target.value })} placeholder="e.g. City Hall" />
-            </div>
-            <div>
-              <label className={lbl}>Department / Division</label>
-              <input className={inp} value={formData.department} onChange={e => set({ department: e.target.value })} placeholder="e.g. Human Resources" />
-            </div>
-            <div>
-              <label className={lbl}>Position / Designation</label>
-              <input className={inp} value={formData.position} onChange={e => set({ position: e.target.value })} placeholder="e.g. Administrative Intern" />
-            </div>
-            <div>
-              <label className={lbl}>Supervisor Name</label>
-              <input className={inp} value={formData.supervisorName} onChange={e => set({ supervisorName: e.target.value })} placeholder="Supervisor's full name" />
-            </div>
-            <div>
-              <label className={lbl}>Monthly Allowance ({'₱'})</label>
-              <input className={inp} value={formData.allowance} onChange={e => set({ allowance: e.target.value })} placeholder="e.g. 5,000" />
-            </div>
-            <div>
-              <label className={lbl}>Start Date</label>
-              <input type="date" className={inp} value={formData.startDate} onChange={e => set({ startDate: e.target.value })} />
-            </div>
-            <div>
-              <label className={lbl}>End Date</label>
-              <input type="date" className={inp} value={formData.endDate} onChange={e => set({ endDate: e.target.value })} />
-            </div>
-          </div>
+          <SectionDivider num="V" title="Assignment" />
+          <AssignmentCards history={formData.assignmentHistory} batches={batches} currentBatchId={formData.assignedBatchId} />
 
           <SectionDivider num="VI" title="Attached Documents" />
           <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
@@ -469,13 +488,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
               <label className={lbl}>Received By</label>
               <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Staff name" />
             </div>
-            <div>
-              <label className={lbl}>Status</label>
-              <select className={sel} value={formData.status} onChange={e => set({ status: e.target.value as GIPApplicant['status'] })}>
-                {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className={lbl}>Remarks</label>
               <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
             </div>
@@ -497,9 +510,7 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
 // ─── Main GIPView ──────────────────────────────────────────────────────────────
 
 export default function GIPView({ onBack }: GIPViewProps) {
-  const { applicants, setApplicants } = useGIP()
-  const { getActivitiesByProgram } = useProgramActivities()
-  const gipActivities = getActivitiesByProgram('GIP') as ProgramActivity[]
+  const { applicants, setApplicants, gipBatches } = useGIP()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
@@ -507,7 +518,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
   const availableFilters = [
-    { id: 'status', label: 'Status', options: STATUS_OPTIONS as string[] },
+    { id: 'status', label: 'Status', options: ['Active', 'Inactive'] as string[] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
     { id: 'civilStatus', label: 'Civil Status', options: CIVIL_STATUS_OPTIONS },
   ]
@@ -533,12 +544,19 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingApplicant, setEditingApplicant] = useState<GIPApplicant | null>(null)
   const [viewingApplicant, setViewingApplicant] = useState<GIPApplicant | null>(null)
+
+  // Assign batch state
   const [assignTarget, setAssignTarget] = useState<GIPApplicant | null>(null)
+  const [assignStep, setAssignStep] = useState<1 | 2>(1)
+  const [assignSearch, setAssignSearch] = useState('')
+  const [selectedBatch, setSelectedBatch] = useState<GIPBatch | null>(null)
+  // View/change assigned batch state
+  const [viewBatchTarget, setViewBatchTarget] = useState<GIPApplicant | null>(null)
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; office: string; status: string; valid: boolean }[]>([])
+  const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; barangay: string; status: string; valid: boolean }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
@@ -546,15 +564,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
   const filtered = applicants.filter(a => {
     const fullName = `${a.lastName} ${a.firstName} ${a.middleName}`.toLowerCase()
+    const lastBatch = a.assignmentHistory[a.assignmentHistory.length - 1]?.batchName ?? ''
     const matchesSearch =
       fullName.includes(searchQuery.toLowerCase()) ||
       a.barangay.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.assignedOffice.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.assignedActivity.toLowerCase().includes(searchQuery.toLowerCase())
+      lastBatch.toLowerCase().includes(searchQuery.toLowerCase())
+    const derivedStatus = deriveStatus(a, gipBatches)
     const matchesFilters = activeFilters.every(filterId => {
       const val = filterValues[filterId]
       if (!val) return true
-      if (filterId === 'status') return a.status === val
+      if (filterId === 'status') return derivedStatus === val
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
       return true
@@ -581,32 +600,64 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
   }
 
-  const handleAssign = (activity: ProgramActivity) => {
+  const handleAssignBatch = (batch: GIPBatch) => {
     if (!assignTarget) return
-    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? { ...a, assignedActivity: activity.title } : a))
+    const today = new Date().toISOString().split('T')[0]
+    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? {
+      ...a,
+      assignedBatchId: batch.id,
+      status: 'Active' as const,
+      assignmentHistory: [
+        ...a.assignmentHistory,
+        { batchId: batch.id, batchName: batch.batchName, assignedDate: today },
+      ],
+    } : a))
     setAssignTarget(null)
-    setSuccessModal({ open: true, message: `Assigned to "${activity.title}" successfully.` })
+    setAssignStep(1)
+    setSelectedBatch(null)
+    setAssignSearch('')
+    setSuccessModal({ open: true, message: `Assigned to "${batch.batchName}" successfully.` })
   }
 
-  const handleUnassign = () => {
-    if (!assignTarget) return
-    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? { ...a, assignedActivity: '' } : a))
-    setAssignTarget(null)
-    setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
+  const handleUnassignBatch = () => {
+    if (!viewBatchTarget) return
+    const today = new Date().toISOString().split('T')[0]
+    const batchId = viewBatchTarget.assignedBatchId
+    setApplicants(prev => prev.map(a => a.id === viewBatchTarget.id ? {
+      ...a,
+      assignedBatchId: null,
+      status: 'Inactive' as const,
+      assignmentHistory: a.assignmentHistory.map(h =>
+        h.batchId === batchId && !h.completedDate
+          ? { ...h, completedDate: today }
+          : h
+      ),
+    } : a))
+    setViewBatchTarget(null)
+    setSuccessModal({ open: true, message: 'Applicant has been unassigned from the batch.' })
+  }
+
+  const openAssignModal = (applicant: GIPApplicant) => {
+    setAssignTarget(applicant)
+    setAssignStep(1)
+    setSelectedBatch(null)
+    setAssignSearch('')
   }
 
   const exportToExcel = () => {
-    const data = filtered.map(a => ({
-      'Last Name': a.lastName, 'First Name': a.firstName, 'Middle Name': a.middleName,
-      'Sex': a.sex, 'Birthdate': a.birthdate, 'Age': a.age, 'Civil Status': a.civilStatus,
-      'Contact': a.contactNumber, 'Email': a.email, 'Barangay': a.barangay,
-      'Classification': a.classification.join(', '),
-      'Education': a.highestEducation, 'School': a.schoolName, 'Course': a.course,
-      'Assigned Office': a.assignedOffice, 'Department': a.department, 'Position': a.position,
-      'Supervisor': a.supervisorName, 'Start Date': a.startDate, 'End Date': a.endDate,
-      'Allowance': a.allowance, 'Assigned Activity': a.assignedActivity,
-      'Status': a.status, 'Remarks': a.remarks,
-    }))
+    const data = filtered.map(a => {
+      const batch = gipBatches.find(b => b.id === a.assignedBatchId)
+      return {
+        'Last Name': a.lastName, 'First Name': a.firstName, 'Middle Name': a.middleName,
+        'Sex': a.sex, 'Birthdate': a.birthdate, 'Age': a.age, 'Civil Status': a.civilStatus,
+        'Contact': a.contactNumber, 'Email': a.email, 'Barangay': a.barangay,
+        'Classification': a.classification.join(', '),
+        'Education': a.highestEducation, 'School': a.schoolName, 'Course': a.course,
+        'Assigned Batch': batch?.batchName ?? '',
+        'Batch Status': batch?.status ?? '',
+        'Status': deriveStatus(a, gipBatches), 'Remarks': a.remarks,
+      }
+    })
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'GIP Applicants')
@@ -615,12 +666,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
   }
 
   const exportToCSV = () => {
-    const data = filtered.map(a => ({
-      'Last Name': a.lastName, 'First Name': a.firstName,
-      'Barangay': a.barangay, 'Assigned Office': a.assignedOffice,
-      'Position': a.position, 'Allowance': a.allowance,
-      'Assigned Activity': a.assignedActivity, 'Status': a.status,
-    }))
+    const data = filtered.map(a => {
+      const batch = gipBatches.find(b => b.id === a.assignedBatchId)
+      return {
+        'Last Name': a.lastName, 'First Name': a.firstName,
+        'Barangay': a.barangay,
+        'Assigned Batch': batch?.batchName ?? '',
+        'Batch Status': batch?.status ?? '',
+        'Status': deriveStatus(a, gipBatches),
+      }
+    })
     const ws = XLSX.utils.json_to_sheet(data)
     const csv = XLSX.utils.sheet_to_csv(ws)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -641,21 +696,35 @@ export default function GIPView({ onBack }: GIPViewProps) {
       const rows = XLSX.utils.sheet_to_json(ws) as Record<string, string>[]
       setImportPreview(rows.slice(0, 5).map(r => ({
         lastName: r['Last Name'] || '', firstName: r['First Name'] || '',
-        office: r['Assigned Office'] || '', status: r['Status'] || '',
+        barangay: r['Barangay'] || '', status: r['Status'] || '',
         valid: !!(r['Last Name'] && r['First Name']),
       })))
     }
     reader.readAsBinaryString(file)
   }
 
-  if (isFormOpen) return <ApplicantForm initial={emptyForm} mode="add" onSave={handleAddSave} onClose={() => setIsFormOpen(false)} />
+  const closeAssignModal = () => {
+    setAssignTarget(null)
+    setAssignStep(1)
+    setSelectedBatch(null)
+    setAssignSearch('')
+  }
+
+  if (isFormOpen) return <ApplicantForm initial={emptyForm} mode="add" batches={gipBatches} onSave={handleAddSave} onClose={() => setIsFormOpen(false)} />
 
   if (editingApplicant) {
     const { id: _id, ...rest } = editingApplicant
-    return <ApplicantForm initial={rest} mode="edit" onSave={handleEditSave} onClose={() => setEditingApplicant(null)} />
+    return <ApplicantForm initial={rest} mode="edit" batches={gipBatches} onSave={handleEditSave} onClose={() => setEditingApplicant(null)} />
   }
 
-  if (viewingApplicant) return <ViewApplicantPanel applicant={viewingApplicant} onClose={() => setViewingApplicant(null)} />
+  if (viewingApplicant) return <ViewApplicantPanel applicant={viewingApplicant} batches={gipBatches} onClose={() => setViewingApplicant(null)} />
+
+  // ── Available batches for assignment (non-completed)
+  const assignableBatches = gipBatches.filter(b => b.status !== 'Completed')
+  const filteredAssignBatches = assignableBatches.filter(b =>
+    b.batchName.toLowerCase().includes(assignSearch.toLowerCase()) ||
+    b.batchCode.toLowerCase().includes(assignSearch.toLowerCase())
+  )
 
   return (
     <>
@@ -674,60 +743,182 @@ export default function GIPView({ onBack }: GIPViewProps) {
         onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
 
-      {/* Assign Activity Modal */}
+      {/* Assign Batch Modal */}
       {assignTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div>
-                <h3 className="text-gray-800">Assign Activity</h3>
-                <p className="text-sm text-gray-400 mt-0.5">{assignTarget.firstName} {assignTarget.lastName}</p>
+                <h3 className="text-gray-800 font-semibold">
+                  {assignStep === 1 ? 'Assign to Batch' : 'Confirm Assignment'}
+                </h3>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {assignTarget.firstName} {assignTarget.lastName}
+                </p>
               </div>
-              <button onClick={() => setAssignTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${assignStep >= 1 ? 'bg-brand-blue text-white' : 'bg-gray-200 text-gray-500'}`}>1</span>
+                  <ChevronRight size={12} />
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${assignStep >= 2 ? 'bg-brand-blue text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
+                </div>
+                <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              </div>
             </div>
-            <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
-              {(() => {
-                const planned = gipActivities.filter(a => a.status === 'Planned')
-                if (planned.length === 0) return (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-gray-400">No planned GIP activities available.</p>
-                    <p className="text-xs text-gray-300 mt-1">Only planned activities can be assigned to applicants.</p>
+
+            {assignStep === 1 && (
+              <>
+                <div className="px-6 pt-4 flex-shrink-0">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue"
+                      placeholder="Search batches..."
+                      value={assignSearch}
+                      onChange={e => setAssignSearch(e.target.value)}
+                    />
                   </div>
-                )
-                return planned.map(activity => (
-                  <button key={activity.id} onClick={() => handleAssign(activity)}
-                    className={`w-full text-left px-4 py-3 rounded-lg border transition-all hover:border-brand-blue hover:bg-blue-50 ${
-                      assignTarget.assignedActivity === activity.title ? 'border-brand-blue bg-blue-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-800">{activity.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {activity.assignedOffice && `${activity.assignedOffice} · `}{activity.startDate} – {activity.endDate}
-                        </p>
-                        {activity.allowance && <p className="text-xs text-gray-400">Allowance: {'₱'}{activity.allowance}/mo</p>}
-                      </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">Planned</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 pt-3 space-y-2">
+                  {filteredAssignBatches.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-gray-400">No available batches.</p>
+                      <p className="text-xs text-gray-300 mt-1">Only Planned and Ongoing batches can be assigned.</p>
                     </div>
-                    {assignTarget.assignedActivity === activity.title && (
-                      <p className="text-xs text-brand-blue mt-1">Currently assigned</p>
-                    )}
+                  ) : filteredAssignBatches.map(batch => (
+                    <button
+                      key={batch.id}
+                      onClick={() => { setSelectedBatch(batch); setAssignStep(2) }}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-brand-blue hover:bg-blue-50 transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800">{batch.batchName}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{batch.batchCode}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {batch.assignedOffice} · {batch.startDate} – {batch.endDate}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold ${BATCH_STATUS_COLORS[batch.status]}`}>
+                          {batch.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                  <button onClick={closeAssignModal} className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+                </div>
+              </>
+            )}
+
+            {assignStep === 2 && selectedBatch && (
+              <>
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-800">{selectedBatch.batchName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{selectedBatch.batchCode}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${BATCH_STATUS_COLORS[selectedBatch.status]}`}>
+                        {selectedBatch.status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <div><span className="text-gray-400">Office:</span> {selectedBatch.assignedOffice || '—'}</div>
+                      <div><span className="text-gray-400">Location:</span> {selectedBatch.deploymentLocation || '—'}</div>
+                      <div><span className="text-gray-400">Start:</span> {selectedBatch.startDate || '—'}</div>
+                      <div><span className="text-gray-400">End:</span> {selectedBatch.endDate || '—'}</div>
+                      <div><span className="text-gray-400">Slots:</span> {selectedBatch.slots || '—'}</div>
+                      <div><span className="text-gray-400">Allowance:</span> {selectedBatch.allowance ? `₱${selectedBatch.allowance}/mo` : '—'}</div>
+                      {selectedBatch.coordinator && <div className="col-span-2"><span className="text-gray-400">Coordinator:</span> {selectedBatch.coordinator}</div>}
+                    </div>
+                  </div>
+                  {assignTarget.assignedBatchId && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                      This applicant is currently assigned to another batch. Assigning will replace the current assignment.
+                    </div>
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+                  <button onClick={() => setAssignStep(1)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
+                  <button
+                    onClick={() => handleAssignBatch(selectedBatch)}
+                    className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark"
+                  >
+                    {assignTarget.assignedBatchId ? 'Re-assign' : 'Assign'}
                   </button>
-                ))
-              })()}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2">
-              {assignTarget.assignedActivity && (
-                <button onClick={handleUnassign} className="w-full py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  Remove Assigned Activity
-                </button>
-              )}
-              <button onClick={() => setAssignTarget(null)} className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {/* View / Change Assigned Batch Modal */}
+      {viewBatchTarget && (() => {
+        const currentBatch = gipBatches.find(b => b.id === viewBatchTarget.assignedBatchId)
+        if (!currentBatch) return null
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <div>
+                  <h3 className="text-gray-800 font-semibold">Assigned Batch</h3>
+                  <p className="text-sm text-gray-400 mt-0.5">{viewBatchTarget.firstName} {viewBatchTarget.lastName}</p>
+                </div>
+                <button onClick={() => setViewBatchTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              </div>
+              <div className="p-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-800">{currentBatch.batchName}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{currentBatch.batchCode}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${BATCH_STATUS_COLORS[currentBatch.status]}`}>
+                      {currentBatch.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div><span className="text-gray-400">Office:</span> {currentBatch.assignedOffice || '—'}</div>
+                    <div><span className="text-gray-400">Location:</span> {currentBatch.deploymentLocation || '—'}</div>
+                    <div><span className="text-gray-400">Start:</span> {currentBatch.startDate || '—'}</div>
+                    <div><span className="text-gray-400">End:</span> {currentBatch.endDate || '—'}</div>
+                    <div><span className="text-gray-400">Slots:</span> {currentBatch.slots || '—'}</div>
+                    <div><span className="text-gray-400">Allowance:</span> {currentBatch.allowance ? `₱${currentBatch.allowance}/mo` : '—'}</div>
+                    {currentBatch.coordinator && <div className="col-span-2"><span className="text-gray-400">Coordinator:</span> {currentBatch.coordinator}</div>}
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+                <button
+                  onClick={handleUnassignBatch}
+                  className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50"
+                >
+                  Unassign
+                </button>
+                <button
+                  onClick={() => {
+                    setViewBatchTarget(null)
+                    openAssignModal(viewBatchTarget)
+                  }}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Change Batch
+                </button>
+                <button
+                  onClick={() => setViewBatchTarget(null)}
+                  className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Import Modal */}
       {isImportModalOpen && (
@@ -756,7 +947,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                       <tr>
                         <th className="px-3 py-2 text-left">Last Name</th>
                         <th className="px-3 py-2 text-left">First Name</th>
-                        <th className="px-3 py-2 text-left">Office</th>
+                        <th className="px-3 py-2 text-left">Barangay</th>
                         <th className="px-3 py-2 text-left">Valid</th>
                       </tr>
                     </thead>
@@ -765,7 +956,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         <tr key={i} className="border-t border-gray-100">
                           <td className="px-3 py-2">{r.lastName}</td>
                           <td className="px-3 py-2">{r.firstName}</td>
-                          <td className="px-3 py-2">{r.office}</td>
+                          <td className="px-3 py-2">{r.barangay}</td>
                           <td className="px-3 py-2">{r.valid ? '✓' : '✗'}</td>
                         </tr>
                       ))}
@@ -828,7 +1019,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
-                  placeholder="Search by name, barangay, office, or activity..."
+                  placeholder="Search by name, barangay, or batch..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -903,66 +1094,67 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Name</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
-                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Office</th>
-                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Position</th>
-                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Allowance</th>
-                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Activity</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Batch</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(applicant => (
-                    <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
-                        <p className="text-gray-400 text-xs">{applicant.sex} &middot; {applicant.age} yrs</p>
-                        {activeFilters.includes('civilStatus') && applicant.civilStatus && (
-                          <p className="text-gray-400 text-xs">{applicant.civilStatus}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{applicant.barangay}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {applicant.classification.slice(0, 1).map(c => (
-                            <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
-                          ))}
-                          {applicant.classification.length > 1 && (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
+                  {filtered.map(applicant => {
+                    const batch = gipBatches.find(b => b.id === applicant.assignedBatchId)
+                    const derivedStatus = deriveStatus(applicant, gipBatches)
+                    return (
+                      <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
+                          <p className="text-gray-400 text-xs">{applicant.sex} &middot; {applicant.age} yrs</p>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{applicant.barangay}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {applicant.classification.slice(0, 1).map(c => (
+                              <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
+                            ))}
+                            {applicant.classification.length > 1 && (
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 max-w-[200px]">
+                          {batch ? (
+                            <div>
+                              <p className="text-gray-800 text-sm leading-tight">{batch.batchName}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block ${BATCH_STATUS_COLORS[batch.status]}`}>
+                                {batch.status}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        <p>{applicant.assignedOffice || '—'}</p>
-                        {applicant.department && <p className="text-gray-400 text-xs">{applicant.department}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.position || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {applicant.allowance ? `₱${applicant.allowance}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 max-w-[160px]">
-                        <span className="line-clamp-2">{applicant.assignedActivity || '—'}</span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={applicant.status} /></td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button
-                          onClick={e => {
-                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                            const menuHeight = 140
-                            const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-                            setMenuPos({
-                              top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-                              right: window.innerWidth - rect.right,
-                            })
-                            setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <StatusBadge status={derivedStatus} />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={e => {
+                              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                              const menuHeight = 160
+                              const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
+                              setMenuPos({
+                                top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+                                right: window.innerWidth - rect.right,
+                              })
+                              setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -975,16 +1167,31 @@ export default function GIPView({ onBack }: GIPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find(a => a.id === openActionMenuId)
         if (!applicant) return null
+        const hasAssignment = applicant.assignedBatchId !== null
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div
               style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-              className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+              className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
             >
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
-              <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
+              {hasAssignment ? (
+                <button
+                  onClick={() => { setViewBatchTarget(applicant); setOpenActionMenuId(null) }}
+                  className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50"
+                >
+                  View / Change Batch
+                </button>
+              ) : (
+                <button
+                  onClick={() => { openAssignModal(applicant); setOpenActionMenuId(null) }}
+                  className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50"
+                >
+                  Assign Batch
+                </button>
+              )}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
             </div>

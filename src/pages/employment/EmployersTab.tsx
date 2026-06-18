@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Employer } from '../../contexts/EmploymentContext'
 import { EMPLOYER_SEED } from '../../contexts/EmploymentContext'
@@ -75,7 +76,12 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    const menuHeight = 110
+    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
+    setMenuPos({
+      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    })
     setOpenMenuId(openMenuId === id ? null : id)
   }
 
@@ -361,8 +367,18 @@ export default function EmployersTab() {
     setSidebarMode(null)
   }
 
-  function handleDelete(id: number) {
-    if (!window.confirm('Are you sure you want to delete this employer?')) return
+  async function handleDelete(id: number) {
+    const result = await Swal.fire({
+      title: 'Delete Employer?',
+      text: 'Are you sure you want to delete this employer? This cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
     const updated = employers.filter(e => e.id !== id)
     setEmployers(updated)
     saveEmployers(updated)

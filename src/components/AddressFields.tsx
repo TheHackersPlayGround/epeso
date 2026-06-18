@@ -1,4 +1,4 @@
-interface AddressValue {
+export interface AddressValue {
   region: string
   province: string
   cityMunicipality: string

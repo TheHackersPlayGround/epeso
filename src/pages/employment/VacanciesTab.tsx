@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
 import { VACANCY_SEED } from '../../contexts/EmploymentContext'
@@ -190,13 +191,52 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    const menuHeight = 140
+    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
+    setMenuPos({
+      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    })
     setOpenMenuId(openMenuId === id ? null : id)
   }
 
   function closeMenu() { setOpenMenuId(null) }
 
   const menuVacancy = vacancies.find((v) => v.id === openMenuId) ?? null
+
+  async function handleConfirmClose() {
+    if (!menuVacancy) return
+    const result = await Swal.fire({
+      title: 'Close Vacancy?',
+      text: `"${menuVacancy.jobTitle}" will no longer accept applicants.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Close',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    onToggleStatus(menuVacancy.id, menuVacancy.status)
+    closeMenu()
+  }
+
+  async function handleConfirmReopen() {
+    if (!menuVacancy) return
+    const result = await Swal.fire({
+      title: 'Re-open Vacancy?',
+      text: `"${menuVacancy.jobTitle}" will be visible to applicants again.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Re-open',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#0077BE',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    onToggleStatus(menuVacancy.id, menuVacancy.status)
+    closeMenu()
+  }
   const showIndustry = activeFilters.includes('industry')
   const showJobType = activeFilters.includes('jobType')
 
@@ -276,24 +316,14 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
             <button onClick={() => { onMatch(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Match</button>
             {menuVacancy.status === 'Open' ? (
               <button
-                onClick={() => {
-                  if (window.confirm(`Close vacancy "${menuVacancy.jobTitle}"? It will no longer accept applicants.`)) {
-                    onToggleStatus(menuVacancy.id, menuVacancy.status)
-                    closeMenu()
-                  }
-                }}
+                onClick={handleConfirmClose}
                 className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50"
               >
                 Close
               </button>
             ) : (
               <button
-                onClick={() => {
-                  if (window.confirm(`Re-open vacancy "${menuVacancy.jobTitle}"? It will be visible to applicants again.`)) {
-                    onToggleStatus(menuVacancy.id, menuVacancy.status)
-                    closeMenu()
-                  }
-                }}
+                onClick={handleConfirmReopen}
                 className="w-full px-3 py-2 text-left text-xs text-green-600 hover:bg-green-50"
               >
                 Open

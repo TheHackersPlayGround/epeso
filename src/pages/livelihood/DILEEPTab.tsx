@@ -1,0 +1,745 @@
+import { useState, useMemo } from 'react'
+import {
+  Search, Plus, ChevronDown, ChevronRight, ChevronLeft, X, Download, Upload,
+  MoreHorizontal, Users, Info,
+} from 'lucide-react'
+import * as XLSX from 'xlsx'
+import Swal from 'sweetalert2'
+import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
+import AddDILPProfileWizard, { EMPTY_DILP_RECORD } from './AddDILPProfileWizard'
+import AddTUPADProfileModal, { EMPTY_TUPAD_RECORD } from './AddTUPADProfileModal'
+import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const LS_KEY = 'lp_dileep_v2'
+
+type DILEEPProgram = 'DILEEP (DILP)' | 'DILEEP (TUPAD)'
+
+const PROGRAM_STATUS_OPTIONS: LivelihoodStatus[] = [
+  'Active', 'Completed', 'Dropped', 'Pending', 'Inactive',
+]
+
+const SEX_OPTIONS = ['Male', 'Female']
+
+const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
+
+const STATUS_COLORS: Record<LivelihoodStatus, string> = {
+  Active:    'bg-green-100 text-green-700',
+  Completed: 'bg-blue-100 text-blue-700',
+  Dropped:   'bg-red-100 text-red-600',
+  Pending:   'bg-yellow-100 text-yellow-700',
+  Closed:    'bg-gray-100 text-gray-500',
+  Approved:  'bg-emerald-100 text-emerald-700',
+  Released:  'bg-purple-100 text-purple-700',
+  Inactive:  'bg-gray-200 text-gray-400',
+}
+
+// ─── Data helpers ─────────────────────────────────────────────────────────────
+
+function loadAllDILEEP(): LivelihoodBeneficiary[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
+    return parsed.length > 0
+      ? parsed
+      : LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)')
+  } catch {
+    return LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)')
+  }
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type FilterOption = { id: string; label: string; options: string[] }
+
+// ─── Name helpers ─────────────────────────────────────────────────────────────
+
+function formatDisplayName(b: { name: string; firstName?: string; lastName?: string; middleName?: string; nameExtension?: string }): string {
+  if (b.firstName && b.lastName) {
+    const given = [b.firstName, b.middleName, b.nameExtension].filter(Boolean).join(' ')
+    return `${b.lastName}, ${given}`
+  }
+  return b.name
+}
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: LivelihoodStatus }) {
+  return (
+    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {status}
+    </span>
+  )
+}
+
+// ─── Assign Project Modal ─────────────────────────────────────────────────────
+
+type AssignProjectModalProps = {
+  beneficiary: LivelihoodBeneficiary
+  program: DILEEPProgram
+  onAssign: (projectId: number, projectName: string) => void
+  onClose: () => void
+}
+
+function AssignProjectModal({ beneficiary, program, onAssign, onClose }: AssignProjectModalProps) {
+  const { activities } = useProgramActivities()
+  const [projectSearch, setProjectSearch] = useState('')
+
+  const serviceLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'DILEEP (TUPAD)'
+
+  const programProjects = activities.filter(
+    a => a.service === program && (a.status === 'Planned' || a.status === 'Ongoing')
+  )
+
+  const filteredProjects = projectSearch.trim()
+    ? programProjects.filter(p =>
+        (p.projectName ?? p.title).toLowerCase().includes(projectSearch.toLowerCase())
+      )
+    : programProjects
+
+  function projectStatusClass(status: string) {
+    if (status === 'Ongoing') return 'bg-green-100 text-green-700'
+    if (status === 'Planned') return 'bg-yellow-100 text-yellow-700'
+    return 'bg-gray-100 text-gray-500'
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-brand-blue px-6 py-5 flex items-start justify-between">
+          <div>
+            <h3 className="text-white font-bold text-lg">Assign Project</h3>
+            <p className="text-white/80 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
+          </div>
+          <button onClick={onClose} className="text-white/80 hover:text-white transition-colors p-1 mt-0.5">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 pt-5 pb-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={projectSearch}
+              onChange={e => setProjectSearch(e.target.value)}
+              placeholder="Search projects..."
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
+            <Info size={12} />
+            Only {serviceLabel} projects (Planned and Ongoing) are shown
+          </p>
+        </div>
+
+        {/* Project list */}
+        <div className="px-5 max-h-72 overflow-y-auto">
+          {filteredProjects.length === 0 ? (
+            <p className="text-center text-sm text-gray-400 py-8">No projects found</p>
+          ) : (
+            filteredProjects.map(project => (
+              <button
+                key={project.id}
+                onClick={() => onAssign(project.id, project.projectName ?? project.title)}
+                className="w-full text-left py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors flex items-start justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">{project.projectName ?? project.title}</p>
+                  {program === 'DILEEP (TUPAD)' ? (
+                    <>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[project.service, project.date, project.location].filter(Boolean).join(' • ')}
+                      </p>
+                      {project.description && (
+                        <p className="text-xs text-gray-400 mt-0.5">{project.description}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {[project.typeOfProject, project.wayOfImplementation].filter(Boolean).join(' • ')}
+                    </p>
+                  )}
+                </div>
+                <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${projectStatusClass(project.status)}`}>
+                  {project.status}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Cancel */}
+        <div className="px-5 py-4 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="w-full py-3 text-sm text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Beneficiary List (sub-view inside DILEEP) ────────────────────────────────
+// Renders 3 separate cards: action buttons | search+filter | table+pagination
+
+type BeneficiaryListProps = {
+  program: DILEEPProgram
+  allRecords: LivelihoodBeneficiary[]
+  onPersistAll: (records: LivelihoodBeneficiary[]) => void
+}
+
+function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [perPage, setPerPage] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [viewingBeneficiary, setViewingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
+  const [editingBeneficiary, setEditingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [assigningBeneficiary, setAssigningBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
+
+  const programRecords = allRecords.filter(b => b.service === program)
+  const programLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'
+
+  const availableFilters: FilterOption[] = [
+    { id: 'status',      label: 'Status',       options: PROGRAM_STATUS_OPTIONS },
+    { id: 'sex',         label: 'Sex',           options: SEX_OPTIONS },
+    { id: 'civilStatus', label: 'Civil Status',  options: CIVIL_STATUS_OPTIONS },
+  ]
+
+  function persistProgram(updated: LivelihoodBeneficiary[]) {
+    const others = allRecords.filter(b => b.service !== program)
+    onPersistAll([...others, ...updated])
+  }
+
+  function handleAddBeneficiary(data: Omit<LivelihoodBeneficiary, 'id'>) {
+    const newRecord: LivelihoodBeneficiary = {
+      ...data,
+      id: Date.now(),
+      service: program,
+      // Keep projectName in sync with the project title for table display
+      projectName: data.projectName ?? data.name,
+    }
+    persistProgram([...programRecords, newRecord])
+    setIsAddOpen(false)
+  }
+
+  function handleEditSave(data: Omit<LivelihoodBeneficiary, 'id'>) {
+    if (!editingBeneficiary) return
+    persistProgram(
+      programRecords.map(b =>
+        b.id === editingBeneficiary.id ? { ...b, ...data, id: b.id, service: program } : b
+      )
+    )
+    setEditingBeneficiary(null)
+  }
+
+  function handleRemoveBeneficiary(id: number) {
+    persistProgram(programRecords.filter(b => b.id !== id))
+    setOpenMenuId(null)
+  }
+
+  function handleAddFilter(id: string) {
+    setActiveFilters(prev => [...prev, id])
+    setCurrentPage(1)
+  }
+
+  function handleRemoveFilter(id: string) {
+    setActiveFilters(prev => prev.filter(f => f !== id))
+    setFilterValues(prev => { const n = { ...prev }; delete n[id]; return n })
+    setCurrentPage(1)
+  }
+
+  function handleFilterValueChange(id: string, value: string) {
+    setFilterValues(prev => ({ ...prev, [id]: value }))
+    setCurrentPage(1)
+  }
+
+  function handleToggleMenu(e: React.MouseEvent, id: number) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const menuHeight = 170
+    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
+    setMenuPos({
+      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    })
+    setOpenMenuId(openMenuId === id ? null : id)
+  }
+
+  function closeMenu() { setOpenMenuId(null) }
+
+  async function handleConfirmRemove(id: number, name: string) {
+    closeMenu()
+    const result = await Swal.fire({
+      title: 'Remove Beneficiary?',
+      text: `This will permanently remove ${name} from the list.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, remove',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+    })
+    if (!result.isConfirmed) return
+    handleRemoveBeneficiary(id)
+  }
+
+  function handleAssignProject(projectId: number, projectName: string) {
+    if (!assigningBeneficiary) return
+    persistProgram(
+      programRecords.map(b =>
+        b.id === assigningBeneficiary.id ? { ...b, assignedDilpProjectId: projectId, projectName } : b
+      )
+    )
+    setAssigningBeneficiary(null)
+  }
+
+  const filtered = useMemo(() => {
+    let result = programRecords
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(b =>
+        b.name.toLowerCase().includes(q) ||
+        (b.barangay ?? '').toLowerCase().includes(q) ||
+        (b.projectName ?? '').toLowerCase().includes(q)
+      )
+    }
+    for (const filterId of activeFilters) {
+      const value = filterValues[filterId]
+      if (!value) continue
+      if (filterId === 'status')      result = result.filter(b => b.status === value)
+      if (filterId === 'sex')         result = result.filter(b => b.sex === value)
+      if (filterId === 'civilStatus') result = result.filter(b => b.civilStatus === value)
+    }
+    return result
+  }, [programRecords, searchQuery, activeFilters, filterValues])
+
+  const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filtered.length)
+
+  const menuBeneficiary = paginated.find(b => b.id === openMenuId) ?? null
+
+  function buildExportRows() {
+    return filtered.map(b => ({
+      'Name': b.name,
+      'Sex': b.sex ?? '',
+      'Barangay': b.barangay ?? '',
+      'Assigned Project': b.projectName ?? '',
+      'Wage Rate': b.wageRate ?? '',
+      'Project Duration': b.projectDuration ?? '',
+      'Date Applied': b.dateEnrolled ?? '',
+      'Status': b.status,
+    }))
+  }
+
+  function handleExportExcel() {
+    const ws = XLSX.utils.json_to_sheet(buildExportRows())
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, programLabel)
+    XLSX.writeFile(wb, `${programLabel}_beneficiaries.xlsx`)
+    setIsExportOpen(false)
+  }
+
+  function handleExportCsv() {
+    const ws = XLSX.utils.json_to_sheet(buildExportRows())
+    const csv = XLSX.utils.sheet_to_csv(ws)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${programLabel}_beneficiaries.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    setIsExportOpen(false)
+  }
+
+  if (program === 'DILEEP (DILP)') {
+    if (isAddOpen) {
+      return (
+        <AddDILPProfileWizard
+          mode="add"
+          initial={{ ...EMPTY_DILP_RECORD, service: program }}
+          onSave={handleAddBeneficiary}
+          onClose={() => setIsAddOpen(false)}
+        />
+      )
+    }
+    if (editingBeneficiary) {
+      return (
+        <AddDILPProfileWizard
+          key={editingBeneficiary.id}
+          mode="edit"
+          initial={editingBeneficiary}
+          onSave={handleEditSave}
+          onClose={() => setEditingBeneficiary(null)}
+        />
+      )
+    }
+    if (viewingBeneficiary) {
+      return (
+        <AddDILPProfileWizard
+          key={viewingBeneficiary.id}
+          mode="view"
+          initial={viewingBeneficiary}
+          onSave={() => {}}
+          onClose={() => setViewingBeneficiary(null)}
+        />
+      )
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Card 1 — Action buttons */}
+      <div className="bg-white rounded-xl shadow-sm px-5 py-4 flex items-center gap-3">
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium hover:bg-brand-blue-dark transition-colors"
+        >
+          <Plus size={16} />
+          Add Profile
+        </button>
+
+        <button
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <Upload size={16} />
+          Import
+        </button>
+
+        <div className="relative">
+          <button
+            onClick={() => setIsExportOpen(o => !o)}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download size={16} />
+            Export
+          </button>
+          {isExportOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsExportOpen(false)} />
+              <div className="absolute left-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                <button onClick={handleExportExcel} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                  Export as Excel
+                </button>
+                <button onClick={handleExportCsv} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50">
+                  Export as CSV
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Table card — search, filter, and table (GIP style) */}
+      <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-48">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                placeholder="Search by name..."
+                aria-label={`Search ${programLabel} beneficiaries`}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
+              />
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsFilterOpen(o => !o)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
+              >
+                <Plus size={16} />
+                <span>Filter By</span>
+                <ChevronDown size={14} className="text-gray-500" />
+              </button>
+              {isFilterOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsFilterOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                    {availableFilters.filter(f => !activeFilters.includes(f.id)).length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
+                    ) : (
+                      availableFilters.filter(f => !activeFilters.includes(f.id)).map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => { handleAddFilter(f.id); setIsFilterOpen(false) }}
+                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                        >
+                          {f.label}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {activeFilters.map(filterId => {
+                const filter = availableFilters.find(f => f.id === filterId)
+                if (!filter) return null
+                return (
+                  <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                    <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
+                    <select
+                      value={filterValues[filterId] ?? ''}
+                      onChange={e => handleFilterValueChange(filterId, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
+                    >
+                      <option value="">All</option>
+                      {filter.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                    <button
+                      onClick={() => handleRemoveFilter(filterId)}
+                      aria-label={`Remove ${filter.label} filter`}
+                      className="text-blue-700 hover:text-blue-900 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            {/* Section header */}
+            <tr className="bg-brand-blue">
+              <td colSpan={8} className="px-5 py-4">
+                <p className="text-white font-bold text-base">Beneficiaries</p>
+                <p className="text-white/70 text-xs">{filtered.length} record(s)</p>
+              </td>
+            </tr>
+            {/* Column headers — same style as other tables */}
+            <tr className="bg-brand-blue border-t border-blue-500">
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap w-10">#</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">NAME</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">SEX</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">BARANGAY</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">ASSIGNED PROJECT</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">DATE APPLIED</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">STATUS</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginated.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-16 text-center">
+                  <div className="flex flex-col items-center gap-3 text-gray-400">
+                    <Users size={48} strokeWidth={1.5} />
+                    {isFiltered ? (
+                      <>
+                        <p className="text-base font-medium text-gray-500">No beneficiaries match your filters</p>
+                        <p className="text-sm">Try adjusting your search or removing some filters.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-base font-medium text-gray-500">No beneficiaries yet</p>
+                        <p className="text-sm">Click "Add Profile" to get started.</p>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((b, idx) => (
+                <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{recordStart + idx}</td>
+                  <td className="px-4 py-3 text-gray-800 font-semibold whitespace-nowrap">{formatDisplayName(b)}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {b.projectName
+                      ? <span className="text-gray-600">{b.projectName}</span>
+                      : <span className="text-gray-400 italic">Not assigned</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateEnrolled ?? '-'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={b.status} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <button
+                      onClick={e => handleToggleMenu(e, b.id)}
+                      aria-label={`Actions for ${b.name}`}
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* Pagination footer */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            Show
+            <select
+              value={perPage}
+              onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+              className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            per page
+          </div>
+
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              aria-label="Previous page"
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              aria-label="Next page"
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Context menu */}
+      {openMenuId !== null && menuPos && menuBeneficiary && (
+        <>
+          <div className="fixed inset-0 z-[200]" onClick={closeMenu} />
+          <div
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
+            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1"
+          >
+            <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
+            <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
+            <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
+            <div className="border-t border-gray-100 my-1" />
+            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
+          </div>
+        </>
+      )}
+
+      {assigningBeneficiary && (
+        <AssignProjectModal
+          beneficiary={assigningBeneficiary}
+          program={program}
+          onAssign={handleAssignProject}
+          onClose={() => setAssigningBeneficiary(null)}
+        />
+      )}
+
+      {program === 'DILEEP (TUPAD)' && isAddOpen && (
+        <AddTUPADProfileModal
+          mode="add"
+          initial={{ ...EMPTY_TUPAD_RECORD, service: program }}
+          onSave={handleAddBeneficiary}
+          onClose={() => setIsAddOpen(false)}
+        />
+      )}
+      {program === 'DILEEP (TUPAD)' && editingBeneficiary && (
+        <AddTUPADProfileModal
+          key={editingBeneficiary.id}
+          mode="edit"
+          initial={editingBeneficiary}
+          onSave={handleEditSave}
+          onClose={() => setEditingBeneficiary(null)}
+        />
+      )}
+      {program === 'DILEEP (TUPAD)' && viewingBeneficiary && (
+        <AddTUPADProfileModal
+          key={viewingBeneficiary.id}
+          mode="view"
+          initial={viewingBeneficiary}
+          onSave={() => {}}
+          onClose={() => setViewingBeneficiary(null)}
+          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function DILEEPTab() {
+  const [activeProgram, setActiveProgram] = useState<DILEEPProgram | null>(null)
+  const [allRecords, setAllRecords] = useState<LivelihoodBeneficiary[]>(loadAllDILEEP)
+
+  function handlePersistAll(records: LivelihoodBeneficiary[]) {
+    setAllRecords(records)
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(records))
+    } catch { /* quota */ }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Program selector */}
+      <div className="bg-white rounded-xl shadow-sm p-8">
+        <div className="flex flex-col gap-2 mb-6">
+          <p className="text-gray-800 font-bold text-base">DILEEP Programs</p>
+          <p className="text-gray-500 text-sm">DOLE Integrated Livelihood and Emergency Employment Program</p>
+        </div>
+        <div className="flex gap-3">
+          {(['DILEEP (DILP)', 'DILEEP (TUPAD)'] as DILEEPProgram[]).map(program => (
+            <button
+              key={program}
+              onClick={() => setActiveProgram(program)}
+              className={`flex-1 py-5 text-base font-bold rounded-xl border transition-colors ${
+                activeProgram === program
+                  ? 'bg-brand-blue border-brand-blue text-white'
+                  : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
+              }`}
+            >
+              {program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeProgram !== null && (
+        <BeneficiaryList
+          program={activeProgram}
+          allRecords={allRecords}
+          onPersistAll={handlePersistAll}
+        />
+      )}
+    </div>
+  )
+}

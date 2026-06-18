@@ -77,6 +77,45 @@ export const VACANCY_SEED: Vacancy[] = [
   { id: 9, jobTitle: 'Cook',               employer: 'Tangub City Restaurant', vacanciesCount: 6,  industry: 'Hospitality',            jobType: 'Full-time', salaryRange: '₱12,000 - ₱16,000', description: 'Prepare and cook meals for restaurant service.', requirements: 'With experience in food preparation, TESDA NC II preferred.', status: 'Open' },
 ]
 
+export type Referral = {
+  id: number
+  applicantId: number
+  applicantName: string
+  vacancyId: number
+  jobTitle: string
+  employer: string
+  referralDate: string        // ISO date string, e.g. "2026-06-18"
+  status: 'Pending' | 'Interviewed' | 'Not Hired'
+  notes?: string
+}
+
+export const REFERRAL_SEED: Referral[] = [
+  { id: 1, applicantId: 1, applicantName: 'Maria Santos',          vacancyId: 4, jobTitle: 'Nurse',      employer: 'City Hospital',        referralDate: '2026-06-10', status: 'Pending',     notes: '' },
+  { id: 2, applicantId: 2, applicantName: 'Juan Santos Dela Cruz', vacancyId: 1, jobTitle: 'Accountant', employer: 'ABC Corporation',      referralDate: '2026-06-08', status: 'Interviewed', notes: '' },
+  { id: 4, applicantId: 4, applicantName: 'Roberto Manalo',        vacancyId: 8, jobTitle: 'IT Support', employer: 'DOST Regional Office', referralDate: '2026-06-01', status: 'Not Hired',   notes: 'Position filled by another candidate.' },
+  { id: 5, applicantId: 5, applicantName: 'Ligaya Flores',         vacancyId: 7, jobTitle: 'Nurse Aide', employer: 'Tangub City Hospital', referralDate: '2026-06-12', status: 'Pending',     notes: '' },
+]
+
+export type Placement = {
+  id: number
+  applicantId: number
+  applicantName: string
+  jobTitle: string
+  employer: string
+  dateHired: string
+  status: 'Active' | 'Resigned' | 'Terminated' | 'Completed'
+  employmentType?: string
+  source?: string
+  referralId?: number
+  vacancyId?: number
+  salaryRange?: string
+  notes?: string
+}
+
+export const PLACEMENT_SEED: Placement[] = [
+  { id: 1, applicantId: 3, applicantName: 'Ana Reyes', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', source: 'Referral', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000', notes: 'Passed interview and accepted the offer.' },
+]
+
 export const SEED: Applicant[] = [
   {
     id: 1,

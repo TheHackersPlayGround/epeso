@@ -3,7 +3,7 @@ import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Applicant } from "./ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./ApplicantsTab";
-import { SEED } from "../../contexts/EmploymentContext";
+import { SEED, VACANCY_SEED } from "../../contexts/EmploymentContext";
 import ApplicantsTab from "./ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
@@ -49,16 +49,19 @@ type ReferApplicantPanelProps = {
   onClose: () => void;
 };
 
-function loadVacanciesForRefer(): Array<{ id: number; jobTitle: string; employer: string; vacanciesCount: number }> {
+function loadVacanciesForRefer(): Array<{ id: number; jobTitle: string; employer: string; vacanciesCount: number; status: string }> {
   try {
     const raw = localStorage.getItem('ef_vacancies')
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.length > 0) return parsed
+    }
   } catch { /* ignore */ }
-  return []
+  return VACANCY_SEED
 }
 
 function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
-  const vacancies = loadVacanciesForRefer().filter(v => (v as any).status !== 'Closed')
+  const vacancies = loadVacanciesForRefer().filter(v => v.status !== 'Closed')
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<{ id: number; label: string } | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -76,6 +79,26 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
 
   function handleConfirm() {
     if (!selected) return
+
+    const vacancy = vacancies.find(v => v.id === selected.id)
+    const newReferral = {
+      id: Date.now(),
+      applicantId: applicant.id,
+      applicantName: applicant.name,
+      vacancyId: selected.id,
+      jobTitle: vacancy?.jobTitle ?? selected.label.split(' – ')[0],
+      employer: vacancy?.employer ?? '',
+      referralDate: new Date().toISOString().slice(0, 10),
+      status: 'Pending' as const,   // PESO workflow: Pending → Interviewed → Hired / Not Hired
+      notes: '',
+    }
+
+    try {
+      const raw = localStorage.getItem('ef_referrals')
+      const existing = raw ? JSON.parse(raw) : []
+      localStorage.setItem('ef_referrals', JSON.stringify([newReferral, ...existing]))
+    } catch { /* quota — silent */ }
+
     setReferred(true)
   }
 

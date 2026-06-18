@@ -7,7 +7,7 @@ export interface ProgramActivity {
   service: string
   date: string
   location: string
-  status: 'Planned' | 'Ongoing' | 'Completed'
+  status: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
   assignedOffice?: string
   startDate?: string
   endDate?: string
@@ -18,9 +18,64 @@ export interface ProgramActivity {
   participants?: number
   counselor?: string
   sessionDuration?: string
+  // DILP-specific fields (only present when service === 'DILEEP (DILP)')
+  projectIdNumber?: string
+  projectName?: string
+  typeOfProject?: string
+  programComponent?: string
+  wayOfImplementation?: string
+}
+
+// Narrowed type for DILP activities — used in the DILP beneficiary form
+// to populate the "Assigned Project" dropdown.
+export type DILPActivity = ProgramActivity & {
+  service: 'DILEEP (DILP)'
+  projectIdNumber: string
+  projectName: string
+  typeOfProject: string
+  programComponent: string
+  wayOfImplementation: string
 }
 
 const SEED: ProgramActivity[] = [
+  // ── DILP Projects ─────────────────────────────────────────────────
+  {
+    id: 101, title: 'DILP Road Clearing Project 2026', service: 'DILEEP (DILP)',
+    date: '2026-01-10', location: 'Tangub City', status: 'Ongoing',
+    projectIdNumber: 'DILP-2026-001', projectName: 'Road Clearing Project',
+    typeOfProject: 'Community Employment', programComponent: 'Emergency Employment',
+    wayOfImplementation: 'Community-Based',
+  },
+  {
+    id: 102, title: 'DILP Community Clean-up Drive 2026', service: 'DILEEP (DILP)',
+    date: '2026-02-01', location: 'Tangub City', status: 'Completed',
+    projectIdNumber: 'DILP-2026-002', projectName: 'Community Clean-up Drive',
+    typeOfProject: 'Environmental', programComponent: 'Livelihood Employment',
+    wayOfImplementation: 'Community-Based',
+  },
+  {
+    id: 103, title: 'DILP Drainage Improvement Project 2026', service: 'DILEEP (DILP)',
+    date: '2026-03-15', location: 'Tangub City', status: 'Planned',
+    projectIdNumber: 'DILP-2026-003', projectName: 'Drainage Improvement Project',
+    typeOfProject: 'Infrastructure', programComponent: 'Emergency Employment',
+    wayOfImplementation: 'Area-Based',
+  },
+  // ── TUPAD Projects ────────────────────────────────────────────────
+  {
+    id: 201, title: 'TUPAD Disaster Preparedness and Response Team', service: 'DILEEP (TUPAD)',
+    date: '2026-06-05', location: 'Disaster-Prone Areas, Tangub City', status: 'Planned',
+    description: 'Emergency employment for disaster risk reduction and preparedness activities.',
+  },
+  {
+    id: 202, title: 'TUPAD Cemetery and Memorial Park Maintenance', service: 'DILEEP (TUPAD)',
+    date: '2026-04-10', location: 'Public Cemetery, Tangub City', status: 'Ongoing',
+    description: 'Temporary employment for cemetery upkeep and landscaping.',
+  },
+  {
+    id: 203, title: 'TUPAD Street Cleaning and Beautification', service: 'DILEEP (TUPAD)',
+    date: '2026-05-15', location: 'Main Streets, Tangub City', status: 'Planned',
+    description: 'Temporary employment for street cleaning and urban beautification.',
+  },
   { id: 1, program: 'CDSP', title: 'Career Coaching Batch 1 – March 2026', service: 'Career Coaching', date: '2026-03-10', startDate: '2026-03-10', endDate: '2026-03-28', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Career coaching batch for fresh graduates and unemployed individuals seeking career direction.' },
   { id: 2, program: 'CDSP', title: 'LEGS Orientation – March 2026', service: 'Labor Employment for Graduating Students', date: '2026-03-15', startDate: '2026-03-15', endDate: '2026-03-15', location: 'PESO Main Office, Tangub City', facilitator: 'Ms. Santos', participants: 30, status: 'Planned', description: 'Orientation for graduating students on labor employment opportunities and requirements.' },
   { id: 3, program: 'CDSP', title: 'Pre-Employment Coaching – April 2026', service: 'Pre-Employment Coaching', date: '2026-04-05', startDate: '2026-04-05', endDate: '2026-04-19', location: 'PESO Main Office, Tangub City', facilitator: 'Mr. Cruz', participants: 25, status: 'Planned', description: 'Pre-employment coaching covering resume writing, interview skills, and job application techniques.' },

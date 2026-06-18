@@ -201,7 +201,12 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    const menuHeight = 110;
+    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8;
+    setMenuPos({
+      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
     setOpenMenuId(openMenuId === id ? null : id);
   }
 

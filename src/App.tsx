@@ -10,6 +10,7 @@ import EmploymentFacilitation from './pages/employment/EmploymentFacilitation'
 import DocumentsView from './pages/documents/DocumentsView'
 import SkillsTrainingView from './pages/skills-training/SkillsTrainingView'
 import Maintenance from './pages/maintenance/Maintenance'
+import LivelihoodView from './pages/livelihood/LivelihoodView'
 import { CDSPProvider } from './contexts/CDSPContext'
 import { GIPProvider } from './contexts/GIPContext'
 import { SPESProvider } from './contexts/SPESContext'
@@ -19,7 +20,7 @@ import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import './styles/App.css'
 
-type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance'
+type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood'
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('Dashboard')
@@ -34,6 +35,7 @@ function AppContent() {
     if (id === 'skills') setCurrentPage('skills')
     if (id === 'documents') setCurrentPage('documents')
     if (id === 'maintenance') setCurrentPage('maintenance')
+    if (id === 'livelihood') setCurrentPage('livelihood')
   }
 
   const navbar = (
@@ -131,6 +133,17 @@ function AppContent() {
         {navbar}
         <div className="flex-1 overflow-y-auto">
           <Maintenance onBack={() => setCurrentPage('dashboard')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPage === 'livelihood') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-y-auto">
+          <LivelihoodView onBack={() => setCurrentPage('dashboard')} />
         </div>
       </div>
     )

@@ -14,6 +14,7 @@ import SPESMaintenanceForm from './SPESMaintenanceForm'
 import SkillsTrainingMaintenanceForm from './SkillsTrainingMaintenanceForm'
 import CDSPMaintenanceForm from './CDSPMaintenanceForm'
 import GIPMaintenanceForm from './GIPMaintenanceForm'
+import LivelihoodMaintenanceForm from './LivelihoodMaintenanceForm'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -456,8 +457,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       {/* CDSP tab */}
       {activeTab === 'CDSP' && <CDSPMaintenanceForm />}
 
-      {/* Livelihood: coming soon */}
-      {activeTab === 'Livelihood' && <ComingSoon tab={activeTab} />}
+      {/* Livelihood tab */}
+      {activeTab === 'Livelihood' && <LivelihoodMaintenanceForm />}
 
       {/* ── Skills Training tab ──────────────────────────────────────────────── */}
       {activeTab === 'Skills Training' && <SkillsTrainingMaintenanceForm />}

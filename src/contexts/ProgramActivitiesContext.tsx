@@ -24,6 +24,11 @@ export interface ProgramActivity {
   typeOfProject?: string
   programComponent?: string
   wayOfImplementation?: string
+  // TUPAD-specific fields (only present when service === 'DILEEP (TUPAD)')
+  assistanceAmount?: string
+  dateReleased?: string
+  beneficiaryType?: 'Individual' | 'Group'
+  tupadDocuments?: string[]
 }
 
 // Narrowed type for DILP activities — used in the DILP beneficiary form
@@ -60,7 +65,44 @@ const SEED: ProgramActivity[] = [
     typeOfProject: 'Infrastructure', programComponent: 'Emergency Employment',
     wayOfImplementation: 'Area-Based',
   },
+  {
+    id: 105, title: 'Vegetable Production Project 2026', service: 'DILEEP (DILP)',
+    date: '2026-04-01', location: 'Tangub City', status: 'Ongoing',
+    projectIdNumber: 'DILP-2026-005', projectName: 'Vegetable Production Project',
+    typeOfProject: 'Individual', programComponent: 'Livelihood Employment',
+    wayOfImplementation: 'Community-Based',
+  },
+  {
+    id: 104, title: 'Hog Raising Livelihood Project 2026', service: 'DILEEP (DILP)',
+    date: '2026-03-01', location: 'Tangub City', status: 'Ongoing',
+    projectIdNumber: 'DILP-2026-004', projectName: 'Hog Raising Livelihood Project',
+    typeOfProject: 'Group', programComponent: 'Establishment',
+    wayOfImplementation: 'Nego-Kart',
+  },
+  // ── SLP Projects ──────────────────────────────────────────────────
+  {
+    id: 301, title: 'Sustainable Livelihood Program - Handicrafts', service: 'SLP',
+    date: '2026-03-18', location: 'Community Center, Tangub City', status: 'Ongoing',
+    description: 'Livelihood training for handicraft production.',
+  },
+  {
+    id: 302, title: 'SLP Food Processing and Packaging', service: 'SLP',
+    date: '2026-04-25', location: 'DOLE Training Center, Tangub City', status: 'Planned',
+    description: 'Livelihood training for food processing microenterprises.',
+  },
+  {
+    id: 303, title: 'SLP Sewing and Garments Production', service: 'SLP',
+    date: '2026-05-10', location: 'Barangay Hall, Tangub City', status: 'Planned',
+    description: 'Skills-based livelihood training on garments and dressmaking.',
+  },
   // ── TUPAD Projects ────────────────────────────────────────────────
+  {
+    id: 204, title: 'TUPAD Road Maintenance and Repair', service: 'DILEEP (TUPAD)',
+    date: '2026-04-15', location: 'Barangay Road Network, Tangub City', status: 'Ongoing',
+    description: 'Emergency employment for road infrastructure maintenance',
+    facilitator: 'Ricardo Santos', participants: 40,
+    assistanceAmount: '4500', dateReleased: '2026-04-20',
+  },
   {
     id: 201, title: 'TUPAD Disaster Preparedness and Response Team', service: 'DILEEP (TUPAD)',
     date: '2026-06-05', location: 'Disaster-Prone Areas, Tangub City', status: 'Planned',

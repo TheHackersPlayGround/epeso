@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Search, Plus, ChevronDown, ChevronRight, ChevronLeft, X, Download, Upload,
   MoreHorizontal, Users, Info,
@@ -13,7 +13,7 @@ import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_dileep_v2'
+const LS_KEY = 'lp_dileep_v4'
 
 type DILEEPProgram = 'DILEEP (DILP)' | 'DILEEP (TUPAD)'
 
@@ -80,14 +80,19 @@ type AssignProjectModalProps = {
   beneficiary: LivelihoodBeneficiary
   program: DILEEPProgram
   onAssign: (projectId: number, projectName: string) => void
+  onUnassign: () => void
   onClose: () => void
 }
 
-function AssignProjectModal({ beneficiary, program, onAssign, onClose }: AssignProjectModalProps) {
+function AssignProjectModal({ beneficiary, program, onAssign, onUnassign, onClose }: AssignProjectModalProps) {
   const { activities } = useProgramActivities()
   const [projectSearch, setProjectSearch] = useState('')
 
   const serviceLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'DILEEP (TUPAD)'
+
+  const currentProject = beneficiary.assignedDilpProjectId
+    ? activities.find(a => a.id === beneficiary.assignedDilpProjectId) ?? null
+    : null
 
   const programProjects = activities.filter(
     a => a.service === program && (a.status === 'Planned' || a.status === 'Ongoing')
@@ -107,81 +112,243 @@ function AssignProjectModal({ beneficiary, program, onAssign, onClose }: AssignP
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         {/* Header */}
-        <div className="bg-brand-blue px-6 py-5 flex items-start justify-between">
+        <div className="bg-brand-blue px-5 pt-5 pb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-white font-bold text-lg">Assign Project</h3>
-            <p className="text-white/80 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
+            <h3 className="text-white font-bold text-base">Assign Project</h3>
+            <p className="text-white/80 text-xs mt-0.5">{formatDisplayName(beneficiary)}</p>
           </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white transition-colors p-1 mt-0.5">
-            <X size={20} />
+          <button onClick={onClose} aria-label="Close" className="text-white/80 hover:text-white transition-colors p-1 mt-0.5">
+            <X size={18} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-5 pt-5 pb-3">
+        <div className="px-4 pt-4 pb-2">
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={projectSearch}
               onChange={e => setProjectSearch(e.target.value)}
               placeholder="Search projects..."
-              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+              aria-label="Search projects"
+              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
             />
           </div>
-          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1.5">
-            <Info size={12} />
+          <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+            <Info size={11} />
             Only {serviceLabel} projects (Planned and Ongoing) are shown
           </p>
         </div>
 
-        {/* Project list */}
-        <div className="px-5 max-h-72 overflow-y-auto">
-          {filteredProjects.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">No projects found</p>
-          ) : (
-            filteredProjects.map(project => (
-              <button
-                key={project.id}
-                onClick={() => onAssign(project.id, project.projectName ?? project.title)}
-                className="w-full text-left py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-800">{project.projectName ?? project.title}</p>
-                  {program === 'DILEEP (TUPAD)' ? (
-                    <>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {[project.service, project.date, project.location].filter(Boolean).join(' • ')}
-                      </p>
-                      {project.description && (
-                        <p className="text-xs text-gray-400 mt-0.5">{project.description}</p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[project.typeOfProject, project.wayOfImplementation].filter(Boolean).join(' • ')}
-                    </p>
+        {/* Currently assigned card */}
+        {currentProject && (
+          <div className="mx-4 mb-2 bg-blue-50 border border-blue-200 rounded-xl p-3">
+            <p className="text-xs font-bold text-brand-blue uppercase tracking-widest mb-1.5">Currently Assigned</p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-brand-blue">{currentProject.projectName ?? currentProject.title}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {currentProject.typeOfProject && (
+                    <span className="text-xs border border-brand-blue text-brand-blue rounded-full px-2 py-0.5">
+                      {currentProject.typeOfProject}
+                    </span>
                   )}
+                  <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${projectStatusClass(currentProject.status)}`}>
+                    {currentProject.status}
+                  </span>
                 </div>
-                <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${projectStatusClass(project.status)}`}>
-                  {project.status}
-                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { onUnassign(); onClose() }}
+                className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors flex-shrink-0 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50"
+              >
+                Unassign
               </button>
-            ))
+            </div>
+          </div>
+        )}
+
+        {/* Project list */}
+        <div className="px-4 max-h-56 overflow-y-auto">
+          {filteredProjects.length === 0 ? (
+            <p className="text-center text-xs text-gray-400 py-6">No projects found</p>
+          ) : (
+            filteredProjects.map(project => {
+              const isCurrent = project.id === beneficiary.assignedDilpProjectId
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => { onAssign(project.id, project.projectName ?? project.title); onClose() }}
+                  className="w-full text-left py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors flex items-start justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-semibold text-gray-800">{project.projectName ?? project.title}</p>
+                      {isCurrent && (
+                        <span className="text-xs bg-orange-100 text-orange-600 rounded-full px-2 py-0.5 font-medium">Current</span>
+                      )}
+                    </div>
+                    {program === 'DILEEP (TUPAD)' ? (
+                      <>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {[project.date, project.location].filter(Boolean).join(' • ')}
+                        </p>
+                        {project.description && (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">{project.description}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[project.typeOfProject, project.programComponent].filter(Boolean).join(' • ')}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${projectStatusClass(project.status)}`}>
+                    {project.status}
+                  </span>
+                </button>
+              )
+            })
           )}
         </div>
 
         {/* Cancel */}
-        <div className="px-5 py-4 border-t border-gray-100">
+        <div className="px-4 py-4 border-t border-gray-100">
           <button
             onClick={onClose}
-            className="w-full py-3 text-sm text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+            className="w-full py-2.5 text-xs text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── View Assigned Project Modal ─────────────────────────────────────────────
+
+type ViewAssignedProjectModalProps = {
+  beneficiary: LivelihoodBeneficiary
+  program: DILEEPProgram
+  onChangeAssignment: () => void
+  onClose: () => void
+}
+
+function ViewAssignedProjectModal({ beneficiary: b, program, onChangeAssignment, onClose }: ViewAssignedProjectModalProps) {
+  const { activities } = useProgramActivities()
+  const assignedProject = b.assignedDilpProjectId
+    ? activities.find(a => a.id === b.assignedDilpProjectId)
+    : null
+
+  function Row({ label, value }: { label: string; value?: string | null }) {
+    return (
+      <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
+        <span className="text-xs text-gray-500 font-medium w-36 flex-shrink-0">{label}</span>
+        <span className="text-xs text-gray-900 font-semibold text-right">{value || '—'}</span>
+      </div>
+    )
+  }
+
+  const header = (
+    <div className="bg-brand-blue px-5 pt-5 pb-4 flex items-start justify-between">
+      <div>
+        <h2 className="text-base font-bold text-white">Assigned Project</h2>
+        <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(b)}</p>
+      </div>
+      <button type="button" onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white transition-colors mt-0.5">
+        <X size={18} />
+      </button>
+    </div>
+  )
+
+  const footer = (
+    <div className="px-5 pb-5 pt-2 flex gap-2">
+      <button type="button" onClick={onChangeAssignment} className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors">
+        Change Assignment
+      </button>
+      <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-semibold hover:bg-brand-blue-dark transition-colors">
+        Close
+      </button>
+    </div>
+  )
+
+  function statusBadgeClass(status?: string) {
+    if (status === 'Ongoing') return 'text-green-600 border border-green-500 bg-white'
+    if (status === 'Planned') return 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+    if (status === 'Completed') return 'bg-blue-100 text-blue-600 border border-blue-200'
+    return 'bg-gray-100 text-gray-600'
+  }
+
+  if (program === 'DILEEP (TUPAD)') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+          {header}
+          <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p className="font-bold text-gray-900 text-base">{assignedProject?.title || b.projectName}</p>
+                <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">DILEEP (TUPAD)</span>
+              </div>
+              {assignedProject?.status && (
+                <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(assignedProject.status)}`}>
+                  {assignedProject.status}
+                </span>
+              )}
+            </div>
+            <Row label="Description" value={assignedProject?.description} />
+            <Row label="Date" value={assignedProject?.date} />
+            <Row label="Location" value={assignedProject?.location} />
+            <Row label="Facilitator" value={assignedProject?.facilitator} />
+            <Row label="Participants" value={assignedProject?.participants != null ? String(assignedProject.participants) : undefined} />
+            <Row label="Assistance Amount" value={assignedProject?.assistanceAmount ? `₱${Number(assignedProject.assistanceAmount).toLocaleString()}` : undefined} />
+            <Row label="Date Released" value={assignedProject?.dateReleased} />
+          </div>
+          {footer}
+        </div>
+      </div>
+    )
+  }
+
+  // DILP layout
+  const assistanceDisplay = b.assistanceAmount ? `₱${Number(b.assistanceAmount).toLocaleString()}` : '—'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        {header}
+        <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
+          {/* Project title + status + ID */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="font-bold text-gray-900 text-base">{assignedProject?.projectName ?? b.projectName}</p>
+              {assignedProject?.projectIdNumber && (
+                <p className="text-xs text-gray-400 mt-0.5">{assignedProject.projectIdNumber}</p>
+              )}
+            </div>
+            {assignedProject?.status && (
+              <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(assignedProject.status)}`}>
+                {assignedProject.status}
+              </span>
+            )}
+          </div>
+          <Row label="Project Type" value={assignedProject?.typeOfProject} />
+          <Row label="Program Component" value={assignedProject?.programComponent} />
+          <Row label="Way of Implementation" value={assignedProject?.wayOfImplementation} />
+          <Row label="Region" value={b.region} />
+          <Row label="Province" value={b.province} />
+          <Row label="City / Municipality" value={b.cityMunicipality} />
+          <Row label="Barangay" value={b.barangay} />
+          <Row label="Street / Purok" value={b.streetPurok} />
+          <Row label="Assistance Amount" value={assistanceDisplay} />
+          <Row label="Date Released" value={b.dateReleased} />
+        </div>
+        {footer}
       </div>
     </div>
   )
@@ -194,9 +361,10 @@ type BeneficiaryListProps = {
   program: DILEEPProgram
   allRecords: LivelihoodBeneficiary[]
   onPersistAll: (records: LivelihoodBeneficiary[]) => void
+  onWizardChange: (open: boolean) => void
 }
 
-function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListProps) {
+function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: BeneficiaryListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -210,6 +378,11 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
   const [editingBeneficiary, setEditingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
+  const [viewingAssignedProject, setViewingAssignedProject] = useState<LivelihoodBeneficiary | null>(null)
+
+  useEffect(() => {
+    onWizardChange(isAddOpen || !!editingBeneficiary || !!viewingBeneficiary)
+  }, [isAddOpen, editingBeneficiary, viewingBeneficiary])
 
   const programRecords = allRecords.filter(b => b.service === program)
   const programLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'
@@ -301,6 +474,18 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
     persistProgram(
       programRecords.map(b =>
         b.id === assigningBeneficiary.id ? { ...b, assignedDilpProjectId: projectId, projectName } : b
+      )
+    )
+    setAssigningBeneficiary(null)
+  }
+
+  function handleUnassignProject() {
+    if (!assigningBeneficiary) return
+    persistProgram(
+      programRecords.map(b =>
+        b.id === assigningBeneficiary.id
+          ? { ...b, assignedDilpProjectId: null, projectName: '', dilpBeneficiaryType: '' }
+          : b
       )
     )
     setAssigningBeneficiary(null)
@@ -399,6 +584,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
           initial={viewingBeneficiary}
           onSave={() => {}}
           onClose={() => setViewingBeneficiary(null)}
+          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
         />
       )
     }
@@ -574,13 +760,19 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
                   <td className="px-4 py-3 text-gray-800 font-semibold whitespace-nowrap">{formatDisplayName(b)}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {b.projectName
-                      ? <span className="text-gray-600">{b.projectName}</span>
-                      : <span className="text-gray-400 italic">Not assigned</span>
-                    }
+                  <td className="px-4 py-3">
+                    {b.projectName ? (
+                      <div>
+                        <p className="text-gray-800 font-medium whitespace-nowrap">{b.projectName}</p>
+                        {b.dilpBeneficiaryType && (
+                          <p className="text-xs text-brand-blue mt-0.5">{b.dilpBeneficiaryType}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">Not assigned</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateEnrolled ?? '-'}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? b.dateEnrolled ?? '-'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <StatusBadge status={b.status} />
                   </td>
@@ -647,7 +839,10 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
           >
             <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
-            <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
+            {menuBeneficiary.projectName
+              ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
+              : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
+            }
             <div className="border-t border-gray-100 my-1" />
             <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
           </div>
@@ -659,7 +854,21 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
           beneficiary={assigningBeneficiary}
           program={program}
           onAssign={handleAssignProject}
+          onUnassign={handleUnassignProject}
           onClose={() => setAssigningBeneficiary(null)}
+        />
+      )}
+
+      {viewingAssignedProject && (
+        <ViewAssignedProjectModal
+          beneficiary={viewingAssignedProject}
+          program={program}
+          onChangeAssignment={() => {
+            const b = viewingAssignedProject
+            setViewingAssignedProject(null)
+            setAssigningBeneficiary(b)
+          }}
+          onClose={() => setViewingAssignedProject(null)}
         />
       )}
 
@@ -700,6 +909,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll }: BeneficiaryListP
 export default function DILEEPTab() {
   const [activeProgram, setActiveProgram] = useState<DILEEPProgram | null>(null)
   const [allRecords, setAllRecords] = useState<LivelihoodBeneficiary[]>(loadAllDILEEP)
+  const [isWizardOpen, setIsWizardOpen] = useState(false)
 
   function handlePersistAll(records: LivelihoodBeneficiary[]) {
     setAllRecords(records)
@@ -710,34 +920,37 @@ export default function DILEEPTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Program selector */}
-      <div className="bg-white rounded-xl shadow-sm p-8">
-        <div className="flex flex-col gap-2 mb-6">
-          <p className="text-gray-800 font-bold text-base">DILEEP Programs</p>
-          <p className="text-gray-500 text-sm">DOLE Integrated Livelihood and Emergency Employment Program</p>
+      {/* Program selector — hidden while a wizard is open */}
+      {!isWizardOpen && (
+        <div className="bg-white rounded-xl shadow-sm p-8">
+          <div className="flex flex-col gap-2 mb-6">
+            <p className="text-gray-800 font-bold text-base">DILEEP Programs</p>
+            <p className="text-gray-500 text-sm">DOLE Integrated Livelihood and Emergency Employment Program</p>
+          </div>
+          <div className="flex gap-3">
+            {(['DILEEP (DILP)', 'DILEEP (TUPAD)'] as DILEEPProgram[]).map(program => (
+              <button
+                key={program}
+                onClick={() => setActiveProgram(program)}
+                className={`flex-1 py-5 text-base font-bold rounded-xl border transition-colors ${
+                  activeProgram === program
+                    ? 'bg-brand-blue border-brand-blue text-white'
+                    : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
+                }`}
+              >
+                {program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-3">
-          {(['DILEEP (DILP)', 'DILEEP (TUPAD)'] as DILEEPProgram[]).map(program => (
-            <button
-              key={program}
-              onClick={() => setActiveProgram(program)}
-              className={`flex-1 py-5 text-base font-bold rounded-xl border transition-colors ${
-                activeProgram === program
-                  ? 'bg-brand-blue border-brand-blue text-white'
-                  : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
-              }`}
-            >
-              {program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {activeProgram !== null && (
         <BeneficiaryList
           program={activeProgram}
           allRecords={allRecords}
           onPersistAll={handlePersistAll}
+          onWizardChange={setIsWizardOpen}
         />
       )}
     </div>

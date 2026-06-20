@@ -174,7 +174,7 @@ export default function AddTUPADProfileModal({ mode, initial, onSave, onClose, o
           {/* View header */}
           <div className="flex items-start justify-between px-8 py-5 border-b border-gray-200">
             <div>
-              <h2 className="font-bold text-xl text-black">{displayName}</h2>
+              <h2 className="font-bold text-xl" style={{ color: '#000' }}>{displayName}</h2>
               <p className="text-brand-blue text-sm mt-0.5">DILEEP – TUPAD</p>
             </div>
             <div className="flex items-center gap-2">

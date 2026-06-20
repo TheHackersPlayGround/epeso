@@ -11,6 +11,8 @@ import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 import DILPForm from './DILPForm'
 import type { DILPFormData, AttachmentItem } from './DILPForm'
+import TUPADForm from './TUPADForm'
+import type { TUPADFormData } from './TUPADForm'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,58 @@ const DEFAULT_SERVICES = [
   'DILEEP (TUPAD)',
   'SLP',
   'CLPEP',
+]
+
+// ─── CLPEP interventions (loaded from CLPEPTab localStorage) ─────────────────
+
+type CLPEPInterventionLocal = {
+  id: number
+  title: string
+  type: string
+  status: 'Planned' | 'Active' | 'Completed'
+  location: string
+  description: string
+  targetBeneficiaries?: number
+  startDate?: string
+  endDate?: string
+  implementingOfficer?: string
+  partnerAgency?: string
+}
+
+const CLPEP_INTERVENTIONS_LS_KEY = 'lp_clpep_interventions_v1'
+
+const CLPEP_DEFAULT_SEED: CLPEPInterventionLocal[] = [
+  {
+    id: 1, title: 'Educational Assistance Program', type: 'Educational Assistance',
+    status: 'Active', location: 'Barangay Community Center',
+    description: 'Provides educational support and school supplies to child laborers and at-risk children.',
+    targetBeneficiaries: 15, startDate: '2026-03-22', endDate: '2026-12-22',
+    implementingOfficer: 'Angela Martinez', partnerAgency: 'DepEd',
+  },
+  {
+    id: 2, title: 'Family Development Session', type: 'Family Intervention',
+    status: 'Planned', location: 'Community Hall, Tangub City',
+    description: 'Educational program for families to prevent child labor through awareness and livelihood support.',
+  },
+]
+
+function loadCLPEPInterventions(): CLPEPInterventionLocal[] {
+  try {
+    const raw = localStorage.getItem(CLPEP_INTERVENTIONS_LS_KEY)
+    const parsed = raw ? (JSON.parse(raw) as CLPEPInterventionLocal[]) : []
+    return parsed.length > 0 ? parsed : CLPEP_DEFAULT_SEED
+  } catch {
+    return CLPEP_DEFAULT_SEED
+  }
+}
+
+const SERVICE_TABS = [
+  { label: 'All Services', value: 'All' },
+  { label: 'DILEEP', value: 'DILEEP' },
+  { label: 'DILEEP – DILP', value: 'DILEEP (DILP)' },
+  { label: 'DILEEP – TUPAD', value: 'DILEEP (TUPAD)' },
+  { label: 'SLP', value: 'SLP' },
+  { label: 'CLPEP', value: 'CLPEP' },
 ]
 
 type ProjectStatus = 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
@@ -111,6 +165,19 @@ const blankForm = {
   status: 'Planned' as ProjectStatus,
 }
 
+const blankTupadForm: TUPADFormData = {
+  title: '',
+  description: '',
+  date: '',
+  location: '',
+  facilitator: '',
+  participants: '',
+  status: 'Planned',
+  assistanceAmount: '',
+  dateReleased: '',
+  beneficiaryType: '',
+}
+
 const blankDilpForm: DILPFormData = {
   projectIdNumber: '',
   projectName: '',
@@ -158,11 +225,16 @@ export default function LivelihoodMaintenanceForm() {
   const [formData, setFormData] = useState(blankForm)
   const [dilpFormData, setDilpFormData] = useState<DILPFormData>(blankDilpForm)
   const [dilpAttachments, setDilpAttachments] = useState<AttachmentItem[]>([])
+  const [tupadFormData, setTupadFormData] = useState<TUPADFormData>(blankTupadForm)
+  const [tupadAttachments, setTupadAttachments] = useState<AttachmentItem[]>([])
 
   // View Projects filters
   const [filterService, setFilterService] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // CLPEP interventions from CLPEPTab localStorage
+  const [clpepInterventions] = useState<CLPEPInterventionLocal[]>(loadCLPEPInterventions)
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -180,12 +252,30 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  const livelihoodProjects = activities.filter(
-    a => a.program === 'Livelihood' || DEFAULT_SERVICES.includes(a.service)
-  )
+  // CLPEP interventions converted to ProgramActivity shape for display (ID offset 900000)
+  const clpepAsActivities: ProgramActivity[] = clpepInterventions.map(i => ({
+    id: i.id + 900000,
+    program: 'Livelihood',
+    service: 'CLPEP',
+    title: i.title,
+    date: i.startDate ?? '',
+    location: i.location,
+    description: i.description,
+    participants: i.targetBeneficiaries,
+    status: (i.status === 'Active' ? 'Ongoing' : i.status) as ProjectStatus,
+    facilitator: i.implementingOfficer,
+  }))
+
+  const livelihoodProjects = [
+    ...activities.filter(a => a.program === 'Livelihood' || DEFAULT_SERVICES.includes(a.service)),
+    ...clpepAsActivities,
+  ]
 
   const filteredProjects = livelihoodProjects.filter(a => {
-    const matchesService = filterService === 'All' || a.service === filterService
+    const matchesService = filterService === 'All' ||
+      (filterService === 'DILEEP'
+        ? (a.service === 'DILEEP (DILP)' || a.service === 'DILEEP (TUPAD)')
+        : a.service === filterService)
     const matchesStatus  = filterStatus  === 'All' || a.status  === filterStatus
     const matchesSearch  = !searchQuery  ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -199,6 +289,8 @@ export default function LivelihoodMaintenanceForm() {
     setFormData(blankForm)
     setDilpFormData(blankDilpForm)
     setDilpAttachments([])
+    setTupadFormData(blankTupadForm)
+    setTupadAttachments([])
     setSelectedService('')
     setEditingId(null)
     setSelectedProject(null)
@@ -234,6 +326,19 @@ export default function LivelihoodMaintenanceForm() {
         assistanceAmount:   '',
         dateReleased:       a.date               ?? '',
         status:             a.status,
+      })
+    } else if (a.service === 'DILEEP (TUPAD)') {
+      setTupadFormData({
+        title:            a.title,
+        description:      a.description      ?? '',
+        date:             a.date,
+        location:         a.location,
+        facilitator:      a.facilitator      ?? '',
+        participants:     a.participants != null ? String(a.participants) : '',
+        status:           (a.status as TUPADFormData['status']) === 'Cancelled' ? 'Planned' : (a.status as TUPADFormData['status']),
+        assistanceAmount: a.assistanceAmount  ?? '',
+        dateReleased:     a.dateReleased      ?? '',
+        beneficiaryType:  a.beneficiaryType   ?? '',
       })
     } else {
       setFormData({
@@ -277,6 +382,25 @@ export default function LivelihoodMaintenanceForm() {
         typeOfProject:      dilpFormData.typeOfProject   || undefined,
         programComponent:   dilpFormData.programComponent  || undefined,
         wayOfImplementation: dilpFormData.wayOfImplementation || undefined,
+      }
+    } else if (selectedService === 'DILEEP (TUPAD)') {
+      if (!tupadFormData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity title.', confirmButtonColor: '#0077BE' }); return }
+
+      payload = {
+        id:               editingId ?? Date.now(),
+        program:          'Livelihood',
+        service:          'DILEEP (TUPAD)',
+        title:            tupadFormData.title.trim(),
+        description:      tupadFormData.description.trim() || undefined,
+        date:             tupadFormData.date,
+        location:         tupadFormData.location,
+        facilitator:      tupadFormData.facilitator         || undefined,
+        participants:     parseInt(tupadFormData.participants) || undefined,
+        status:           tupadFormData.status,
+        assistanceAmount: tupadFormData.assistanceAmount    || undefined,
+        dateReleased:     tupadFormData.dateReleased        || undefined,
+        beneficiaryType:  (tupadFormData.beneficiaryType as 'Individual' | 'Group') || undefined,
+        tupadDocuments:   tupadAttachments.map(a => a.name),
       }
     } else {
       if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a project title.', confirmButtonColor: '#0077BE' }); return }
@@ -455,8 +579,24 @@ export default function LivelihoodMaintenanceForm() {
             </div>
           )}
 
-          {/* Generic form for non-DILP services */}
-          {selectedService !== 'DILEEP (DILP)' && (selectedService || mode !== 'add') && (
+          {/* TUPAD-specific form */}
+          {selectedService === 'DILEEP (TUPAD)' && (
+            <div className="border-t pt-6">
+              <TUPADForm
+                formData={tupadFormData}
+                onChange={setTupadFormData}
+                onSave={handleSave}
+                mode={mode}
+                onCancel={mode === 'add' ? goHome : goToList}
+                attachments={tupadAttachments}
+                onAddAttachment={att => setTupadAttachments(prev => [...prev, att])}
+                onRemoveAttachment={idx => setTupadAttachments(prev => prev.filter((_, i) => i !== idx))}
+              />
+            </div>
+          )}
+
+          {/* Generic form for non-DILP and non-TUPAD services */}
+          {selectedService !== 'DILEEP (DILP)' && selectedService !== 'DILEEP (TUPAD)' && (selectedService || mode !== 'add') && (
             <div className="border-t pt-6 space-y-5">
               {/* Title + Description */}
               <div>
@@ -608,31 +748,42 @@ export default function LivelihoodMaintenanceForm() {
   const renderViewProjects = () => (
     <>
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-md p-5 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <select
-            value={filterService}
-            onChange={e => setFilterService(e.target.value)}
-            className={inputCls + ' bg-white'}
-          >
-            <option value="All">All Services</option>
-            {services.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+      <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+        {/* Service tabs */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {SERVICE_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setFilterService(tab.value)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                filterService === tab.value
+                  ? 'bg-brand-blue text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {/* Status dropdown + Search */}
+        <div className="flex gap-3">
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className={inputCls + ' bg-white'}
+            className={inputCls + ' bg-white w-44 flex-shrink-0'}
           >
             <option value="All">All Status</option>
             <option value="Planned">Planned</option>
             <option value="Ongoing">Ongoing</option>
             <option value="Completed">Completed</option>
+            <option value="Pending">Pending</option>
+            <option value="Released">Released</option>
           </select>
-          <div className="relative col-span-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="Search by title or service..."
+              placeholder="Search by project title or service..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className={inputCls + ' pl-9'}
@@ -661,6 +812,7 @@ export default function LivelihoodMaintenanceForm() {
         {openMenuId !== null && menuPos !== null && (() => {
           const a = livelihoodProjects.find(x => x.id === openMenuId)
           if (!a) return null
+          const isReadOnly = a.id >= 900000  // CLPEP interventions loaded from CLPEPTab localStorage
           return (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
@@ -675,56 +827,62 @@ export default function LivelihoodMaintenanceForm() {
                   <FolderOpen size={14} className="text-blue-500" />
                   View Details
                 </button>
-                <button
-                  onClick={() => { setSelectedProject(a); setAction('view_participants'); setOpenMenuId(null) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
-                >
-                  <Users size={14} className="text-gray-500" />
-                  View Participants
-                </button>
-                <div className="my-1 border-t border-gray-100" />
-                <button
-                  onClick={() => { fillFormFromProject(a); setEditingId(a.id); setAction('edit_project'); setOpenMenuId(null) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
-                >
-                  <Edit2 size={14} className="text-blue-500" />
-                  Edit
-                </button>
-                {a.status === 'Planned' && (
+                {!isReadOnly && (
                   <button
-                    onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Ongoing', label: 'Mark as Ongoing' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                    onClick={() => { setSelectedProject(a); setAction('view_participants'); setOpenMenuId(null) }}
+                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                   >
-                    <PlayCircle size={14} className="text-blue-500" />
-                    Mark as Ongoing
+                    <Users size={14} className="text-gray-500" />
+                    View Participants
                   </button>
                 )}
-                {a.status === 'Ongoing' && (
-                  <button
-                    onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Completed', label: 'Mark as Completed' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
-                  >
-                    <CheckCircle size={14} className="text-green-600" />
-                    Mark as Completed
-                  </button>
+                {!isReadOnly && (
+                  <>
+                    <div className="my-1 border-t border-gray-100" />
+                    <button
+                      onClick={() => { fillFormFromProject(a); setEditingId(a.id); setAction('edit_project'); setOpenMenuId(null) }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                    >
+                      <Edit2 size={14} className="text-blue-500" />
+                      Edit
+                    </button>
+                    {a.status === 'Planned' && (
+                      <button
+                        onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Ongoing', label: 'Mark as Ongoing' }); setOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                      >
+                        <PlayCircle size={14} className="text-blue-500" />
+                        Mark as Ongoing
+                      </button>
+                    )}
+                    {a.status === 'Ongoing' && (
+                      <button
+                        onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Completed', label: 'Mark as Completed' }); setOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                      >
+                        <CheckCircle size={14} className="text-green-600" />
+                        Mark as Completed
+                      </button>
+                    )}
+                    {a.status === 'Completed' && (
+                      <button
+                        onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Planned', label: 'Reopen Project' }); setOpenMenuId(null) }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                      >
+                        <RefreshCw size={14} className="text-blue-500" />
+                        Reopen Project
+                      </button>
+                    )}
+                    <div className="my-1 border-t border-gray-100" />
+                    <button
+                      onClick={() => { setDeleteConfirm(a.id); setOpenMenuId(null) }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
+                    >
+                      <Trash2 size={14} className="text-red-500" />
+                      Delete
+                    </button>
+                  </>
                 )}
-                {a.status === 'Completed' && (
-                  <button
-                    onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Planned', label: 'Reopen Project' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
-                  >
-                    <RefreshCw size={14} className="text-blue-500" />
-                    Reopen Project
-                  </button>
-                )}
-                <div className="my-1 border-t border-gray-100" />
-                <button
-                  onClick={() => { setDeleteConfirm(a.id); setOpenMenuId(null) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
-                >
-                  <Trash2 size={14} className="text-red-500" />
-                  Delete
-                </button>
               </div>
             </>
           )

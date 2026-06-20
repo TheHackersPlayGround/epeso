@@ -91,6 +91,7 @@ type DILPWizardProps = {
   mode: 'add' | 'edit' | 'view'
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
   onClose: () => void
+  onEdit?: () => void
 }
 
 // ─── FormUploadSection — simple file attachment list for step 8 ───────────────
@@ -155,7 +156,7 @@ function FormUploadSection({ forms, onChange }: FormUploadSectionProps) {
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function AddDILPProfileWizard({ initial, mode, onSave, onClose }: DILPWizardProps) {
+export default function AddDILPProfileWizard({ initial, mode, onSave, onClose, onEdit }: DILPWizardProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
     ...EMPTY_DILP_RECORD,
@@ -739,12 +740,6 @@ export default function AddDILPProfileWizard({ initial, mode, onSave, onClose }:
       <div className="space-y-5">
         <SectionHeader title="IX. PESO OFFICE ONLY" />
 
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-medium text-amber-800">
-            This section is for PESO Office use only.
-          </p>
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="dilp-dateReceived" className={labelClass}>
@@ -802,7 +797,7 @@ export default function AddDILPProfileWizard({ initial, mode, onSave, onClose }:
     <div className="bg-white rounded-xl shadow-md flex">
 
       {/* Left sidebar — section stepper */}
-      <div className="w-72 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6 overflow-y-auto">
+      <div className="w-72 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6">
         <nav className="space-y-2">
           {STEPS.map((step, stepIndex) => (
             <button
@@ -830,18 +825,29 @@ export default function AddDILPProfileWizard({ initial, mode, onSave, onClose }:
             <Users size={20} className="text-brand-blue" />
             <h3 className="text-gray-800 m-0 text-base font-medium">{headerTitle}</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close form"
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={24} className="text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isViewMode && onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="px-5 py-2 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-brand-blue-dark transition-colors"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close form"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X size={24} className="text-gray-600" />
+            </button>
+          </div>
         </div>
 
-        {/* Form content — scrollable */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-6">
+        {/* Form content */}
+        <form onSubmit={handleSubmit} className="px-8 py-6">
           {/* fieldset disabled={isViewMode} disables all inputs in view mode */}
           <fieldset disabled={isViewMode} className="border-0 p-0 m-0 min-w-0">
             {renderCurrentStep()}

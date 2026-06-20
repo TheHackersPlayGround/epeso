@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import { Plus, Upload, Download, ChevronDown, X } from 'lucide-react'
+import { ArrowLeft, Plus, Upload, Download, ChevronDown, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { OFWProfile } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
@@ -294,15 +294,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
       <div className="max-w-7xl mx-auto px-6 py-6">
 
         {/* Page title */}
-        <div className="flex items-center gap-3 mb-5">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+        <div className="mb-6 flex items-center gap-4">
+          <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
           <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>OFW Services</p>
         </div>
 

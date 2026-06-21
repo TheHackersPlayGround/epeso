@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
@@ -53,7 +53,7 @@ function SectionDivider({ numeral, title, gray }: { numeral: string; title: stri
   )
 }
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none placeholder:text-gray-900'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none placeholder:text-gray-400'
 const inpFocus = `${inp} focus:ring-[#0077BE]`
 const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
 
@@ -818,7 +818,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   placeholder="Search by name, classification, batch, or qualification..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                 />
               </div>
               <div className="relative">
@@ -969,3 +969,4 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     </>
   )
 }
+

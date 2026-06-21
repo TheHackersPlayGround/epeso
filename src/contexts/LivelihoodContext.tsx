@@ -3,6 +3,80 @@
 
 export type LivelihoodService = 'DILEEP (DILP)' | 'DILEEP (TUPAD)' | 'SLP' | 'CLPEP'
 
+// ─── SLP Project ──────────────────────────────────────────────────────────────
+
+export type SLPProject = {
+  id: number
+  title: string
+  date: string
+  location: string
+  description: string
+  status: 'Planned' | 'Ongoing' | 'Completed'
+  facilitator?: string
+  participants?: number
+  assistanceAmount?: string
+  dateReleased?: string
+}
+
+export const SLP_PROJECTS_SEED: SLPProject[] = [
+  {
+    id: 1, title: 'Handicrafts', date: '2026-03-18',
+    location: 'Community Center, Tangub City',
+    description: 'Livelihood training for handicraft production',
+    status: 'Ongoing', facilitator: 'Rosa Garcia', participants: 20,
+    assistanceAmount: '10000', dateReleased: '2026-04-01',
+  },
+  {
+    id: 2, title: 'SLP Food Processing and Packaging', date: '2026-04-25',
+    location: 'DOLE Training Center, Tangub City',
+    description: 'Livelihood training for food processing microenterprises',
+    status: 'Planned', facilitator: 'Maribel Cruz', participants: 15,
+    assistanceAmount: '8000', dateReleased: '2026-05-10',
+  },
+  {
+    id: 3, title: 'SLP Sewing and Garments Production', date: '2026-05-10',
+    location: 'Barangay Hall, Tangub City',
+    description: 'Skills-based livelihood training on garments and dressmaking',
+    status: 'Planned', facilitator: 'Leonora Reyes', participants: 12,
+    assistanceAmount: '7500', dateReleased: '2026-06-15',
+  },
+]
+
+// ─── CLPEP Intervention ───────────────────────────────────────────────────────
+
+export type CLPEPIntervention = {
+  id: number
+  title: string
+  type: string
+  status: 'Planned' | 'Active' | 'Completed'
+  location: string
+  description: string
+  targetBeneficiaries?: number
+  startDate?: string
+  endDate?: string
+  implementingOfficer?: string
+  partnerAgency?: string
+}
+
+export const CLPEP_INTERVENTIONS_SEED: CLPEPIntervention[] = [
+  {
+    id: 1, title: 'Educational Assistance Program',
+    type: 'Educational Assistance', status: 'Active',
+    location: 'Barangay Community Center, Tangub City',
+    description: 'Provides educational support and school supplies to child laborers and at-risk children.',
+    targetBeneficiaries: 15, startDate: '2026-03-22', endDate: '2026-12-22',
+    implementingOfficer: 'Angela Martinez', partnerAgency: 'DepEd',
+  },
+  {
+    id: 2, title: 'Family Development Session',
+    type: 'Family Intervention', status: 'Planned',
+    location: 'Community Hall, Tangub City',
+    description: 'Educational program for families to prevent child labor through awareness and livelihood support.',
+    targetBeneficiaries: 20, startDate: '2026-04-15', endDate: '2026-12-15',
+    implementingOfficer: 'Roberto Dela Cruz', partnerAgency: 'DSWD',
+  },
+]
+
 export type LivelihoodStatus =
   | 'Active'
   | 'Completed'
@@ -111,9 +185,15 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     lastName: 'Santos',
     middleName: 'C.',
     sex: 'Female',
+    birthdate: '1995-03-12',
+    age: 31,
+    civilStatus: 'Single',
+    contactNumber: '09171234005',
     assignedDilpProjectId: 104,
     projectName: 'Hog Raising Livelihood Project',
     dilpBeneficiaryType: 'Individual',
+    wageRate: '₱500/day',
+    projectDuration: '10 days',
     region: 'Region X (Northern Mindanao)',
     province: 'Misamis Occidental',
     cityMunicipality: 'Tangub City',
@@ -156,32 +236,29 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     firstName: 'Ana',
     lastName: 'Cruz',
     middleName: 'T.',
-    nameExtension: '',
     sex: 'Female',
     birthdate: '1992-11-15',
     age: 33,
     civilStatus: 'Married',
     contactNumber: '09191234003',
-    email: '',
-    houseBlockLotNo: '',
+    houseBlockLotNo: '12',
     streetPurok: 'Purok 1',
     barangay: 'Pangabuan',
     cityMunicipality: 'Tangub City',
     province: 'Misamis Occidental',
     is4PsBeneficiary: false,
-    slpParticipantIdNumber: '',
+    slpParticipantIdNumber: 'SLP-2026-003',
     eligibilityType: 'Regular',
-    sector: [],
-    sectorOthersSpecify: '',
-    educationalAttainment: '',
-    sourceOfIncome: '',
-    totalHouseholdMonthlyIncome: '',
-    householdVulnerabilityScore: '',
+    sector: ['Solo Parent'],
+    educationalAttainment: 'College Graduate',
+    sourceOfIncome: 'Sari-sari Store',
+    totalHouseholdMonthlyIncome: '8000',
+    householdVulnerabilityScore: '3',
     vulnerabilitySeverity: 'Low',
     assessmentResult: 'Qualified',
     assignedSlpProjectId: 1,
     projectName: 'Handicrafts',
-    slpTrack: '',
+    slpTrack: 'Enterprise - Individual',
     remarks: 'Successfully completed SLP training.',
     dateApplied: '2026-02-20',
     dateApplicationReceived: '2026-02-20',
@@ -196,21 +273,27 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     firstName: 'Carlos',
     lastName: 'Dela Torre',
     middleName: 'M.',
-    nameExtension: '',
     sex: 'Male',
     birthdate: '1988-05-08',
     age: 38,
     civilStatus: 'Married',
     contactNumber: '09201234004',
-    email: '',
     streetPurok: 'Purok 3',
     barangay: 'Sta. Cruz',
     cityMunicipality: 'Tangub City',
     province: 'Misamis Occidental',
+    assignedInterventionId: 1,
+    childLaborStatus: 'At Risk',
+    schoolStatus: 'Enrolled',
+    natureOfWork: 'Informal Trade',
+    currentlyWorking: true,
+    hoursWorkedPerWeek: '20',
+    schoolName: 'Tangub City National High School',
+    gradeYearLevel: 'Grade 10',
+    guardianName: 'Rosa Dela Torre',
+    guardianRelationship: 'Mother',
+    guardianContactNumber: '09201234100',
     dateApplied: '2026-04-01',
-    cooperativeName: '',
-    cooperativeRole: '',
-    remarks: '',
     attachedForms: [],
     dateApplicationReceived: '2026-04-01',
     receivedBy: 'Carlo Bautista',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
@@ -1200,7 +1200,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 placeholder="Search by name, barangay, or assigned activity..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
               />
             </div>
             <div className="relative">
@@ -1346,3 +1346,4 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     </>
   )
 }
+

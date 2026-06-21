@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
-import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary, LivelihoodStatus, CLPEPIntervention } from '../../contexts/LivelihoodContext'
+import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
 import AddCLPEPProfileWizard, { EMPTY_CLPEP_RECORD } from './AddCLPEPProfileWizard'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -30,53 +30,13 @@ const INTERVENTION_STATUS_COLORS: Record<string, string> = {
   Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
 }
 
-// ─── Intervention Type ────────────────────────────────────────────────────────
-
-type CLPEPIntervention = {
-  id: number
-  title: string
-  type: string
-  status: 'Planned' | 'Active' | 'Completed'
-  location: string
-  description: string
-  targetBeneficiaries?: number
-  startDate?: string
-  endDate?: string
-  implementingOfficer?: string
-  partnerAgency?: string
-}
-
-const INTERVENTIONS_SEED: CLPEPIntervention[] = [
-  {
-    id: 1,
-    title: 'Educational Assistance Program',
-    type: 'Educational Assistance',
-    status: 'Active',
-    location: 'Barangay Community Center',
-    description: 'Provides educational support and school supplies to child laborers and at-risk children.',
-    targetBeneficiaries: 15,
-    startDate: '2026-03-22',
-    endDate: '2026-12-22',
-    implementingOfficer: 'Angela Martinez',
-    partnerAgency: 'DepEd',
-  },
-  {
-    id: 2,
-    title: 'Family Development Session',
-    type: 'Family Intervention',
-    status: 'Planned',
-    location: 'Community Hall, Tangub City',
-    description: 'Educational program for families to prevent child labor through awareness and livelihood support.',
-  },
-]
-
 function loadInterventions(): CLPEPIntervention[] {
   try {
     const raw = localStorage.getItem(LS_INTERVENTIONS_KEY)
     const parsed = raw ? (JSON.parse(raw) as CLPEPIntervention[]) : []
-    return parsed.length > 0 ? parsed : INTERVENTIONS_SEED
+    return parsed.length > 0 ? parsed : CLPEP_INTERVENTIONS_SEED
   } catch {
-    return INTERVENTIONS_SEED
+    return CLPEP_INTERVENTIONS_SEED
   }
 }
 

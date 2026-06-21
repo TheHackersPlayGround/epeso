@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 
 export interface ProgramActivity {
@@ -24,11 +24,22 @@ export interface ProgramActivity {
   typeOfProject?: string
   programComponent?: string
   wayOfImplementation?: string
+  region?: string
+  province?: string
+  cityMunicipality?: string
+  barangay?: string
+  streetPurok?: string
   // TUPAD-specific fields (only present when service === 'DILEEP (TUPAD)')
   assistanceAmount?: string
   dateReleased?: string
   beneficiaryType?: 'Individual' | 'Group'
   tupadDocuments?: string[]
+  // SLP-specific fields (only present when service === 'SLP')
+  slpTrack?: string
+  projectCategory?: string
+  // CLPEP-specific fields (only present when service === 'CLPEP')
+  partnerAgency?: string
+  referralRequired?: 'Yes' | 'No'
 }
 
 // Narrowed type for DILP activities — used in the DILP beneficiary form
@@ -46,54 +57,73 @@ const SEED: ProgramActivity[] = [
   // ── DILP Projects ─────────────────────────────────────────────────
   {
     id: 101, title: 'DILP Road Clearing Project 2026', service: 'DILEEP (DILP)',
-    date: '2026-01-10', location: 'Tangub City', status: 'Ongoing',
+    date: '2026-01-10', location: 'Tangub City, Misamis Occidental', status: 'Ongoing',
     projectIdNumber: 'DILP-2026-001', projectName: 'Road Clearing Project',
-    typeOfProject: 'Community Employment', programComponent: 'Emergency Employment',
-    wayOfImplementation: 'Community-Based',
+    typeOfProject: 'Group', programComponent: 'Formation', wayOfImplementation: 'ACP',
+    region: 'Region X (Northern Mindanao)', province: 'Misamis Occidental',
+    cityMunicipality: 'Tangub City', barangay: 'Poblacion', streetPurok: 'National Highway',
+    assistanceAmount: '45000', dateReleased: '2026-02-15',
   },
   {
     id: 102, title: 'DILP Community Clean-up Drive 2026', service: 'DILEEP (DILP)',
-    date: '2026-02-01', location: 'Tangub City', status: 'Completed',
+    date: '2026-02-01', location: 'Tangub City, Misamis Occidental', status: 'Completed',
     projectIdNumber: 'DILP-2026-002', projectName: 'Community Clean-up Drive',
-    typeOfProject: 'Environmental', programComponent: 'Livelihood Employment',
-    wayOfImplementation: 'Community-Based',
+    typeOfProject: 'Group', programComponent: 'Enhancement', wayOfImplementation: 'ACP',
+    region: 'Region X (Northern Mindanao)', province: 'Misamis Occidental',
+    cityMunicipality: 'Tangub City', barangay: 'Mantic', streetPurok: 'Purok 3',
+    assistanceAmount: '30000', dateReleased: '2026-03-15',
   },
   {
     id: 103, title: 'DILP Drainage Improvement Project 2026', service: 'DILEEP (DILP)',
-    date: '2026-03-15', location: 'Tangub City', status: 'Planned',
+    date: '2026-03-15', location: 'Tangub City, Misamis Occidental', status: 'Planned',
     projectIdNumber: 'DILP-2026-003', projectName: 'Drainage Improvement Project',
-    typeOfProject: 'Infrastructure', programComponent: 'Emergency Employment',
-    wayOfImplementation: 'Area-Based',
+    typeOfProject: 'Group', programComponent: 'Restoration', wayOfImplementation: 'ACP',
+    region: 'Region X (Northern Mindanao)', province: 'Misamis Occidental',
+    cityMunicipality: 'Tangub City', barangay: 'Pangabuan', streetPurok: 'Riverside Road',
+    assistanceAmount: '60000',
   },
   {
     id: 105, title: 'Vegetable Production Project 2026', service: 'DILEEP (DILP)',
-    date: '2026-04-01', location: 'Tangub City', status: 'Ongoing',
+    date: '2026-04-01', location: 'Tangub City, Misamis Occidental', status: 'Ongoing',
     projectIdNumber: 'DILP-2026-005', projectName: 'Vegetable Production Project',
-    typeOfProject: 'Individual', programComponent: 'Livelihood Employment',
-    wayOfImplementation: 'Community-Based',
+    typeOfProject: 'Individual', programComponent: 'Enhancement', wayOfImplementation: 'ACP',
+    region: 'Region X (Northern Mindanao)', province: 'Misamis Occidental',
+    cityMunicipality: 'Tangub City', barangay: 'Maloro', streetPurok: 'Purok 2',
+    assistanceAmount: '35000', dateReleased: '2026-05-01',
   },
   {
     id: 104, title: 'Hog Raising Livelihood Project 2026', service: 'DILEEP (DILP)',
-    date: '2026-03-01', location: 'Tangub City', status: 'Ongoing',
+    date: '2026-03-01', location: 'Tangub City, Misamis Occidental', status: 'Ongoing',
     projectIdNumber: 'DILP-2026-004', projectName: 'Hog Raising Livelihood Project',
-    typeOfProject: 'Group', programComponent: 'Establishment',
-    wayOfImplementation: 'Nego-Kart',
+    typeOfProject: 'Group', programComponent: 'Formation', wayOfImplementation: 'Direct Admin',
+    region: 'Region X (Northern Mindanao)', province: 'Misamis Occidental',
+    cityMunicipality: 'Tangub City', barangay: 'Sta. Cruz', streetPurok: 'Purok 5',
+    assistanceAmount: '80000', dateReleased: '2026-04-10',
   },
   // ── SLP Projects ──────────────────────────────────────────────────
   {
     id: 301, title: 'Sustainable Livelihood Program - Handicrafts', service: 'SLP',
     date: '2026-03-18', location: 'Community Center, Tangub City', status: 'Ongoing',
     description: 'Livelihood training for handicraft production.',
+    projectName: 'Sustainable Livelihood Program - Handicrafts',
+    slpTrack: 'Micro-enterprise Development', projectCategory: 'Non-Food Based Enterprise',
+    facilitator: 'Rosa Garcia', assistanceAmount: '15000', dateReleased: '2026-04-01',
   },
   {
     id: 302, title: 'SLP Food Processing and Packaging', service: 'SLP',
     date: '2026-04-25', location: 'DOLE Training Center, Tangub City', status: 'Planned',
     description: 'Livelihood training for food processing microenterprises.',
+    projectName: 'SLP Food Processing and Packaging',
+    slpTrack: 'Micro-enterprise Development', projectCategory: 'Food Production',
+    facilitator: 'Maribel Santos', assistanceAmount: '12000', dateReleased: '2026-06-01',
   },
   {
     id: 303, title: 'SLP Sewing and Garments Production', service: 'SLP',
     date: '2026-05-10', location: 'Barangay Hall, Tangub City', status: 'Planned',
     description: 'Skills-based livelihood training on garments and dressmaking.',
+    projectName: 'SLP Sewing and Garments Production',
+    slpTrack: 'Micro-enterprise Development', projectCategory: 'Non-Food Based Enterprise',
+    facilitator: 'Leonora Reyes', assistanceAmount: '10000', dateReleased: '2026-06-30',
   },
   // ── TUPAD Projects ────────────────────────────────────────────────
   {
@@ -101,22 +131,28 @@ const SEED: ProgramActivity[] = [
     date: '2026-04-15', location: 'Barangay Road Network, Tangub City', status: 'Ongoing',
     description: 'Emergency employment for road infrastructure maintenance',
     facilitator: 'Ricardo Santos', participants: 40,
-    assistanceAmount: '4500', dateReleased: '2026-04-20',
+    assistanceAmount: '4500', dateReleased: '2026-04-20', beneficiaryType: 'Group',
   },
   {
     id: 201, title: 'TUPAD Disaster Preparedness and Response Team', service: 'DILEEP (TUPAD)',
     date: '2026-06-05', location: 'Disaster-Prone Areas, Tangub City', status: 'Planned',
     description: 'Emergency employment for disaster risk reduction and preparedness activities.',
+    facilitator: 'Mario Santos', participants: 25,
+    assistanceAmount: '3500', dateReleased: '2026-07-01', beneficiaryType: 'Group',
   },
   {
     id: 202, title: 'TUPAD Cemetery and Memorial Park Maintenance', service: 'DILEEP (TUPAD)',
     date: '2026-04-10', location: 'Public Cemetery, Tangub City', status: 'Ongoing',
     description: 'Temporary employment for cemetery upkeep and landscaping.',
+    facilitator: 'Luisa Reyes', participants: 30,
+    assistanceAmount: '4000', dateReleased: '2026-04-20', beneficiaryType: 'Group',
   },
   {
     id: 203, title: 'TUPAD Street Cleaning and Beautification', service: 'DILEEP (TUPAD)',
     date: '2026-05-15', location: 'Main Streets, Tangub City', status: 'Planned',
     description: 'Temporary employment for street cleaning and urban beautification.',
+    facilitator: 'Pedro Cruz', participants: 35,
+    assistanceAmount: '3800', dateReleased: '2026-06-01', beneficiaryType: 'Group',
   },
   { id: 1, program: 'CDSP', title: 'Career Coaching Batch 1 – March 2026', service: 'Career Coaching', date: '2026-03-10', startDate: '2026-03-10', endDate: '2026-03-28', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Career coaching batch for fresh graduates and unemployed individuals seeking career direction.' },
   { id: 2, program: 'CDSP', title: 'LEGS Orientation – March 2026', service: 'Labor Employment for Graduating Students', date: '2026-03-15', startDate: '2026-03-15', endDate: '2026-03-15', location: 'PESO Main Office, Tangub City', facilitator: 'Ms. Santos', participants: 30, status: 'Planned', description: 'Orientation for graduating students on labor employment opportunities and requirements.' },
@@ -201,8 +237,28 @@ interface ActivitiesContextValue {
 
 const ProgramActivitiesContext = createContext<ActivitiesContextValue | null>(null)
 
+function loadActivities(): ProgramActivity[] {
+  try {
+    const raw = localStorage.getItem('lp_program_activities_v1')
+    if (!raw) return SEED
+    const saved = JSON.parse(raw) as ProgramActivity[]
+    if (saved.length === 0) return SEED
+    const seedById = new Map(SEED.map(s => [s.id, s]))
+    return saved.map(stored => {
+      const seedEntry = seedById.get(stored.id)
+      return seedEntry ? { ...seedEntry, ...stored } : stored
+    })
+  } catch {
+    return SEED
+  }
+}
+
 export function ProgramActivitiesProvider({ children }: { children: ReactNode }) {
-  const [activities, setActivities] = useState<ProgramActivity[]>(SEED)
+  const [activities, setActivities] = useState<ProgramActivity[]>(loadActivities)
+
+  useEffect(() => {
+    localStorage.setItem('lp_program_activities_v1', JSON.stringify(activities))
+  }, [activities])
 
   const addActivity = (activity: ProgramActivity) =>
     setActivities(prev => [...prev, activity])

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+﻿import { useRef, useState } from 'react'
 import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import AddressFields, { type AddressValue } from '../../components/AddressFields'
 
@@ -39,7 +39,7 @@ interface DILPFormProps {
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
-const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50 disabled:text-gray-600 text-sm text-gray-900 placeholder:text-gray-900 read-only:bg-gray-50 read-only:cursor-default'
+const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50 disabled:text-gray-600 text-sm text-gray-900 placeholder:text-gray-400 read-only:bg-gray-50 read-only:cursor-default'
 const labelCls = 'block text-sm text-gray-700 mb-1.5'
 const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-brand-blue mb-4'
 
@@ -291,3 +291,4 @@ export default function DILPForm({
     </>
   )
 }
+

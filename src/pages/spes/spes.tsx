@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, CheckCircle, Upload, Download, ChevronDown, MoreHorizontal,
@@ -1048,7 +1048,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <div className="relative flex-1 min-w-48">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-900"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                     placeholder="Search by name, barangay, school, or assigned batch..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -1216,3 +1216,4 @@ export default function SPESView({ onBack }: SPESViewProps) {
     </>
   )
 }
+

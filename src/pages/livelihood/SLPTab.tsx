@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
-import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
+import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED } from '../../contexts/LivelihoodContext'
 import AddSLPProfileWizard, { EMPTY_SLP_RECORD } from './AddSLPProfileWizard'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -42,29 +42,6 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
   Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
 }
 
-type SLPProject = {
-  id: number
-  title: string
-  date: string
-  location: string
-  description: string
-  status: 'Planned' | 'Ongoing' | 'Completed'
-  facilitator?: string
-  participants?: number
-  assistanceAmount?: string
-  dateReleased?: string
-}
-
-const SLP_PROJECTS_SEED: SLPProject[] = [
-  {
-    id: 1, title: 'Handicrafts', date: '2026-03-18', location: 'Community Center',
-    description: 'Livelihood training for handicraft production', status: 'Ongoing',
-    facilitator: 'Rosa Garcia', participants: 20,
-    assistanceAmount: '10000', dateReleased: '2026-04-01',
-  },
-  { id: 2, title: 'SLP Food Processing and Packaging', date: '2026-04-25', location: 'DOLE Training Center', description: 'Livelihood training for food processing microenterprises', status: 'Planned' },
-  { id: 3, title: 'SLP Sewing and Garments Production', date: '2026-05-10', location: 'Barangay Hall', description: 'Skills-based livelihood training on garments and dressmaking', status: 'Planned' },
-]
 
 function loadSLPProjects(): SLPProject[] {
   try {

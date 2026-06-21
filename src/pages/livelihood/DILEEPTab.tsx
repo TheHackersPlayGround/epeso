@@ -42,9 +42,10 @@ function loadAllDILEEP(): LivelihoodBeneficiary[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    return parsed.length > 0
-      ? parsed
-      : LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)')
+    if (parsed.length > 0) return parsed
+    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)')
+    try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
+    return seed
   } catch {
     return LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)')
   }

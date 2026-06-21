@@ -1,27 +1,15 @@
-import { useState, useRef, useEffect } from 'react'
-import { LogOut, User, ChevronDown } from 'lucide-react'
+import { User, ChevronDown } from 'lucide-react'
 import logoImage from '../../assets/logo3.png'
 
 interface NavbarProps {
   activeTab: string
   onTabChange: (tab: string) => void
   onLogout: () => void
+  onProfileClick: () => void
   username?: string
 }
 
-export default function Navbar({ activeTab, onTabChange, onLogout}: NavbarProps) {
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+export default function Navbar({ activeTab, onTabChange, onLogout: _onLogout, onProfileClick, username = 'User' }: NavbarProps) {
 
   return (
     <nav className="bg-brand-blue shadow-md h-21">
@@ -62,36 +50,15 @@ export default function Navbar({ activeTab, onTabChange, onLogout}: NavbarProps)
             ))}
           </div>
 
-          {/* Right: User dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-            >
-              <User size={18} />
-              <span style={{ fontSize: 'var(--text-base)' }}>Vicky</span>
-              <ChevronDown
-                size={15}
-                className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {dropdownOpen && (
-              <div
-                className="absolute right-0 mt-2 w-44 bg-white rounded-lg py-1 z-50"
-                style={{ boxShadow: 'var(--shadow-md)' }}
-              >
-                <button
-                  onClick={() => { setDropdownOpen(false); onLogout() }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
-                  style={{ fontSize: 'var(--text-sm)' }}
-                >
-                  <LogOut size={15} className="text-gray-500" />
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Right: Profile button */}
+          <button
+            onClick={onProfileClick}
+            className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+          >
+            <User size={18} />
+            <span style={{ fontSize: 'var(--text-base)' }}>{username}</span>
+            <ChevronDown size={15} />
+          </button>
 
         </div>
       </div>

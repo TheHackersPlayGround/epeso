@@ -13,6 +13,8 @@ import Maintenance from './pages/maintenance/Maintenance'
 import SecurityView from './pages/security/SecurityView'
 import LivelihoodView from './pages/livelihood/LivelihoodView'
 import ReportView from './pages/report/ReportView'
+import AboutView from './pages/about/AboutView'
+import ProfileView from './pages/profile/ProfileView'
 import { CDSPProvider } from './contexts/CDSPContext'
 import { GIPProvider } from './contexts/GIPContext'
 import { SPESProvider } from './contexts/SPESContext'
@@ -20,11 +22,38 @@ import { OFWProvider } from './contexts/OFWContext'
 import { SkillsTrainingProvider } from './contexts/SkillsTrainingContext'
 import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
+import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED, CLPEP_INTERVENTIONS_SEED } from './contexts/LivelihoodContext'
 import './styles/App.css'
 
-type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report'
+const DEFAULT_CURRENT_USER = {
+  id: 1, firstName: 'Vicky', lastName: 'Administrator',
+  username: 'admin', email: 'admin@peso.gov.ph',
+  role: 'Administrator', status: 'Active',
+  lastLogin: new Date().toLocaleString(), permissions: [],
+}
+function initCurrentUser() {
+  try {
+    if (!localStorage.getItem('peso_current_user'))
+      localStorage.setItem('peso_current_user', JSON.stringify(DEFAULT_CURRENT_USER))
+  } catch { /* quota */ }
+}
+initCurrentUser()
 
-function AppContent() {
+function initLivelihoodLS() {
+  const set = (key: string, data: unknown[]) => {
+    try { if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(data)) } catch { /* quota */ }
+  }
+  set('lp_dileep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)'))
+  set('lp_slp_v4', LIVELIHOOD_SEED.filter(b => b.service === 'SLP'))
+  set('lp_clpep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP'))
+  set('lp_slp_projects_v2', SLP_PROJECTS_SEED)
+  set('lp_clpep_interventions_v1', CLPEP_INTERVENTIONS_SEED)
+}
+initLivelihoodLS()
+
+type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
+
+function AppContent({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
 
@@ -42,11 +71,22 @@ function AppContent() {
     if (id === 'report')     setCurrentPage('report')
   }
 
+  const getCurrentUsername = () => {
+    try { return (JSON.parse(localStorage.getItem('peso_current_user') || '{}') as { firstName?: string }).firstName || 'User' }
+    catch { return 'User' }
+  }
+
   const navbar = (
     <Navbar
       activeTab={activeTab}
-      onTabChange={setActiveTab}
+      onTabChange={(tab) => {
+        setActiveTab(tab)
+        if (tab === 'About PESO') setCurrentPage('about')
+        if (tab === 'Dashboard') setCurrentPage('dashboard')
+      }}
       onLogout={() => setCurrentPage('dashboard')}
+      onProfileClick={() => setCurrentPage('profile')}
+      username={getCurrentUsername()}
     />
   )
 
@@ -173,6 +213,31 @@ function AppContent() {
     )
   }
 
+  if (currentPage === 'about') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <AboutView onBack={() => { setCurrentPage('dashboard'); setActiveTab('Dashboard') }} />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPage === 'profile') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <ProfileView
+            onBack={() => setCurrentPage('dashboard')}
+            onLogout={onLogout}
+          />
+        </div>
+      </div>
+    )
+  }
+
   // Dashboard
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
@@ -199,7 +264,7 @@ export default function App() {
           <OFWProvider>
             <SkillsTrainingProvider>
               <ProgramActivitiesProvider>
-                <AppContent />
+                <AppContent onLogout={() => setIsLoggedIn(false)} />
               </ProgramActivitiesProvider>
             </SkillsTrainingProvider>
           </OFWProvider>

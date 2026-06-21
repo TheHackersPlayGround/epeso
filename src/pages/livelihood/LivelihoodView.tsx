@@ -1,8 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import DILEEPTab from './DILEEPTab'
 import SLPTab from './SLPTab'
 import CLPEPTab from './CLPEPTab'
+import {
+  LIVELIHOOD_SEED,
+  SLP_PROJECTS_SEED,
+  CLPEP_INTERVENTIONS_SEED,
+} from '../../contexts/LivelihoodContext'
+
+function seedLS(key: string, data: unknown[]) {
+  try {
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(data))
+  } catch { /* quota */ }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +33,14 @@ const TABS: { id: TabType; label: string }[] = [
 
 export default function LivelihoodView({ onBack }: LivelihoodViewProps) {
   const [activeTab, setActiveTab] = useState<TabType>('dileep')
+
+  useEffect(() => {
+    seedLS('lp_dileep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)'))
+    seedLS('lp_slp_v4', LIVELIHOOD_SEED.filter(b => b.service === 'SLP'))
+    seedLS('lp_clpep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP'))
+    seedLS('lp_slp_projects_v2', SLP_PROJECTS_SEED)
+    seedLS('lp_clpep_interventions_v1', CLPEP_INTERVENTIONS_SEED)
+  }, [])
 
   return (
     <div className="min-h-full flex flex-col bg-brand-bg">

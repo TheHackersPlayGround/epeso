@@ -47,7 +47,9 @@ function loadSLPProjects(): SLPProject[] {
   try {
     const raw = localStorage.getItem(LS_PROJECTS_KEY)
     const parsed = raw ? (JSON.parse(raw) as SLPProject[]) : []
-    return parsed.length > 0 ? parsed : SLP_PROJECTS_SEED
+    if (parsed.length > 0) return parsed
+    try { localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(SLP_PROJECTS_SEED)) } catch { /* quota */ }
+    return SLP_PROJECTS_SEED
   } catch {
     return SLP_PROJECTS_SEED
   }
@@ -59,7 +61,10 @@ function loadBeneficiaries(): LivelihoodBeneficiary[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    return parsed.length > 0 ? parsed : LIVELIHOOD_SEED.filter(b => b.service === 'SLP')
+    if (parsed.length > 0) return parsed
+    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'SLP')
+    try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
+    return seed
   } catch {
     return LIVELIHOOD_SEED.filter(b => b.service === 'SLP')
   }

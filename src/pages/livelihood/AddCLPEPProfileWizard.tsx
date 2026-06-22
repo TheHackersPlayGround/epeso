@@ -192,11 +192,12 @@ type CLPEPWizardProps = {
   mode: 'add' | 'edit' | 'view'
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
   onClose: () => void
+  onEdit?: () => void
 }
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose }: CLPEPWizardProps) {
+export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, onEdit }: CLPEPWizardProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
     ...EMPTY_CLPEP_RECORD,
@@ -940,6 +941,15 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose }
                 >
                   Close
                 </button>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
                 {!isLastStep && (
                   <button
                     type="button"

@@ -1,6 +1,12 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
+export interface OFWAttachment {
+  name: string
+  fileName: string
+  fileData?: string  // base64 data URL — only present when uploaded in-session
+}
+
 export interface OFWProfile {
   id: number
   referenceNumber: string
@@ -16,6 +22,18 @@ export interface OFWProfile {
   typeOfRequest: string[]
   status: 'Pending' | 'Ongoing' | 'Approved' | 'Completed' | 'Rejected'
   remarks: string
+  // Employment referral sub-panel
+  desiredPosition?: string
+  typeOfSkill?: string
+  agencies?: string[]
+  // OWWA Welfare Case attachment
+  owwaWelfareFile?: OFWAttachment
+  // Livelihood ELPOR form attachments
+  elporFiles?: Record<string, OFWAttachment>
+  // PESO Office Only
+  dateApplicationReceived?: string
+  receivedBy?: string
+  attachedDocuments?: OFWAttachment[]
 }
 
 const SEED: OFWProfile[] = [

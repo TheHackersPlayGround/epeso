@@ -64,7 +64,28 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
 
   // OWWA Welfare Case attachment state
   const owwaInputRef = useRef<HTMLInputElement>(null)
-  const [owwaFile, setOwwaFile] = useState('')
+  const [owwaAttachment, setOwwaAttachment] = useState<{ fileName: string; fileData: string } | null>(null)
+
+  // PESO Office Only state
+  const [dateReceived, setDateReceived] = useState('')
+  const [receivedBy, setReceivedBy] = useState('')
+  const [attachedDocuments, setAttachedDocuments] = useState<{ id: number; name: string; fileName: string; fileData?: string }[]>([])
+  const docFileRefs = useRef<Record<number, HTMLInputElement | null>>({})
+
+  function addDocument() {
+    const id = Date.now()
+    setAttachedDocuments(prev => [...prev, { id, name: '', fileName: '' }])
+  }
+  function removeDocument(id: number) {
+    setAttachedDocuments(prev => prev.filter(d => d.id !== id))
+  }
+  function updateDocName(id: number, name: string) {
+    setAttachedDocuments(prev => prev.map(d => d.id === id ? { ...d, name } : d))
+  }
+  async function updateDocFile(id: number, file: File) {
+    const fileData = await readFileAsDataURL(file)
+    setAttachedDocuments(prev => prev.map(d => d.id === id ? { ...d, fileName: file.name, fileData } : d))
+  }
 
   // ELPOR attachment state
   const elporARef = useRef<HTMLInputElement>(null)
@@ -72,7 +93,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
   const elporBRef = useRef<HTMLInputElement>(null)
   const elporB1Ref = useRef<HTMLInputElement>(null)
   const elporCRef = useRef<HTMLInputElement>(null)
-  const [elporFiles, setElporFiles] = useState<Record<string, string>>({})
+  const [elporAttachments, setElporAttachments] = useState<Record<string, { fileName: string; fileData: string }>>({})
 
   const elporRefs: Record<string, React.RefObject<HTMLInputElement | null>> = {
     'ELPOR Form A': elporARef,
@@ -81,6 +102,13 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
     'ELPOR Form B1': elporB1Ref,
     'ELPOR Form C': elporCRef,
   }
+
+  const readFileAsDataURL = (file: File): Promise<string> =>
+    new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onload = e => resolve((e.target?.result as string) ?? '')
+      reader.readAsDataURL(file)
+    })
 
   const set = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }))
 
@@ -112,34 +140,45 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
       typeOfRequest: form.typeOfRequest,
       status: 'Pending',
       remarks: '',
+      desiredPosition: desiredPosition || undefined,
+      typeOfSkill: typeOfSkill || undefined,
+      agencies: agencies.filter(a => a.trim()).length ? agencies.filter(a => a.trim()) : undefined,
+      owwaWelfareFile: owwaAttachment ? { name: 'OFW Welfare Case Form', fileName: owwaAttachment.fileName, fileData: owwaAttachment.fileData } : undefined,
+      elporFiles: Object.keys(elporAttachments).length
+        ? Object.fromEntries(Object.entries(elporAttachments).map(([k, v]) => [k, { name: k, fileName: v.fileName, fileData: v.fileData }]))
+        : undefined,
+      dateApplicationReceived: dateReceived,
+      receivedBy,
+      attachedDocuments: attachedDocuments.map(({ name, fileName, fileData }) => ({ name, fileName, fileData })),
     })
   }
 
   const lbl = sublbl
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="px-6 py-6">
+    <div className="h-full bg-brand-bg flex flex-col">
+      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DBEAFE' }}>
+            <svg className="w-4 h-4" style={{ color: '#0077BE' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>Add New Request — OFW</p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
 
-          {/* Panel header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5" style={{ color: '#0077BE' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span className="font-semibold text-gray-800 text-sm">PESO Request for Assistance</span>
-            </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Section I header */}
+          {/* Section header */}
           <div className="px-6 py-3" style={{ backgroundColor: '#0077BE' }}>
-            <p className="text-white font-bold text-sm tracking-wide">I. PESO REQUEST FOR ASSISTANCE</p>
+            <p className="text-white font-bold text-sm tracking-wide">PESO REQUEST FOR ASSISTANCE</p>
           </div>
 
           {/* Form */}
@@ -214,11 +253,10 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                 <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
                 <select className={inp} value={form.employmentStatus} onChange={e => set('employmentStatus', e.target.value)} required>
                   <option value="">Select Status</option>
-                  <option>Employed Abroad</option>
-                  <option>Unemployed</option>
-                  <option>Repatriated</option>
-                  <option>Distressed</option>
-                  <option>Self-employed</option>
+                  <option>employed</option>
+                  <option>self-employed</option>
+                  <option>unemployed</option>
+                  <option>underemployed</option>
                 </select>
               </div>
             </div>
@@ -295,7 +333,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#0077BE' }}>Attach OFW Welfare Case Form</p>
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
-                          <input ref={owwaInputRef} type="file" className="hidden" onChange={e => setOwwaFile(e.target.files?.[0]?.name ?? '')} />
+                          <input ref={owwaInputRef} type="file" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) { const fd = await readFileAsDataURL(f); setOwwaAttachment({ fileName: f.name, fileData: fd }) } }} />
                           <button
                             type="button"
                             onClick={() => owwaInputRef.current?.click()}
@@ -304,7 +342,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                             <AttachIcon />
                             Attach File
                           </button>
-                          {owwaFile && <span className="text-xs text-gray-500 truncate max-w-xs">{owwaFile}</span>}
+                          {owwaAttachment && <span className="text-xs text-gray-500 truncate max-w-xs">{owwaAttachment.fileName}</span>}
                         </div>
                       </div>
                     )}
@@ -325,7 +363,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                                   ref={elporRefs[formName]}
                                   type="file"
                                   className="hidden"
-                                  onChange={e => setElporFiles(prev => ({ ...prev, [formName]: e.target.files?.[0]?.name ?? '' }))}
+                                  onChange={async e => { const f = e.target.files?.[0]; if (f) { const fd = await readFileAsDataURL(f); setElporAttachments(prev => ({ ...prev, [formName]: { fileName: f.name, fileData: fd } })) } }}
                                 />
                                 <button
                                   type="button"
@@ -335,7 +373,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                                   <AttachIcon />
                                   Attach File
                                 </button>
-                                {elporFiles[formName] && <span className="text-xs text-gray-500 truncate max-w-xs">{elporFiles[formName]}</span>}
+                                {elporAttachments[formName] && <span className="text-xs text-gray-500 truncate max-w-xs">{elporAttachments[formName].fileName}</span>}
                               </div>
                             </div>
                           ))}
@@ -344,6 +382,73 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* PESO Office Only */}
+            <div className="border-t border-gray-200 pt-5">
+              <div className="px-4 py-2 rounded-lg mb-4" style={{ backgroundColor: '#0077BE' }}>
+                <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label className={lbl}>Date Received</label>
+                  <input type="date" className={inp} value={dateReceived} onChange={e => setDateReceived(e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Received By</label>
+                  <input className={inp} placeholder="Name of receiving officer" value={receivedBy} onChange={e => setReceivedBy(e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <p className={lbl}>Attached Documents</p>
+                <div className="space-y-3 mt-2">
+                  {attachedDocuments.map(doc => (
+                    <div key={doc.id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                      <input
+                        className={`${inp} flex-1`}
+                        placeholder="Document name (e.g. Birth Certificate)"
+                        value={doc.name}
+                        onChange={e => updateDocName(doc.id, e.target.value)}
+                      />
+                      <input
+                        ref={el => { docFileRefs.current[doc.id] = el }}
+                        type="file"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) updateDocFile(doc.id, f) }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => docFileRefs.current[doc.id]?.click()}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"
+                      >
+                        <AttachIcon />
+                        {doc.fileName ? <span className="max-w-[120px] truncate text-xs text-gray-500">{doc.fileName}</span> : 'Attach File'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeDocument(doc.id)}
+                        className="flex-shrink-0 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addDocument}
+                    className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-colors w-full justify-center"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Document
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -372,3 +477,4 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
     </div>
   )
 }
+

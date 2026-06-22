@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, CLPEPIntervention } from '../../contexts/LivelihoodContext'
@@ -8,10 +8,10 @@ import AddCLPEPProfileWizard, { EMPTY_CLPEP_RECORD } from './AddCLPEPProfileWiza
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_clpep_v4'
+const LS_KEY = 'lp_clpep_v6'
 const LS_INTERVENTIONS_KEY = 'lp_clpep_interventions_v1'
 
-const STATUS_OPTIONS: LivelihoodStatus[] = ['Active', 'Completed', 'Dropped']
+const STATUS_OPTIONS: LivelihoodStatus[] = ['Active', 'Inactive', 'Dropped']
 
 const STATUS_COLORS: Record<LivelihoodStatus, string> = {
   Active:    'bg-green-100 text-green-700',
@@ -48,16 +48,21 @@ type FilterOption = { id: string; label: string; options: string[] }
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
+function normalizeStatus(b: LivelihoodBeneficiary): LivelihoodBeneficiary {
+  if (b.status === 'Dropped') return b
+  return { ...b, status: b.cooperativeName ? 'Active' : 'Inactive' }
+}
+
 function loadBeneficiaries(): LivelihoodBeneficiary[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    if (parsed.length > 0) return parsed
-    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
+    if (parsed.length > 0) return parsed.map(normalizeStatus)
+    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP').map(normalizeStatus)
     try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
     return seed
   } catch {
-    return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
+    return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP').map(normalizeStatus)
   }
 }
 
@@ -239,31 +244,32 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
 
         {/* Header */}
-        <div className="bg-brand-blue px-5 pt-5 pb-4">
+        <div className="bg-brand-blue px-6 pt-5 pb-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-base font-bold text-white">Assign Intervention</h2>
-              <p className="text-blue-200 text-xs mt-0.5">{beneficiary.name}</p>
+              <h2 className="text-lg font-bold text-white">Assign Intervention</h2>
+              <p className="text-blue-200 text-sm mt-0.5">{beneficiary.name}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="px-4 pt-4">
+        <div className="px-6 pt-5">
           {/* Currently Assigned card */}
           {currentIntervention && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1.5">Currently Assigned</p>
-              <div className="flex items-start justify-between gap-2">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">Currently Assigned</p>
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold text-brand-blue">{currentIntervention.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[currentIntervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <p className="text-sm font-bold text-brand-blue">{currentIntervention.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{currentIntervention.type} &bull; {currentIntervention.location}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[currentIntervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
                       {currentIntervention.status}
                     </span>
                   </div>
@@ -271,7 +277,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                 <button
                   type="button"
                   onClick={() => { onUnassign(); onClose() }}
-                  className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                  className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   Unassign
                 </button>
@@ -281,26 +287,26 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
 
           {/* Search */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search interventions..."
               aria-label="Search CLPEP interventions"
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-orange-400 placeholder:text-gray-400"
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
-            <Info size={11} className="flex-shrink-0" />
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <Info size={12} className="flex-shrink-0" />
             Only CLPEP interventions (Planned and Active) are shown
           </p>
         </div>
 
         {/* Intervention list */}
-        <div className="px-4 py-2 max-h-56 overflow-y-auto divide-y divide-gray-100">
+        <div className="px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100">
           {filtered.length === 0 ? (
-            <p className="text-xs text-gray-400 italic text-center py-6">No interventions found</p>
+            <p className="text-sm text-gray-400 italic text-center py-8">No interventions found</p>
           ) : (
             filtered.map(intervention => {
               const isCurrent = intervention.id === beneficiary.assignedInterventionId
@@ -309,12 +315,12 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                   key={intervention.id}
                   type="button"
                   onClick={() => { onAssign(intervention.title, intervention.id); onClose() }}
-                  className="w-full text-left py-3 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left py-3.5 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-xs font-bold text-gray-900">{intervention.title}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-gray-900">{intervention.title}</p>
                         {isCurrent && (
                           <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-600 rounded-full">Current</span>
                         )}
@@ -323,10 +329,10 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                         {intervention.type} &bull; {intervention.location}
                       </p>
                       {intervention.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{intervention.description}</p>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{intervention.description}</p>
                       )}
                     </div>
-                    <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
                       {intervention.status}
                     </span>
                   </div>
@@ -337,11 +343,11 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
         </div>
 
         {/* Footer */}
-        <div className="px-4 pb-4 pt-2">
+        <div className="px-6 pb-5 pt-3">
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 border border-gray-200 rounded-xl text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+            className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
@@ -374,23 +380,23 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
 
         {/* Header */}
-        <div className="bg-brand-blue px-5 pt-5 pb-4">
+        <div className="bg-brand-blue px-6 pt-5 pb-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-base font-bold text-white">Assigned Intervention</h2>
-              <p className="text-blue-200 text-xs mt-0.5">{beneficiary.name}</p>
+              <h2 className="text-lg font-bold text-white">Assigned Intervention</h2>
+              <p className="text-blue-200 text-sm mt-0.5">{beneficiary.name}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
+        <div className="px-6 py-5 max-h-[65vh] overflow-y-auto">
           {intervention ? (
             <>
               {/* Title + type + status */}
@@ -418,7 +424,7 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 pt-2 flex gap-2">
+        <div className="px-6 pb-6 pt-2 flex gap-2">
           <button
             type="button"
             onClick={() => { onChangeAssignment(beneficiary); onClose() }}
@@ -443,6 +449,7 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
 
 type BeneficiaryTableProps = {
   beneficiaries: LivelihoodBeneficiary[]
+  interventions: CLPEPIntervention[]
   totalCount: number
   isFiltered: boolean
   onView: (b: LivelihoodBeneficiary) => void
@@ -452,9 +459,17 @@ type BeneficiaryTableProps = {
   onViewAssignedIntervention: (b: LivelihoodBeneficiary) => void
 }
 
-function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+
+  const totalPages = Math.max(1, Math.ceil(beneficiaries.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = beneficiaries.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = beneficiaries.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, beneficiaries.length)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -530,13 +545,29 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
               </td>
             </tr>
           ) : (
-            beneficiaries.map((b, idx) => (
+            paginated.map((b, idx) => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{idx + 1}</td>
+                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{recordStart + idx}</td>
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap italic">{b.cooperativeName || 'Not assigned'}</td>
+                <td className="px-4 py-3">
+                  {b.cooperativeName ? (
+                    <div>
+                      <p className="text-gray-800 text-sm font-medium">{b.cooperativeName}</p>
+                      {(() => {
+                        const iv = interventions.find(i => i.id === b.assignedInterventionId)
+                        return iv ? (
+                          <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[iv.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {iv.status}
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 italic text-sm">Not assigned</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? '-'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <StatusBadge status={b.status} />
@@ -555,6 +586,32 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
           )}
         </tbody>
       </table>
+      {beneficiaries.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            Show
+            <select
+              value={perPage}
+              onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+              className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            per page
+          </div>
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <ChevronLeft size={16} />
+            </button>
+            <span>{recordStart} to {recordEnd} of {beneficiaries.length} records</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {openMenuId !== null && menuPos && menuBeneficiary && (
         <>
@@ -573,98 +630,6 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-// ─── View Modal ───────────────────────────────────────────────────────────────
-
-function ViewBeneficiaryModal({ beneficiary: b, onClose, onEdit }: { beneficiary: LivelihoodBeneficiary; onClose: () => void; onEdit: () => void }) {
-  function Field({ label, value }: { label: string; value?: string | number | null }) {
-    return (
-      <div>
-        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-        <p className="text-sm text-gray-900 font-medium">{value || '-'}</p>
-      </div>
-    )
-  }
-
-  function SectionTitle({ title }: { title: string }) {
-    return (
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-5 mt-8 border-t border-gray-100 pt-6">
-        {title}
-      </p>
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between px-8 pt-7 pb-5 border-b border-gray-100">
-          <div>
-            <h2 className="text-2xl font-bold" style={{ color: '#000' }}>{b.name}</h2>
-            <p className="text-sm text-brand-blue font-medium mt-1">CLPEP</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="px-5 py-2 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-[#01a0ff] transition-colors"
-            >
-              Edit
-            </button>
-            <button type="button" onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="px-8 pb-8">
-          <SectionTitle title="Personal Information" />
-          <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-            <Field label="Last Name" value={b.lastName} />
-            <Field label="First Name" value={b.firstName} />
-            <Field label="Middle Name" value={b.middleName} />
-            <Field label="Sex" value={b.sex} />
-            <Field label="Birthdate" value={b.birthdate} />
-            <Field label="Age" value={b.age} />
-            <Field label="Civil Status" value={b.civilStatus} />
-            <Field label="Contact Number" value={b.contactNumber} />
-          </div>
-
-          <SectionTitle title="Address" />
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            <Field label="Street / Purok" value={b.streetPurok} />
-            <Field label="Barangay" value={b.barangay} />
-            <Field label="City / Municipality" value={b.cityMunicipality} />
-            <Field label="Province" value={b.province} />
-          </div>
-
-          <SectionTitle title="Application Details" />
-          <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-            <Field label="Date Applied" value={b.dateApplied} />
-            <Field label="Status" value={b.status} />
-            <Field label="Remarks" value={b.remarks} />
-          </div>
-
-          <SectionTitle title="Attached Forms" />
-          {(b.attachedForms ?? []).length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No forms attached</p>
-          ) : (
-            <ul className="space-y-2">
-              {(b.attachedForms ?? []).map((form, i) => (
-                <li key={i} className="text-sm text-gray-700">{form}</li>
-              ))}
-            </ul>
-          )}
-
-          <SectionTitle title="PESO Office" />
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            <Field label="Date Application Received" value={b.dateApplicationReceived} />
-            <Field label="Received By" value={b.receivedBy} />
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -712,14 +677,14 @@ export default function CLPEPTab() {
 
   function handleAssignIntervention(beneficiary: LivelihoodBeneficiary, title: string, id: number) {
     persist(beneficiaries.map(b =>
-      b.id === beneficiary.id ? { ...b, cooperativeName: title, assignedInterventionId: id } : b
+      b.id === beneficiary.id ? { ...b, cooperativeName: title, assignedInterventionId: id, status: 'Active' as const } : b
     ))
   }
 
   function handleUnassignIntervention() {
     if (!assigningBeneficiary) return
     persist(beneficiaries.map(b =>
-      b.id === assigningBeneficiary.id ? { ...b, cooperativeName: '', assignedInterventionId: null } : b
+      b.id === assigningBeneficiary.id ? { ...b, cooperativeName: '', assignedInterventionId: null, status: 'Inactive' as const } : b
     ))
     setAssigningBeneficiary(null)
   }
@@ -795,6 +760,19 @@ export default function CLPEPTab() {
     )
   }
 
+  if (viewingBeneficiary) {
+    return (
+      <AddCLPEPProfileWizard
+        key={viewingBeneficiary.id}
+        mode="view"
+        initial={viewingBeneficiary}
+        onSave={() => {}}
+        onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
+        onClose={() => setViewingBeneficiary(null)}
+      />
+    )
+  }
+
   if (editingBeneficiary) {
     return (
       <AddCLPEPProfileWizard
@@ -829,7 +807,12 @@ export default function CLPEPTab() {
       )}
 
       {/* Top action card */}
-      <div className="bg-white rounded-xl shadow-sm px-6 py-4 flex items-center gap-3">
+      <div className="bg-white rounded-xl shadow-sm px-6 py-4">
+        <div className="mb-3">
+          <p className="text-gray-800 font-bold text-xl">CLPEP</p>
+          <p className="text-gray-500 text-sm mt-0.5">Child Labor Prevention and Elimination Program</p>
+        </div>
+        <div className="flex items-center gap-3">
         <button
           onClick={() => setIsAddOpen(true)}
           className="flex items-center gap-2 px-5 py-2 bg-brand-blue text-white rounded-full text-sm font-medium hover:bg-[#01a0ff] transition-colors whitespace-nowrap"
@@ -859,6 +842,7 @@ export default function CLPEPTab() {
             </>
           )}
         </div>
+        </div>
       </div>
 
       {/* Main table card */}
@@ -885,6 +869,7 @@ export default function CLPEPTab() {
 
         <BeneficiaryTable
           beneficiaries={filtered}
+          interventions={interventions}
           totalCount={filtered.length}
           isFiltered={isFiltered}
           onView={setViewingBeneficiary}
@@ -895,13 +880,6 @@ export default function CLPEPTab() {
         />
       </div>
 
-      {viewingBeneficiary && (
-        <ViewBeneficiaryModal
-          beneficiary={viewingBeneficiary}
-          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
-          onClose={() => setViewingBeneficiary(null)}
-        />
-      )}
     </div>
   )
 }

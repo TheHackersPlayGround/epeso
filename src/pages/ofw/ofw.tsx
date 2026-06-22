@@ -1,6 +1,6 @@
 ﻿import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import { ArrowLeft, Plus, Upload, Download, ChevronDown, X } from 'lucide-react'
+import { ArrowLeft, Plus, Upload, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { OFWProfile } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
@@ -11,7 +11,34 @@ interface OFWViewProps {
   onBack: () => void
 }
 
-type StatusFilter = 'All' | OFWProfile['status']
+type FilterKey = 'referenceNo' | 'dateFiled' | 'status' | 'employmentStatus' | 'address' | 'typeOfRequest'
+
+const FILTER_DEFS: { key: FilterKey; label: string; type: 'text' | 'date' | 'select'; options?: string[] }[] = [
+  { key: 'referenceNo',      label: 'Reference No.',      type: 'text' },
+  { key: 'dateFiled',        label: 'Date Filed',          type: 'date' },
+  { key: 'status',           label: 'Status',              type: 'select', options: ['Pending', 'Ongoing', 'Approved', 'Completed', 'Rejected'] },
+  { key: 'employmentStatus', label: 'Employment Status',   type: 'select', options: ['employed', 'self-employed', 'unemployed', 'underemployed'] },
+  { key: 'address',          label: 'Address',             type: 'text' },
+  { key: 'typeOfRequest',    label: 'Type of Request',     type: 'select', options: [
+    'employment referral',
+    'skills training',
+    'on-line services',
+    'registration',
+    'accreditation',
+    'annual report repatriation',
+    'OWWA Scholarship – ODSP/EDSP',
+    'OWWA Benefits',
+    'OWWA Welfare Case',
+    'inquiry (pls specify)',
+    'application letter and resume-making',
+    're-integration program for OFWs',
+    'free clearance for 1st-time jobseekers',
+    'labor Market Information (LMI)',
+    'livelihood',
+    'Job Vacancy for posting',
+    'other DOLE program (please specify)',
+  ]},
+]
 
 function StatusBadge({ status }: { status: OFWProfile['status'] }) {
   const map: Record<OFWProfile['status'], string> = {
@@ -105,10 +132,12 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   // Search & filter
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
-  const [employmentFilter, setEmploymentFilter] = useState('All')
-  const [showFilterMenu, setShowFilterMenu] = useState(false)
-  const filterRef = useRef<HTMLDivElement | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [activeFilters, setActiveFilters] = useState<FilterKey[]>([])
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+  const filterDropdownRef = useRef<HTMLDivElement | null>(null)
 
   // Action menu (portal)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -136,11 +165,27 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilterMenu(false)
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) setShowFilterDropdown(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  const addFilter = (key: FilterKey) => {
+    if (!activeFilters.includes(key)) {
+      setActiveFilters(prev => [...prev, key])
+      const def = FILTER_DEFS.find(f => f.key === key)!
+      setFilterValues(prev => ({ ...prev, [key]: def.options?.[0] ?? '' }))
+      setCurrentPage(1)
+    }
+    setShowFilterDropdown(false)
+  }
+
+  const removeFilter = (key: FilterKey) => {
+    setActiveFilters(prev => prev.filter(k => k !== key))
+    setFilterValues(prev => { const n = { ...prev }; delete n[key]; return n })
+    setCurrentPage(1)
+  }
 
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, id: number) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -178,10 +223,27 @@ export default function OFWView({ onBack }: OFWViewProps) {
       p.referenceNumber.toLowerCase().includes(q) ||
       p.contactNumber.includes(q) ||
       p.barangay.toLowerCase().includes(q)
-    const matchStatus = statusFilter === 'All' || p.status === statusFilter
-    const matchEmployment = employmentFilter === 'All' || p.employmentStatus === employmentFilter
-    return matchSearch && matchStatus && matchEmployment
+    const matchFilters = activeFilters.every(key => {
+      const val = filterValues[key]
+      if (!val) return true
+      switch (key) {
+        case 'referenceNo':      return p.referenceNumber.toLowerCase().includes(val.toLowerCase())
+        case 'dateFiled':        return p.dateFiled === val
+        case 'status':           return p.status === val
+        case 'employmentStatus': return p.employmentStatus === val
+        case 'address':          return [p.address, p.barangay, p.municipality, p.province].join(' ').toLowerCase().includes(val.toLowerCase())
+        case 'typeOfRequest':    return p.typeOfRequest.some(t => t.toLowerCase().includes(val.toLowerCase()))
+        default:                 return true
+      }
+    })
+    return matchSearch && matchFilters
   })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filtered.length)
 
   // ── Export ────────────────────────────────────────────────────
   const exportToExcel = () => {
@@ -289,9 +351,31 @@ export default function OFWView({ onBack }: OFWViewProps) {
     )
   }
 
+  if (viewProfile) {
+    return (
+      <OFWProfileModal
+        profile={viewProfile}
+        mode="view"
+        onClose={() => setViewProfile(null)}
+        onSave={handleUpdateProfile}
+      />
+    )
+  }
+
+  if (editProfile) {
+    return (
+      <OFWProfileModal
+        profile={editProfile}
+        mode="edit"
+        onClose={() => setEditProfile(null)}
+        onSave={handleUpdateProfile}
+      />
+    )
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="w-full px-6 py-8">
 
         {/* Page title */}
         <div className="mb-6 flex items-center gap-4">
@@ -299,33 +383,27 @@ export default function OFWView({ onBack }: OFWViewProps) {
           <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>OFW Services</p>
         </div>
 
-        {/* Toolbar card */}
+        {/* Action buttons card */}
         <div className="bg-white rounded-xl shadow-md p-3 mb-4">
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex gap-2">
             <button
               onClick={() => setShowAddForm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm"
             >
-              <Plus size={16} />
-              <span>Add Profile</span>
+              <Plus size={16} /><span>Add Profile</span>
             </button>
-
-            {/* Import */}
             <button
               onClick={() => setIsImportModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
             >
               <Upload size={16} /><span>Import</span>
             </button>
-
-            {/* Export dropdown */}
             <div className="relative">
               <button
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
               >
-                <Download size={20} /><span>Export</span><ChevronDown size={16} />
+                <Download size={16} /><span>Export</span><ChevronDown size={14} />
               </button>
               {isExportDropdownOpen && (
                 <>
@@ -342,138 +420,190 @@ export default function OFWView({ onBack }: OFWViewProps) {
               )}
             </div>
           </div>
+        </div>
 
-          {/* Search + Filter By */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+        {/* Search + Filter + Table card */}
+        <div className="bg-white rounded-xl shadow-md p-4">
+          <div className="flex gap-3 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                 placeholder="Search by name, reference no., contact number, barangay..."
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
               />
             </div>
-
-            {/* Filter By dropdown */}
-            <div className="relative" ref={filterRef}>
+            <div className="relative" ref={filterDropdownRef}>
               <button
-                onClick={() => setShowFilterMenu(v => !v)}
+                onClick={() => setShowFilterDropdown(v => !v)}
                 className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>Filter By</span>
-                <ChevronDown size={14} className="text-gray-500" />
+                <Plus size={16} /><span>Filter By</span><ChevronDown size={14} className="text-gray-500" />
               </button>
-              {showFilterMenu && (
+              {showFilterDropdown && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-60 z-50">
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Status</p>
-                      {(['All', 'Pending', 'Ongoing', 'Approved', 'Completed', 'Rejected'] as const).map(s => (
-                        <label key={s} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
-                          <input type="radio" name="ofw-status-filter" checked={statusFilter === s} onChange={() => setStatusFilter(s)} className="accent-brand-blue" />
-                          {s}
-                        </label>
-                      ))}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Employment Status</p>
-                      {(['All', 'Employed Abroad', 'Unemployed', 'Repatriated', 'Distressed'] as const).map(s => (
-                        <label key={s} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
-                          <input type="radio" name="ofw-employment-filter" checked={employmentFilter === s} onChange={() => setEmploymentFilter(s)} className="accent-brand-blue" />
-                          {s}
-                        </label>
-                      ))}
-                    </div>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowFilterDropdown(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[200px] overflow-hidden">
+                    {FILTER_DEFS.map((def, i) => (
+                      <button
+                        key={def.key}
+                        onClick={() => addFilter(def.key)}
+                        className={`w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between ${i < FILTER_DEFS.length - 1 ? 'border-b border-gray-50' : ''}`}
+                      >
+                        <span>{def.label}</span>
+                        {activeFilters.includes(def.key) && (
+                          <span className="text-xs text-gray-400 ml-3">(Active)</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-gray-200">
-                  {['Reference No.', 'Name', 'Contact Number', 'Address', 'Date Filed', 'Employment Status', 'Type of Request', 'Status', 'Actions'].map(col => (
-                    <th key={col} className="px-4 py-3 text-left text-sm font-bold text-gray-700 whitespace-nowrap">
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">No records found.</td>
-                  </tr>
-                ) : filtered.map(profile => (
-                  <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{profile.referenceNumber}</td>
-                    <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{profile.name}</td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.contactNumber}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[180px]">
-                      <span className="block truncate" title={[profile.address, profile.barangay].filter(Boolean).join(', ')}>
-                        {[profile.barangay, profile.municipality].filter(Boolean).join(', ')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.employmentStatus}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[180px]">
-                      <span className="block truncate" title={profile.typeOfRequest.join(', ')}>
-                        {profile.typeOfRequest.join(', ') || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusBadge status={profile.status} />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={e => openMenu(e, profile.id)}
-                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors"
+          {/* Active filter chips */}
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {activeFilters.map(key => {
+                const def = FILTER_DEFS.find(f => f.key === key)!
+                return (
+                  <div key={key} className="flex items-center gap-1.5 pl-3 pr-1.5 py-1 bg-blue-50 border border-blue-200 rounded-full text-sm">
+                    <span className="text-brand-blue font-semibold text-xs whitespace-nowrap">{def.label}:</span>
+                    {def.type === 'text' && (
+                      <input
+                        className="bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400 w-32"
+                        placeholder="Enter value..."
+                        value={filterValues[key] ?? ''}
+                        onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
+                      />
+                    )}
+                    {def.type === 'date' && (
+                      <input
+                        type="date"
+                        className="bg-transparent text-sm text-gray-700 outline-none"
+                        value={filterValues[key] ?? ''}
+                        onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
+                      />
+                    )}
+                    {def.type === 'select' && (
+                      <select
+                        className="bg-transparent text-sm text-gray-700 outline-none cursor-pointer pr-1"
+                        value={filterValues[key] ?? def.options![0]}
+                        onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
                       >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-                        </svg>
-                      </button>
-                      {openMenuId === profile.id && (
-                        <ActionMenu
-                          profile={profile}
-                          pos={menuPos}
-                          menuRef={menuRef}
-                          onView={() => setViewProfile(profile)}
-                          onEdit={() => setEditProfile(profile)}
-                          onStartProcessing={() => handleStatusChange(profile.id, 'Ongoing')}
-                          onMarkCompleted={() => handleStatusChange(profile.id, 'Completed')}
-                          onDelete={() => setDeleteTarget(profile)}
-                          onClose={closeMenu}
-                        />
-                      )}
-                    </td>
+                        {def.options!.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => removeFilter(key)}
+                      className="ml-0.5 p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-blue-100 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+
+          {filtered.length === 0 ? (
+            <div className="text-center py-20">
+              <Users size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-600 text-lg">No profiles found</p>
+              <p className="text-gray-400 text-sm mt-1">
+                {profiles.length === 0 ? 'Click "Add Profile" to register the first OFW profile.' : 'Try adjusting your search or filters.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-brand-blue">
+                    {['Reference No.', 'Name', 'Contact Number', 'Address', 'Date Filed', 'Employment Status', 'Type of Request', 'Status', 'Actions'].map(col => (
+                      <th key={col} className="px-4 py-4 text-left text-white whitespace-nowrap">{col}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginated.map(profile => (
+                    <tr key={profile.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{profile.referenceNumber}</td>
+                      <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{profile.name}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.contactNumber}</td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[180px]">
+                        <span className="block truncate" title={[profile.address, profile.barangay].filter(Boolean).join(', ')}>
+                          {[profile.barangay, profile.municipality].filter(Boolean).join(', ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.employmentStatus}</td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[180px]">
+                        <span className="block truncate" title={profile.typeOfRequest.join(', ')}>
+                          {profile.typeOfRequest.join(', ') || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <StatusBadge status={profile.status} />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          onClick={e => openMenu(e, profile.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        {openMenuId === profile.id && (
+                          <ActionMenu
+                            profile={profile}
+                            pos={menuPos}
+                            menuRef={menuRef}
+                            onView={() => setViewProfile(profile)}
+                            onEdit={() => setEditProfile(profile)}
+                            onStartProcessing={() => handleStatusChange(profile.id, 'Ongoing')}
+                            onMarkCompleted={() => handleStatusChange(profile.id, 'Completed')}
+                            onDelete={() => setDeleteTarget(profile)}
+                            onClose={closeMenu}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filtered.length > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    Show
+                    <select
+                      value={perPage}
+                      onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+                      className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                    per page
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-gray-600">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── View / Edit modals ──────────────────────────────────── */}
-      {viewProfile && (
-        <OFWProfileModal profile={viewProfile} mode="view" onClose={() => setViewProfile(null)} onSave={handleUpdateProfile} />
-      )}
-      {editProfile && (
-        <OFWProfileModal profile={editProfile} mode="edit" onClose={() => setEditProfile(null)} onSave={handleUpdateProfile} />
-      )}
       {deleteTarget && (
         <ConfirmModal
           message={`Delete profile for "${deleteTarget.name}" (${deleteTarget.referenceNumber})? This action cannot be undone.`}

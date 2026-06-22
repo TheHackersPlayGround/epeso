@@ -20,25 +20,25 @@ export type SLPProject = {
 
 export const SLP_PROJECTS_SEED: SLPProject[] = [
   {
-    id: 1, title: 'Handicrafts', date: '2026-03-18',
+    id: 301, title: 'Sustainable Livelihood Program - Handicrafts', date: '2026-03-18',
     location: 'Community Center, Tangub City',
-    description: 'Livelihood training for handicraft production',
-    status: 'Ongoing', facilitator: 'Rosa Garcia', participants: 20,
-    assistanceAmount: '10000', dateReleased: '2026-04-01',
+    description: 'Livelihood training for handicraft production.',
+    status: 'Ongoing', facilitator: 'Rosa Garcia',
+    assistanceAmount: '15000', dateReleased: '2026-04-01',
   },
   {
-    id: 2, title: 'SLP Food Processing and Packaging', date: '2026-04-25',
+    id: 302, title: 'SLP Food Processing and Packaging', date: '2026-04-25',
     location: 'DOLE Training Center, Tangub City',
-    description: 'Livelihood training for food processing microenterprises',
-    status: 'Planned', facilitator: 'Maribel Cruz', participants: 15,
-    assistanceAmount: '8000', dateReleased: '2026-05-10',
+    description: 'Livelihood training for food processing microenterprises.',
+    status: 'Planned', facilitator: 'Maribel Santos',
+    assistanceAmount: '12000', dateReleased: '2026-06-01',
   },
   {
-    id: 3, title: 'SLP Sewing and Garments Production', date: '2026-05-10',
+    id: 303, title: 'SLP Sewing and Garments Production', date: '2026-05-10',
     location: 'Barangay Hall, Tangub City',
-    description: 'Skills-based livelihood training on garments and dressmaking',
-    status: 'Planned', facilitator: 'Leonora Reyes', participants: 12,
-    assistanceAmount: '7500', dateReleased: '2026-06-15',
+    description: 'Skills-based livelihood training on garments and dressmaking.',
+    status: 'Planned', facilitator: 'Leonora Reyes',
+    assistanceAmount: '10000', dateReleased: '2026-06-30',
   },
 ]
 
@@ -86,6 +86,9 @@ export type LivelihoodStatus =
   | 'Approved'
   | 'Released'
   | 'Inactive'
+  | 'Accepted'
+  | 'Waitlisted'
+  | 'Rejected'
 
 export type LivelihoodBeneficiary = {
   id: number
@@ -232,7 +235,7 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     id: 3,
     name: 'Cruz, Ana T.',
     service: 'SLP',
-    status: 'Completed',
+    status: 'Active',
     firstName: 'Ana',
     lastName: 'Cruz',
     middleName: 'T.',
@@ -256,8 +259,8 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     householdVulnerabilityScore: '3',
     vulnerabilitySeverity: 'Low',
     assessmentResult: 'Qualified',
-    assignedSlpProjectId: 1,
-    projectName: 'Handicrafts',
+    assignedSlpProjectId: 301,
+    projectName: 'Sustainable Livelihood Program - Handicrafts',
     slpTrack: 'Enterprise - Individual',
     remarks: 'Successfully completed SLP training.',
     dateApplied: '2026-02-20',
@@ -269,7 +272,7 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     id: 4,
     name: 'Dela Torre, Carlos M.',
     service: 'CLPEP',
-    status: 'Active',
+    status: 'Inactive',
     firstName: 'Carlos',
     lastName: 'Dela Torre',
     middleName: 'M.',
@@ -282,7 +285,7 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     barangay: 'Sta. Cruz',
     cityMunicipality: 'Tangub City',
     province: 'Misamis Occidental',
-    assignedInterventionId: 1,
+    assignedInterventionId: null,
     childLaborStatus: 'At Risk',
     schoolStatus: 'Enrolled',
     natureOfWork: 'Informal Trade',

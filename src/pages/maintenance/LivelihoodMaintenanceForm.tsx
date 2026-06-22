@@ -8,7 +8,7 @@ import {
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
-import type { LivelihoodBeneficiary, CLPEPIntervention, SLPProject } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary, CLPEPIntervention } from '../../contexts/LivelihoodContext'
 import DILPForm from './DILPForm'
 import type { DILPFormData, AttachmentItem } from './DILPForm'
 import TUPADForm from './TUPADForm'
@@ -27,41 +27,10 @@ const DEFAULT_SERVICES = [
   'CLPEP',
 ]
 
-// ─── CLPEP / SLP localStorage helpers ────────────────────────────────────────
+// ─── CLPEP localStorage helpers ───────────────────────────────────────────────
 
 const CLPEP_INTERVENTIONS_LS_KEY = 'lp_clpep_interventions_v1'
-const SLP_PROJECTS_LS_KEY = 'lp_slp_projects_v2'
-
-function saveSLPToStore(activity: ProgramActivity) {
-  try {
-    const raw = localStorage.getItem(SLP_PROJECTS_LS_KEY)
-    const existing: SLPProject[] = raw ? JSON.parse(raw) : []
-    const slpProject: SLPProject = {
-      id: activity.id,
-      title: activity.title,
-      date: activity.date,
-      location: activity.location ?? '',
-      description: activity.description ?? '',
-      status: activity.status as 'Planned' | 'Ongoing' | 'Completed',
-      facilitator: activity.facilitator,
-      assistanceAmount: activity.assistanceAmount,
-      dateReleased: activity.dateReleased,
-    }
-    const updated = existing.some(p => p.id === slpProject.id)
-      ? existing.map(p => p.id === slpProject.id ? slpProject : p)
-      : [...existing, slpProject]
-    localStorage.setItem(SLP_PROJECTS_LS_KEY, JSON.stringify(updated))
-  } catch { /* storage unavailable */ }
-}
-
-function deleteSLPFromStore(id: number) {
-  try {
-    const raw = localStorage.getItem(SLP_PROJECTS_LS_KEY)
-    if (!raw) return
-    const existing: SLPProject[] = JSON.parse(raw)
-    localStorage.setItem(SLP_PROJECTS_LS_KEY, JSON.stringify(existing.filter(p => p.id !== id)))
-  } catch { /* storage unavailable */ }
-}
+const SLP_BENEFICIARIES_LS_KEY = 'lp_slp_v6'
 
 function loadCLPEPInterventions(): CLPEPIntervention[] {
   try {
@@ -75,7 +44,6 @@ function loadCLPEPInterventions(): CLPEPIntervention[] {
 
 const SERVICE_TABS = [
   { label: 'All Services', value: 'All' },
-  { label: 'DILEEP', value: 'DILEEP' },
   { label: 'DILEEP – DILP', value: 'DILEEP (DILP)' },
   { label: 'DILEEP – TUPAD', value: 'DILEEP (TUPAD)' },
   { label: 'SLP', value: 'SLP' },
@@ -314,10 +282,7 @@ export default function LivelihoodMaintenanceForm() {
   ]
 
   const filteredProjects = livelihoodProjects.filter(a => {
-    const matchesService = filterService === 'All' ||
-      (filterService === 'DILEEP'
-        ? (a.service === 'DILEEP (DILP)' || a.service === 'DILEEP (TUPAD)')
-        : a.service === filterService)
+    const matchesService = filterService === 'All' || a.service === filterService
     const matchesStatus  = filterStatus  === 'All' || a.status  === filterStatus
     const matchesSearch  = !searchQuery  ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -558,11 +523,9 @@ export default function LivelihoodMaintenanceForm() {
 
     if (editingId !== null) {
       setActivities(prev => prev.map(a => a.id === editingId ? payload : a))
-      if (payload.service === 'SLP') saveSLPToStore(payload)
       Swal.fire({ icon: 'success', title: 'Project Updated', text: 'The project has been updated.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
     } else {
       setActivities(prev => [...prev, payload])
-      if (payload.service === 'SLP') saveSLPToStore(payload)
       Swal.fire({ icon: 'success', title: 'Project Added', text: 'New Livelihood project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
     }
 
@@ -604,9 +567,7 @@ export default function LivelihoodMaintenanceForm() {
       localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
       setClpepInterventions(updated)
     } else {
-      const toDelete = activities.find(a => a.id === deleteConfirm)
       setActivities(prev => prev.filter(a => a.id !== deleteConfirm))
-      if (toDelete?.service === 'SLP') deleteSLPFromStore(deleteConfirm)
     }
     setDeleteConfirm(null)
   }
@@ -624,13 +585,28 @@ export default function LivelihoodMaintenanceForm() {
       setActivities(prev =>
         prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a)
       )
-      if (project.service === 'SLP') saveSLPToStore({ ...project, status: nextStatus })
       if (nextStatus === 'Completed') {
-        const beneficiaries = loadBeneficiaries()
-        const updated = beneficiaries.map(b =>
+        // Auto-Inactive DILP beneficiaries
+        const dilpBeneficiaries = loadBeneficiaries()
+        const updatedDilp = dilpBeneficiaries.map(b =>
           b.assignedDilpProjectId === project.id ? { ...b, status: 'Inactive' as const } : b
         )
-        saveBeneficiaries(updated)
+        saveBeneficiaries(updatedDilp)
+        // Auto-Inactive SLP beneficiaries (stored separately)
+        if (project.service === 'SLP') {
+          try {
+            const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
+            if (raw) {
+              const slpBeneficiaries: LivelihoodBeneficiary[] = JSON.parse(raw)
+              const updatedSlp = slpBeneficiaries.map(b =>
+                b.assignedSlpProjectId === project.id && b.status === 'Active'
+                  ? { ...b, status: 'Inactive' as const }
+                  : b
+              )
+              localStorage.setItem(SLP_BENEFICIARIES_LS_KEY, JSON.stringify(updatedSlp))
+            }
+          } catch { /* storage unavailable */ }
+        }
       }
     }
     Swal.fire({ icon: 'success', title: 'Status Updated', text: `Project is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
@@ -1040,15 +1016,13 @@ export default function LivelihoodMaintenanceForm() {
                   <FolderOpen size={14} className="text-blue-500" />
                   View Details
                 </button>
-                {!isCLPEP && (
-                  <button
-                    onClick={() => { setSelectedProject(a); setAction('view_participants'); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
-                  >
-                    <Users size={14} className="text-gray-500" />
-                    View Participants
-                  </button>
-                )}
+                <button
+                  onClick={() => { setSelectedProject(a); setAction('view_participants'); setOpenMenuId(null) }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                >
+                  <Users size={14} className="text-gray-500" />
+                  View Participants
+                </button>
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { fillFormFromProject(a); setEditingId(a.id); setAction('edit_project'); setOpenMenuId(null) }}
@@ -1120,7 +1094,7 @@ export default function LivelihoodMaintenanceForm() {
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location</th>
                   <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Participants</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
-                  <th className="px-6 py-4 w-16" />
+                  <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1175,8 +1149,19 @@ export default function LivelihoodMaintenanceForm() {
 
   const renderViewParticipants = () => {
     if (!selectedProject) return null
-    const allBeneficiaries = loadBeneficiaries()
-    const participants = allBeneficiaries.filter(b => b.assignedDilpProjectId === selectedProject.id)
+    const isCLPEP = selectedProject.id >= 900000
+    let participants: LivelihoodBeneficiary[]
+    if (isCLPEP) {
+      const realId = selectedProject.id - 900000
+      try {
+        const raw = localStorage.getItem('lp_clpep_v6')
+        const clpepBeneficiaries: LivelihoodBeneficiary[] = raw ? JSON.parse(raw) : LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
+        participants = clpepBeneficiaries.filter(b => b.assignedInterventionId === realId)
+      } catch { participants = [] }
+    } else {
+      const allBeneficiaries = loadBeneficiaries()
+      participants = allBeneficiaries.filter(b => b.assignedDilpProjectId === selectedProject.id)
+    }
 
     const BENEFICIARY_STATUS_COLORS: Record<string, string> = {
       Active:    'bg-blue-100 text-blue-700',
@@ -1211,8 +1196,8 @@ export default function LivelihoodMaintenanceForm() {
         {participants.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
             <Users size={40} className="mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 text-sm">No participants assigned to this project yet.</p>
-            <p className="text-gray-400 text-xs mt-1">Assign beneficiaries from the Livelihood (DILEEP) module.</p>
+            <p className="text-gray-500 text-sm">No participants assigned to this intervention yet.</p>
+            <p className="text-gray-400 text-xs mt-1">Assign beneficiaries from the {isCLPEP ? 'CLPEP' : 'Livelihood (DILEEP)'} module.</p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1330,7 +1315,7 @@ export default function LivelihoodMaintenanceForm() {
               <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">#</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service Name</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Projects Count</th>
-              <th className="px-6 py-4 w-20" />
+              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-20">Actions</th>
             </tr>
           </thead>
           <tbody>

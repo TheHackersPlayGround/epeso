@@ -2,6 +2,7 @@
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, CheckCircle, Upload, Download, ChevronDown, MoreHorizontal,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useSPES } from '../../contexts/SPESContext'
@@ -328,9 +329,9 @@ function ApplicantForm({ initial, mode, onSave, onClose }: {
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
           </div>
-          <h2 className="text-gray-900 text-lg font-semibold">
+          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — SPES'}
-          </h2>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={derivedStatus} />
@@ -535,6 +536,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const { applicants, setApplicants, spesBatches } = useSPES()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -543,14 +546,15 @@ export default function SPESView({ onBack }: SPESViewProps) {
     { id: 'status', label: 'Status', options: STATUS_OPTIONS as string[] },
     { id: 'schoolType', label: 'School Type', options: SCHOOL_TYPE_OPTIONS },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
+    { id: 'age', label: 'Age', options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus', label: 'Civil Status', options: CIVIL_STATUS_OPTIONS },
   ]
 
   const handleAddFilter = (filterId: string) => {
     if (!activeFilters.includes(filterId)) {
-      const filter = availableFilters.find(f => f.id === filterId)
       setActiveFilters(prev => [...prev, filterId])
-      setFilterValues(prev => ({ ...prev, [filterId]: filter?.options[0] ?? '' }))
+      setFilterValues(prev => ({ ...prev, [filterId]: '' }))
+      setCurrentPage(1)
     }
     setIsFilterDropdownOpen(false)
   }
@@ -558,10 +562,12 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const handleRemoveFilter = (filterId: string) => {
     setActiveFilters(prev => prev.filter(id => id !== filterId))
     setFilterValues(prev => { const n = { ...prev }; delete n[filterId]; return n })
+    setCurrentPage(1)
   }
 
   const handleFilterValueChange = (filterId: string, value: string) => {
     setFilterValues(prev => ({ ...prev, [filterId]: value }))
+    setCurrentPage(1)
   }
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -597,10 +603,24 @@ export default function SPESView({ onBack }: SPESViewProps) {
       if (filterId === 'schoolType') return a.schoolType === val
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
+      if (filterId === 'age') {
+        const age = a.age ?? 0
+        if (val === 'Below 20') return age < 20
+        if (val === '20–25') return age >= 20 && age <= 25
+        if (val === '26–30') return age >= 26 && age <= 30
+        if (val === '31–40') return age >= 31 && age <= 40
+        if (val === 'Above 40') return age > 40
+      }
       return true
     })
     return matchesSearch && matchesFilters
   })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filtered.length)
 
   const handleAddSave = (data: Omit<SPESApplicant, 'id'>) => {
     setApplicants(prev => [...prev, { ...data, id: Date.now() }])
@@ -1051,7 +1071,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                     placeholder="Search by name, barangay, school, or assigned batch..."
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
                   />
                 </div>
                 <div className="relative">
@@ -1096,6 +1116,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                           className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
                           onClick={e => e.stopPropagation()}
                         >
+                          <option value="">All</option>
                           {filter?.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                         <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900 transition-colors">
@@ -1120,6 +1141,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   <thead>
                     <tr className="bg-brand-blue">
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">Name</th>
+                      {activeFilters.includes('sex')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Sex</th>}
+                      {activeFilters.includes('age')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Age</th>}
+                      {activeFilters.includes('civilStatus') && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Civil Status</th>}
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">School</th>
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">Grade / Year Level</th>
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Batch</th>
@@ -1128,12 +1152,14 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(applicant => (
+                    {paginated.map(applicant => (
                       <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
                           <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
-                          <p className="text-gray-400 text-xs">{applicant.sex} · {applicant.age} yrs</p>
                         </td>
+                        {activeFilters.includes('sex')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.sex || '—'}</td>}
+                        {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age ? `${applicant.age} yrs` : '—'}</td>}
+                        {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.civilStatus || '—'}</td>}
                         <td className="px-4 py-3 text-gray-600">
                           <p className="whitespace-nowrap">{applicant.schoolName || '—'}</p>
                           {applicant.schoolType && <p className="text-gray-400 text-xs">{applicant.schoolType}</p>}
@@ -1172,6 +1198,32 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     ))}
                   </tbody>
                 </table>
+                {filtered.length > 0 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      Show
+                      <select
+                        value={perPage}
+                        onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                      </select>
+                      per page
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+                      <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

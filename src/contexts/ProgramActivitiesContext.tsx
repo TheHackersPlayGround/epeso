@@ -239,7 +239,7 @@ const ProgramActivitiesContext = createContext<ActivitiesContextValue | null>(nu
 
 function loadActivities(): ProgramActivity[] {
   try {
-    const raw = localStorage.getItem('lp_program_activities_v1')
+    const raw = localStorage.getItem('lp_program_activities_v2')
     if (!raw) return SEED
     const saved = JSON.parse(raw) as ProgramActivity[]
     if (saved.length === 0) return SEED
@@ -257,7 +257,7 @@ export function ProgramActivitiesProvider({ children }: { children: ReactNode })
   const [activities, setActivities] = useState<ProgramActivity[]>(loadActivities)
 
   useEffect(() => {
-    localStorage.setItem('lp_program_activities_v1', JSON.stringify(activities))
+    localStorage.setItem('lp_program_activities_v2', JSON.stringify(activities))
   }, [activities])
 
   const addActivity = (activity: ProgramActivity) =>

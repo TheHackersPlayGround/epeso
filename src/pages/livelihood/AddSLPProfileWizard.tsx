@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { X, Users, Plus, Paperclip } from 'lucide-react'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
 
-const STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Active', 'Completed', 'Dropped',
-]
+const STATUS_BADGE: Record<string, string> = {
+  Active:   'bg-green-100 text-green-700',
+  Inactive: 'bg-gray-100 text-gray-500',
+  Dropped:  'bg-red-100 text-red-600',
+}
 
 const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Special'] as const
 
@@ -114,11 +116,12 @@ type SLPWizardProps = {
   mode: 'add' | 'edit' | 'view'
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
   onClose: () => void
+  onEdit?: () => void
 }
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function AddSLPProfileWizard({ initial, mode, onSave, onClose }: SLPWizardProps) {
+export default function AddSLPProfileWizard({ initial, mode, onSave, onClose, onEdit }: SLPWizardProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
     ...EMPTY_SLP_RECORD,
@@ -722,29 +725,40 @@ export default function AddSLPProfileWizard({ initial, mode, onSave, onClose }: 
           </div>
         </div>
 
-        <div>
-          <label htmlFor="slp-dateApplied" className={labelClass}>Date Applied</label>
-          <input
-            id="slp-dateApplied"
-            type="date"
-            className={inputClass}
-            value={formData.dateApplied ?? ''}
-            onChange={e => updateField({ dateApplied: e.target.value })}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="slp-dateApplied" className={labelClass}>Date Applied</label>
+            <input
+              id="slp-dateApplied"
+              type="date"
+              className={inputClass}
+              value={formData.dateApplied ?? ''}
+              onChange={e => updateField({ dateApplied: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="slp-receivedBy" className={labelClass}>Received By</label>
+            <input
+              id="slp-receivedBy"
+              type="text"
+              className={inputClass}
+              placeholder="Name of receiving officer"
+              value={formData.receivedBy ?? ''}
+              onChange={e => updateField({ receivedBy: e.target.value })}
+            />
+          </div>
         </div>
 
         <div>
-          <label htmlFor="slp-status" className={labelClass}>Status</label>
-          <select
-            id="slp-status"
-            className={selectClass}
-            value={formData.status}
-            onChange={e => updateField({ status: e.target.value as LivelihoodStatus })}
-          >
-            {STATUS_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
+          <label className={labelClass}>Status</label>
+          <div className="flex items-center gap-3">
+            <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_BADGE[formData.status] ?? 'bg-gray-100 text-gray-500'}`}>
+              {formData.status}
+            </span>
+          </div>
+          {!isViewMode && (
+            <p className="text-xs text-gray-400 mt-1.5">Active / Inactive are set automatically based on project assignment.</p>
+          )}
         </div>
       </div>
     )
@@ -845,6 +859,15 @@ export default function AddSLPProfileWizard({ initial, mode, onSave, onClose }: 
                 >
                   Close
                 </button>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
                 {!isLastStep && (
                   <button
                     type="button"

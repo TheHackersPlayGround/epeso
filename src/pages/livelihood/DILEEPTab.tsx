@@ -18,7 +18,7 @@ const LS_KEY = 'lp_dileep_v4'
 type DILEEPProgram = 'DILEEP (DILP)' | 'DILEEP (TUPAD)'
 
 const PROGRAM_STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Active', 'Completed', 'Dropped', 'Pending', 'Inactive',
+  'Accepted', 'Waitlisted', 'Rejected', 'Active', 'Inactive', 'Dropped',
 ]
 
 const SEX_OPTIONS = ['Male', 'Female']
@@ -26,14 +26,17 @@ const SEX_OPTIONS = ['Male', 'Female']
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
 
 const STATUS_COLORS: Record<LivelihoodStatus, string> = {
-  Active:    'bg-green-100 text-green-700',
-  Completed: 'bg-blue-100 text-blue-700',
-  Dropped:   'bg-red-100 text-red-600',
-  Pending:   'bg-yellow-100 text-yellow-700',
-  Closed:    'bg-gray-100 text-gray-500',
-  Approved:  'bg-emerald-100 text-emerald-700',
-  Released:  'bg-purple-100 text-purple-700',
-  Inactive:  'bg-gray-200 text-gray-400',
+  Active:     'bg-green-100 text-green-700',
+  Completed:  'bg-blue-100 text-blue-700',
+  Dropped:    'bg-red-100 text-red-600',
+  Pending:    'bg-yellow-100 text-yellow-700',
+  Closed:     'bg-gray-100 text-gray-500',
+  Approved:   'bg-emerald-100 text-emerald-700',
+  Released:   'bg-purple-100 text-purple-700',
+  Inactive:   'bg-gray-200 text-gray-400',
+  Accepted:   'bg-emerald-100 text-emerald-700',
+  Waitlisted: 'bg-yellow-100 text-yellow-700',
+  Rejected:   'bg-red-100 text-red-600',
 }
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
@@ -366,6 +369,7 @@ type BeneficiaryListProps = {
 }
 
 function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: BeneficiaryListProps) {
+  const { activities } = useProgramActivities()
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -765,9 +769,25 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
                     {b.projectName ? (
                       <div>
                         <p className="text-gray-800 font-medium whitespace-nowrap">{b.projectName}</p>
-                        {b.dilpBeneficiaryType && (
-                          <p className="text-xs text-brand-blue mt-0.5">{b.dilpBeneficiaryType}</p>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          {(() => {
+                            const proj = b.assignedDilpProjectId ? activities.find(a => a.id === b.assignedDilpProjectId) : null
+                            if (!proj) return null
+                            const colors: Record<string, string> = {
+                              Planned:   'bg-yellow-100 text-yellow-700 border border-yellow-200',
+                              Ongoing:   'text-green-600 border border-green-500 bg-white',
+                              Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
+                            }
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[proj.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                                {proj.status}
+                              </span>
+                            )
+                          })()}
+                          {b.dilpBeneficiaryType && (
+                            <span className="text-xs text-brand-blue">{b.dilpBeneficiaryType}</span>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-gray-400 italic">Not assigned</span>
@@ -925,23 +945,29 @@ export default function DILEEPTab() {
       {!isWizardOpen && (
         <div className="bg-white rounded-xl shadow-sm p-8">
           <div className="flex flex-col gap-2 mb-6">
-            <p className="text-gray-800 font-bold text-base">DILEEP Programs</p>
-            <p className="text-gray-500 text-sm">DOLE Integrated Livelihood and Emergency Employment Program</p>
+            <p className="text-gray-800 font-bold text-xl">DILEEP Programs</p>
+            <p className="text-gray-500 text-base">DOLE Integrated Livelihood and Emergency Employment Program</p>
           </div>
           <div className="flex gap-3">
-            {(['DILEEP (DILP)', 'DILEEP (TUPAD)'] as DILEEPProgram[]).map(program => (
-              <button
-                key={program}
-                onClick={() => setActiveProgram(program)}
-                className={`flex-1 py-5 text-base font-bold rounded-xl border transition-colors ${
-                  activeProgram === program
-                    ? 'bg-brand-blue border-brand-blue text-white'
-                    : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
-                }`}
-              >
-                {program === 'DILEEP (DILP)' ? 'DILP' : 'TUPAD'}
-              </button>
-            ))}
+            {(['DILEEP (DILP)', 'DILEEP (TUPAD)'] as DILEEPProgram[]).map(program => {
+              const isDILP = program === 'DILEEP (DILP)'
+              return (
+                <button
+                  key={program}
+                  onClick={() => setActiveProgram(program)}
+                  className={`flex-1 py-5 rounded-xl border transition-colors ${
+                    activeProgram === program
+                      ? 'bg-brand-blue border-brand-blue text-white'
+                      : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
+                  }`}
+                >
+                  <p className="text-xl font-bold">{isDILP ? 'DILP' : 'TUPAD'}</p>
+                  <p className={`text-sm mt-1 font-normal ${activeProgram === program ? 'text-white/80' : 'text-brand-blue/70'}`}>
+                    {isDILP ? 'DOLE Integrated Livelihood Program' : 'Tulong Panghanapbuhay sa Ating Disadvantaged/Displaced Workers'}
+                  </p>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}

@@ -14,7 +14,7 @@ const BENEFICIARY_CLASSIFICATION_OPTIONS = [
 ] as const
 
 const STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Pending', 'Approved', 'Released', 'Completed', 'Inactive',
+  'Accepted', 'Waitlisted', 'Rejected',
 ]
 
 const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
@@ -48,7 +48,7 @@ const labelClass = 'block text-gray-700 mb-2 text-xs font-semibold uppercase'
 export const EMPTY_DILP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   name: '',
   service: 'DILEEP (DILP)',
-  status: 'Pending',
+  status: 'Waitlisted',
   firstName: '',
   lastName: '',
   middleName: '',
@@ -210,7 +210,7 @@ export default function AddDILPProfileWizard({ initial, mode, onSave, onClose, o
   function handleSaveAsDraft() {
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = (formData.lastName ? `${formData.lastName}, ${givenNames}` : givenNames) || 'Draft'
-    onSave({ ...formData, name: fullName, status: 'Pending' })
+    onSave({ ...formData, name: fullName, status: 'Waitlisted' })
   }
 
   // ── Section header — inset block matching AddApplicantSidebar style ──

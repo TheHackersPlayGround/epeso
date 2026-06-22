@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
   Upload, Download, AlertCircle, MoreHorizontal, Users,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
@@ -164,8 +165,6 @@ function ViewProfilePanel({ profile, onClose }: { profile: SkillsTrainingProfile
             <Field label="Received By" value={profile.receivedBy} />
             <Field label="Batch No." value={profile.trainingBatchNo} />
             <Field label="Status" value={profile.status} />
-            <Field label="Assessment Result" value={profile.assessmentResult} />
-            <Field label="Remarks" value={profile.remarks} />
           </div>
         </div>
       </div>
@@ -244,7 +243,7 @@ function AddProfileForm({
             <Users size={18} style={{ color: BRAND }} />
           </div>
           <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
-            {mode === 'edit' ? 'Edit Profile' : 'Add New Profile — Skills Training'}
+            {mode === 'edit' ? 'Edit Profile — Skills Training' : 'Add New Profile — Skills Training'}
           </p>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -403,14 +402,6 @@ function AddProfileForm({
                 <option value="Accepted">Accepted</option>
               </select>
             </div>
-            <div>
-              <label className={lbl}>Assessment Result</label>
-              <input className={inpFocus} value={formData.assessmentResult} onChange={e => set({ assessmentResult: e.target.value })} placeholder="e.g. Passed, Failed, Not yet assessed" />
-            </div>
-            <div>
-              <label className={lbl}>Remarks</label>
-              <input className={inpFocus} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
-            </div>
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
@@ -441,6 +432,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [assignSearch, setAssignSearch] = useState('')
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -458,25 +451,28 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   const availableFilters = [
-    { id: 'classification', label: 'Classification', options: CLASSIFICATION_OPTIONS },
+    { id: 'classification', label: 'Classification', options: [...CLASSIFICATION_OPTIONS, 'Others'] },
     { id: 'desiredQualification', label: 'Desired Qualification', options: [...QUALIFICATION_OPTIONS, 'Others'] },
     { id: 'purposeOfTraining', label: 'Purpose of Training', options: [...PURPOSE_OPTIONS, 'Others'] },
     { id: 'status', label: 'Status', options: ['Accepted', 'Waitlisted'] },
     { id: 'batchNo', label: 'Training Batch No.', options: BATCH_OPTIONS },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
+    { id: 'age', label: 'Age', options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
+    { id: 'civilStatus', label: 'Civil Status', options: CIVIL_STATUS_OPTIONS },
   ]
 
   const handleAddFilter = (filterId: string) => {
     if (!activeFilters.includes(filterId)) {
-      const filter = availableFilters.find(f => f.id === filterId)
       setActiveFilters(prev => [...prev, filterId])
-      setFilterValues(prev => ({ ...prev, [filterId]: filter?.options[0] ?? '' }))
+      setFilterValues(prev => ({ ...prev, [filterId]: '' }))
+      setCurrentPage(1)
     }
     setIsFilterDropdownOpen(false)
   }
   const handleRemoveFilter = (filterId: string) => {
     setActiveFilters(prev => prev.filter(id => id !== filterId))
     setFilterValues(prev => { const n = { ...prev }; delete n[filterId]; return n })
+    setCurrentPage(1)
   }
 
   const filteredProfiles = profiles.filter(p => {
@@ -491,17 +487,33 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       const val = filterValues[filterId]
       if (!val) return true
       switch (filterId) {
-        case 'classification': return p.classification.includes(val)
+        case 'classification': return p.classification.includes(val) || (val === 'Others' && p.classificationOther.filter(Boolean).length > 0)
         case 'desiredQualification': return p.desiredQualification.includes(val) || (val === 'Others' && p.qualificationOther.length > 0)
         case 'purposeOfTraining': return p.purposeOfTraining.includes(val) || (val === 'Others' && p.purposeOther.length > 0)
         case 'status': return p.status === val
         case 'batchNo': return p.trainingBatchNo === val
         case 'sex': return p.sex === val
+        case 'civilStatus': return p.civilStatus === val
+        case 'age': {
+          const age = p.age ?? 0
+          if (val === 'Below 20') return age < 20
+          if (val === '20–25') return age >= 20 && age <= 25
+          if (val === '26–30') return age >= 26 && age <= 30
+          if (val === '31–40') return age >= 31 && age <= 40
+          if (val === 'Above 40') return age > 40
+          return true
+        }
         default: return true
       }
     })
     return matchesSearch && matchesFilters
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredProfiles.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filteredProfiles.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filteredProfiles.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filteredProfiles.length)
 
   const getTrainingName = (id: number | null): string => {
     if (!id) return '—'
@@ -817,7 +829,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   type="text"
                   placeholder="Search by name, classification, batch, or qualification..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
                   className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
                 />
               </div>
@@ -847,8 +859,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   return (
                     <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                       <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                      <select value={filterValues[filterId] || ''} onChange={e => setFilterValues(prev => ({ ...prev, [filterId]: e.target.value }))} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
-                        {filter?.options.map(opt => <option key={opt}>{opt}</option>)}
+                      <select value={filterValues[filterId] || ''} onChange={e => { setFilterValues(prev => ({ ...prev, [filterId]: e.target.value })); setCurrentPage(1) }} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
+                        <option value="">All</option>
+                        {filter?.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
                       <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900"><X size={14} /></button>
                     </div>
@@ -872,6 +885,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 <thead>
                   <tr className="bg-brand-blue">
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Applicant Name</th>
+                    {activeFilters.includes('sex')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Sex</th>}
+                    {activeFilters.includes('age')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Age</th>}
+                    {activeFilters.includes('civilStatus') && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Civil Status</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Desired Qualification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Purpose of Training</th>
@@ -882,12 +898,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProfiles.map(profile => (
+                  {paginated.map(profile => (
                     <tr key={profile.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <p className="text-gray-800 font-medium">{profile.lastName}, {profile.firstName}{profile.middleName ? ` ${profile.middleName.charAt(0)}.` : ''}</p>
-                        <p className="text-gray-400 text-xs">{profile.sex}{profile.age ? ` · ${profile.age} yrs` : ''}</p>
                       </td>
+                      {activeFilters.includes('sex')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.sex || '—'}</td>}
+                      {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.age ? `${profile.age} yrs` : '—'}</td>}
+                      {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.civilStatus || '—'}</td>}
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {profile.classification.slice(0, 1).map(c => <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>)}
@@ -942,6 +960,32 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   ))}
                 </tbody>
               </table>
+              {filteredProfiles.length > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    Show
+                    <select
+                      value={perPage}
+                      onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+                      className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                    per page
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-gray-600">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span>{recordStart} to {recordEnd} of {filteredProfiles.length} records</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

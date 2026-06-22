@@ -9,6 +9,7 @@ import { useSPES } from '../../contexts/SPESContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import { useOFW } from '../../contexts/OFWContext'
+import { SEED as EF_APPLICANT_SEED, VACANCY_SEED, REFERRAL_SEED, PLACEMENT_SEED } from '../../contexts/EmploymentContext'
 
 interface ReportViewProps {
   onBack: () => void
@@ -46,9 +47,19 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
 
-  const readLS = (key: string): any[] => {
-    try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
+  const readLS = (key: string, fallback: any[] = []): any[] => {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return fallback
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback
+    } catch { return fallback }
   }
+
+  const efApplicants = () => readLS('ef_applicants', EF_APPLICANT_SEED)
+  const efVacancies  = () => readLS('ef_vacancies',  VACANCY_SEED)
+  const efReferrals  = () => readLS('ef_referrals',  REFERRAL_SEED)
+  const efPlacements = () => readLS('ef_placements', PLACEMENT_SEED)
 
   const reportCategories = [
     { id: 'general-peso', name: 'General PESO Report' },
@@ -93,8 +104,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const generateData = (category: ReportCategory): any[] => {
     switch (category) {
       case 'employment-facilitation': {
-        const referrals = readLS('ef_referrals')
-        const placements = readLS('ef_placements')
+        const referrals = efReferrals()
+        const placements = efPlacements()
         const placedIds = new Set(placements.map((p: any) => p.applicantId))
         const placedRows = placements.map((p: any) => ({
           'Applicant Name': p.applicantName,
@@ -167,7 +178,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
 
       case 'livelihood': {
-        const all = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v4'), ...readLS('lp_clpep_v4')]
+        const all = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v5'), ...readLS('lp_clpep_v6')]
         return all.map((b: any) => ({
           'Beneficiary Name': b.name || `${b.firstName || ''} ${b.lastName || ''}`.trim() || '-',
           'Program Type': b.service || '-',
@@ -187,10 +198,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
         }))
 
       case 'general-peso': {
-        const lhAll = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v4'), ...readLS('lp_clpep_v4')]
+        const lhAll = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v5'), ...readLS('lp_clpep_v6')]
         const CDSP_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
         return [
-          { 'Program / Service': 'Employment Facilitation', 'Activities Conducted': readLS('ef_vacancies').length, 'Participants': readLS('ef_applicants').length, 'Beneficiaries': readLS('ef_applicants').length, 'Placements': readLS('ef_placements').length, 'Status': 'Active' },
+          { 'Program / Service': 'Employment Facilitation', 'Activities Conducted': efVacancies().length, 'Participants': efApplicants().length, 'Beneficiaries': efApplicants().length, 'Placements': efPlacements().length, 'Status': 'Active' },
           { 'Program / Service': 'CDSP', 'Activities Conducted': activities.filter(a => a.program === 'CDSP' || CDSP_SERVICES.includes(a.service)).length, 'Participants': cdspApplicants.length, 'Beneficiaries': cdspApplicants.length, 'Placements': 0, 'Status': 'Active' },
           { 'Program / Service': 'GIP', 'Activities Conducted': gipBatches.length, 'Participants': gipApplicants.length, 'Beneficiaries': gipApplicants.length, 'Placements': gipApplicants.length, 'Status': 'Active' },
           { 'Program / Service': 'SPES', 'Activities Conducted': spesBatches.length, 'Participants': spesApplicants.length, 'Beneficiaries': spesApplicants.length, 'Placements': spesApplicants.length, 'Status': 'Active' },
@@ -206,8 +217,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   const generateAnalytics = () => {
-    const efCount = readLS('ef_applicants').length
-    const lhAll = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v4'), ...readLS('lp_clpep_v4')]
+    const efCount = efApplicants().length
+    const lhAll = [...readLS('lp_dileep_v4'), ...readLS('lp_slp_v5'), ...readLS('lp_clpep_v6')]
     const counts = {
       'Employment Facilitation': efCount,
       'Skills Training': skillsProfiles.length,
@@ -232,10 +243,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   const generateEmploymentFacilitationAnalytics = () => {
-    const applicants = readLS('ef_applicants')
-    const vacancies = readLS('ef_vacancies')
-    const referrals = readLS('ef_referrals')
-    const placements = readLS('ef_placements')
+    const applicants = efApplicants()
+    const vacancies = efVacancies()
+    const referrals = efReferrals()
+    const placements = efPlacements()
     const totalReferrals = referrals.length + placements.length
     const placementRate = totalReferrals > 0 ? parseFloat(((placements.length / totalReferrals) * 100).toFixed(1)) : 0
 

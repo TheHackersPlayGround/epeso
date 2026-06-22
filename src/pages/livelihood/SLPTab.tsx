@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
@@ -8,18 +8,13 @@ import AddSLPProfileWizard, { EMPTY_SLP_RECORD } from './AddSLPProfileWizard'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_slp_v4'
-const LS_PROJECTS_KEY = 'lp_slp_projects_v2'
+const LS_KEY = 'lp_slp_v6'
+const ACTIVITIES_LS_KEY = 'lp_program_activities_v2'
 
 const STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Active', 'Completed', 'Dropped',
+  'Active', 'Inactive',
 ]
 
-const SLP_TRACK_OPTIONS = [
-  'Micro-enterprise Development',
-  'Employment Facilitation',
-  'Community-Based',
-]
 
 const STATUS_COLORS: Record<LivelihoodStatus, string> = {
   Active:    'bg-green-100 text-green-700',
@@ -45,14 +40,32 @@ const PROJECT_STATUS_COLORS: Record<string, string> = {
 
 function loadSLPProjects(): SLPProject[] {
   try {
-    const raw = localStorage.getItem(LS_PROJECTS_KEY)
-    const parsed = raw ? (JSON.parse(raw) as SLPProject[]) : []
-    if (parsed.length > 0) return parsed
-    try { localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(SLP_PROJECTS_SEED)) } catch { /* quota */ }
-    return SLP_PROJECTS_SEED
-  } catch {
-    return SLP_PROJECTS_SEED
-  }
+    const raw = localStorage.getItem(ACTIVITIES_LS_KEY)
+    if (raw) {
+      const activities = JSON.parse(raw) as Array<{
+        id: number; service: string; title: string; date: string
+        location?: string; description?: string; status: string
+        facilitator?: string; participants?: number
+        assistanceAmount?: string; dateReleased?: string
+      }>
+      const slp = activities.filter(a => a.service === 'SLP')
+      if (slp.length > 0) {
+        return slp.map(a => ({
+          id: a.id,
+          title: a.title,
+          date: a.date,
+          location: a.location ?? '',
+          description: a.description ?? '',
+          status: a.status as SLPProject['status'],
+          facilitator: a.facilitator,
+          participants: a.participants,
+          assistanceAmount: a.assistanceAmount,
+          dateReleased: a.dateReleased,
+        }))
+      }
+    }
+  } catch { /* ignore */ }
+  return SLP_PROJECTS_SEED
 }
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
@@ -467,6 +480,7 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
 
 type BeneficiaryTableProps = {
   beneficiaries: LivelihoodBeneficiary[]
+  projects: SLPProject[]
   totalCount: number
   isFiltered: boolean
   onView: (b: LivelihoodBeneficiary) => void
@@ -476,13 +490,21 @@ type BeneficiaryTableProps = {
   onViewAssignedProject: (b: LivelihoodBeneficiary) => void
 }
 
-function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+
+  const totalPages = Math.max(1, Math.ceil(beneficiaries.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = beneficiaries.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = beneficiaries.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, beneficiaries.length)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuHeight = 140
+    const menuHeight = 160
     const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
     setMenuPos({
       top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
@@ -515,7 +537,7 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-brand-blue">
-            <td colSpan={8} className="px-4 py-3">
+            <td colSpan={9} className="px-4 py-3">
               <p className="text-white font-bold text-sm">Beneficiaries</p>
               <p className="text-blue-200 text-xs">{totalCount} record(s)</p>
             </td>
@@ -527,6 +549,7 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Barangay</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assigned Project</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Applied</th>
+            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assessment Result</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>
           </tr>
@@ -534,7 +557,7 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
         <tbody>
           {beneficiaries.length === 0 ? (
             <tr>
-              <td colSpan={8} className="py-16 text-center">
+              <td colSpan={9} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -554,14 +577,35 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
               </td>
             </tr>
           ) : (
-            beneficiaries.map((b, idx) => (
+            paginated.map((b, idx) => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{idx + 1}</td>
+                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{recordStart + idx}</td>
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap italic">{b.projectName || 'Not assigned'}</td>
+                <td className="px-4 py-3">
+                  {b.projectName ? (() => {
+                    const proj = projects.find(p => p.id === b.assignedSlpProjectId)
+                    return (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm text-gray-800 line-clamp-1">{b.projectName}</span>
+                        {proj && (
+                          <span className={`self-start px-1.5 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[proj.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                            {proj.status}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })() : <span className="text-gray-400 text-xs italic">Not assigned</span>}
+                </td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? '-'}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {b.assessmentResult ? (
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${b.assessmentResult === 'Qualified' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                      {b.assessmentResult}
+                    </span>
+                  ) : <span className="text-gray-400 text-xs">—</span>}
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <StatusBadge status={b.status} />
                 </td>
@@ -579,6 +623,32 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
           )}
         </tbody>
       </table>
+      {beneficiaries.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            Show
+            <select
+              value={perPage}
+              onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+              className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            per page
+          </div>
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <ChevronLeft size={16} />
+            </button>
+            <span>{recordStart} to {recordEnd} of {beneficiaries.length} records</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {openMenuId !== null && menuPos && menuBeneficiary && (
         <>
@@ -601,119 +671,34 @@ function BeneficiaryTable({ beneficiaries, totalCount, isFiltered, onView, onEdi
   )
 }
 
-// ─── View Modal ──────────────────────────────────────────────────────────────
-
-type SLPViewModalProps = {
-  beneficiary: LivelihoodBeneficiary
-  onEdit: () => void
-  onClose: () => void
-}
-
-function SLPViewModal({ beneficiary: b, onEdit, onClose }: SLPViewModalProps) {
-  const attachedForms = b.attachedForms ?? []
-
-  function Field({ label, value }: { label: string; value?: string | number | null }) {
-    return (
-      <div>
-        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-        <p className="text-sm text-gray-900 font-medium">{value || '-'}</p>
-      </div>
-    )
-  }
-
-  function SectionTitle({ title }: { title: string }) {
-    return (
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-5 mt-8 border-t border-gray-100 pt-6">
-        {title}
-      </p>
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="flex items-start justify-between px-8 pt-7 pb-5 border-b border-gray-100">
-          <div>
-            <h2 className="text-2xl font-bold" style={{ color: '#000' }}>{b.name}</h2>
-            <p className="text-sm text-brand-blue font-medium mt-1">SLP</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="px-5 py-2 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-[#01a0ff] transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-8 pb-8">
-          <SectionTitle title="Personal Information" />
-          <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-            <Field label="Last Name" value={b.lastName} />
-            <Field label="First Name" value={b.firstName} />
-            <Field label="Middle Name" value={b.middleName} />
-            <Field label="Sex" value={b.sex} />
-            <Field label="Birthdate" value={b.birthdate} />
-            <Field label="Age" value={b.age} />
-            <Field label="Civil Status" value={b.civilStatus} />
-            <Field label="Contact Number" value={b.contactNumber} />
-          </div>
-
-          <SectionTitle title="Address" />
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            <Field label="Street / Purok" value={b.streetPurok} />
-            <Field label="Barangay" value={b.barangay} />
-            <Field label="City / Municipality" value={b.cityMunicipality} />
-            <Field label="Province" value={b.province} />
-          </div>
-
-          <SectionTitle title="Application Details" />
-          <div className="grid grid-cols-3 gap-x-8 gap-y-6">
-            <Field label="Date Applied" value={b.dateApplied} />
-            <Field label="Status" value={b.status} />
-            <Field label="Remarks" value={b.remarks} />
-          </div>
-
-          <SectionTitle title="Attached Forms" />
-          {attachedForms.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No forms attached</p>
-          ) : (
-            <ul className="space-y-2">
-              {attachedForms.map((form, i) => (
-                <li key={i} className="text-sm text-gray-700">{form}</li>
-              ))}
-            </ul>
-          )}
-
-          <SectionTitle title="PESO Office" />
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            <Field label="Date Application Received" value={b.dateApplicationReceived} />
-            <Field label="Received By" value={b.receivedBy} />
-          </div>
-        </div>
-
-      </div>
-    </div>
-  )
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SLPTab() {
   const [beneficiaries, setBeneficiaries] = useState<LivelihoodBeneficiary[]>(loadBeneficiaries)
-  const [slpProjects] = useState<SLPProject[]>(loadSLPProjects)
+  const [slpProjects, setSlpProjects] = useState<SLPProject[]>(loadSLPProjects)
+
+  // On mount: sync project statuses and auto-set beneficiaries Inactive when project is Completed.
+  useEffect(() => {
+    const freshProjects = loadSLPProjects()
+    setSlpProjects(freshProjects)
+
+    setBeneficiaries(prev => {
+      let changed = false
+      const updated = prev.map(b => {
+        if (!b.assignedSlpProjectId) return b
+        const proj = freshProjects.find(p => p.id === b.assignedSlpProjectId)
+        if (proj?.status === 'Completed' && b.status === 'Active') {
+          changed = true
+          return { ...b, status: 'Inactive' as LivelihoodStatus }
+        }
+        return b
+      })
+      if (changed) {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(updated)) } catch { /* quota */ }
+      }
+      return changed ? updated : prev
+    })
+  }, [])
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
@@ -752,14 +737,14 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   function handleAssignProject(beneficiary: LivelihoodBeneficiary, projectName: string, projectId: number) {
     persist(beneficiaries.map(b =>
-      b.id === beneficiary.id ? { ...b, projectName, assignedSlpProjectId: projectId } : b
+      b.id === beneficiary.id ? { ...b, projectName, assignedSlpProjectId: projectId, status: 'Active' } : b
     ))
   }
 
   function handleUnassignSLPProject() {
     if (!assigningBeneficiary) return
     persist(beneficiaries.map(b =>
-      b.id === assigningBeneficiary.id ? { ...b, projectName: '', assignedSlpProjectId: null } : b
+      b.id === assigningBeneficiary.id ? { ...b, projectName: '', assignedSlpProjectId: null, status: 'Inactive' } : b
     ))
     setAssigningBeneficiary(null)
   }
@@ -844,6 +829,19 @@ const availableFilters: FilterOption[] = useMemo(() => [
     )
   }
 
+  if (viewingBeneficiary) {
+    return (
+      <AddSLPProfileWizard
+        key={viewingBeneficiary.id}
+        mode="view"
+        initial={viewingBeneficiary}
+        onSave={() => {}}
+        onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
+        onClose={() => setViewingBeneficiary(null)}
+      />
+    )
+  }
+
   if (editingBeneficiary) {
     return (
       <AddSLPProfileWizard
@@ -858,14 +856,6 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   return (
     <div className="space-y-4">
-      {viewingBeneficiary && (
-        <SLPViewModal
-          beneficiary={viewingBeneficiary}
-          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
-          onClose={() => setViewingBeneficiary(null)}
-        />
-      )}
-
       {assigningBeneficiary && (
         <AssignProjectModal
           beneficiary={assigningBeneficiary}
@@ -886,7 +876,12 @@ const availableFilters: FilterOption[] = useMemo(() => [
       )}
 
       {/* Top action card */}
-      <div className="bg-white rounded-xl shadow-sm px-6 py-4 flex items-center gap-3">
+      <div className="bg-white rounded-xl shadow-sm px-6 py-4">
+        <div className="mb-3">
+          <p className="text-gray-800 font-bold text-xl">SLP</p>
+          <p className="text-gray-500 text-sm mt-0.5">Sustainable Livelihood Program</p>
+        </div>
+        <div className="flex items-center gap-3">
         <button
           onClick={() => setIsAddOpen(true)}
           className="flex items-center gap-2 px-5 py-2 bg-brand-blue text-white rounded-full text-sm font-medium hover:bg-[#01a0ff] transition-colors whitespace-nowrap"
@@ -928,6 +923,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
             </>
           )}
         </div>
+        </div>
       </div>
 
       {/* Main table card */}
@@ -954,6 +950,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
         <BeneficiaryTable
           beneficiaries={filtered}
+          projects={slpProjects}
           totalCount={filtered.length}
           isFiltered={isFiltered}
           onView={setViewingBeneficiary}

@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, AlertCircle,
+  Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
@@ -17,7 +17,7 @@ const DEFAULT_SERVICES = [
   'Labor Employment for Graduating Students',
 ]
 
-type ActivityStatus = 'Planned' | 'Ongoing' | 'Completed'
+type ActivityStatus = 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
 type Action =
   | ''
   | 'add_activity'
@@ -40,6 +40,7 @@ const STATUS_COLORS: Record<ActivityStatus, string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
+  Cancelled: 'bg-gray-100 text-gray-500',
 }
 
 function StatusBadge({ status }: { status: ActivityStatus }) {
@@ -130,6 +131,8 @@ export default function CDSPMaintenanceForm() {
   const [filterService, setFilterService] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -159,6 +162,11 @@ export default function CDSPMaintenanceForm() {
       a.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesService && matchesStatus && matchesSearch
   })
+  const totalPages = Math.max(1, Math.ceil(filteredActivities.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedActivities = filteredActivities.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filteredActivities.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filteredActivities.length)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -517,7 +525,7 @@ export default function CDSPMaintenanceForm() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <select
             value={filterService}
-            onChange={e => setFilterService(e.target.value)}
+            onChange={e => { setFilterService(e.target.value); setCurrentPage(1) }}
             className={inputCls + ' bg-white'}
           >
             <option value="All">All Services</option>
@@ -525,7 +533,7 @@ export default function CDSPMaintenanceForm() {
           </select>
           <select
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
             className={inputCls + ' bg-white'}
           >
             <option value="All">All Status</option>
@@ -539,7 +547,7 @@ export default function CDSPMaintenanceForm() {
               type="text"
               placeholder="Search by title or service..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
               className={inputCls + ' pl-9'}
             />
           </div>
@@ -662,7 +670,7 @@ export default function CDSPMaintenanceForm() {
                 </tr>
               </thead>
               <tbody>
-                {filteredActivities.map(a => (
+                {paginatedActivities.map(a => (
                   <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-800 text-sm">{a.title}</p>
@@ -703,6 +711,22 @@ export default function CDSPMaintenanceForm() {
                 ))}
               </tbody>
             </table>
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                Show
+                <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue">
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                per page
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                <span>{recordStart} to {recordEnd} of {filteredActivities.length} records</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+              </div>
+            </div>
           </div>
         )}
       </div>

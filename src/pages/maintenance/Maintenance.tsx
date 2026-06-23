@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import {
   ArrowLeft, Plus, FolderOpen, PlusCircle, MoreHorizontal,
   Edit2, Trash2, CheckCircle, PlayCircle, RefreshCw, ClipboardList,
-  Wrench, Users, Search,
+  Users, Search,
 } from 'lucide-react'
 
 import { useSPES } from '../../contexts/SPESContext'
@@ -62,22 +62,6 @@ const TABS: { key: MaintenanceTab; label: string }[] = [
   { key: 'Livelihood',     label: 'Livelihood' },
   { key: 'Skills Training',label: 'Skills Training' },
 ]
-
-// ─── Coming soon placeholder ──────────────────────────────────────────────────
-
-function ComingSoon({ tab }: { tab: string }) {
-  return (
-    <div className="bg-white rounded-xl shadow-md py-24 text-center">
-      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Wrench size={28} className="text-brand-blue" />
-      </div>
-      <h3 className="text-gray-700 mb-2">{tab} Maintenance</h3>
-      <p className="text-gray-400 text-sm text-center px-8">
-        This tab is under construction. Check back soon.
-      </p>
-    </div>
-  )
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 

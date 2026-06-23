@@ -14,7 +14,7 @@ import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
 import ViewApplicantSidebar from "./ViewApplicantSidebar";
 
-const LS_KEY = "ef_applicants";
+const LS_KEY = "ef_applicants_v2";
 
 function loadApplicants(): Applicant[] {
   try {
@@ -52,10 +52,7 @@ type ReferApplicantPanelProps = {
 function loadVacanciesForRefer(): Array<{ id: number; jobTitle: string; employer: string; vacanciesCount: number; status: string }> {
   try {
     const raw = localStorage.getItem('ef_vacancies')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.length > 0) return parsed
-    }
+    if (raw) return JSON.parse(raw)
   } catch { /* ignore */ }
   return VACANCY_SEED
 }
@@ -304,6 +301,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('');
 
   // ── Derived data ──────────────────────────────────────────────────
   const filteredApplicants = useMemo(() => {
@@ -361,8 +359,15 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       }
     }
 
+    const parts = (n: string) => n.trim().split(/\s+/);
+    result = [...result].sort((a, b) => {
+      const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase();
+      const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase();
+      return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA);
+    });
+
     return result;
-  }, [applicants, searchQuery, activeFilters, filterValues]);
+  }, [applicants, searchQuery, activeFilters, filterValues, sortOrder]);
 
   const isFiltered = searchQuery.trim().length > 0 || activeFilters.some((f) => filterValues[f]);
 
@@ -565,6 +570,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onImportClick={() => setIsImportModalOpen(true)}
               onShowResumeMaker={() => setIsResumeMakerOpen(true)}
               onSearchChange={handleSearchChange}
+              sortOrder={sortOrder}
+              onSortOrderChange={setSortOrder}
               onToggleFilterDropdown={() => setIsFilterDropdownOpen((p) => !p)}
               onCloseFilterDropdown={() => setIsFilterDropdownOpen(false)}
               onAddFilter={handleAddFilter}

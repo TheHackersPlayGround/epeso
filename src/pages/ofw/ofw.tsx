@@ -134,6 +134,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
   const [activeFilters, setActiveFilters] = useState<FilterKey[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
@@ -175,7 +176,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
     if (!activeFilters.includes(key)) {
       setActiveFilters(prev => [...prev, key])
       const def = FILTER_DEFS.find(f => f.key === key)!
-      setFilterValues(prev => ({ ...prev, [key]: def.options?.[0] ?? '' }))
+      setFilterValues(prev => ({ ...prev, [key]: '' }))
       setCurrentPage(1)
     }
     setShowFilterDropdown(false)
@@ -239,11 +240,18 @@ export default function OFWView({ onBack }: OFWViewProps) {
     return matchSearch && matchFilters
   })
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const sorted = [...filtered].sort((a, b) => {
+    const parts = (n: string) => n.trim().split(/\s+/)
+    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
+    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+  })
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
-  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
-  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
-  const recordEnd = Math.min(safePage * perPage, filtered.length)
+  const paginated = sorted.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, sorted.length)
 
   // ── Export ────────────────────────────────────────────────────
   const exportToExcel = () => {
@@ -434,6 +442,17 @@ export default function OFWView({ onBack }: OFWViewProps) {
                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
               />
             </div>
+            <select
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value as typeof sortOrder)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer"
+            >
+              <option value="" disabled>Sort By</option>
+        <option value="firstName_asc">First Name ASC</option>
+              <option value="firstName_desc">First Name DSC</option>
+              <option value="lastName_asc">Last Name ASC</option>
+              <option value="lastName_desc">Last Name DSC</option>
+            </select>
             <div className="relative" ref={filterDropdownRef}>
               <button
                 onClick={() => setShowFilterDropdown(v => !v)}
@@ -490,9 +509,10 @@ export default function OFWView({ onBack }: OFWViewProps) {
                     {def.type === 'select' && (
                       <select
                         className="bg-transparent text-sm text-gray-700 outline-none cursor-pointer pr-1"
-                        value={filterValues[key] ?? def.options![0]}
+                        value={filterValues[key] ?? ''}
                         onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
                       >
+                        <option value="">Select...</option>
                         {def.options!.map(o => <option key={o}>{o}</option>)}
                       </select>
                     )}
@@ -509,7 +529,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
           )}
 
 
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="text-center py-20">
               <Users size={48} className="mx-auto text-gray-300 mb-3" />
               <p className="text-gray-600 text-lg">No profiles found</p>
@@ -573,7 +593,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                   ))}
                 </tbody>
               </table>
-              {filtered.length > 0 && (
+              {sorted.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     Show
@@ -592,7 +612,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                     <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                       <ChevronLeft size={16} />
                     </button>
-                    <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+                    <span>{recordStart} to {recordEnd} of {sorted.length} records</span>
                     <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                       <ChevronRight size={16} />
                     </button>

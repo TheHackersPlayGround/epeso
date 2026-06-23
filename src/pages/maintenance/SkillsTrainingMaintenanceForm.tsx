@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Trash2, PlayCircle, CheckCircle, RefreshCw, Search, Plus,
-  ArrowLeft, Edit2, Users,
+  ArrowLeft, Edit2, Users, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import type { SkillsTrainingBatch } from '../../contexts/SkillsTrainingContext'
@@ -18,6 +18,7 @@ const ACTIVITY_STATUS_COLORS: Record<ProgramActivity['status'], string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
+  Cancelled: 'bg-gray-100 text-gray-500',
 }
 
 const PARTICIPANT_STATUS_COLORS: Record<string, string> = {
@@ -27,7 +28,7 @@ const PARTICIPANT_STATUS_COLORS: Record<string, string> = {
 
 type STAction = '' | 'add_training' | 'add_batch' | 'view_trainings' | 'view_batches'
 type TrainingSubView = '' | 'view_details' | 'edit' | 'view_participants'
-type TrainingStatus = 'Planned' | 'Ongoing' | 'Completed'
+type TrainingStatus = 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
 
 const blank = {
   selectedBatch: '',
@@ -234,6 +235,8 @@ export default function SkillsTrainingMaintenanceForm() {
   const [trainingSearch, setTrainingSearch]             = useState('')
   const [trainingBatchFilter, setTrainingBatchFilter]   = useState('All')
   const [trainingStatusFilter, setTrainingStatusFilter] = useState('All')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
   const [trainingMenuId, setTrainingMenuId]             = useState<number | null>(null)
   const [trainingMenuPos, setTrainingMenuPos]           = useState<{ top: number; left: number } | null>(null)
   const [trainingSubView, setTrainingSubView]           = useState<TrainingSubView>('')
@@ -256,6 +259,11 @@ export default function SkillsTrainingMaintenanceForm() {
     const matchStatus = trainingStatusFilter === 'All' || a.status === trainingStatusFilter
     return matchSearch && matchBatch && matchStatus
   })
+  const totalPages = Math.max(1, Math.ceil(filteredTrainings.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedTrainings = filteredTrainings.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filteredTrainings.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filteredTrainings.length)
 
   const isBatchName = (s: string) => skillsTrainingBatches.some(b => b.batchName === s)
 
@@ -532,12 +540,12 @@ export default function SkillsTrainingMaintenanceForm() {
           {/* Filter bar */}
           <div className="bg-white rounded-xl shadow-md p-5 mb-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <select value={trainingBatchFilter} onChange={e => setTrainingBatchFilter(e.target.value)}
+              <select value={trainingBatchFilter} onChange={e => { setTrainingBatchFilter(e.target.value); setCurrentPage(1) }}
                 className={inputCls + ' bg-white'}>
                 <option value="All">All Batches</option>
                 {skillsTrainingBatches.map(b => <option key={b.id} value={b.batchName}>{b.batchName}</option>)}
               </select>
-              <select value={trainingStatusFilter} onChange={e => setTrainingStatusFilter(e.target.value)}
+              <select value={trainingStatusFilter} onChange={e => { setTrainingStatusFilter(e.target.value); setCurrentPage(1) }}
                 className={inputCls + ' bg-white'}>
                 <option value="All">All Status</option>
                 <option value="Planned">Planned</option>
@@ -546,7 +554,7 @@ export default function SkillsTrainingMaintenanceForm() {
               </select>
               <div className="relative col-span-2">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="text" value={trainingSearch} onChange={e => setTrainingSearch(e.target.value)}
+                <input type="text" value={trainingSearch} onChange={e => { setTrainingSearch(e.target.value); setCurrentPage(1) }}
                   placeholder="Search by title or service..."
                   className={inputCls + ' pl-9'} />
               </div>
@@ -589,7 +597,7 @@ export default function SkillsTrainingMaintenanceForm() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTrainings.map(a => (
+                    {paginatedTrainings.map(a => (
                       <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <p className="font-medium text-gray-800 text-sm">{a.title}</p>
@@ -628,6 +636,22 @@ export default function SkillsTrainingMaintenanceForm() {
                     ))}
                   </tbody>
                 </table>
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    Show
+                    <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue">
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                    per page
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-gray-600">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                    <span>{recordStart} to {recordEnd} of {filteredTrainings.length} records</span>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

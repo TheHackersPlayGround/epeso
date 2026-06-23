@@ -124,7 +124,9 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.gender}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.education}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.skills}</td>
-      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">General Program</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+        {(applicant.fullFormData?.referredProgram as string) || '—'}
+      </td>
 
       {activeFilters.includes("disability") && (
         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
@@ -395,24 +397,30 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
 
 // ─── Search bar ────────────────────────────────────────────────────────────────
 
+type SortOrderType = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '';
+
 type ApplicantsSearchBarProps = {
   searchQuery: string;
   activeFilters: string[];
   isFilterDropdownOpen: boolean;
+  sortOrder: SortOrderType;
   onSearchChange: (value: string) => void;
   onToggleFilterDropdown: () => void;
   onAddFilter: (filterId: string) => void;
   onCloseFilterDropdown: () => void;
+  onSortOrderChange: (v: SortOrderType) => void;
 };
 
 function ApplicantsSearchBar({
   searchQuery,
   activeFilters,
   isFilterDropdownOpen,
+  sortOrder,
   onSearchChange,
   onToggleFilterDropdown,
   onAddFilter,
   onCloseFilterDropdown,
+  onSortOrderChange,
 }: ApplicantsSearchBarProps) {
   const unselectedFilters = AVAILABLE_FILTERS.filter((f) => !activeFilters.includes(f.id));
 
@@ -428,6 +436,21 @@ function ApplicantsSearchBar({
           aria-label="Search applicants"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      <div className="relative">
+        <select
+          value={sortOrder}
+          onChange={e => onSortOrderChange(e.target.value as SortOrderType)}
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+          <option value="firstName_desc">First Name DSC</option>
+          <option value="lastName_asc">Last Name ASC</option>
+          <option value="lastName_desc">Last Name DSC</option>
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       <div className="relative">
@@ -583,6 +606,8 @@ type ApplicantsTabProps = {
   onImportClick: () => void;
   onShowResumeMaker: () => void;
   onSearchChange: (v: string) => void;
+  sortOrder: SortOrderType;
+  onSortOrderChange: (v: SortOrderType) => void;
   onToggleFilterDropdown: () => void;
   onCloseFilterDropdown: () => void;
   onAddFilter: (id: string) => void;
@@ -612,6 +637,8 @@ export default function ApplicantsTab({
   onImportClick,
   onShowResumeMaker,
   onSearchChange,
+  sortOrder,
+  onSortOrderChange,
   onToggleFilterDropdown,
   onCloseFilterDropdown,
   onAddFilter,
@@ -644,10 +671,12 @@ export default function ApplicantsTab({
             searchQuery={searchQuery}
             activeFilters={activeFilters}
             isFilterDropdownOpen={isFilterDropdownOpen}
+            sortOrder={sortOrder}
             onSearchChange={onSearchChange}
             onToggleFilterDropdown={onToggleFilterDropdown}
             onAddFilter={onAddFilter}
             onCloseFilterDropdown={onCloseFilterDropdown}
+            onSortOrderChange={onSortOrderChange}
           />
 
           {activeFilters.length > 0 && (

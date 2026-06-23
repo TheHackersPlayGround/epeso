@@ -4,14 +4,14 @@ import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, CLPEPIntervention } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
-import AddCLPEPProfileWizard, { EMPTY_CLPEP_RECORD } from './AddCLPEPProfileWizard'
+import CLPEPProfileForm, { EMPTY_CLPEP_RECORD } from './CLPEPProfileForm'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_clpep_v6'
+const LS_KEY = 'lp_clpep_v8'
 const LS_INTERVENTIONS_KEY = 'lp_clpep_interventions_v1'
 
-const STATUS_OPTIONS: LivelihoodStatus[] = ['Active', 'Inactive', 'Dropped']
+const STATUS_OPTIONS: LivelihoodStatus[] = ['Accepted', 'Waitlisted', 'Rejected']
 
 const STATUS_COLORS: Record<LivelihoodStatus, string> = {
   Active:    'bg-green-100 text-green-700',
@@ -22,6 +22,9 @@ const STATUS_COLORS: Record<LivelihoodStatus, string> = {
   Approved:  'bg-emerald-100 text-emerald-700',
   Released:  'bg-purple-100 text-purple-700',
   Inactive:  'bg-gray-200 text-gray-400',
+  Accepted:  'bg-emerald-100 text-emerald-700',
+  Waitlisted:'bg-yellow-100 text-yellow-700',
+  Rejected:  'bg-red-100 text-red-600',
 }
 
 const INTERVENTION_STATUS_COLORS: Record<string, string> = {
@@ -48,21 +51,16 @@ type FilterOption = { id: string; label: string; options: string[] }
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
-function normalizeStatus(b: LivelihoodBeneficiary): LivelihoodBeneficiary {
-  if (b.status === 'Dropped') return b
-  return { ...b, status: b.cooperativeName ? 'Active' : 'Inactive' }
-}
-
 function loadBeneficiaries(): LivelihoodBeneficiary[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    if (parsed.length > 0) return parsed.map(normalizeStatus)
-    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP').map(normalizeStatus)
+    if (parsed.length > 0) return parsed
+    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
     try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
     return seed
   } catch {
-    return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP').map(normalizeStatus)
+    return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
   }
 }
 
@@ -83,15 +81,17 @@ type SearchBarProps = {
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
+  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
+  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '') => void
 }
 
 function SearchBar({
-  searchQuery, activeFilters, isFilterOpen, availableFilters,
-  onSearchChange, onToggleFilter, onCloseFilter, onAddFilter,
+  searchQuery, activeFilters, isFilterOpen, availableFilters, sortOrder,
+  onSearchChange, onToggleFilter, onCloseFilter, onAddFilter, onSortChange,
 }: SearchBarProps) {
   const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
 
@@ -107,6 +107,21 @@ function SearchBar({
           aria-label="Search CLPEP beneficiaries"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      <div className="relative">
+        <select
+          value={sortOrder}
+          onChange={e => onSortChange(e.target.value as typeof sortOrder)}
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+          <option value="firstName_desc">First Name DSC</option>
+          <option value="lastName_asc">Last Name ASC</option>
+          <option value="lastName_desc">Last Name DSC</option>
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       <div className="relative">
@@ -452,6 +467,7 @@ type BeneficiaryTableProps = {
   interventions: CLPEPIntervention[]
   totalCount: number
   isFiltered: boolean
+  activeFilters: string[]
   onView: (b: LivelihoodBeneficiary) => void
   onEdit: (b: LivelihoodBeneficiary) => void
   onRemove: (id: number) => void
@@ -459,7 +475,7 @@ type BeneficiaryTableProps = {
   onViewAssignedIntervention: (b: LivelihoodBeneficiary) => void
 }
 
-function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -506,18 +522,13 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-brand-blue">
-            <td colSpan={8} className="px-4 py-3">
-              <p className="text-white font-bold text-sm">Beneficiaries</p>
-              <p className="text-blue-200 text-xs">{totalCount} record(s)</p>
-            </td>
-          </tr>
-          <tr className="bg-brand-blue">
-            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">#</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Name</th>
-            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>
+            {activeFilters.includes('sex') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>}
+            {activeFilters.includes('civilStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Civil Status</th>}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Barangay</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assigned Intervention</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Applied</th>
+            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Application Details</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>
           </tr>
@@ -525,7 +536,7 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
         <tbody>
           {beneficiaries.length === 0 ? (
             <tr>
-              <td colSpan={8} className="py-16 text-center">
+              <td colSpan={8 + ['sex', 'civilStatus'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -547,9 +558,9 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
           ) : (
             paginated.map((b, idx) => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{recordStart + idx}</td>
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
+                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
+                {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus ?? '—'}</td>}
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
                 <td className="px-4 py-3">
                   {b.cooperativeName ? (
@@ -571,6 +582,17 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? '-'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <StatusBadge status={b.status} />
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {(() => {
+                    const iv = interventions.find(i => i.id === b.assignedInterventionId)
+                    const isActive = !!b.cooperativeName && !!iv && iv.status !== 'Completed'
+                    return (
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+                        {isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button
@@ -640,6 +662,7 @@ export default function CLPEPTab() {
   const [beneficiaries, setBeneficiaries] = useState<LivelihoodBeneficiary[]>(loadBeneficiaries)
   const [interventions] = useState<CLPEPIntervention[]>(loadInterventions)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -717,6 +740,14 @@ export default function CLPEPTab() {
     return result
   }, [beneficiaries, searchQuery, activeFilters, filterValues])
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortOrder) return 0
+    const parts = (n: string) => n.trim().split(/\s+/)
+    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
+    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+  })
+
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
   function buildExportRows() {
@@ -751,7 +782,7 @@ export default function CLPEPTab() {
 
   if (isAddOpen) {
     return (
-      <AddCLPEPProfileWizard
+      <CLPEPProfileForm
         mode="add"
         initial={{ ...EMPTY_CLPEP_RECORD }}
         onSave={data => { handleAddBeneficiary(data); setIsAddOpen(false) }}
@@ -762,7 +793,7 @@ export default function CLPEPTab() {
 
   if (viewingBeneficiary) {
     return (
-      <AddCLPEPProfileWizard
+      <CLPEPProfileForm
         key={viewingBeneficiary.id}
         mode="view"
         initial={viewingBeneficiary}
@@ -775,7 +806,7 @@ export default function CLPEPTab() {
 
   if (editingBeneficiary) {
     return (
-      <AddCLPEPProfileWizard
+      <CLPEPProfileForm
         key={editingBeneficiary.id}
         mode="edit"
         initial={editingBeneficiary}
@@ -853,10 +884,12 @@ export default function CLPEPTab() {
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
             availableFilters={availableFilters}
+            sortOrder={sortOrder}
             onSearchChange={setSearchQuery}
             onToggleFilter={() => setIsFilterOpen(o => !o)}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
+            onSortChange={setSortOrder}
           />
           <FilterBadges
             activeFilters={activeFilters}
@@ -868,10 +901,11 @@ export default function CLPEPTab() {
         </div>
 
         <BeneficiaryTable
-          beneficiaries={filtered}
+          beneficiaries={sorted}
           interventions={interventions}
-          totalCount={filtered.length}
+          totalCount={sorted.length}
           isFiltered={isFiltered}
+          activeFilters={activeFilters}
           onView={setViewingBeneficiary}
           onEdit={setEditingBeneficiary}
           onRemove={handleRemoveBeneficiary}

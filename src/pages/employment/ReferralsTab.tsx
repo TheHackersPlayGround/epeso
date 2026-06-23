@@ -16,38 +16,11 @@ function loadReferrals(): Referral[] {
     if (!raw) return REFERRAL_SEED
     const parsed = JSON.parse(raw) as Array<Referral & { status: string }>
     // Filter out any legacy 'Hired' records — those now live in ef_placements
-    const valid = parsed.filter(r => r.status !== 'Hired') as Referral[]
-    return valid.length > 0 ? valid : REFERRAL_SEED
+    const valid = parsed.filter(r => (r.status as string) !== 'Hired') as Referral[]
+    return valid
   } catch {
     return REFERRAL_SEED
   }
-}
-
-type SimpleApplicant = { id: number; name: string }
-type SimpleVacancy = { id: number; jobTitle: string; employer: string }
-
-function loadApplicantsForReferral(): SimpleApplicant[] {
-  try {
-    const raw = localStorage.getItem('ef_applicants')
-    if (raw) {
-      const list = JSON.parse(raw) as Array<{ id: number; name: string }>
-      return list.map(a => ({ id: a.id, name: a.name }))
-    }
-  } catch { /* ignore */ }
-  return []
-}
-
-function loadVacanciesForReferral(): SimpleVacancy[] {
-  try {
-    const raw = localStorage.getItem('ef_vacancies')
-    if (raw) {
-      const list = JSON.parse(raw) as Array<{ id: number; jobTitle: string; employer: string; status: string }>
-      return list
-        .filter(v => v.status !== 'Closed')
-        .map(v => ({ id: v.id, jobTitle: v.jobTitle, employer: v.employer }))
-    }
-  } catch { /* ignore */ }
-  return []
 }
 
 // ── Filter config ─────────────────────────────────────────────────────────────
@@ -367,68 +340,6 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
   )
 }
 
-// ── View Referral Modal ───────────────────────────────────────────────────────
-
-function ViewReferralModal({ referral, onClose }: { referral: Referral; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">Referral Details</h3>
-          <button
-            onClick={onClose}
-            aria-label="Close referral details"
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-5 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Applicant Name</p>
-              <p className="text-sm font-medium text-gray-800">{referral.applicantName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Job Title</p>
-              <p className="text-sm font-medium text-gray-800">{referral.jobTitle}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Employer</p>
-              <p className="text-sm font-medium text-gray-800">{referral.employer || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Date Referred</p>
-              <p className="text-sm font-medium text-gray-800">{referral.referralDate || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-0.5">Status</p>
-              <ReferralStatusBadge status={referral.status} />
-            </div>
-          </div>
-
-          {referral.notes && (
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Notes</p>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{referral.notes}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Update Status Modal ───────────────────────────────────────────────────────
 
 type UpdateStatusModalProps = {
@@ -499,254 +410,12 @@ function UpdateStatusModal({ referral, onClose, onSave }: UpdateStatusModalProps
     </div>
   )
 }
-
-// ── Add Referral Modal ────────────────────────────────────────────────────────
-
-type AddReferralModalProps = {
-  onClose: () => void
-  onSave: (data: Omit<Referral, 'id'>) => void
-}
-
-function AddReferralModal({ onClose, onSave }: AddReferralModalProps) {
-  const applicants = loadApplicantsForReferral()
-  const vacancies = loadVacanciesForReferral()
-
-  const today = new Date().toISOString().slice(0, 10)
-
-  const [selectedApplicantId, setSelectedApplicantId] = useState<number | null>(null)
-  const [applicantSearch, setApplicantSearch] = useState('')
-  const [showApplicantDropdown, setShowApplicantDropdown] = useState(false)
-
-  const [selectedVacancyId, setSelectedVacancyId] = useState<number | null>(null)
-  const [vacancySearch, setVacancySearch] = useState('')
-  const [showVacancyDropdown, setShowVacancyDropdown] = useState(false)
-
-  const [referralDate, setReferralDate] = useState(today)
-  const [notes, setNotes] = useState('')
-  const [showFieldErrors, setShowFieldErrors] = useState(false)
-
-  const selectedApplicant = applicants.find(a => a.id === selectedApplicantId) ?? null
-  const selectedVacancy = vacancies.find(v => v.id === selectedVacancyId) ?? null
-
-  const filteredApplicants = applicants.filter(a =>
-    a.name.toLowerCase().includes(applicantSearch.toLowerCase())
-  )
-  const filteredVacancies = vacancies.filter(v =>
-    `${v.jobTitle} ${v.employer}`.toLowerCase().includes(vacancySearch.toLowerCase())
-  )
-
-  function fieldErr(isEmpty: boolean) { return showFieldErrors && isEmpty }
-
-  function dropdownCls(isEmpty: boolean) {
-    return `w-full px-3 py-2 border rounded-lg text-sm flex items-center justify-between cursor-pointer ${
-      fieldErr(isEmpty)
-        ? 'border-red-500 ring-2 ring-red-200'
-        : 'border-gray-300 focus-within:ring-2 focus-within:ring-brand-blue'
-    }`
-  }
-
-  function ErrMsg({ show }: { show: boolean }) {
-    return show ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null
-  }
-
-  function handleSave() {
-    if (!selectedApplicantId || !selectedVacancyId || !referralDate) {
-      setShowFieldErrors(true)
-      return
-    }
-
-    onSave({
-      applicantId: selectedApplicant!.id,
-      applicantName: selectedApplicant!.name,
-      vacancyId: selectedVacancy!.id,
-      jobTitle: selectedVacancy!.jobTitle,
-      employer: selectedVacancy!.employer,
-      referralDate,
-      status: 'Pending',
-      notes: notes.trim(),
-    })
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">Add Referral</h3>
-          <button
-            onClick={onClose}
-            aria-label="Close add referral modal"
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-
-          {/* Applicant dropdown */}
-          <div>
-            <label htmlFor="referral-applicant" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
-              Applicant <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <div
-                id="referral-applicant"
-                className={dropdownCls(!selectedApplicantId)}
-                onClick={() => setShowApplicantDropdown(p => !p)}
-              >
-                <span className={selectedApplicant ? 'text-gray-900' : 'text-gray-400'}>
-                  {selectedApplicant ? selectedApplicant.name : 'Select an applicant...'}
-                </span>
-                <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
-              </div>
-              <ErrMsg show={fieldErr(!selectedApplicantId)} />
-
-              {showApplicantDropdown && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowApplicantDropdown(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                    <div className="p-2 border-b border-gray-100">
-                      <input
-                        type="text"
-                        value={applicantSearch}
-                        onChange={e => setApplicantSearch(e.target.value)}
-                        placeholder="Search applicant..."
-                        onClick={e => e.stopPropagation()}
-                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-brand-blue"
-                      />
-                    </div>
-                    {filteredApplicants.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-gray-400">No applicants found</p>
-                    ) : (
-                      filteredApplicants.map(a => (
-                        <button
-                          key={a.id}
-                          onClick={() => { setSelectedApplicantId(a.id); setApplicantSearch(''); setShowApplicantDropdown(false) }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors border-b border-gray-100 last:border-b-0"
-                        >
-                          {a.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Vacancy dropdown */}
-          <div>
-            <label htmlFor="referral-vacancy" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
-              Job Vacancy <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <div
-                id="referral-vacancy"
-                className={dropdownCls(!selectedVacancyId)}
-                onClick={() => setShowVacancyDropdown(p => !p)}
-              >
-                <span className={selectedVacancy ? 'text-gray-900' : 'text-gray-400'}>
-                  {selectedVacancy
-                    ? `${selectedVacancy.jobTitle} – ${selectedVacancy.employer}`
-                    : 'Select a vacancy...'}
-                </span>
-                <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
-              </div>
-              <ErrMsg show={fieldErr(!selectedVacancyId)} />
-
-              {showVacancyDropdown && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowVacancyDropdown(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                    <div className="p-2 border-b border-gray-100">
-                      <input
-                        type="text"
-                        value={vacancySearch}
-                        onChange={e => setVacancySearch(e.target.value)}
-                        placeholder="Search vacancy..."
-                        onClick={e => e.stopPropagation()}
-                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-brand-blue"
-                      />
-                    </div>
-                    {filteredVacancies.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-gray-400">No open vacancies found</p>
-                    ) : (
-                      filteredVacancies.map(v => (
-                        <button
-                          key={v.id}
-                          onClick={() => { setSelectedVacancyId(v.id); setVacancySearch(''); setShowVacancyDropdown(false) }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors border-b border-gray-100 last:border-b-0"
-                        >
-                          <span className="font-medium">{v.jobTitle}</span>
-                          <span className="text-gray-400"> – {v.employer}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Date Referred */}
-          <div>
-            <label htmlFor="referral-date" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
-              Date Referred <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="referral-date"
-              type="date"
-              value={referralDate}
-              onChange={e => setReferralDate(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 ${
-                fieldErr(!referralDate)
-                  ? 'border-red-500 ring-2 ring-red-200'
-                  : 'border-gray-300 focus:ring-brand-blue'
-              }`}
-            />
-            <ErrMsg show={fieldErr(!referralDate)} />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label htmlFor="referral-notes" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
-              Notes <span className="text-gray-400 font-normal normal-case">(optional)</span>
-            </label>
-            <textarea
-              id="referral-notes"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Any additional notes about this referral..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y text-gray-900 placeholder:text-gray-400"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
-          >
-            Add Referral
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReferralsTab() {
   const [referrals, setReferrals] = useState<Referral[]>(loadReferrals)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -792,9 +461,17 @@ export default function ReferralsTab() {
       let salaryRange = ''
       try {
         const rawVac = localStorage.getItem('ef_vacancies')
-        const vacList = rawVac ? JSON.parse(rawVac) : VACANCY_SEED
-        const vac = vacList.find((v: { id: number; jobType?: string; salaryRange?: string }) => v.id === referral.vacancyId)
+        const vacList: Array<{ id: number; jobType?: string; salaryRange?: string; vacanciesCount?: number }> =
+          rawVac ? JSON.parse(rawVac) : VACANCY_SEED
+        const vac = vacList.find(v => v.id === referral.vacancyId)
         if (vac) { employmentType = vac.jobType ?? ''; salaryRange = vac.salaryRange ?? '' }
+        // Decrement vacancy count; auto-close when it hits 0
+        const updated = vacList.map(v => {
+          if (v.id !== referral.vacancyId) return v
+          const newCount = Math.max(0, (v.vacanciesCount ?? 1) - 1)
+          return { ...v, vacanciesCount: newCount, status: newCount === 0 ? 'Closed' : v.status }
+        })
+        localStorage.setItem('ef_vacancies', JSON.stringify(updated))
       } catch { /* ignore */ }
       const newPlacement: Placement = {
         id: Date.now(),
@@ -875,8 +552,17 @@ export default function ReferralsTab() {
       if (filterId === 'employer') result = result.filter(r => r.employer === value)
     }
 
+    if (sortOrder) {
+      result = [...result].sort((a, b) => {
+        const parts = (n: string) => n.trim().split(/\s+/)
+        const keyA = (sortOrder.startsWith('firstName') ? parts(a.applicantName)[0] : parts(a.applicantName).at(-1) ?? '').toLowerCase()
+        const keyB = (sortOrder.startsWith('firstName') ? parts(b.applicantName)[0] : parts(b.applicantName).at(-1) ?? '').toLowerCase()
+        return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+      })
+    }
+
     return result
-  }, [referrals, searchQuery, activeFilters, filterValues])
+  }, [referrals, searchQuery, activeFilters, filterValues, sortOrder])
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
@@ -889,10 +575,12 @@ export default function ReferralsTab() {
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
             availableFilters={availableFilters}
+            sortOrder={sortOrder}
             onSearchChange={v => setSearchQuery(v)}
             onToggleFilter={() => setIsFilterOpen(o => !o)}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
+            onSortChange={setSortOrder}
             onExportExcel={handleExportExcel}
             onExportCsv={handleExportCsv}
           />

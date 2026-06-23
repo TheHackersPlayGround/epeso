@@ -1,58 +1,22 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
   ChevronDown, AlertCircle, CheckCircle, Upload, Download, MoreHorizontal,
-  FileText, ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useCDSP } from '../../contexts/CDSPContext'
 import type { CDSPApplicant } from '../../contexts/CDSPContext'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
-import AddressFields from '../../components/AddressFields'
+import CDSPProfileForm, {
+  ViewApplicantPanel, emptyForm, CDSP_SEED_SERVICES,
+  getEffectiveStatus, StatusBadge, CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS,
+} from './CDSPProfileForm'
 
 interface CDSPViewProps {
   onBack: () => void
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-
-const CLASSIFICATION_OPTIONS = [
-  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
-  'Out of School Youth (OSY)', 'Person with Disability (PWD)', 'Solo Parent',
-  'Women', 'Senior Citizen', 'Returning OFW', 'Other',
-]
-
-const EDUCATION_OPTIONS = [
-  'Elementary Level', 'Elementary Graduate', 'High School Level', 'High School Graduate',
-  'Senior High School Level', 'Senior High School Graduate', 'Vocational / Technical',
-  'College Level', 'College Level (2nd Year)', 'College Level (3rd Year)',
-  'College Level (4th Year)', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral',
-]
-
-const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Underemployed', 'Unemployed', 'Self-Employed', 'Student', 'Retired']
-
-const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
-
-
-const emptyForm: Omit<CDSPApplicant, 'id'> = {
-  lastName: '', firstName: '', middleName: '',
-  sex: '', birthdate: '', age: 0, civilStatus: '',
-  contactNumber: '', email: '',
-  streetPurok: '', barangay: '', cityMunicipality: '', province: '', region: '',
-  classification: [], classificationOther: '',
-  highestEducation: '', schoolName: '', course: '', yearGraduated: '',
-  employmentStatus: '', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-  serviceAvailed: '', assignedActivity: '',
-  careerGoal: '', coachingType: '', careerAssessmentResult: '',
-  targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-  school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
-  applicantSignature: '', dateSignature: '',
-  dateApplicationReceived: '', receivedBy: '', counselorName: '',
-  status: 'Active', remarks: '',
-  attachedDocuments: [],
 }
 
 // ─── Activity status badge ─────────────────────────────────────────────────────
@@ -61,24 +25,6 @@ function activityStatusBadge(status: string) {
   if (status === 'Ongoing')   return 'bg-green-100 text-green-700'
   if (status === 'Completed') return 'bg-blue-100 text-blue-700'
   return 'bg-yellow-100 text-yellow-700'
-}
-
-// ─── Status badge ──────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: 'Active' | 'Inactive' }) {
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-      status === 'Active' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
-    }`}>
-      {status}
-    </span>
-  )
-}
-
-function getEffectiveStatus(applicant: CDSPApplicant, activities: { title: string; status: string }[]): 'Active' | 'Inactive' {
-  if (!applicant.assignedActivity) return 'Inactive'
-  const act = activities.find(a => a.title === applicant.assignedActivity)
-  return (act && act.status !== 'Completed') ? 'Active' : 'Inactive'
 }
 
 // ─── Confirm Modal ─────────────────────────────────────────────────────────────
@@ -119,490 +65,6 @@ function ConfirmModal({
   )
 }
 
-// ─── Section divider ───────────────────────────────────────────────────────────
-
-function SectionDivider({ numeral, title, gray }: { numeral: string; title: string; gray?: boolean }) {
-  return (
-    <div className={`flex items-center gap-2 mt-8 mb-4 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-brand-blue'}`}>
-      <span className="text-white text-xs font-bold">{numeral}.</span>
-      <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
-    </div>
-  )
-}
-
-// ─── View Applicant Panel ──────────────────────────────────────────────────────
-
-const CDSP_SEED_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
-
-function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; onClose: () => void }) {
-  const { activities } = useProgramActivities()
-  const cdspActivities = activities.filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
-  const cdspServices = Array.from(new Set(cdspActivities.map(a => a.service)))
-
-  const fullName = `${applicant.lastName}, ${applicant.firstName}${applicant.middleName ? ' ' + applicant.middleName : ''}`.trim()
-
-  const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
-    <div>
-      <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
-      <p className="text-gray-800 text-sm">{value || '—'}</p>
-    </div>
-  )
-
-  return (
-    <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Users size={18} className="text-blue-600" />
-          </div>
-          <div>
-            <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-lg)' }}>{fullName}</p>
-            <p className="text-sm text-gray-400">{applicant.serviceAvailed}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <StatusBadge status={getEffectiveStatus(applicant, cdspActivities)} />
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
-
-          <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-5">
-            <Field label="Last Name" value={applicant.lastName} />
-            <Field label="First Name" value={applicant.firstName} />
-            <Field label="Middle Name" value={applicant.middleName} />
-            <Field label="Sex" value={applicant.sex} />
-            <Field label="Birthdate" value={applicant.birthdate} />
-            <Field label="Age" value={applicant.age} />
-            <Field label="Civil Status" value={applicant.civilStatus} />
-            <Field label="Contact Number" value={applicant.contactNumber} />
-            <Field label="Email" value={applicant.email} />
-          </div>
-
-          <SectionDivider numeral="II" title="Address" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Region" value={applicant.region} />
-            <Field label="Province" value={applicant.province} />
-            <Field label="City / Municipality" value={applicant.cityMunicipality} />
-            <Field label="Barangay" value={applicant.barangay} />
-            <div className="col-span-2"><Field label="Street / Purok #" value={applicant.streetPurok} /></div>
-          </div>
-
-          <SectionDivider numeral="III" title="Classification" />
-          <div className="flex flex-wrap gap-2">
-            {CLASSIFICATION_OPTIONS.map((opt) => (
-              <span key={opt} className={`px-3 py-1 rounded-full text-xs border ${
-                applicant.classification.includes(opt)
-                  ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                  : 'border-gray-200 text-gray-300'
-              }`}>{opt}</span>
-            ))}
-          </div>
-          {applicant.classificationOther && (
-            <p className="text-sm text-gray-600 mt-2">Other: {applicant.classificationOther}</p>
-          )}
-
-          <SectionDivider numeral="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Highest Attainment" value={applicant.highestEducation} />
-            <Field label="Course / Program" value={applicant.course} />
-          </div>
-
-          <SectionDivider numeral="V" title="Employment Status" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Employment Status" value={applicant.employmentStatus} />
-            <Field label="Current Occupation" value={applicant.currentOccupation} />
-          </div>
-
-          <SectionDivider numeral="VI" title="CDSP Service Availed" />
-          <div className="flex flex-wrap gap-2 mb-4">
-            {cdspServices.map((svc) => (
-              <span key={svc} className={`px-3 py-1 rounded-full text-xs border ${
-                applicant.serviceAvailed === svc
-                  ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                  : 'border-gray-200 text-gray-300'
-              }`}>{svc}</span>
-            ))}
-          </div>
-          {(() => {
-            const act = applicant.assignedActivity
-              ? cdspActivities.find(a => a.title === applicant.assignedActivity)
-              : null
-            const statusColor =
-              act?.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
-              act?.status === 'Ongoing'   ? 'bg-green-100 text-green-700' :
-              'bg-yellow-100 text-yellow-700'
-            return (
-              <div className="mb-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Assigned Activity</p>
-                {applicant.assignedActivity ? (
-                  <>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-gray-800 font-medium">{applicant.assignedActivity}</span>
-                      {act && (
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor}`}>
-                          {act.status}
-                        </span>
-                      )}
-                    </div>
-                    {act?.status === 'Completed' && (
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-100 px-3 py-1.5 rounded-lg w-fit">
-                        <CheckCircle size={12} />
-                        <span>Service completed and recorded in Section VI</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-gray-800 text-sm">—</p>
-                )}
-              </div>
-            )
-          })()}
-
-          {(applicant.attachedDocuments?.length ?? 0) > 0 && (
-            <>
-              <SectionDivider numeral="VII" title="Attached Documents" />
-              <div className="space-y-2">
-                {applicant.attachedDocuments.map((doc, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <FileText size={14} className="text-brand-blue" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800">{doc.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
-                    </div>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline whitespace-nowrap">View</a>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Received" value={applicant.dateApplicationReceived} />
-            <Field label="Received By" value={applicant.receivedBy} />
-            <Field label="Counselor" value={applicant.counselorName} />
-            <Field label="Status" value={getEffectiveStatus(applicant, cdspActivities)} />
-            <Field label="Remarks" value={applicant.remarks} />
-          </div>
-
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Doc Attach Section ────────────────────────────────────────────────────────
-
-function DocAttachSection({
-  documents,
-  onChange,
-}: {
-  documents: { name: string; file: File; url: string }[]
-  onChange: (docs: { name: string; file: File; url: string }[]) => void
-}) {
-  const [pendingName, setPendingName] = useState('')
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const name = pendingName.trim() || file.name
-    onChange([...documents, { name, file, url: URL.createObjectURL(file) }])
-    setPendingName('')
-    e.target.value = ''
-  }
-
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
-
-  return (
-    <div className="space-y-3">
-      {documents.length > 0 && (
-        <div className="space-y-2 mb-2">
-          {documents.map((doc, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
-              <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <FileText size={14} className="text-brand-blue" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800">{doc.name}</p>
-                <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
-              </div>
-              <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline">View</a>
-              <button onClick={() => onChange(documents.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 ml-1">
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex gap-2">
-        <input
-          className={inp}
-          value={pendingName}
-          onChange={(e) => setPendingName(e.target.value)}
-          placeholder="Document name (e.g. Resume, Birth Certificate...)"
-        />
-        <label className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg cursor-pointer hover:bg-brand-blue-dark whitespace-nowrap text-sm flex-shrink-0">
-          <Upload size={15} />
-          Attach File
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </label>
-      </div>
-      <p className="text-xs text-gray-400">Supported: PDF, images (JPG, PNG), Word documents.</p>
-    </div>
-  )
-}
-
-// ─── Add / Edit Profile Form ───────────────────────────────────────────────────
-
-function AddProfileForm({
-  onClose,
-  onSave,
-  initialData,
-  mode = 'add',
-}: {
-  onClose: () => void
-  onSave: (data: Omit<CDSPApplicant, 'id'>) => void
-  initialData?: Omit<CDSPApplicant, 'id'>
-  mode?: 'add' | 'edit'
-}) {
-  const { activities } = useProgramActivities()
-  const cdspServices = Array.from(new Set(
-    activities
-      .filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
-      .map(a => a.service)
-  ))
-
-  const [formData, setFormData] = useState<Omit<CDSPApplicant, 'id'>>(initialData ?? emptyForm)
-  const set = (updates: Partial<Omit<CDSPApplicant, 'id'>>) => setFormData((prev) => ({ ...prev, ...updates }))
-
-  const toggleArr = (field: 'classification' | 'industriesOfInterest' | 'preEmploymentRequirements', value: string) => {
-    const arr = formData[field] as string[]
-    set({ [field]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] })
-  }
-
-  const handleBirthdate = (date: string) => {
-    const age = date ? new Date().getFullYear() - new Date(date).getFullYear() : 0
-    set({ birthdate: date, age })
-  }
-
-  const handleSave = () => {
-    if (!formData.lastName || !formData.firstName) { alert('Please fill in Last Name and First Name.'); return }
-    if (!formData.serviceAvailed) { alert('Please select a CDSP Service Availed (Section VI).'); return }
-    onSave(formData)
-  }
-
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
-  const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
-  const sel = `${inp} bg-white`
-
-  const CheckItem = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (
-    <label className="flex items-center gap-2 cursor-pointer select-none">
-      <div
-        onClick={onChange}
-        className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${checked ? 'bg-brand-blue border-brand-blue' : 'border-gray-300 bg-white'}`}
-      >
-        {checked && <span className="text-white text-xs leading-none">✓</span>}
-      </div>
-      <span className="text-sm text-gray-700">{label}</span>
-    </label>
-  )
-
-  return (
-    <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Users size={18} className="text-brand-blue" />
-          </div>
-          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
-            {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — CDSP'}
-          </p>
-        </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
-
-          {/* I. Personal Information */}
-          <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.lastName} onChange={(e) => set({ lastName: e.target.value })} placeholder="Dela Cruz" />
-            </div>
-            <div>
-              <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.firstName} onChange={(e) => set({ firstName: e.target.value })} placeholder="Juan" />
-            </div>
-            <div>
-              <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input className={inp} value={formData.middleName} onChange={(e) => set({ middleName: e.target.value })} placeholder="M." />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className={lbl}>Sex</label>
-              <select className={sel} value={formData.sex} onChange={(e) => set({ sex: e.target.value as CDSPApplicant['sex'] })}>
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Birthdate</label>
-              <input type="date" className={inp} value={formData.birthdate} onChange={(e) => handleBirthdate(e.target.value)} />
-            </div>
-            <div>
-              <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={(e) => set({ age: parseInt(e.target.value) || 0 })} placeholder="0" min={0} />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={lbl}>Civil Status</label>
-              <select className={sel} value={formData.civilStatus} onChange={(e) => set({ civilStatus: e.target.value })}>
-                <option value="">Select</option>
-                {CIVIL_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={(e) => set({ contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
-            </div>
-            <div>
-              <label className={lbl}>Email <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input type="email" className={inp} value={formData.email} onChange={(e) => set({ email: e.target.value })} placeholder="example@email.com" />
-            </div>
-          </div>
-
-          {/* II. Address */}
-          <SectionDivider numeral="II" title="Address" />
-          <AddressFields
-            value={{ region: formData.region, province: formData.province, cityMunicipality: formData.cityMunicipality, barangay: formData.barangay, streetPurok: formData.streetPurok }}
-            onChange={(addr) => set(addr)}
-            inputClass={inp}
-            labelClass={lbl}
-          />
-
-          {/* III. Classification */}
-          <SectionDivider numeral="III" title="Classification" />
-          <div className="grid grid-cols-2 gap-3">
-            {CLASSIFICATION_OPTIONS.filter((o) => o !== 'Other').map((opt) => (
-              <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleArr('classification', opt)} />
-            ))}
-            <CheckItem label="Other" checked={formData.classification.includes('Other')} onChange={() => toggleArr('classification', 'Other')} />
-          </div>
-          {formData.classification.includes('Other') && (
-            <div className="mt-3">
-              <label className={lbl}>Please specify</label>
-              <input className={inp} value={formData.classificationOther} onChange={(e) => set({ classificationOther: e.target.value })} placeholder="Specify classification" />
-            </div>
-          )}
-
-          {/* IV. Educational Background */}
-          <SectionDivider numeral="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className={lbl}>Highest Educational Attainment</label>
-              <select className={sel} value={formData.highestEducation} onChange={(e) => set({ highestEducation: e.target.value })}>
-                <option value="">Select</option>
-                {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Course / Program</label>
-              <input className={inp} value={formData.course} onChange={(e) => set({ course: e.target.value })} placeholder="e.g. BS Information Technology" />
-            </div>
-            <div>
-              <label className={lbl}>Year Graduated</label>
-              <input className={inp} value={formData.yearGraduated} onChange={(e) => set({ yearGraduated: e.target.value })} placeholder="e.g. 2024" />
-            </div>
-          </div>
-
-          {/* V. Employment Status */}
-          <SectionDivider numeral="V" title="Employment Status" />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Employment Status</label>
-              <select className={sel} value={formData.employmentStatus} onChange={(e) => set({ employmentStatus: e.target.value })}>
-                <option value="">Select</option>
-                {EMPLOYMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Current Occupation</label>
-              <input className={inp} value={formData.currentOccupation} onChange={(e) => set({ currentOccupation: e.target.value })} placeholder="e.g. Sales Associate" />
-            </div>
-          </div>
-
-          {/* VI. CDSP Service Availed */}
-          <SectionDivider numeral="VI" title="CDSP Service Availed" />
-          <div className="space-y-2 mb-4">
-            {cdspServices.map((svc) => (
-              <label
-                key={svc}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${formData.serviceAvailed === svc ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.serviceAvailed === svc ? 'border-brand-blue' : 'border-gray-300'}`}>
-                  {formData.serviceAvailed === svc && <div className="w-2 h-2 rounded-full bg-brand-blue" />}
-                </div>
-                <input type="radio" className="hidden" checked={formData.serviceAvailed === svc} onChange={() => set({ serviceAvailed: svc, assignedActivity: '' })} />
-                <span className={`text-sm ${formData.serviceAvailed === svc ? 'text-brand-blue' : 'text-gray-700'}`}>{svc}</span>
-              </label>
-            ))}
-          </div>
-
-          {/* VII. Attached Documents */}
-          <SectionDivider numeral="VII" title="Attached Documents" />
-          <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
-          <DocAttachSection documents={formData.attachedDocuments} onChange={(docs) => set({ attachedDocuments: docs })} />
-
-          {/* VIII. PESO Office Only */}
-          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Date Received</label>
-              <input type="date" className={inp} value={formData.dateApplicationReceived} onChange={(e) => set({ dateApplicationReceived: e.target.value })} />
-            </div>
-            <div>
-              <label className={lbl}>Received By</label>
-              <input className={inp} value={formData.receivedBy} onChange={(e) => set({ receivedBy: e.target.value })} placeholder="Staff name" />
-            </div>
-            <div>
-              <label className={lbl}>Counselor</label>
-              <input className={inp} value={formData.counselorName} onChange={(e) => set({ counselorName: e.target.value })} placeholder="Counselor name" />
-            </div>
-            <div>
-              <label className={lbl}>Remarks</label>
-              <input className={inp} value={formData.remarks} onChange={(e) => set({ remarks: e.target.value })} placeholder="Optional" />
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <button onClick={onClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
-              {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
@@ -614,6 +76,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -688,11 +151,18 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     return matchesSearch && matchesFilters
   })
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortOrder) return 0
+    const keyA = (sortOrder.startsWith('firstName') ? (a.firstName ?? '') : (a.lastName ?? '')).toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? (b.firstName ?? '') : (b.lastName ?? '')).toLowerCase()
+    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+  })
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
-  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
-  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
-  const recordEnd = Math.min(safePage * perPage, filtered.length)
+  const paginated = sorted.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, sorted.length)
 
   const handleAddSave = (data: Omit<CDSPApplicant, 'id'>) => {
     setApplicants((prev) => [...prev, { ...data, id: Date.now() }])
@@ -830,10 +300,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
   // ─── Full-page sub-views ────────────────────────────────────────────────────
 
-  if (isFormOpen) return <AddProfileForm onClose={() => setIsFormOpen(false)} onSave={handleAddSave} mode="add" />
+  if (isFormOpen) return <CDSPProfileForm onClose={() => setIsFormOpen(false)} onSave={handleAddSave} mode="add" />
   if (editingApplicant) {
     const { id: _id, ...rest } = editingApplicant
-    return <AddProfileForm onClose={() => setEditingApplicant(null)} onSave={handleEditSave} initialData={rest} mode="edit" />
+    return <CDSPProfileForm onClose={() => setEditingApplicant(null)} onSave={handleEditSave} initialData={rest} mode="edit" />
   }
   if (viewingApplicant) return <ViewApplicantPanel applicant={viewingApplicant} onClose={() => setViewingApplicant(null)} />
 
@@ -841,7 +311,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
   return (
     <>
-<ConfirmModal
+      <ConfirmModal
         isOpen={deleteConfirm.open} type="confirm"
         title="Delete Applicant Profile"
         message="Are you sure you want to delete this applicant's profile? This action cannot be undone."
@@ -875,7 +345,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
-              {/* Orange header */}
               <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
                 <div>
                   <h3 className="text-white m-0 text-base font-semibold">Assigned Activity</h3>
@@ -957,7 +426,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col">
-              {/* Orange header */}
               <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
                 <div>
                   <h3 className="text-white m-0 text-base font-semibold">Assign Activity</h3>
@@ -1078,7 +546,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
-              {/* Orange header */}
               <div className="bg-brand-blue px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
                 <div>
                   <h3 className="text-white m-0 text-base font-semibold">Assign Activity</h3>
@@ -1225,6 +692,20 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               />
             </div>
             <div className="relative">
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as typeof sortOrder)}
+                className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+              >
+                <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+                <option value="firstName_desc">First Name DSC</option>
+                <option value="lastName_asc">Last Name ASC</option>
+                <option value="lastName_desc">Last Name DSC</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
+            <div className="relative">
               <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700">
                 <Plus size={16} /><span>Filter By</span><ChevronDown size={14} className="text-gray-500" />
               </button>
@@ -1267,7 +748,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
           )}
           </div>
 
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="text-center py-20">
               <Users size={48} className="mx-auto text-gray-300 mb-3" />
               <p className="text-gray-600 text-lg">No applicants found</p>
@@ -1344,7 +825,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   ))}
                 </tbody>
               </table>
-              {filtered.length > 0 && (
+              {sorted.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     Show
@@ -1363,7 +844,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                       <ChevronLeft size={16} />
                     </button>
-                    <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+                    <span>{recordStart} to {recordEnd} of {sorted.length} records</span>
                     <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                       <ChevronRight size={16} />
                     </button>
@@ -1399,4 +880,3 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     </>
   )
 }
-

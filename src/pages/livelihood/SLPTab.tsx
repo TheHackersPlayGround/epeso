@@ -4,11 +4,11 @@ import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED } from '../../contexts/LivelihoodContext'
-import AddSLPProfileWizard, { EMPTY_SLP_RECORD } from './AddSLPProfileWizard'
+import SLPProfileForm, { EMPTY_SLP_RECORD } from './SLPProfileForm'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_slp_v6'
+const LS_KEY = 'lp_slp_v7'
 const ACTIVITIES_LS_KEY = 'lp_program_activities_v2'
 
 const STATUS_OPTIONS: LivelihoodStatus[] = [
@@ -17,14 +17,17 @@ const STATUS_OPTIONS: LivelihoodStatus[] = [
 
 
 const STATUS_COLORS: Record<LivelihoodStatus, string> = {
-  Active:    'bg-green-100 text-green-700',
-  Completed: 'bg-blue-100 text-blue-700',
-  Dropped:   'bg-red-100 text-red-600',
-  Pending:   'bg-yellow-100 text-yellow-700',
-  Closed:    'bg-gray-100 text-gray-500',
-  Approved:  'bg-emerald-100 text-emerald-700',
-  Released:  'bg-purple-100 text-purple-700',
-  Inactive:  'bg-gray-200 text-gray-400',
+  Active:     'bg-green-100 text-green-700',
+  Completed:  'bg-blue-100 text-blue-700',
+  Dropped:    'bg-red-100 text-red-600',
+  Pending:    'bg-yellow-100 text-yellow-700',
+  Closed:     'bg-gray-100 text-gray-500',
+  Approved:   'bg-emerald-100 text-emerald-700',
+  Released:   'bg-purple-100 text-purple-700',
+  Inactive:   'bg-gray-200 text-gray-400',
+  Accepted:   'bg-teal-100 text-teal-700',
+  Waitlisted: 'bg-orange-100 text-orange-700',
+  Rejected:   'bg-red-100 text-red-700',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -100,15 +103,17 @@ type SearchBarProps = {
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
+  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
+  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '') => void
 }
 
 function SearchBar({
-  searchQuery, activeFilters, isFilterOpen, availableFilters,
-  onSearchChange, onToggleFilter, onCloseFilter, onAddFilter,
+  searchQuery, activeFilters, isFilterOpen, availableFilters, sortOrder,
+  onSearchChange, onToggleFilter, onCloseFilter, onAddFilter, onSortChange,
 }: SearchBarProps) {
   const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
 
@@ -124,6 +129,21 @@ function SearchBar({
           aria-label="Search SLP beneficiaries"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      <div className="relative">
+        <select
+          value={sortOrder}
+          onChange={e => onSortChange(e.target.value as typeof sortOrder)}
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+          <option value="firstName_desc">First Name DSC</option>
+          <option value="lastName_asc">Last Name ASC</option>
+          <option value="lastName_desc">Last Name DSC</option>
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       {/* Filter By */}
@@ -483,6 +503,7 @@ type BeneficiaryTableProps = {
   projects: SLPProject[]
   totalCount: number
   isFiltered: boolean
+  activeFilters: string[]
   onView: (b: LivelihoodBeneficiary) => void
   onEdit: (b: LivelihoodBeneficiary) => void
   onRemove: (id: number) => void
@@ -490,7 +511,7 @@ type BeneficiaryTableProps = {
   onViewAssignedProject: (b: LivelihoodBeneficiary) => void
 }
 
-function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -537,15 +558,9 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, onV
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-brand-blue">
-            <td colSpan={9} className="px-4 py-3">
-              <p className="text-white font-bold text-sm">Beneficiaries</p>
-              <p className="text-blue-200 text-xs">{totalCount} record(s)</p>
-            </td>
-          </tr>
-          <tr className="bg-brand-blue">
-            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">#</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Name</th>
-            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>
+            {activeFilters.includes('sex') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>}
+            {activeFilters.includes('civilStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Civil Status</th>}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Barangay</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assigned Project</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Applied</th>
@@ -557,7 +572,7 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, onV
         <tbody>
           {beneficiaries.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-16 text-center">
+              <td colSpan={8 + ['sex', 'civilStatus'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -579,9 +594,9 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, onV
           ) : (
             paginated.map((b, idx) => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{recordStart + idx}</td>
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
+                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
+                {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus ?? '—'}</td>}
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
                 <td className="px-4 py-3">
                   {b.projectName ? (() => {
@@ -700,6 +715,7 @@ export default function SLPTab() {
     })
   }, [])
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -785,6 +801,14 @@ const availableFilters: FilterOption[] = useMemo(() => [
     return result
   }, [beneficiaries, searchQuery, activeFilters, filterValues])
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortOrder) return 0
+    const parts = (n: string) => n.trim().split(/\s+/)
+    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
+    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+  })
+
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
   function buildExportRows() {
@@ -820,7 +844,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   if (isAddOpen) {
     return (
-      <AddSLPProfileWizard
+      <SLPProfileForm
         mode="add"
         initial={{ ...EMPTY_SLP_RECORD }}
         onSave={data => { handleAddBeneficiary(data); setIsAddOpen(false) }}
@@ -831,7 +855,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   if (viewingBeneficiary) {
     return (
-      <AddSLPProfileWizard
+      <SLPProfileForm
         key={viewingBeneficiary.id}
         mode="view"
         initial={viewingBeneficiary}
@@ -844,7 +868,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   if (editingBeneficiary) {
     return (
-      <AddSLPProfileWizard
+      <SLPProfileForm
         key={editingBeneficiary.id}
         mode="edit"
         initial={editingBeneficiary}
@@ -934,10 +958,12 @@ const availableFilters: FilterOption[] = useMemo(() => [
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
             availableFilters={availableFilters}
+            sortOrder={sortOrder}
             onSearchChange={setSearchQuery}
             onToggleFilter={() => setIsFilterOpen(o => !o)}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
+            onSortChange={setSortOrder}
           />
           <FilterBadges
             activeFilters={activeFilters}
@@ -949,10 +975,11 @@ const availableFilters: FilterOption[] = useMemo(() => [
         </div>
 
         <BeneficiaryTable
-          beneficiaries={filtered}
+          beneficiaries={sorted}
           projects={slpProjects}
-          totalCount={filtered.length}
+          totalCount={sorted.length}
           isFiltered={isFiltered}
+          activeFilters={activeFilters}
           onView={setViewingBeneficiary}
           onEdit={setEditingBeneficiary}
           onRemove={handleRemoveBeneficiary}

@@ -54,7 +54,7 @@ const PARTNER_AGENCIES = [
   'Other',
 ]
 
-const STATUS_OPTIONS: CLPEPFormData['status'][] = ['Planned', 'Active', 'Completed', 'Archived']
+const STATUS_OPTIONS: CLPEPFormData['status'][] = ['Planned', 'Active', 'Completed']
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -225,28 +225,6 @@ export default function CLPEPForm({
             className={inputCls}
             placeholder="Enter location or venue"
           />
-        </div>
-      </div>
-
-      {/* ─── Referral Information ─────────────────────────────────────────────── */}
-      <div className="border-t pt-5 mb-6">
-        <p className={sectionHeadingCls}>Referral Information</p>
-        <label className={labelCls}>Referral Required?</label>
-        <div className="flex gap-6 mt-1">
-          {(['Yes', 'No'] as const).map(val => (
-            <label key={val} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
-              <input
-                type="radio"
-                name="clpep-referralRequired"
-                value={val}
-                checked={formData.referralRequired === val}
-                onChange={() => field('referralRequired', val)}
-                disabled={isView}
-                className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default"
-              />
-              <span className="text-sm text-gray-700">{val}</span>
-            </label>
-          ))}
         </div>
       </div>
 

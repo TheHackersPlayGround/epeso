@@ -13,7 +13,7 @@ function loadPlacements(): Placement[] {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return PLACEMENT_SEED
     const parsed = JSON.parse(raw) as Placement[]
-    return parsed.length > 0 ? parsed : PLACEMENT_SEED
+    return parsed
   } catch {
     return PLACEMENT_SEED
   }
@@ -42,15 +42,19 @@ function PlacementStatusBadge({ status }: { status: Placement['status'] }) {
 
 // ── Search Bar ────────────────────────────────────────────────────────────────
 
+type SortOrder = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
+
 type PlacementsSearchBarProps = {
   searchQuery: string
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
+  sortOrder: SortOrder
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
+  onSortChange: (v: SortOrder) => void
   onExportExcel: () => void
   onExportCsv: () => void
 }
@@ -60,10 +64,12 @@ function PlacementsSearchBar({
   activeFilters,
   isFilterOpen,
   availableFilters,
+  sortOrder,
   onSearchChange,
   onToggleFilter,
   onCloseFilter,
   onAddFilter,
+  onSortChange,
   onExportExcel,
   onExportCsv,
 }: PlacementsSearchBarProps) {
@@ -82,6 +88,22 @@ function PlacementsSearchBar({
           aria-label="Search placements"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      {/* Sort By */}
+      <div className="relative">
+        <select
+          value={sortOrder}
+          onChange={e => onSortChange(e.target.value as SortOrder)}
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+          <option value="firstName_desc">First Name DSC</option>
+          <option value="lastName_asc">Last Name ASC</option>
+          <option value="lastName_desc">Last Name DSC</option>
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       {/* Filter By */}
@@ -639,6 +661,7 @@ function UpdatePlacementStatusModal({ placement, onClose, onSave }: UpdatePlacem
 export default function PlacementsTab() {
   const [placements, setPlacements] = useState<Placement[]>(loadPlacements)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -733,8 +756,17 @@ export default function PlacementsTab() {
       if (filterId === 'employer') result = result.filter(p => p.employer === value)
     }
 
+    if (sortOrder) {
+      result = [...result].sort((a, b) => {
+        const parts = (n: string) => n.trim().split(/\s+/)
+        const keyA = (sortOrder.startsWith('firstName') ? parts(a.applicantName)[0] : parts(a.applicantName).at(-1) ?? '').toLowerCase()
+        const keyB = (sortOrder.startsWith('firstName') ? parts(b.applicantName)[0] : parts(b.applicantName).at(-1) ?? '').toLowerCase()
+        return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+      })
+    }
+
     return result
-  }, [placements, searchQuery, activeFilters, filterValues])
+  }, [placements, searchQuery, activeFilters, filterValues, sortOrder])
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
@@ -747,8 +779,10 @@ export default function PlacementsTab() {
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
             availableFilters={availableFilters}
+            sortOrder={sortOrder}
             onSearchChange={v => setSearchQuery(v)}
             onToggleFilter={() => setIsFilterOpen(o => !o)}
+            onSortChange={setSortOrder}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
             onExportExcel={handleExportExcel}

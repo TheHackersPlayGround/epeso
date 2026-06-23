@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, AlertCircle,
+  Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
@@ -30,7 +30,9 @@ const DEFAULT_SERVICES = [
 // ─── CLPEP localStorage helpers ───────────────────────────────────────────────
 
 const CLPEP_INTERVENTIONS_LS_KEY = 'lp_clpep_interventions_v1'
-const SLP_BENEFICIARIES_LS_KEY = 'lp_slp_v6'
+const SLP_BENEFICIARIES_LS_KEY = 'lp_slp_v7'
+const DILP_BENEFICIARIES_LS_KEY = 'lp_dileep_v5'
+const CLPEP_BENEFICIARIES_LS_KEY = 'lp_clpep_v8'
 
 function loadCLPEPInterventions(): CLPEPIntervention[] {
   try {
@@ -199,12 +201,26 @@ const blankDilpForm: DILPFormData = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function loadBeneficiaries(): LivelihoodBeneficiary[] {
-  const raw = localStorage.getItem('lp_dileep_v2')
+  const raw = localStorage.getItem(DILP_BENEFICIARIES_LS_KEY)
   return raw ? JSON.parse(raw) : LIVELIHOOD_SEED
 }
 
 function saveBeneficiaries(data: LivelihoodBeneficiary[]) {
-  localStorage.setItem('lp_dileep_v2', JSON.stringify(data))
+  localStorage.setItem(DILP_BENEFICIARIES_LS_KEY, JSON.stringify(data))
+}
+
+function loadSlpBeneficiaries(): LivelihoodBeneficiary[] {
+  try {
+    const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function loadClpepBeneficiaries(): LivelihoodBeneficiary[] {
+  try {
+    const raw = localStorage.getItem(CLPEP_BENEFICIARIES_LS_KEY)
+    return raw ? JSON.parse(raw) : LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
+  } catch { return [] }
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -236,6 +252,8 @@ export default function LivelihoodMaintenanceForm() {
   const [filterService, setFilterService] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
 
   // CLPEP interventions from CLPEPTab localStorage (settable so new adds appear immediately)
   const [clpepInterventions, setClpepInterventions] = useState<CLPEPIntervention[]>(loadCLPEPInterventions)
@@ -289,6 +307,11 @@ export default function LivelihoodMaintenanceForm() {
       a.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesService && matchesStatus && matchesSearch
   })
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / perPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedProjects = filteredProjects.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = filteredProjects.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, filteredProjects.length)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -932,6 +955,45 @@ export default function LivelihoodMaintenanceForm() {
     )
   }
 
+  // ── Participant count helpers (read from localStorage on each render) ────────
+
+  const dilpBeneficiaryCountMap = (() => {
+    const map: Record<number, number> = {}
+    loadBeneficiaries().forEach(b => {
+      if (b.assignedDilpProjectId != null)
+        map[b.assignedDilpProjectId] = (map[b.assignedDilpProjectId] ?? 0) + 1
+    })
+    return map
+  })()
+
+  const slpBeneficiaryCountMap = (() => {
+    const map: Record<number, number> = {}
+    loadSlpBeneficiaries().forEach(b => {
+      if (b.assignedSlpProjectId != null)
+        map[b.assignedSlpProjectId] = (map[b.assignedSlpProjectId] ?? 0) + 1
+    })
+    return map
+  })()
+
+  const clpepBeneficiaryCountMap = (() => {
+    const map: Record<number, number> = {}
+    loadClpepBeneficiaries().forEach(b => {
+      if (b.assignedInterventionId != null)
+        map[b.assignedInterventionId] = (map[b.assignedInterventionId] ?? 0) + 1
+    })
+    return map
+  })()
+
+  const getParticipantCount = (a: ProgramActivity): number | undefined => {
+    if (a.service === 'DILEEP (DILP)' || a.service === 'DILEEP (TUPAD)')
+      return dilpBeneficiaryCountMap[a.id]
+    if (a.service === 'SLP')
+      return slpBeneficiaryCountMap[a.id]
+    if (a.id >= 900000)
+      return clpepBeneficiaryCountMap[a.id - 900000]
+    return undefined
+  }
+
   // ── Render: view projects ─────────────────────────────────────────────────
 
   const renderViewProjects = () => (
@@ -943,7 +1005,7 @@ export default function LivelihoodMaintenanceForm() {
           {SERVICE_TABS.map(tab => (
             <button
               key={tab.value}
-              onClick={() => setFilterService(tab.value)}
+              onClick={() => { setFilterService(tab.value); setCurrentPage(1) }}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 filterService === tab.value
                   ? 'bg-brand-blue text-white'
@@ -958,7 +1020,7 @@ export default function LivelihoodMaintenanceForm() {
         <div className="flex gap-3">
           <select
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
             className="w-44 flex-shrink-0 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent text-sm text-gray-900 bg-white"
           >
             <option value="All">All Status</option>
@@ -974,7 +1036,7 @@ export default function LivelihoodMaintenanceForm() {
               type="text"
               placeholder="Search by project title or service..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
               className={inputCls + ' pl-9'}
             />
           </div>
@@ -1098,7 +1160,7 @@ export default function LivelihoodMaintenanceForm() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProjects.map(a => (
+                {paginatedProjects.map(a => (
                   <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-800 text-sm">{a.title}</p>
@@ -1114,7 +1176,7 @@ export default function LivelihoodMaintenanceForm() {
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 text-center">
-                      {a.participants ?? '—'}
+                      {getParticipantCount(a) ?? '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={a.status} />
@@ -1139,6 +1201,22 @@ export default function LivelihoodMaintenanceForm() {
                 ))}
               </tbody>
             </table>
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                Show
+                <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue">
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                per page
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                <span>{recordStart} to {recordEnd} of {filteredProjects.length} records</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1153,14 +1231,12 @@ export default function LivelihoodMaintenanceForm() {
     let participants: LivelihoodBeneficiary[]
     if (isCLPEP) {
       const realId = selectedProject.id - 900000
-      try {
-        const raw = localStorage.getItem('lp_clpep_v6')
-        const clpepBeneficiaries: LivelihoodBeneficiary[] = raw ? JSON.parse(raw) : LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
-        participants = clpepBeneficiaries.filter(b => b.assignedInterventionId === realId)
-      } catch { participants = [] }
+      participants = loadClpepBeneficiaries().filter(b => b.assignedInterventionId === realId)
+    } else if (selectedProject.service === 'SLP') {
+      participants = loadSlpBeneficiaries().filter(b => b.assignedSlpProjectId === selectedProject.id)
     } else {
-      const allBeneficiaries = loadBeneficiaries()
-      participants = allBeneficiaries.filter(b => b.assignedDilpProjectId === selectedProject.id)
+      // DILEEP (DILP) or DILEEP (TUPAD)
+      participants = loadBeneficiaries().filter(b => b.assignedDilpProjectId === selectedProject.id)
     }
 
     const BENEFICIARY_STATUS_COLORS: Record<string, string> = {
@@ -1197,7 +1273,7 @@ export default function LivelihoodMaintenanceForm() {
           <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
             <Users size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-gray-500 text-sm">No participants assigned to this intervention yet.</p>
-            <p className="text-gray-400 text-xs mt-1">Assign beneficiaries from the {isCLPEP ? 'CLPEP' : 'Livelihood (DILEEP)'} module.</p>
+            <p className="text-gray-400 text-xs mt-1">Assign beneficiaries from the {isCLPEP ? 'CLPEP' : selectedProject?.service === 'SLP' ? 'SLP' : 'Livelihood (DILEEP)'} module.</p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

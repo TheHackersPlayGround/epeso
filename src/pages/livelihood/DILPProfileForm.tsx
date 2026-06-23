@@ -86,7 +86,7 @@ export const EMPTY_DILP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-type DILPWizardProps = {
+type DILPProfileFormProps = {
   initial: Omit<LivelihoodBeneficiary, 'id'>
   mode: 'add' | 'edit' | 'view'
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
@@ -156,7 +156,7 @@ function FormUploadSection({ forms, onChange }: FormUploadSectionProps) {
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function AddDILPProfileWizard({ initial, mode, onSave, onClose, onEdit }: DILPWizardProps) {
+export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit }: DILPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
     ...EMPTY_DILP_RECORD,
@@ -786,8 +786,8 @@ export default function AddDILPProfileWizard({ initial, mode, onSave, onClose, o
   const headerTitle = isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add'
-      ? 'Add new profile'
-      : 'Edit profile'
+      ? 'Add new profile - DILP'
+      : 'Edit profile - DILP'
 
   const isLastStep = currentStep === STEPS.length
 

@@ -84,7 +84,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
         if (tab === 'About PESO') setCurrentPage('about')
         if (tab === 'Dashboard') setCurrentPage('dashboard')
       }}
-      onLogout={() => setCurrentPage('dashboard')}
+      onLogout={onLogout}
       onProfileClick={() => setCurrentPage('profile')}
       username={getCurrentUsername()}
     />

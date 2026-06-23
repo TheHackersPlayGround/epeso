@@ -25,25 +25,10 @@ const AVAILABLE_FILTERS: FilterOption[] = [
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
-type VacanciesToolbarProps = { onAdd: () => void }
-
-function VacanciesToolbar({ onAdd }: VacanciesToolbarProps) {
-  return (
-    <div className="flex gap-2">
-      <button
-        onClick={onAdd}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm"
-      >
-        <Plus size={16} />
-        Add Vacancy
-      </button>
-    </div>
-  )
-}
-
 // ── Search Bar ────────────────────────────────────────────────────────────────
 
 type VacanciesSearchBarProps = {
+  onAdd: () => void
   searchQuery: string
   activeFilters: string[]
   isFilterOpen: boolean
@@ -54,6 +39,7 @@ type VacanciesSearchBarProps = {
 }
 
 function VacanciesSearchBar({
+  onAdd,
   searchQuery,
   activeFilters,
   isFilterOpen,
@@ -66,6 +52,13 @@ function VacanciesSearchBar({
 
   return (
     <div className="flex flex-wrap gap-3">
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap"
+      >
+        <Plus size={16} />
+        Add Vacancy
+      </button>
       <div className="relative flex-1 min-w-48">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -409,7 +402,7 @@ type SimpleApplicant = { id: number; name: string; skills: string; education: st
 
 function loadApplicantsForMatch(): SimpleApplicant[] {
   try {
-    const raw = localStorage.getItem('ef_applicants')
+    const raw = localStorage.getItem('ef_applicants_v2')
     if (raw) {
       const list = JSON.parse(raw) as Array<{ id: number; name: string; skills: string; education: string }>
       return list.map(a => ({ id: a.id, name: a.name, skills: a.skills ?? '', education: a.education ?? '' }))
@@ -455,7 +448,27 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
                   )}
                 </div>
                 <button
-                  onClick={() => setReferred(prev => new Set(prev).add(applicant.id))}
+                  onClick={() => {
+                    if (referred.has(applicant.id)) return
+                    // Write referral to ef_referrals
+                    try {
+                      const raw = localStorage.getItem('ef_referrals')
+                      const existing = raw ? JSON.parse(raw) : []
+                      const newReferral = {
+                        id: Date.now(),
+                        applicantId: applicant.id,
+                        applicantName: applicant.name,
+                        vacancyId: vacancy.id,
+                        jobTitle: vacancy.jobTitle,
+                        employer: vacancy.employer,
+                        referralDate: new Date().toISOString().slice(0, 10),
+                        status: 'Pending',
+                        notes: '',
+                      }
+                      localStorage.setItem('ef_referrals', JSON.stringify([newReferral, ...existing]))
+                    } catch { /* quota */ }
+                    setReferred(prev => new Set(prev).add(applicant.id))
+                  }}
                   disabled={referred.has(applicant.id)}
                   className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
                     referred.has(applicant.id)
@@ -922,13 +935,10 @@ export default function VacanciesTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-white rounded-xl shadow-md p-3">
-        <VacanciesToolbar onAdd={() => setShowAddModal(true)} />
-      </div>
-
       <div className="bg-white rounded-xl shadow-md p-4">
         <div className="mb-4">
           <VacanciesSearchBar
+            onAdd={() => setShowAddModal(true)}
             searchQuery={searchQuery}
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}

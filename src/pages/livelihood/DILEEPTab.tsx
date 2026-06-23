@@ -7,13 +7,13 @@ import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
-import AddDILPProfileWizard, { EMPTY_DILP_RECORD } from './AddDILPProfileWizard'
-import AddTUPADProfileModal, { EMPTY_TUPAD_RECORD } from './AddTUPADProfileModal'
+import DILPProfileForm, { EMPTY_DILP_RECORD } from './DILPProfileForm'
+import TUPADProfileForm, { EMPTY_TUPAD_RECORD } from './TUPADProfileForm'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_dileep_v4'
+const LS_KEY = 'lp_dileep_v5'
 
 type DILEEPProgram = 'DILEEP (DILP)' | 'DILEEP (TUPAD)'
 
@@ -377,6 +377,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [perPage, setPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [viewingBeneficiary, setViewingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
@@ -516,12 +517,19 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
     return result
   }, [programRecords, searchQuery, activeFilters, filterValues])
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortOrder) return 0
+    const keyA = (sortOrder.startsWith('firstName') ? (a.firstName ?? a.name.split(' ')[0] ?? '') : (a.lastName ?? a.name.split(' ').at(-1) ?? '')).toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? (b.firstName ?? b.name.split(' ')[0] ?? '') : (b.lastName ?? b.name.split(' ').at(-1) ?? '')).toLowerCase()
+    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+  })
+
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
-  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage)
-  const recordStart = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1
-  const recordEnd = Math.min(safePage * perPage, filtered.length)
+  const paginated = sorted.slice((safePage - 1) * perPage, safePage * perPage)
+  const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
+  const recordEnd = Math.min(safePage * perPage, sorted.length)
 
   const menuBeneficiary = paginated.find(b => b.id === openMenuId) ?? null
 
@@ -562,7 +570,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
   if (program === 'DILEEP (DILP)') {
     if (isAddOpen) {
       return (
-        <AddDILPProfileWizard
+        <DILPProfileForm
           mode="add"
           initial={{ ...EMPTY_DILP_RECORD, service: program }}
           onSave={handleAddBeneficiary}
@@ -572,7 +580,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
     }
     if (editingBeneficiary) {
       return (
-        <AddDILPProfileWizard
+        <DILPProfileForm
           key={editingBeneficiary.id}
           mode="edit"
           initial={editingBeneficiary}
@@ -583,7 +591,43 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
     }
     if (viewingBeneficiary) {
       return (
-        <AddDILPProfileWizard
+        <DILPProfileForm
+          key={viewingBeneficiary.id}
+          mode="view"
+          initial={viewingBeneficiary}
+          onSave={() => {}}
+          onClose={() => setViewingBeneficiary(null)}
+          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
+        />
+      )
+    }
+  }
+
+  if (program === 'DILEEP (TUPAD)') {
+    if (isAddOpen) {
+      return (
+        <TUPADProfileForm
+          mode="add"
+          initial={{ ...EMPTY_TUPAD_RECORD, service: program }}
+          onSave={handleAddBeneficiary}
+          onClose={() => setIsAddOpen(false)}
+        />
+      )
+    }
+    if (editingBeneficiary) {
+      return (
+        <TUPADProfileForm
+          key={editingBeneficiary.id}
+          mode="edit"
+          initial={editingBeneficiary}
+          onSave={handleEditSave}
+          onClose={() => setEditingBeneficiary(null)}
+        />
+      )
+    }
+    if (viewingBeneficiary) {
+      return (
+        <TUPADProfileForm
           key={viewingBeneficiary.id}
           mode="view"
           initial={viewingBeneficiary}
@@ -655,6 +699,20 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
             </div>
 
             <div className="relative">
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as typeof sortOrder)}
+                className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+              >
+                <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+                <option value="firstName_desc">First Name DSC</option>
+                <option value="lastName_asc">Last Name ASC</option>
+                <option value="lastName_desc">Last Name DSC</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
+            <div className="relative">
               <button
                 onClick={() => setIsFilterOpen(o => !o)}
                 className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
@@ -719,18 +777,10 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
 
         <table className="w-full text-sm">
           <thead>
-            {/* Section header */}
             <tr className="bg-brand-blue">
-              <td colSpan={8} className="px-5 py-4">
-                <p className="text-white font-bold text-base">Beneficiaries</p>
-                <p className="text-white/70 text-xs">{filtered.length} record(s)</p>
-              </td>
-            </tr>
-            {/* Column headers — same style as other tables */}
-            <tr className="bg-brand-blue border-t border-blue-500">
-              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap w-10">#</th>
               <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">NAME</th>
-              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">SEX</th>
+              {activeFilters.includes('sex') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">SEX</th>}
+              {activeFilters.includes('civilStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">CIVIL STATUS</th>}
               <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">BARANGAY</th>
               <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">ASSIGNED PROJECT</th>
               <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">DATE APPLIED</th>
@@ -741,7 +791,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center">
+                <td colSpan={7 + ['sex', 'civilStatus'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-3 text-gray-400">
                     <Users size={48} strokeWidth={1.5} />
                     {isFiltered ? (
@@ -761,9 +811,9 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
             ) : (
               paginated.map((b, idx) => (
                 <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{recordStart + idx}</td>
                   <td className="px-4 py-3 text-gray-800 font-semibold whitespace-nowrap">{formatDisplayName(b)}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '-'}</td>
+                  {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
+                  {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus ?? '—'}</td>}
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
                   <td className="px-4 py-3">
                     {b.projectName ? (
@@ -837,7 +887,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
             >
               <ChevronLeft size={16} />
             </button>
-            <span>{recordStart} to {recordEnd} of {filtered.length} records</span>
+            <span>{recordStart} to {recordEnd} of {sorted.length} records</span>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
@@ -893,33 +943,6 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
         />
       )}
 
-      {program === 'DILEEP (TUPAD)' && isAddOpen && (
-        <AddTUPADProfileModal
-          mode="add"
-          initial={{ ...EMPTY_TUPAD_RECORD, service: program }}
-          onSave={handleAddBeneficiary}
-          onClose={() => setIsAddOpen(false)}
-        />
-      )}
-      {program === 'DILEEP (TUPAD)' && editingBeneficiary && (
-        <AddTUPADProfileModal
-          key={editingBeneficiary.id}
-          mode="edit"
-          initial={editingBeneficiary}
-          onSave={handleEditSave}
-          onClose={() => setEditingBeneficiary(null)}
-        />
-      )}
-      {program === 'DILEEP (TUPAD)' && viewingBeneficiary && (
-        <AddTUPADProfileModal
-          key={viewingBeneficiary.id}
-          mode="view"
-          initial={viewingBeneficiary}
-          onSave={() => {}}
-          onClose={() => setViewingBeneficiary(null)}
-          onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
-        />
-      )}
 
     </div>
   )

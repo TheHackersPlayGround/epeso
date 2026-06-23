@@ -1,135 +1,62 @@
-import { useState, useRef, useEffect } from 'react'
-import { X, Users, Plus, Paperclip, Upload, ChevronDown } from 'lucide-react'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import { useState } from 'react'
+import { X, Users, Plus, Paperclip } from 'lucide-react'
+import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: LivelihoodStatus[] = ['Active', 'Completed', 'Dropped']
-
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
 
-const CHILD_LABOR_STATUS_OPTIONS = [
-  'Child Laborer',
-  'At Risk of Child Labor',
-  'Former Child Laborer',
-  'Not Yet Assessed',
-] as const
-
-const SCHOOL_STATUS_OPTIONS = [
-  'Currently Enrolled',
-  'Out of School',
-  'ALS Learner',
-  'Graduated',
-] as const
-
-const RELATIONSHIP_OPTIONS = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Relative', 'Others'] as const
-
-const ASSIGNED_INTERVENTION_OPTIONS = [
-  'Skills Training',
-  'Livelihood Assistance',
-  'Referral to Employment',
-  'Other',
-] as const
-
-const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] as const
-
-// ─── Custom Select Dropdown ───────────────────────────────────────────────────
-
-type SelectDropdownProps = {
-  id: string
-  value: string
-  options: readonly string[]
-  placeholder?: string
-  onChange: (value: string) => void
-  disabled?: boolean
+const STATUS_BADGE: Record<string, string> = {
+  Active:   'bg-green-100 text-green-700',
+  Inactive: 'bg-gray-100 text-gray-500',
+  Dropped:  'bg-red-100 text-red-600',
 }
 
-function SelectDropdown({ id, value, options, placeholder = 'Select', onChange, disabled }: SelectDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Special'] as const
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    if (isOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen])
+const SLP_TRACK_OPTIONS = [
+  'Enterprise - Individual',
+  'Enterprise - Association',
+  'Employment',
+] as const
 
-  function handleToggle() {
-    if (disabled) return
-    if (!isOpen && ref.current) {
-      const rect = ref.current.getBoundingClientRect()
-      const estimatedHeight = Math.min((options.length + 1) * 42, 240)
-      setDropUp(window.innerHeight - rect.bottom < estimatedHeight + 8)
-    }
-    setIsOpen(o => !o)
-  }
+const VULNERABILITY_SEVERITY_OPTIONS = ['Low', 'Medium', 'High'] as const
 
-  return (
-    <div ref={ref} className="relative">
-      <button
-        id={id}
-        type="button"
-        disabled={disabled}
-        onClick={handleToggle}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        className={`w-full flex items-center justify-between px-4 py-2 border rounded-full text-sm text-gray-900 bg-white transition-colors outline-none disabled:bg-gray-50 disabled:cursor-default ${
-          isOpen ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-gray-300 hover:border-brand-blue'
-        }`}
-      >
-        <span className={value ? 'text-gray-900' : 'text-gray-400'}>{value || placeholder}</span>
-        <ChevronDown size={16} className={`text-gray-500 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+const ASSESSMENT_RESULT_OPTIONS = ['Qualified', 'Not Qualified'] as const
 
-      {isOpen && (
-        <ul
-          role="listbox"
-          className={`absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto ${
-            dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
-          }`}
-        >
-          <li
-            role="option"
-            aria-selected={value === ''}
-            onClick={() => { onChange(''); setIsOpen(false) }}
-            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-              value === '' ? 'bg-blue-100 text-brand-blue font-medium' : 'text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {placeholder}
-          </li>
-          {options.map(opt => (
-            <li
-              key={opt}
-              role="option"
-              aria-selected={value === opt}
-              onClick={() => { onChange(opt); setIsOpen(false) }}
-              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-                value === opt ? 'bg-blue-100 text-brand-blue font-medium' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {opt}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
+const EDUCATIONAL_ATTAINMENT_OPTIONS = [
+  'No Formal Education',
+  'Elementary Level',
+  'Elementary Graduate',
+  'High School Level',
+  'High School Graduate',
+  'Vocational/Technical',
+  'College Level',
+  'College Graduate',
+  'Post Graduate',
+] as const
+
+const SECTOR_OPTIONS = [
+  'Indigenous People (IP)',
+  'Internally Displaced Person (IDP)',
+  'Overseas Filipino Worker (OFW)',
+  'Person with Disability (PWD)',
+  'Senior Citizen',
+  'Solo Parent',
+  'Agrarian Reform Beneficiary (ARB)',
+  'Farmer/Fisherfolk',
+  'Others',
+] as const
+
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI'] as const
 
 const STEPS = [
-  { id: 1, label: 'PERSONAL INFORMATION' },
-  { id: 2, label: 'ADDRESS INFORMATION' },
-  { id: 3, label: 'CHILD LABOR INFORMATION' },
-  { id: 4, label: 'PARENT / GUARDIAN' },
-  { id: 5, label: 'APPLICATION DETAILS' },
+  { id: 1, label: 'SLP INFORMATION' },
+  { id: 2, label: 'PERSONAL INFORMATION' },
+  { id: 3, label: 'ADDRESS INFORMATION' },
+  { id: 4, label: 'SECTOR CLASSIFICATION' },
+  { id: 5, label: 'ASSESSMENT SUMMARY' },
   { id: 6, label: 'ATTACHMENTS' },
-  { id: 7, label: 'PESO OFFICE ONLY' },
 ] as const
 
 // ─── Shared CSS class strings ─────────────────────────────────────────────────
@@ -146,9 +73,9 @@ const labelClass = 'block text-gray-700 mb-2 text-xs font-semibold uppercase'
 
 // ─── Empty record ─────────────────────────────────────────────────────────────
 
-export const EMPTY_CLPEP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
+export const EMPTY_SLP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   name: '',
-  service: 'CLPEP',
+  service: 'SLP',
   status: 'Active',
   firstName: '',
   lastName: '',
@@ -165,29 +92,26 @@ export const EMPTY_CLPEP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   barangay: '',
   cityMunicipality: 'Tangub City',
   province: 'Misamis Occidental',
-  childLaborStatus: '',
-  schoolStatus: '',
-  natureOfWork: '',
-  currentlyWorking: undefined,
-  hoursWorkedPerWeek: '',
-  schoolName: '',
-  gradeYearLevel: '',
-  guardianName: '',
-  guardianRelationship: '',
-  guardianContactNumber: '',
-  dateApplied: '',
-  cooperativeName: '',
-  cooperativeRole: '',
+  is4PsBeneficiary: false,
+  slpParticipantIdNumber: '',
+  eligibilityType: 'Regular',
+  sector: [],
+  sectorOthersSpecify: '',
+  educationalAttainment: '',
+  sourceOfIncome: '',
+  totalHouseholdMonthlyIncome: '',
+  householdVulnerabilityScore: '',
+  vulnerabilitySeverity: 'Low',
+  assessmentResult: 'Qualified',
+  slpTrack: 'Enterprise - Individual',
   remarks: '',
-  caseReportFile: '',
+  dateApplied: '',
   attachedForms: [],
-  dateApplicationReceived: '',
-  receivedBy: '',
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-type CLPEPWizardProps = {
+type SLPProfileFormProps = {
   initial: Omit<LivelihoodBeneficiary, 'id'>
   mode: 'add' | 'edit' | 'view'
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
@@ -197,10 +121,10 @@ type CLPEPWizardProps = {
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, onEdit }: CLPEPWizardProps) {
+export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit }: SLPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
-    ...EMPTY_CLPEP_RECORD,
+    ...EMPTY_SLP_RECORD,
     ...initial,
   })
   const [newFormName, setNewFormName] = useState('')
@@ -222,6 +146,15 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
     updateField({ birthdate: value, age: ageCalculated })
   }
 
+  function handleSectorToggle(option: string) {
+    if (isViewMode) return
+    const current = formData.sector ?? []
+    const next = current.includes(option)
+      ? current.filter(s => s !== option)
+      : [...current, option]
+    updateField({ sector: next })
+  }
+
   function handleNext() {
     if (currentStep < STEPS.length) setCurrentStep(step => step + 1)
   }
@@ -236,17 +169,13 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
       alert('Last name and first name are required.')
       return
     }
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
-      .filter(Boolean)
-      .join(' ')
+    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
     onSave({ ...formData, name: fullName })
   }
 
   function handleSaveAsDraft() {
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
-      .filter(Boolean)
-      .join(' ')
+    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = (formData.lastName
       ? `${formData.lastName}, ${givenNames}`
       : givenNames) || 'Draft'
@@ -285,13 +214,6 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
     updateField({ attachedForms: current.filter((_, i) => i !== index) })
   }
 
-  function handleCaseReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    updateField({ caseReportFile: file.name })
-    event.target.value = ''
-  }
-
   // ── Section header ─────────────────────────────────────────────────
 
   function SectionHeader({ title }: { title: string }) {
@@ -307,37 +229,95 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
   function renderStep1() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="I. PERSONAL INFORMATION" />
+        <SectionHeader title="I. SLP INFORMATION" />
+
+        <div>
+          <label htmlFor="slp-participantId" className={labelClass}>
+            SLP Participant ID Number
+          </label>
+          <input
+            id="slp-participantId"
+            className={inputClass}
+            placeholder="Enter participant ID number"
+            value={formData.slpParticipantIdNumber ?? ''}
+            onChange={e => updateField({ slpParticipantIdNumber: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>
+            Participant Type <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-6 mt-1">
+            {[{ label: '4Ps', value: true }, { label: 'Non-4Ps', value: false }].map(option => (
+              <label key={option.label} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="slpParticipantType"
+                  checked={formData.is4PsBeneficiary === option.value}
+                  onChange={() => updateField({ is4PsBeneficiary: option.value })}
+                  className="w-4 h-4 accent-brand-blue"
+                />
+                <span className="text-sm text-gray-700">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="slp-eligibilityType" className={labelClass}>Eligibility Type</label>
+          <select
+            id="slp-eligibilityType"
+            className={selectClass}
+            value={formData.eligibilityType ?? ''}
+            onChange={e => updateField({ eligibilityType: e.target.value })}
+          >
+            <option value="">Select</option>
+            {ELIGIBILITY_TYPE_OPTIONS.map(opt => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    )
+  }
+
+  function renderStep2() {
+    return (
+      <div className="space-y-5">
+        <SectionHeader title="II. PERSONAL INFORMATION" />
 
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <label htmlFor="clpep-lastName" className={labelClass}>
+            <label htmlFor="slp-lastName" className={labelClass}>
               Last Name <span className="text-red-500">*</span>
             </label>
             <input
-              id="clpep-lastName"
+              id="slp-lastName"
               className={inputClass}
               placeholder="Enter last name"
               value={formData.lastName ?? ''}
               onChange={e => updateField({ lastName: e.target.value })}
+              required
             />
           </div>
           <div>
-            <label htmlFor="clpep-firstName" className={labelClass}>
+            <label htmlFor="slp-firstName" className={labelClass}>
               First Name <span className="text-red-500">*</span>
             </label>
             <input
-              id="clpep-firstName"
+              id="slp-firstName"
               className={inputClass}
               placeholder="Enter first name"
               value={formData.firstName ?? ''}
               onChange={e => updateField({ firstName: e.target.value })}
+              required
             />
           </div>
           <div>
-            <label htmlFor="clpep-middleName" className={labelClass}>Middle Name</label>
+            <label htmlFor="slp-middleName" className={labelClass}>Middle Name</label>
             <input
-              id="clpep-middleName"
+              id="slp-middleName"
               className={inputClass}
               placeholder="Enter middle name"
               value={formData.middleName ?? ''}
@@ -345,9 +325,9 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
             />
           </div>
           <div>
-            <label htmlFor="clpep-nameExtension" className={labelClass}>Extension Name</label>
+            <label htmlFor="slp-nameExtension" className={labelClass}>Extension Name</label>
             <input
-              id="clpep-nameExtension"
+              id="slp-nameExtension"
               className={inputClass}
               placeholder="Jr., Sr., III"
               value={formData.nameExtension ?? ''}
@@ -358,21 +338,22 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
 
         <div className="grid grid-cols-5 gap-4">
           <div>
-            <label htmlFor="clpep-birthdate" className={labelClass}>
+            <label htmlFor="slp-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
             <input
-              id="clpep-birthdate"
+              id="slp-birthdate"
               type="date"
               className={inputClass}
               value={formData.birthdate ?? ''}
               onChange={e => handleBirthdate(e.target.value)}
+              required
             />
           </div>
           <div>
-            <label htmlFor="clpep-age" className={labelClass}>Age</label>
+            <label htmlFor="slp-age" className={labelClass}>Age</label>
             <input
-              id="clpep-age"
+              id="slp-age"
               type="number"
               className={inputClass + ' bg-gray-50'}
               value={formData.age || ''}
@@ -380,14 +361,15 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
             />
           </div>
           <div>
-            <label htmlFor="clpep-sex" className={labelClass}>
+            <label htmlFor="slp-sex" className={labelClass}>
               Sex <span className="text-red-500">*</span>
             </label>
             <select
-              id="clpep-sex"
+              id="slp-sex"
               className={selectClass}
               value={formData.sex ?? ''}
               onChange={e => updateField({ sex: e.target.value })}
+              required
             >
               <option value="">Select</option>
               <option>Male</option>
@@ -395,9 +377,9 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
             </select>
           </div>
           <div>
-            <label htmlFor="clpep-civilStatus" className={labelClass}>Civil Status</label>
+            <label htmlFor="slp-civilStatus" className={labelClass}>Civil Status</label>
             <select
-              id="clpep-civilStatus"
+              id="slp-civilStatus"
               className={selectClass}
               value={formData.civilStatus ?? ''}
               onChange={e => updateField({ civilStatus: e.target.value })}
@@ -407,9 +389,9 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
             </select>
           </div>
           <div>
-            <label htmlFor="clpep-contactNumber" className={labelClass}>Contact Number</label>
+            <label htmlFor="slp-contactNumber" className={labelClass}>Contact Number</label>
             <input
-              id="clpep-contactNumber"
+              id="slp-contactNumber"
               className={inputClass}
               placeholder="09XXXXXXXXX"
               value={formData.contactNumber ?? ''}
@@ -419,9 +401,9 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
         </div>
 
         <div>
-          <label htmlFor="clpep-email" className={labelClass}>Email Address</label>
+          <label htmlFor="slp-email" className={labelClass}>Email Address</label>
           <input
-            id="clpep-email"
+            id="slp-email"
             type="email"
             className={inputClass}
             placeholder="juan.delacruz@example.com"
@@ -433,17 +415,17 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
     )
   }
 
-  function renderStep2() {
+  function renderStep3() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="II. ADDRESS INFORMATION" />
+        <SectionHeader title="III. ADDRESS INFORMATION" />
 
         <div>
-          <label htmlFor="clpep-houseBlockLot" className={labelClass}>
+          <label htmlFor="slp-houseBlockLot" className={labelClass}>
             House / Block / Lot Number
           </label>
           <input
-            id="clpep-houseBlockLot"
+            id="slp-houseBlockLot"
             className={inputClass}
             placeholder="Enter house, block, or lot number"
             value={formData.houseBlockLotNo ?? ''}
@@ -452,9 +434,9 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
         </div>
 
         <div>
-          <label htmlFor="clpep-streetPurok" className={labelClass}>Street / Purok / Zone</label>
+          <label htmlFor="slp-streetPurok" className={labelClass}>Street / Purok / Zone</label>
           <input
-            id="clpep-streetPurok"
+            id="slp-streetPurok"
             className={inputClass}
             placeholder="Enter street, purok, or zone"
             value={formData.streetPurok ?? ''}
@@ -464,30 +446,31 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label htmlFor="clpep-barangay" className={labelClass}>
+            <label htmlFor="slp-barangay" className={labelClass}>
               Barangay <span className="text-red-500">*</span>
             </label>
             <input
-              id="clpep-barangay"
+              id="slp-barangay"
               className={inputClass}
               placeholder="Enter barangay"
               value={formData.barangay ?? ''}
               onChange={e => updateField({ barangay: e.target.value })}
+              required
             />
           </div>
           <div>
-            <label htmlFor="clpep-city" className={labelClass}>Municipality / City</label>
+            <label htmlFor="slp-city" className={labelClass}>Municipality / City</label>
             <input
-              id="clpep-city"
+              id="slp-city"
               className={inputClass}
               value={formData.cityMunicipality ?? ''}
               onChange={e => updateField({ cityMunicipality: e.target.value })}
             />
           </div>
           <div>
-            <label htmlFor="clpep-province" className={labelClass}>Province</label>
+            <label htmlFor="slp-province" className={labelClass}>Province</label>
             <input
-              id="clpep-province"
+              id="slp-province"
               className={inputClass}
               value={formData.province ?? ''}
               onChange={e => updateField({ province: e.target.value })}
@@ -498,141 +481,53 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
     )
   }
 
-  function renderStep3() {
+  function renderStep4() {
+    const selectedSectors = formData.sector ?? []
+
     return (
       <div className="space-y-5">
-        <SectionHeader title="III. CHILD LABOR INFORMATION" />
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-childLaborStatus" className={labelClass}>Child Labor Status</label>
-            <SelectDropdown
-              id="clpep-childLaborStatus"
-              value={formData.childLaborStatus ?? ''}
-              options={CHILD_LABOR_STATUS_OPTIONS}
-              onChange={v => updateField({ childLaborStatus: v })}
-              disabled={isViewMode}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-schoolStatus" className={labelClass}>School Status</label>
-            <SelectDropdown
-              id="clpep-schoolStatus"
-              value={formData.schoolStatus ?? ''}
-              options={SCHOOL_STATUS_OPTIONS}
-              onChange={v => updateField({ schoolStatus: v })}
-              disabled={isViewMode}
-            />
-          </div>
-        </div>
+        <SectionHeader title="IV. SECTOR CLASSIFICATION" />
 
         <div>
-          <label htmlFor="clpep-natureOfWork" className={labelClass}>Nature of Work</label>
-          <input
-            id="clpep-natureOfWork"
-            className={inputClass}
-            placeholder="Enter nature of work"
-            value={formData.natureOfWork ?? ''}
-            onChange={e => updateField({ natureOfWork: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label className={labelClass}>Currently Working?</label>
-          <div className="flex gap-6 mt-1">
-            {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map(option => (
-              <label key={option.label} className="flex items-center gap-2 cursor-pointer">
+          <label className={labelClass}>Sector (Select all that apply)</label>
+          <div className="border border-gray-200 rounded-lg p-3 max-h-56 overflow-y-auto space-y-2">
+            {SECTOR_OPTIONS.map(option => (
+              <label key={option} className="flex items-center gap-2.5 cursor-pointer">
                 <input
-                  type="radio"
-                  name="clpep-currentlyWorking"
-                  checked={formData.currentlyWorking === option.value}
-                  onChange={() => updateField({ currentlyWorking: option.value })}
-                  className="w-4 h-4 accent-brand-blue"
+                  type="checkbox"
+                  checked={selectedSectors.includes(option)}
+                  onChange={() => handleSectorToggle(option)}
+                  className="w-4 h-4 accent-brand-blue rounded"
                 />
-                <span className="text-sm text-gray-700">{option.label}</span>
+                <span className="text-sm text-gray-700">{option}</span>
               </label>
             ))}
           </div>
+          {selectedSectors.includes('Others') && (
+            <input
+              className={inputClass + ' mt-3'}
+              placeholder="Please specify"
+              value={formData.sectorOthersSpecify ?? ''}
+              onChange={e => updateField({ sectorOthersSpecify: e.target.value })}
+            />
+          )}
         </div>
 
         <div>
-          <label htmlFor="clpep-hoursWorkedPerWeek" className={labelClass}>Hours Worked Per Week</label>
-          <input
-            id="clpep-hoursWorkedPerWeek"
-            type="number"
-            min="0"
-            className={inputClass}
-            placeholder="Enter hours per week"
-            value={formData.hoursWorkedPerWeek ?? ''}
-            onChange={e => updateField({ hoursWorkedPerWeek: e.target.value })}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-schoolName" className={labelClass}>School Name</label>
-            <input
-              id="clpep-schoolName"
-              className={inputClass}
-              placeholder="Enter school name"
-              value={formData.schoolName ?? ''}
-              onChange={e => updateField({ schoolName: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-gradeYearLevel" className={labelClass}>Grade / Year Level</label>
-            <input
-              id="clpep-gradeYearLevel"
-              className={inputClass}
-              placeholder="e.g. Grade 7, 2nd Year"
-              value={formData.gradeYearLevel ?? ''}
-              onChange={e => updateField({ gradeYearLevel: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep4() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="IV. PARENT / GUARDIAN INFORMATION" />
-
-        <div>
-          <label htmlFor="clpep-guardianName" className={labelClass}>
-            Parent / Guardian Name <span className="text-red-500">*</span>
+          <label htmlFor="slp-educationalAttainment" className={labelClass}>
+            Educational Attainment
           </label>
-          <input
-            id="clpep-guardianName"
-            className={inputClass}
-            placeholder="Enter parent or guardian name"
-            value={formData.guardianName ?? ''}
-            onChange={e => updateField({ guardianName: e.target.value })}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-guardianRelationship" className={labelClass}>Relationship</label>
-            <SelectDropdown
-              id="clpep-guardianRelationship"
-              value={formData.guardianRelationship ?? ''}
-              options={RELATIONSHIP_OPTIONS}
-              onChange={v => updateField({ guardianRelationship: v })}
-              disabled={isViewMode}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-guardianContactNumber" className={labelClass}>Contact Number</label>
-            <input
-              id="clpep-guardianContactNumber"
-              className={inputClass}
-              placeholder="09XXXXXXXXX"
-              value={formData.guardianContactNumber ?? ''}
-              onChange={e => updateField({ guardianContactNumber: e.target.value })}
-            />
-          </div>
+          <select
+            id="slp-educationalAttainment"
+            className={selectClass}
+            value={formData.educationalAttainment ?? ''}
+            onChange={e => updateField({ educationalAttainment: e.target.value })}
+          >
+            <option value="">Select</option>
+            {EDUCATIONAL_ATTAINMENT_OPTIONS.map(opt => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
         </div>
       </div>
     )
@@ -641,54 +536,107 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
   function renderStep5() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="V. APPLICATION DETAILS" />
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
-            <input
-              id="clpep-dateApplied"
-              type="date"
-              className={inputClass}
-              value={formData.dateApplied ?? ''}
-              onChange={e => updateField({ dateApplied: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-status" className={labelClass}>Status</label>
-            <SelectDropdown
-              id="clpep-status"
-              value={formData.status}
-              options={STATUS_OPTIONS}
-              placeholder="Select"
-              onChange={v => updateField({ status: v as LivelihoodStatus })}
-              disabled={isViewMode}
-            />
-          </div>
-        </div>
+        <SectionHeader title="V. ASSESSMENT SUMMARY" />
 
         <div>
-          <label htmlFor="clpep-assignedIntervention" className={labelClass}>Assigned Intervention</label>
-          <SelectDropdown
-            id="clpep-assignedIntervention"
-            value={formData.cooperativeName ?? ''}
-            options={ASSIGNED_INTERVENTION_OPTIONS}
-            onChange={v => updateField({ cooperativeName: v })}
-            disabled={isViewMode}
+          <label htmlFor="slp-sourceOfIncome" className={labelClass}>Source of Income</label>
+          <input
+            id="slp-sourceOfIncome"
+            className={inputClass}
+            placeholder="Enter source of income"
+            value={formData.sourceOfIncome ?? ''}
+            onChange={e => updateField({ sourceOfIncome: e.target.value })}
           />
         </div>
 
         <div>
-          <label htmlFor="clpep-remarks" className={labelClass}>Remarks</label>
+          <label htmlFor="slp-totalHouseholdIncome" className={labelClass}>
+            Total Household Monthly Income
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
+              ₱
+            </span>
+            <input
+              id="slp-totalHouseholdIncome"
+              type="number"
+              min="0"
+              className={inputClass + ' pl-7'}
+              placeholder="0.00"
+              value={formData.totalHouseholdMonthlyIncome ?? ''}
+              onChange={e => updateField({ totalHouseholdMonthlyIncome: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="slp-vulnerabilityScore" className={labelClass}>
+            Household Vulnerability Score
+          </label>
+          <input
+            id="slp-vulnerabilityScore"
+            className={inputClass}
+            placeholder="Enter score"
+            value={formData.householdVulnerabilityScore ?? ''}
+            onChange={e => updateField({ householdVulnerabilityScore: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="slp-vulnerabilitySeverity" className={labelClass}>
+            Vulnerability Severity
+          </label>
+          <select
+            id="slp-vulnerabilitySeverity"
+            className={selectClass}
+            value={formData.vulnerabilitySeverity ?? VULNERABILITY_SEVERITY_OPTIONS[0]}
+            onChange={e => updateField({ vulnerabilitySeverity: e.target.value })}
+          >
+            {VULNERABILITY_SEVERITY_OPTIONS.map(opt => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="slp-assessmentResult" className={labelClass}>Assessment Result</label>
+          <select
+            id="slp-assessmentResult"
+            className={selectClass}
+            value={formData.assessmentResult ?? ASSESSMENT_RESULT_OPTIONS[0]}
+            onChange={e => updateField({ assessmentResult: e.target.value })}
+          >
+            {ASSESSMENT_RESULT_OPTIONS.map(opt => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="slp-slpTrack" className={labelClass}>SLP Track</label>
+          <select
+            id="slp-slpTrack"
+            className={selectClass}
+            value={formData.slpTrack ?? SLP_TRACK_OPTIONS[0]}
+            onChange={e => updateField({ slpTrack: e.target.value })}
+          >
+            {SLP_TRACK_OPTIONS.map(opt => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="slp-remarks" className={labelClass}>Remarks</label>
           <textarea
-            id="clpep-remarks"
+            id="slp-remarks"
             className={inputClass + ' resize-none'}
-            rows={4}
-            placeholder="Enter remarks"
+            rows={3}
             value={formData.remarks ?? ''}
             onChange={e => updateField({ remarks: e.target.value })}
           />
         </div>
+
       </div>
     )
   }
@@ -699,38 +647,6 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
     return (
       <div className="space-y-5">
         <SectionHeader title="VI. ATTACHMENTS" />
-
-        <div>
-          <p className={labelClass}>Case Report / Referral Form</p>
-          <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg py-8 cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors">
-            {formData.caseReportFile ? (
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <Paperclip size={16} className="text-brand-blue" />
-                <span className="font-medium">{formData.caseReportFile}</span>
-                <button
-                  type="button"
-                  onClick={e => { e.preventDefault(); updateField({ caseReportFile: '' }) }}
-                  aria-label="Remove case report file"
-                  className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <>
-                <Upload size={28} className="text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Click to upload or drag and drop</p>
-                <p className="text-xs text-gray-400 mt-1">PDF, JPG, JPEG, PNG (max. 10MB)</p>
-              </>
-            )}
-            <input
-              type="file"
-              className="sr-only"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleCaseReportUpload}
-            />
-          </label>
-        </div>
 
         <div>
           <p className={labelClass}>Supporting Documents</p>
@@ -791,7 +707,6 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
                 <button
                   type="button"
                   onClick={handleCancelAddingForm}
-                  aria-label="Cancel adding form"
                   className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                 >
                   <X size={14} />
@@ -809,37 +724,41 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
             )}
           </div>
         </div>
-      </div>
-    )
-  }
 
-  function renderStep7() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="VII. PESO OFFICE ONLY" />
-
-        <div>
-          <label htmlFor="clpep-dateApplicationReceived" className={labelClass}>
-            Date Application Received
-          </label>
-          <input
-            id="clpep-dateApplicationReceived"
-            type="date"
-            className={inputClass}
-            value={formData.dateApplicationReceived ?? ''}
-            onChange={e => updateField({ dateApplicationReceived: e.target.value })}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="slp-dateApplied" className={labelClass}>Date Applied</label>
+            <input
+              id="slp-dateApplied"
+              type="date"
+              className={inputClass}
+              value={formData.dateApplied ?? ''}
+              onChange={e => updateField({ dateApplied: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="slp-receivedBy" className={labelClass}>Received By</label>
+            <input
+              id="slp-receivedBy"
+              type="text"
+              className={inputClass}
+              placeholder="Name of receiving officer"
+              value={formData.receivedBy ?? ''}
+              onChange={e => updateField({ receivedBy: e.target.value })}
+            />
+          </div>
         </div>
 
         <div>
-          <label htmlFor="clpep-receivedBy" className={labelClass}>Received By</label>
-          <input
-            id="clpep-receivedBy"
-            className={inputClass}
-            placeholder="Enter name of receiver"
-            value={formData.receivedBy ?? ''}
-            onChange={e => updateField({ receivedBy: e.target.value })}
-          />
+          <label className={labelClass}>Status</label>
+          <div className="flex items-center gap-3">
+            <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_BADGE[formData.status] ?? 'bg-gray-100 text-gray-500'}`}>
+              {formData.status}
+            </span>
+          </div>
+          {!isViewMode && (
+            <p className="text-xs text-gray-400 mt-1.5">Active / Inactive are set automatically based on project assignment.</p>
+          )}
         </div>
       </div>
     )
@@ -853,7 +772,6 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
       case 4: return renderStep4()
       case 5: return renderStep5()
       case 6: return renderStep6()
-      case 7: return renderStep7()
       default: return null
     }
   }
@@ -861,8 +779,8 @@ export default function AddCLPEPProfileWizard({ initial, mode, onSave, onClose, 
   const headerTitle = isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add'
-      ? 'Add new profile'
-      : 'Edit profile'
+      ? 'Add new profile - SLP'
+      : 'Edit profile - SLP'
 
   const isLastStep = currentStep === STEPS.length
 

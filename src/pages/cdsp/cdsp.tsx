@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmtDate } from '../../utils/formatDate'
 import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
@@ -76,7 +77,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -153,6 +154,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   })
 
   const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === 'dateApplied_newest') return (b.dateApplicationReceived || '').localeCompare(a.dateApplicationReceived || '')
+    if (sortOrder === 'dateApplied_oldest') return (a.dateApplicationReceived || '').localeCompare(b.dateApplicationReceived || '')
     if (!sortOrder) return 0
     const keyA = (sortOrder.startsWith('firstName') ? (a.firstName ?? '') : (a.lastName ?? '')).toLowerCase()
     const keyB = (sortOrder.startsWith('firstName') ? (b.firstName ?? '') : (b.lastName ?? '')).toLowerCase()
@@ -359,7 +362,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <span className="text-sm text-gray-800 font-medium">{value}</span>
             </div>
           ) : null
-        const canChange = !activity || activity.status === 'Planned'
+        const canChange = !activity || activity.status === 'Completed'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
@@ -439,8 +442,14 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
           s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
           s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
           'bg-amber-100 text-amber-700 border border-amber-200'
+        const visibleHistory = (a.assignmentHistory ?? []).filter(entry => {
+          const act = cdspActivities.find(x => x.title === entry.activityTitle)
+          const entryStatus = act?.status ?? 'Planned'
+          const isCurrent = a.assignedActivity === entry.activityTitle
+          return entryStatus === 'Completed' || isCurrent
+        })
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
               <div className="bg-white border-b border-gray-200 rounded-t-2xl px-6 py-5 flex items-center justify-between flex-shrink-0">
                 <div>
@@ -450,30 +459,31 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 <button onClick={() => setViewingAssignmentHistoryFor(null)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
               </div>
               <div className="px-6 py-5 overflow-y-auto flex-1">
-                {(a.assignmentHistory?.length ?? 0) === 0 ? (
+                {visibleHistory.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
                       <Users size={26} className="text-gray-400" />
                     </div>
                     <p className="text-sm font-bold text-black">No assignments yet</p>
-                    <p className="text-xs text-gray-600 text-center">Activity assignments will appear here once the applicant is assigned to an activity.</p>
+                    <p className="text-xs text-gray-600 text-center">Completed or active activity assignments will appear here.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {[...(a.assignmentHistory ?? [])].reverse().map((entry, i) => {
+                    {[...visibleHistory].reverse().map((entry, i) => {
                       const act = cdspActivities.find(x => x.title === entry.activityTitle)
                       const isCurrent = a.assignedActivity === entry.activityTitle
+                      const entryStatus = act?.status ?? 'Planned'
                       return (
                         <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.activityTitle}</p>
-                            <p className="text-xs text-gray-400 mt-1">Date Assigned: {entry.assignedDate || '—'}</p>
-                            {entry.completedDate && (
-                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
+                            <p className="text-xs text-gray-400 mt-1">Date Assigned: {fmtDate(entry.assignedDate)}</p>
+                            {entry.completedDate && entryStatus === 'Completed' && (
+                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {fmtDate(entry.completedDate)}</p>
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
-                            {act && <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor(act.status)}`}>{act.status}</span>}
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor(entryStatus)}`}>{entryStatus}</span>
                             {isCurrent && <span className="text-[10px] px-2.5 py-1 rounded-full bg-brand-blue text-white font-semibold">Current</span>}
                           </div>
                         </div>
@@ -778,6 +788,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 <option value="firstName_desc">First Name DSC</option>
                 <option value="lastName_asc">Last Name ASC</option>
                 <option value="lastName_desc">Last Name DSC</option>
+                <option value="dateApplied_newest">Date Applied (Latest)</option>
+                <option value="dateApplied_oldest">Date Applied (Oldest)</option>
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
@@ -846,6 +858,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Service Availed</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Activity</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
@@ -884,6 +897,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         })() : <span className="text-gray-400 text-xs italic">Not assigned</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={getEffectiveStatus(applicant, cdspActivities)} /></td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={(e) => {

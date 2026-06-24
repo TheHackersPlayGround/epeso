@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { fmtDate } from '../../utils/formatDate'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
@@ -103,12 +104,12 @@ type SearchBarProps = {
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
-  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
+  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
-  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '') => void
+  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | '') => void
 }
 
 function SearchBar({
@@ -142,6 +143,8 @@ function SearchBar({
           <option value="firstName_desc">First Name DSC</option>
           <option value="lastName_asc">Last Name ASC</option>
           <option value="lastName_desc">Last Name DSC</option>
+          <option value="dateApplied_newest">Date Applied (Latest)</option>
+          <option value="dateApplied_oldest">Date Applied (Oldest)</option>
         </select>
         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
@@ -269,13 +272,14 @@ type AssignProjectModalProps = {
 
 function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClose }: AssignProjectModalProps) {
   const [search, setSearch] = useState('')
+  const canAssign = beneficiary.assessmentResult === 'Qualified'
 
   const currentProject = beneficiary.assignedSlpProjectId
     ? projects.find(p => p.id === beneficiary.assignedSlpProjectId) ?? null
     : null
 
   const filtered = useMemo(() => {
-    const active = projects.filter(p => p.status === 'Planned' || p.status === 'Ongoing')
+    const active = projects.filter(p => p.status === 'Planned')
     if (!search.trim()) return active
     const q = search.toLowerCase()
     return active.filter(p => p.title.toLowerCase().includes(q))
@@ -302,6 +306,15 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
             </button>
           </div>
         </div>
+
+        {!canAssign && (
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+            <AlertCircle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
+              Assessment result is <span className="font-semibold">{beneficiary.assessmentResult || 'Not Set'}</span>. Update to <span className="font-semibold">Qualified</span> before assigning a project.
+            </p>
+          </div>
+        )}
 
         <div className="px-4 pt-4">
           {/* Currently Assigned card */}
@@ -343,12 +356,12 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
           </div>
           <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
             <Info size={11} className="flex-shrink-0" />
-            Only SLP projects (Planned and Ongoing) are shown
+            Only SLP projects with <span className="font-semibold">Planned</span> status are shown
           </p>
         </div>
 
         {/* Project list */}
-        <div className="px-4 py-2 max-h-56 overflow-y-auto divide-y divide-gray-100">
+        <div className={`px-4 py-2 max-h-56 overflow-y-auto divide-y divide-gray-100${!canAssign ? ' pointer-events-none opacity-40' : ''}`}>
           {filtered.length === 0 ? (
             <p className="text-xs text-gray-400 italic text-center py-6">No projects found</p>
           ) : (
@@ -613,7 +626,7 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
                     )
                   })() : <span className="text-gray-400 text-xs italic">Not assigned</span>}
                 </td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.dateApplied)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {b.assessmentResult ? (
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${b.assessmentResult === 'Qualified' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -715,7 +728,7 @@ export default function SLPTab() {
     })
   }, [])
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -802,6 +815,8 @@ const availableFilters: FilterOption[] = useMemo(() => [
   }, [beneficiaries, searchQuery, activeFilters, filterValues])
 
   const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === 'dateApplied_newest') return (b.dateApplied || '').localeCompare(a.dateApplied || '')
+    if (sortOrder === 'dateApplied_oldest') return (a.dateApplied || '').localeCompare(b.dateApplied || '')
     if (!sortOrder) return 0
     const parts = (n: string) => n.trim().split(/\s+/)
     const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()

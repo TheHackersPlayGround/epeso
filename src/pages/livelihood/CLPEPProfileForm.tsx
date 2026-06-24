@@ -800,18 +800,6 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
         <SectionHeader title="VII. PESO OFFICE ONLY" />
 
         <div>
-          <label htmlFor="clpep-dateApplicationReceived" className={labelClass}>
-            Date Application Received
-          </label>
-          <DatePicker
-            id="clpep-dateApplicationReceived"
-            className={inputClass}
-            value={formData.dateApplicationReceived ?? ''}
-            onChange={value => updateField({ dateApplicationReceived: value })}
-          />
-        </div>
-
-        <div>
           <label htmlFor="clpep-receivedBy" className={labelClass}>Received By</label>
           <input
             id="clpep-receivedBy"

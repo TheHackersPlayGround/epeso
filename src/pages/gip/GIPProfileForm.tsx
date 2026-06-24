@@ -238,7 +238,7 @@ export function ViewApplicantPanel({ applicant, batches, onClose }: {
           )}
           <Sec num="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Received" value={applicant.dateApplicationReceived} />
+            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
             <Field label="Status" value={applicant.status} />
             <Field label="Remarks" value={applicant.remarks} />
@@ -436,7 +436,7 @@ export default function GIPProfileForm({ initial, mode, batches, onSave, onClose
           <SectionDivider num="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>Date Application Received</label>
+              <label className={lbl}>Date Applied</label>
               <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>

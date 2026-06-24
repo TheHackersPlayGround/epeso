@@ -554,8 +554,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       <td className="px-4 py-3 text-gray-800 whitespace-nowrap">{profile.name}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.contactNumber}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px]">
-                        <span className="block truncate" title={[profile.address, profile.barangay].filter(Boolean).join(', ')}>
-                          {[profile.barangay, profile.municipality].filter(Boolean).join(', ')}
+                        <span className="block truncate" title={profile.barangay}>
+                          {profile.barangay}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>

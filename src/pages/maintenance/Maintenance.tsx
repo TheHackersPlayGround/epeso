@@ -31,7 +31,7 @@ interface MaintenanceProps {
 // ─── Status badge colors ──────────────────────────────────────────────────────
 
 const SPES_BATCH_STATUS_COLORS: Record<SPESBatch['status'], string> = {
-  Open:      'bg-blue-100 text-blue-700',
+  Open:      'bg-green-100 text-green-700',
   Closed:    'bg-gray-100 text-gray-600',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
@@ -48,7 +48,7 @@ const APPLICANT_STATUS_COLORS: Record<string, string> = {
 const GIP_BATCH_STATUS_COLORS: Record<GIPBatch['status'], string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
-  Completed: 'bg-gray-100 text-gray-600',
+  Completed: 'bg-blue-100 text-blue-700',
 }
 
 const GIP_CONFIRM_COLOR = '#0077BE'
@@ -215,6 +215,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
   // ── GIP filtered batches ────────────────────────────────────────────────────
 
+  const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
   const filteredGipBatches = gipBatches.filter(b => {
     const matchSearch = !gipSearch ||
       b.batchName.toLowerCase().includes(gipSearch.toLowerCase()) ||
@@ -222,7 +223,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       b.assignedOffice.toLowerCase().includes(gipSearch.toLowerCase())
     const matchStatus = gipStatusFilter === 'All' || b.status === gipStatusFilter
     return matchSearch && matchStatus
-  })
+  }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
 
   const gipBatchTotalPages = Math.max(1, Math.ceil(filteredGipBatches.length / gipBatchPerPage))
   const gipBatchSafePage = Math.min(gipBatchPage, gipBatchTotalPages)
@@ -230,11 +231,12 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const gipBatchRecordStart = filteredGipBatches.length === 0 ? 0 : (gipBatchSafePage - 1) * gipBatchPerPage + 1
   const gipBatchRecordEnd = Math.min(gipBatchSafePage * gipBatchPerPage, filteredGipBatches.length)
 
-  const spesBatchTotalPages = Math.max(1, Math.ceil(spesBatches.length / spesBatchPerPage))
+  const sortedSpesBatches = [...spesBatches].sort((a, b) => statusRank(a.status) - statusRank(b.status))
+  const spesBatchTotalPages = Math.max(1, Math.ceil(sortedSpesBatches.length / spesBatchPerPage))
   const spesBatchSafePage = Math.min(spesBatchPage, spesBatchTotalPages)
-  const paginatedSpesBatches = spesBatches.slice((spesBatchSafePage - 1) * spesBatchPerPage, spesBatchSafePage * spesBatchPerPage)
-  const spesBatchRecordStart = spesBatches.length === 0 ? 0 : (spesBatchSafePage - 1) * spesBatchPerPage + 1
-  const spesBatchRecordEnd = Math.min(spesBatchSafePage * spesBatchPerPage, spesBatches.length)
+  const paginatedSpesBatches = sortedSpesBatches.slice((spesBatchSafePage - 1) * spesBatchPerPage, spesBatchSafePage * spesBatchPerPage)
+  const spesBatchRecordStart = sortedSpesBatches.length === 0 ? 0 : (spesBatchSafePage - 1) * spesBatchPerPage + 1
+  const spesBatchRecordEnd = Math.min(spesBatchSafePage * spesBatchPerPage, sortedSpesBatches.length)
 
   // ── Early return: SPES sub-views ───────────────────────────────────────────
 
@@ -601,7 +603,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
                   <div>
                     <h3 className="text-white m-0">GIP Batches</h3>
-                    <p className="text-white/70 text-sm">{filteredGipBatches.length} batch(es) found</p>
                   </div>
                   <button
                     onClick={() => setGipAction('add_batch')}
@@ -873,7 +874,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
                   <div>
                     <h3 className="text-white m-0">SPES Batches</h3>
-                    <p className="text-white/70 text-sm">{spesBatches.length} batch(es) found</p>
                   </div>
                   <button
                     onClick={() => setSpesAction('add_batch')}
@@ -987,7 +987,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-500">
-                        {spesBatchRecordStart}–{spesBatchRecordEnd} of {spesBatches.length} records
+                        {spesBatchRecordStart}–{spesBatchRecordEnd} of {sortedSpesBatches.length} records
                       </span>
                       <div className="flex gap-1">
                         <button

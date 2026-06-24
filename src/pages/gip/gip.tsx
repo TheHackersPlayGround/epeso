@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmtDate } from '../../utils/formatDate'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, CheckCircle, Upload, Download, ChevronDown, MoreHorizontal,
@@ -54,7 +55,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -137,6 +138,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
   })
 
   const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === 'dateApplied_newest') return (b.dateApplicationReceived || '').localeCompare(a.dateApplicationReceived || '')
+    if (sortOrder === 'dateApplied_oldest') return (a.dateApplicationReceived || '').localeCompare(b.dateApplicationReceived || '')
     if (!sortOrder) return 0
     const keyA = (sortOrder.startsWith('firstName') ? (a.firstName ?? '') : (a.lastName ?? '')).toLowerCase()
     const keyB = (sortOrder.startsWith('firstName') ? (b.firstName ?? '') : (b.lastName ?? '')).toLowerCase()
@@ -287,7 +290,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
   if (viewingApplicant) return <ViewApplicantPanel applicant={viewingApplicant} batches={gipBatches} onClose={() => setViewingApplicant(null)} />
 
-  const assignableBatches = gipBatches.filter(b => b.status !== 'Completed')
+  const assignableBatches = gipBatches.filter(b => b.status === 'Planned')
   const filteredAssignBatches = assignableBatches.filter(b =>
     b.batchName.toLowerCase().includes(assignSearch.toLowerCase()) ||
     b.batchCode.toLowerCase().includes(assignSearch.toLowerCase())
@@ -350,7 +353,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   {filteredAssignBatches.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-sm text-gray-400">No available batches.</p>
-                      <p className="text-xs text-gray-300 mt-1">Only Planned and Ongoing batches can be assigned.</p>
+                      <p className="text-xs text-gray-300 mt-1">Only Planned batches can be assigned.</p>
                     </div>
                   ) : filteredAssignBatches.map(batch => (
                     <button
@@ -427,6 +430,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
       {viewBatchTarget && (() => {
         const currentBatch = gipBatches.find(b => b.id === viewBatchTarget.assignedBatchId)
         if (!currentBatch) return null
+        const canChange = currentBatch.status === 'Completed'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
@@ -463,7 +467,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 <button onClick={handleUnassignBatch} className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50">Unassign</button>
                 <button
                   onClick={() => { setViewBatchTarget(null); openAssignModal(viewBatchTarget) }}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                  disabled={!canChange}
+                  className={`flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50${!canChange ? ' opacity-50 cursor-not-allowed' : ''}`}
                 >Change Batch</button>
                 <button onClick={() => setViewBatchTarget(null)} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark">Close</button>
               </div>
@@ -585,6 +590,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   <option value="firstName_desc">First Name DSC</option>
                   <option value="lastName_asc">Last Name ASC</option>
                   <option value="lastName_desc">Last Name DSC</option>
+                  <option value="dateApplied_newest">Date Applied (Latest)</option>
+                  <option value="dateApplied_oldest">Date Applied (Oldest)</option>
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>
@@ -665,6 +672,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Batch</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
@@ -707,6 +715,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={derivedStatus} />
                         </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <button
                             onClick={e => {

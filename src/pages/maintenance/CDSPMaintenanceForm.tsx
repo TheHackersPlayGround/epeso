@@ -41,7 +41,7 @@ const STATUS_COLORS: Record<ActivityStatus, string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
-  Cancelled: 'bg-gray-100 text-gray-500',
+  Cancelled: 'bg-red-100 text-red-600',
 }
 
 function StatusBadge({ status }: { status: ActivityStatus }) {
@@ -159,6 +159,7 @@ export default function CDSPMaintenanceForm() {
     a => a.program === 'CDSP' || DEFAULT_SERVICES.includes(a.service)
   )
 
+  const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
   const filteredActivities = cdspActivities.filter(a => {
     const matchesService = filterService === 'All' || a.service === filterService
     const matchesStatus  = filterStatus  === 'All' || a.status  === filterStatus
@@ -166,7 +167,7 @@ export default function CDSPMaintenanceForm() {
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesService && matchesStatus && matchesSearch
-  })
+  }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
   const totalPages = Math.max(1, Math.ceil(filteredActivities.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedActivities = filteredActivities.slice((safePage - 1) * perPage, safePage * perPage)
@@ -567,7 +568,6 @@ export default function CDSPMaintenanceForm() {
         <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-white m-0">CDSP Activities</h3>
-            <p className="text-white/70 text-sm">{filteredActivities.length} activity(s) found</p>
           </div>
           <button
             onClick={() => { resetForm(); setAction('add_activity') }}
@@ -899,7 +899,6 @@ export default function CDSPMaintenanceForm() {
       <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
         <div>
           <h3 className="text-white m-0">CDSP Services</h3>
-          <p className="text-white/70 text-sm">{services.length} service(s)</p>
         </div>
         <button
           onClick={() => setAction('add_service')}

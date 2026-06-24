@@ -90,10 +90,10 @@ export type Referral = {
 }
 
 export const REFERRAL_SEED: Referral[] = [
-  { id: 1, applicantId: 1, applicantName: 'Maria Santos',          vacancyId: 4, jobTitle: 'Nurse',      employer: 'City Hospital',        referralDate: '2026-06-10', status: 'Pending',     notes: '' },
-  { id: 2, applicantId: 2, applicantName: 'Juan Santos Dela Cruz', vacancyId: 1, jobTitle: 'Accountant', employer: 'ABC Corporation',      referralDate: '2026-06-08', status: 'Interviewed', notes: '' },
-  { id: 4, applicantId: 4, applicantName: 'Roberto Manalo',        vacancyId: 8, jobTitle: 'IT Support', employer: 'DOST Regional Office', referralDate: '2026-06-01', status: 'Not Hired',   notes: 'Position filled by another candidate.' },
-  { id: 5, applicantId: 5, applicantName: 'Ligaya Flores',         vacancyId: 7, jobTitle: 'Nurse Aide', employer: 'Tangub City Hospital', referralDate: '2026-06-12', status: 'Pending',     notes: '' },
+  { id: 1, applicantId: 1, applicantName: 'Santos, Maria C.',      vacancyId: 4, jobTitle: 'Nurse',      employer: 'City Hospital',        referralDate: '2026-06-10', status: 'Pending',     notes: '' },
+  { id: 2, applicantId: 2, applicantName: 'Dela Cruz, Juan S.',    vacancyId: 1, jobTitle: 'Accountant', employer: 'ABC Corporation',      referralDate: '2026-06-08', status: 'Interviewed', notes: '' },
+  { id: 4, applicantId: 4, applicantName: 'Manalo, Roberto G.',    vacancyId: 8, jobTitle: 'IT Support', employer: 'DOST Regional Office', referralDate: '2026-06-01', status: 'Not Hired',   notes: 'Position filled by another candidate.' },
+  { id: 5, applicantId: 5, applicantName: 'Flores, Ligaya B.',     vacancyId: 7, jobTitle: 'Nurse Aide', employer: 'Tangub City Hospital', referralDate: '2026-06-12', status: 'Pending',     notes: '' },
 ]
 
 export type Placement = {
@@ -113,13 +113,13 @@ export type Placement = {
 }
 
 export const PLACEMENT_SEED: Placement[] = [
-  { id: 1, applicantId: 3, applicantName: 'Ana Reyes', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', source: 'Referral', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000', notes: 'Passed interview and accepted the offer.' },
+  { id: 1, applicantId: 3, applicantName: 'Reyes, Ana L.', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', source: 'Referral', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000', notes: 'Passed interview and accepted the offer.' },
 ]
 
 export const SEED: Applicant[] = [
   {
     id: 1,
-    name: "Maria Santos",
+    name: "Santos, Maria C.",
     gender: "Female",
     age: 28,
     education: "Bachelor of Science in Nursing (Tertiary)",
@@ -243,7 +243,7 @@ export const SEED: Applicant[] = [
   },
   {
     id: 2,
-    name: "Juan Santos Dela Cruz",
+    name: "Dela Cruz, Juan S.",
     gender: "Male",
     age: 27,
     education: "Bachelor of Science in Accountancy (Tertiary)",
@@ -358,7 +358,7 @@ export const SEED: Applicant[] = [
   },
   {
     id: 3,
-    name: "Ana Reyes",
+    name: "Reyes, Ana L.",
     gender: "Female",
     age: 22,
     education: "Senior High School Graduate",
@@ -473,7 +473,7 @@ export const SEED: Applicant[] = [
   },
   {
     id: 4,
-    name: "Roberto Manalo",
+    name: "Manalo, Roberto G.",
     gender: "Male",
     age: 45,
     education: "Bachelor of Science in Information Technology (Tertiary)",
@@ -603,7 +603,7 @@ export const SEED: Applicant[] = [
   },
   {
     id: 5,
-    name: "Ligaya Flores",
+    name: "Flores, Ligaya B.",
     gender: "Female",
     age: 31,
     education: "Bachelor of Science in Nursing (Tertiary)",

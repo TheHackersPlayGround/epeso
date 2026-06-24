@@ -19,7 +19,7 @@ const ACTIVITY_STATUS_COLORS: Record<ProgramActivity['status'], string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
-  Cancelled: 'bg-gray-100 text-gray-500',
+  Cancelled: 'bg-red-100 text-red-600',
 }
 
 const PARTICIPANT_STATUS_COLORS: Record<string, string> = {
@@ -256,6 +256,7 @@ export default function SkillsTrainingMaintenanceForm() {
 
   const stActivities = activities.filter((a): a is ProgramActivity => a.program === 'Skills Training')
 
+  const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
   const filteredTrainings = stActivities.filter(a => {
     const matchSearch = !trainingSearch ||
       a.title.toLowerCase().includes(trainingSearch.toLowerCase()) ||
@@ -263,7 +264,7 @@ export default function SkillsTrainingMaintenanceForm() {
     const matchBatch  = trainingBatchFilter === 'All' || a.service === trainingBatchFilter
     const matchStatus = trainingStatusFilter === 'All' || a.status === trainingStatusFilter
     return matchSearch && matchBatch && matchStatus
-  })
+  }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
   const totalPages = Math.max(1, Math.ceil(filteredTrainings.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedTrainings = filteredTrainings.slice((safePage - 1) * perPage, safePage * perPage)
@@ -598,7 +599,6 @@ export default function SkillsTrainingMaintenanceForm() {
             <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
               <div>
                 <h3 className="text-white m-0">Skills Training Trainings</h3>
-                <p className="text-white/70 text-sm">{filteredTrainings.length} training(s) found</p>
               </div>
               <button onClick={() => setAction('add_training')}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
@@ -792,7 +792,6 @@ export default function SkillsTrainingMaintenanceForm() {
           <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
             <div>
               <h3 className="text-white m-0">Skills Training Batches</h3>
-              <p className="text-white/70 text-sm">{skillsTrainingBatches.length} batch(es)</p>
             </div>
             <button onClick={() => setAction('add_batch')}
               className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">

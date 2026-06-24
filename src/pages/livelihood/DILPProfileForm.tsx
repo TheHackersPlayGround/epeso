@@ -739,28 +739,15 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       <div className="space-y-5">
         <SectionHeader title="IX. PESO OFFICE ONLY" />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="dilp-dateReceived" className={labelClass}>
-              Date Application Received
-            </label>
-            <DatePicker
-              id="dilp-dateReceived"
-              className={inputClass}
-              value={formData.dateApplicationReceived ?? ''}
-              onChange={value => updateField({ dateApplicationReceived: value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-receivedBy" className={labelClass}>Received By</label>
-            <input
-              id="dilp-receivedBy"
-              className={inputClass}
-              placeholder="Enter name"
-              value={formData.receivedBy ?? ''}
-              onChange={e => updateField({ receivedBy: e.target.value })}
-            />
-          </div>
+        <div>
+          <label htmlFor="dilp-receivedBy" className={labelClass}>Received By</label>
+          <input
+            id="dilp-receivedBy"
+            className={inputClass}
+            placeholder="Enter name"
+            value={formData.receivedBy ?? ''}
+            onChange={e => updateField({ receivedBy: e.target.value })}
+          />
         </div>
       </div>
     )

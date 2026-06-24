@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { X, Users, Upload, Download } from 'lucide-react'
-import { useSPES } from '../../contexts/SPESContext'
-import type { SPESApplicant, SPESBatchAssignment } from '../../contexts/SPESContext'
+import type { SPESApplicant } from '../../contexts/SPESContext'
 import AddressFields from '../../components/AddressFields'
 import DatePicker from '../../components/DatePicker'
 
@@ -198,7 +197,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           )}
           <Sec num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Application Received" value={applicant.dateApplicationReceived} />
+            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
             <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
           </div>
@@ -216,7 +215,6 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
   onSave: (data: Omit<SPESApplicant, 'id'>) => void
   onClose: () => void
 }) {
-  const { spesBatches } = useSPES()
   const [formData, setFormData] = useState(initial)
   const set = (patch: Partial<Omit<SPESApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
 
@@ -245,13 +243,6 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
   )
-
-  const statusStyles: Record<string, string> = {
-    Completed: 'bg-blue-100 text-blue-700 border border-blue-200',
-    Ongoing:   'bg-green-100 text-green-700 border border-green-200',
-    Open:      'bg-sky-50 text-sky-600 border border-sky-200',
-    Closed:    'bg-gray-100 text-gray-500 border border-gray-200',
-  }
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
@@ -376,49 +367,17 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="V" title="Assignments" />
-          {formData.assignmentHistory && formData.assignmentHistory.length > 0 ? (
-            <div className="space-y-3 mb-2">
-              {formData.assignmentHistory.map((entry: SPESBatchAssignment, i: number) => {
-                const batch = spesBatches.find(b => b.id === entry.batchId)
-                const batchStatus = batch?.status ?? 'Completed'
-                const isCurrent = formData.assignedBatchId === entry.batchId
-                return (
-                  <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.batchName}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Date Assigned: {entry.assignedDate || '—'}</p>
-                      {entry.completedDate && (
-                        <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyles[batchStatus] ?? statusStyles.Closed}`}>
-                        {batchStatus}
-                      </span>
-                      {isCurrent && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue font-semibold">Current</span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 mb-2">No batch assignments yet. Use "Assign Batch" from the applicant list.</p>
-          )}
-
-          <SectionDivider num="VI" title="Attached Documents" />
+          <SectionDivider num="V" title="Attached Documents" />
           <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. school ID, certificate of enrollment). This section is optional / if applicable.</p>
           <AttachedDocsEditor
             docs={formData.attachedDocuments}
             onChange={docs => set({ attachedDocuments: docs })}
           />
 
-          <SectionDivider num="VII" title="For PESO Office Only" gray />
+          <SectionDivider num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>Date Application Received</label>
+              <label className={lbl}>Date Applied</label>
               <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>

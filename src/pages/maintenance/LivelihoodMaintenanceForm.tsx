@@ -304,6 +304,7 @@ export default function LivelihoodMaintenanceForm() {
     ...clpepAsActivities,
   ]
 
+  const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
   const filteredProjects = livelihoodProjects.filter(a => {
     const matchesService = filterService === 'All' || a.service === filterService
     const matchesStatus  = filterStatus  === 'All' || a.status  === filterStatus
@@ -311,7 +312,7 @@ export default function LivelihoodMaintenanceForm() {
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesService && matchesStatus && matchesSearch
-  })
+  }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedProjects = filteredProjects.slice((safePage - 1) * perPage, safePage * perPage)
@@ -1056,7 +1057,6 @@ export default function LivelihoodMaintenanceForm() {
         <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-white m-0">Livelihood Projects</h3>
-            <p className="text-white/70 text-sm">{filteredProjects.length} project(s) found</p>
           </div>
           <button
             onClick={() => { resetForm(); setAction('add_project') }}
@@ -1394,7 +1394,6 @@ export default function LivelihoodMaintenanceForm() {
       <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
         <div>
           <h3 className="text-white m-0">Livelihood Services</h3>
-          <p className="text-white/70 text-sm">{services.length} service(s)</p>
         </div>
         <button
           onClick={() => setAction('add_service')}

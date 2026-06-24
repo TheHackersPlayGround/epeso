@@ -315,15 +315,9 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="V. PESO OFFICE ONLY" />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Date Application Received</label>
-            <DatePicker className={inputClass} value={formData.dateApplicationReceived ?? ''} onChange={value => updateField({ dateApplicationReceived: value })} />
-          </div>
-          <div>
-            <label className={labelClass}>Received By</label>
-            <input className={inputClass} placeholder="Staff name" value={formData.receivedBy ?? ''} onChange={e => updateField({ receivedBy: e.target.value })} />
-          </div>
+        <div>
+          <label className={labelClass}>Received By</label>
+          <input className={inputClass} placeholder="Staff name" value={formData.receivedBy ?? ''} onChange={e => updateField({ receivedBy: e.target.value })} />
         </div>
       </div>
     )

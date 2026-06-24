@@ -394,7 +394,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
 
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
-                  <label className={lbl}>Date Received</label>
+                  <label className={lbl}>Date Applied</label>
                   <DatePicker className={inp} value={dateReceived} onChange={setDateReceived} />
                 </div>
                 <div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmtDate } from '../../utils/formatDate'
 import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
@@ -38,7 +39,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -115,6 +116,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   })
 
   const sortedProfiles = [...filteredProfiles].sort((a, b) => {
+    if (sortOrder === 'dateApplied_newest') return (b.dateApplicationReceived || '').localeCompare(a.dateApplicationReceived || '')
+    if (sortOrder === 'dateApplied_oldest') return (a.dateApplicationReceived || '').localeCompare(b.dateApplicationReceived || '')
     if (!sortOrder) return 0
     const keyA = (sortOrder.startsWith('firstName') ? (a.firstName ?? '') : (a.lastName ?? '')).toLowerCase()
     const keyB = (sortOrder.startsWith('firstName') ? (b.firstName ?? '') : (b.lastName ?? '')).toLowerCase()
@@ -283,6 +286,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               </div>
               <button onClick={() => { setAssigningProfile(null); setAssignSearch('') }} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
+            {assigningProfile.status !== 'Accepted' && (
+              <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0 flex items-start gap-2">
+                <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">
+                  Applicant status is <span className="font-semibold">{assigningProfile.status}</span>. Update to <span className="font-semibold">Accepted</span> before assigning an activity.
+                </p>
+              </div>
+            )}
             {assigningProfile.assignedTrainingId && (() => {
               const assigned = skillsTrainings.find(t => t.id === assigningProfile.assignedTrainingId)
               return assigned ? (
@@ -307,7 +318,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 <input type="text" placeholder="Search trainings..." value={assignSearch} onChange={e => setAssignSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent outline-none" />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className={`flex-1 overflow-y-auto${assigningProfile.status !== 'Accepted' ? ' pointer-events-none opacity-40' : ''}`}>
               {plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).map(training => {
                 const isAssigned = assigningProfile.assignedTrainingId === training.id
                 return (
@@ -447,6 +458,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   <option value="firstName_desc">First Name DSC</option>
                   <option value="lastName_asc">Last Name ASC</option>
                   <option value="lastName_desc">Last Name DSC</option>
+                  <option value="dateApplied_newest">Date Applied (Latest)</option>
+                  <option value="dateApplied_oldest">Date Applied (Oldest)</option>
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>
@@ -559,7 +572,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateApplicationReceived || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(profile.dateApplicationReceived)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => {

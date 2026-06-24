@@ -198,6 +198,7 @@ export default function GIPMaintenanceForm({
             className={`px-3 py-1 rounded-full text-xs font-semibold ${
               form.status === 'Planned'   ? 'bg-yellow-100 text-yellow-700' :
               form.status === 'Ongoing'   ? 'bg-green-100 text-green-700'  :
+              form.status === 'Completed' ? 'bg-blue-100 text-blue-700'    :
               'bg-gray-100 text-gray-600'
             }`}
           >

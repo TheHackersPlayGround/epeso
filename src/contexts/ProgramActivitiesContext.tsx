@@ -142,21 +142,21 @@ const SEED: ProgramActivity[] = [
   },
   {
     id: 202, title: 'TUPAD Cemetery and Memorial Park Maintenance', service: 'DILEEP (TUPAD)',
-    date: '2026-04-10', location: 'Public Cemetery, Tangub City', status: 'Ongoing',
+    date: '2026-04-10', location: 'Public Cemetery, Tangub City', status: 'Completed',
     description: 'Temporary employment for cemetery upkeep and landscaping.',
     facilitator: 'Luisa Reyes', participants: 30,
     assistanceAmount: '4000', dateReleased: '2026-04-20', beneficiaryType: 'Group',
   },
   {
     id: 203, title: 'TUPAD Street Cleaning and Beautification', service: 'DILEEP (TUPAD)',
-    date: '2026-05-15', location: 'Main Streets, Tangub City', status: 'Planned',
+    date: '2026-05-15', location: 'Main Streets, Tangub City', status: 'Completed',
     description: 'Temporary employment for street cleaning and urban beautification.',
     facilitator: 'Pedro Cruz', participants: 35,
     assistanceAmount: '3800', dateReleased: '2026-06-01', beneficiaryType: 'Group',
   },
   { id: 1, program: 'CDSP', title: 'Career Coaching Batch 1 – March 2026', service: 'Career Coaching', date: '2026-03-10', startDate: '2026-03-10', endDate: '2026-03-28', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Career coaching batch for fresh graduates and unemployed individuals seeking career direction.' },
   { id: 2, program: 'CDSP', title: 'LEGS Orientation – March 2026', service: 'Labor Employment for Graduating Students', date: '2026-03-15', startDate: '2026-03-15', endDate: '2026-03-15', location: 'PESO Main Office, Tangub City', facilitator: 'Ms. Santos', participants: 30, status: 'Planned', description: 'Orientation for graduating students on labor employment opportunities and requirements.' },
-  { id: 3, program: 'CDSP', title: 'Pre-Employment Coaching – April 2026', service: 'Pre-Employment Coaching', date: '2026-04-05', startDate: '2026-04-05', endDate: '2026-04-19', location: 'PESO Main Office, Tangub City', facilitator: 'Mr. Cruz', participants: 25, status: 'Planned', description: 'Pre-employment coaching covering resume writing, interview skills, and job application techniques.' },
+  { id: 3, program: 'CDSP', title: 'Pre-Employment Coaching – April 2026', service: 'Pre-Employment Coaching', date: '2026-04-05', startDate: '2026-04-05', endDate: '2026-04-19', location: 'PESO Main Office, Tangub City', facilitator: 'Mr. Cruz', participants: 25, status: 'Completed', description: 'Pre-employment coaching covering resume writing, interview skills, and job application techniques.' },
   { id: 4, program: 'CDSP', title: 'LEGS Orientation – April 2026', service: 'Labor Employment for Graduating Students', date: '2026-04-15', startDate: '2026-04-15', endDate: '2026-04-15', location: 'Tangub City College, Main Hall', facilitator: 'Ms. Santos', participants: 45, status: 'Planned', description: 'Second batch orientation for graduating students preparing to enter the workforce.' },
   { id: 5, program: 'CDSP', title: 'Career Coaching Batch 2 – May 2026', service: 'Career Coaching', date: '2026-05-08', startDate: '2026-05-08', endDate: '2026-05-22', location: 'PESO Main Office, Tangub City', facilitator: 'Engr. Lito Reyes', participants: 20, status: 'Planned', description: 'Second career coaching batch focusing on career path planning and goal setting.' },
   {
@@ -239,7 +239,7 @@ const ProgramActivitiesContext = createContext<ActivitiesContextValue | null>(nu
 
 function loadActivities(): ProgramActivity[] {
   try {
-    const raw = localStorage.getItem('lp_program_activities_v2')
+    const raw = localStorage.getItem('lp_program_activities_v4')
     if (!raw) return SEED
     const saved = JSON.parse(raw) as ProgramActivity[]
     if (saved.length === 0) return SEED
@@ -257,7 +257,7 @@ export function ProgramActivitiesProvider({ children }: { children: ReactNode })
   const [activities, setActivities] = useState<ProgramActivity[]>(loadActivities)
 
   useEffect(() => {
-    localStorage.setItem('lp_program_activities_v2', JSON.stringify(activities))
+    localStorage.setItem('lp_program_activities_v4', JSON.stringify(activities))
   }, [activities])
 
   const addActivity = (activity: ProgramActivity) =>

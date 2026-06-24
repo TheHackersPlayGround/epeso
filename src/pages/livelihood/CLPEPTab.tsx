@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { fmtDate } from '../../utils/formatDate'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, CLPEPIntervention } from '../../contexts/LivelihoodContext'
@@ -81,12 +82,12 @@ type SearchBarProps = {
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
-  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
+  sortOrder: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
-  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '') => void
+  onSortChange: (v: 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | '') => void
 }
 
 function SearchBar({
@@ -120,6 +121,8 @@ function SearchBar({
           <option value="firstName_desc">First Name DSC</option>
           <option value="lastName_asc">Last Name ASC</option>
           <option value="lastName_desc">Last Name DSC</option>
+          <option value="dateApplied_newest">Date Applied (Latest)</option>
+          <option value="dateApplied_oldest">Date Applied (Oldest)</option>
         </select>
         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
@@ -245,13 +248,14 @@ type AssignInterventionModalProps = {
 
 function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose }: AssignInterventionModalProps) {
   const [search, setSearch] = useState('')
+  const canAssign = !['Waitlisted', 'Rejected'].includes(beneficiary.status)
 
   const currentIntervention = beneficiary.assignedInterventionId
     ? interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
     : null
 
   const filtered = useMemo(() => {
-    const active = interventions.filter(i => i.status === 'Planned' || i.status === 'Active')
+    const active = interventions.filter(i => i.status === 'Planned')
     if (!search.trim()) return active
     const q = search.toLowerCase()
     return active.filter(i => i.title.toLowerCase().includes(q))
@@ -273,6 +277,15 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
             </button>
           </div>
         </div>
+
+        {!canAssign && (
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+            <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
+              Applicant status is <span className="font-semibold">{beneficiary.status}</span>. Update to <span className="font-semibold">Accepted</span> before assigning an intervention.
+            </p>
+          </div>
+        )}
 
         <div className="px-6 pt-5">
           {/* Currently Assigned card */}
@@ -314,12 +327,12 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
           </div>
           <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
             <Info size={12} className="flex-shrink-0" />
-            Only CLPEP interventions (Planned and Active) are shown
+            Only CLPEP interventions with <span className="font-semibold">Planned</span> status are shown
           </p>
         </div>
 
         {/* Intervention list */}
-        <div className="px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100">
+        <div className={`px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100${!canAssign ? ' pointer-events-none opacity-40' : ''}`}>
           {filtered.length === 0 ? (
             <p className="text-sm text-gray-400 italic text-center py-8">No interventions found</p>
           ) : (
@@ -579,7 +592,7 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
                     <span className="text-gray-400 italic text-sm">Not assigned</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.dateApplied ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.dateApplied)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <StatusBadge status={b.status} />
                 </td>
@@ -662,7 +675,7 @@ export default function CLPEPTab() {
   const [beneficiaries, setBeneficiaries] = useState<LivelihoodBeneficiary[]>(loadBeneficiaries)
   const [interventions] = useState<CLPEPIntervention[]>(loadInterventions)
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -741,6 +754,8 @@ export default function CLPEPTab() {
   }, [beneficiaries, searchQuery, activeFilters, filterValues])
 
   const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === 'dateApplied_newest') return (b.dateApplied || '').localeCompare(a.dateApplied || '')
+    if (sortOrder === 'dateApplied_oldest') return (a.dateApplied || '').localeCompare(b.dateApplied || '')
     if (!sortOrder) return 0
     const parts = (n: string) => n.trim().split(/\s+/)
     const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()

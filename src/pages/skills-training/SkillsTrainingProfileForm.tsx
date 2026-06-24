@@ -186,7 +186,7 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
 
           <SectionDivider numeral="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Received" value={profile.dateApplicationReceived} />
+            <Field label="Date Applied" value={profile.dateApplicationReceived} />
             <Field label="Received By" value={profile.receivedBy} />
             <Field label="Batch No." value={profile.trainingBatchNo} />
             <Field label="Status" value={profile.status} />
@@ -368,7 +368,7 @@ export default function SkillsTrainingProfileForm({
           <SectionDivider numeral="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>Date Application Received</label>
+              <label className={lbl}>Date Applied</label>
               <DatePicker className={inpFocus} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>

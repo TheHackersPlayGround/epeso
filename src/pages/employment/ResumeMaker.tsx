@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
-import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText } from 'lucide-react';
+import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText, Pencil, Minus, User } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ResumeCheckbox from './ResumeCheckbox';
@@ -195,6 +195,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   });
   const resumeRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const resumePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [resumePhoto, setResumePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,6 +207,17 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => { setResumePhoto(selectedApplicant?.profileImage ?? null); }, [selectedApplicant?.id]);
+
+  function handleResumePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setResumePhoto(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
 
   const filteredApplicants = searchQuery.trim() === ''
     ? applicants
@@ -234,7 +247,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   function isFieldAvailable(field: keyof FieldSelection): boolean {
     if (!selectedApplicant) return false;
     switch (field) {
-      case 'profilePicture': return !!selectedApplicant.profileImage;
+      case 'profilePicture': return true;
       case 'fullName':       return !!(selectedApplicant.firstName || selectedApplicant.surname);
       // age and dateOfBirth share the same source field; 'N/A' means it was never entered
       case 'age':
@@ -283,8 +296,10 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
 
   async function handleDownloadPDF() {
     if (!resumeRef.current || !selectedApplicant) return;
+    const noPrint = resumeRef.current.querySelectorAll<HTMLElement>('.resume-no-print');
+    noPrint.forEach(el => { el.style.visibility = 'hidden'; });
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
       const canvas = await html2canvas(resumeRef.current, {
         scale: 2,
         useCORS: true,
@@ -305,6 +320,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       alert(`Failed to generate PDF: ${msg}. Please try the Print button instead.`);
+    } finally {
+      noPrint.forEach(el => { el.style.visibility = ''; });
     }
   }
 
@@ -504,13 +521,45 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                     {/* Header with Photo */}
                     <div className="pb-4 mb-5 border-b-4 border-brand-blue">
                       <div className="flex gap-5 items-start">
-                        {selectedFields.profilePicture && isFieldAvailable('profilePicture') && (
-                          <div className="flex-shrink-0">
-                            <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
-                              <img
-                                src={selectedApplicant.profileImage!}
-                                alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
-                                className="w-full h-full object-cover"
+                        {selectedFields.profilePicture && (
+                          <div className="flex-shrink-0 pb-5">
+                            <div className="relative">
+                              <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
+                                {resumePhoto ? (
+                                  <img
+                                    src={resumePhoto}
+                                    alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <User size={64} className="text-gray-400" />
+                                )}
+                              </div>
+                              {resumePhoto ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setResumePhoto(null)}
+                                  title="Remove photo"
+                                  className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow border-2 border-white hover:bg-red-600 transition-colors"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => resumePhotoInputRef.current?.click()}
+                                  title="Upload photo"
+                                  className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-brand-blue text-white flex items-center justify-center shadow border-2 border-white hover:bg-brand-blue-dark transition-colors"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                              <input
+                                ref={resumePhotoInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden resume-no-print"
+                                onChange={handleResumePhotoChange}
                               />
                             </div>
                           </div>

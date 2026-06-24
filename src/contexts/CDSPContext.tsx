@@ -75,7 +75,6 @@ const SEED: CDSPApplicant[] = [
     dateApplicationReceived: '2026-03-10', receivedBy: 'Admin', counselorName: 'Engr. Lito Reyes',
     status: 'Active', remarks: '', attachedDocuments: [],
     assignmentHistory: [
-      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-01-15', completedDate: '2026-02-28' },
       { activityTitle: 'Career Coaching Batch 1 – March 2026', assignedDate: '2026-03-10' },
     ],
   },

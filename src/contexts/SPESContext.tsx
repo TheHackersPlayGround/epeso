@@ -113,7 +113,7 @@ const mockSpesBatches: SPESBatch[] = [
     supervisor: '',
     fundingSource: 'DOLE',
     fundingSourceOther: '',
-    status: 'Open',
+    status: 'Completed',
     documents: [],
   },
 ]
@@ -206,7 +206,7 @@ interface SPESContextType {
 
 const SPESContext = createContext<SPESContextType | undefined>(undefined)
 
-const SCHEMA_VERSION = 'v2'
+const SCHEMA_VERSION = 'v3'
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {

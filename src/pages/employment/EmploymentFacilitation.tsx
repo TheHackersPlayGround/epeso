@@ -14,7 +14,7 @@ import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
 import ViewApplicantSidebar from "./ViewApplicantSidebar";
 
-const LS_KEY = "ef_applicants_v2";
+const LS_KEY = "ef_applicants_v3";
 
 function loadApplicants(): Applicant[] {
   try {
@@ -388,7 +388,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // ── CRUD handlers ─────────────────────────────────────────────────
   function handleSaveApplicant(formData: ApplicantFormData) {
     const mapped: Omit<Applicant, "id"> = {
-      name: [formData.surname, formData.firstName, formData.middleName].filter(Boolean).join(", "),
+      name: formData.surname
+        ? `${formData.surname}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName.charAt(0) + '.' : ''}`
+        : formData.firstName,
       gender: formData.sex,
       age: formData.dateOfBirth
         ? new Date().getFullYear() - new Date(formData.dateOfBirth).getFullYear()

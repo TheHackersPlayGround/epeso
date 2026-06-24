@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
+import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Trash2, PlayCircle, CheckCircle, RefreshCw, Search, Plus,
@@ -142,7 +143,7 @@ function TrainingForm({
                     {isView ? (
                       <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">{form.date || '—'}</div>
                     ) : (
-                      <input type="date" value={form.date} onChange={e => onChange('date', e.target.value)} className={inputCls} />
+                      <DatePicker className={inputCls} value={form.date} onChange={value => onChange('date', value)} />
                     )}
                   </div>
                   <div>
@@ -237,6 +238,10 @@ export default function SkillsTrainingMaintenanceForm() {
   const [trainingStatusFilter, setTrainingStatusFilter] = useState('All')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
+  const [participantPage, setParticipantPage] = useState(1)
+  const [participantPerPage, setParticipantPerPage] = useState(10)
+  const [batchPage, setBatchPage] = useState(1)
+  const [batchPerPage, setBatchPerPage] = useState(10)
   const [trainingMenuId, setTrainingMenuId]             = useState<number | null>(null)
   const [trainingMenuPos, setTrainingMenuPos]           = useState<{ top: number; left: number } | null>(null)
   const [trainingSubView, setTrainingSubView]           = useState<TrainingSubView>('')
@@ -264,6 +269,12 @@ export default function SkillsTrainingMaintenanceForm() {
   const paginatedTrainings = filteredTrainings.slice((safePage - 1) * perPage, safePage * perPage)
   const recordStart = filteredTrainings.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredTrainings.length)
+
+  const batchTotalPages = Math.max(1, Math.ceil(skillsTrainingBatches.length / batchPerPage))
+  const batchSafePage = Math.min(batchPage, batchTotalPages)
+  const paginatedBatches = skillsTrainingBatches.slice((batchSafePage - 1) * batchPerPage, batchSafePage * batchPerPage)
+  const batchRecordStart = skillsTrainingBatches.length === 0 ? 0 : (batchSafePage - 1) * batchPerPage + 1
+  const batchRecordEnd = Math.min(batchSafePage * batchPerPage, skillsTrainingBatches.length)
 
   const isBatchName = (s: string) => skillsTrainingBatches.some(b => b.batchName === s)
 
@@ -364,6 +375,11 @@ export default function SkillsTrainingMaintenanceForm() {
 
   if (action === 'view_trainings' && trainingSubView === 'view_participants' && selectedTraining) {
     const participants = profiles.filter(p => p.assignedTrainingId === selectedTraining.id)
+    const ptotal = Math.max(1, Math.ceil(participants.length / participantPerPage))
+    const psafe = Math.min(participantPage, ptotal)
+    const paginatedPts = participants.slice((psafe - 1) * participantPerPage, psafe * participantPerPage)
+    const pStart = participants.length === 0 ? 0 : (psafe - 1) * participantPerPage + 1
+    const pEnd = Math.min(psafe * participantPerPage, participants.length)
     return (
       <>
         {/* Action cards */}
@@ -412,7 +428,7 @@ export default function SkillsTrainingMaintenanceForm() {
                     </tr>
                   </thead>
                   <tbody>
-                    {participants.map(p => (
+                    {paginatedPts.map(p => (
                       <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-5 py-3.5 text-gray-800 font-medium text-sm">
                           {p.lastName}, {p.firstName} {p.middleName}
@@ -429,6 +445,23 @@ export default function SkillsTrainingMaintenanceForm() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {participants.length > 0 && (
+              <div className="px-4 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Rows per page:</span>
+                  <select value={participantPerPage} onChange={e => { setParticipantPerPage(Number(e.target.value)); setParticipantPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+                    {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500">{pStart}–{pEnd} of {participants.length} records</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => setParticipantPage(p => Math.max(1, p - 1))} disabled={psafe === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                    <button onClick={() => setParticipantPage(p => Math.min(ptotal, p + 1))} disabled={psafe === ptotal} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -781,18 +814,16 @@ export default function SkillsTrainingMaintenanceForm() {
               <table className="w-full">
                 <thead className="border-b-2 border-gray-200">
                   <tr>
-                    <th className="px-8 py-5 text-left text-gray-800 font-bold">#</th>
                     <th className="px-8 py-5 text-left text-gray-800 font-bold">Batch Number</th>
                     <th className="px-8 py-5 text-left text-gray-800 font-bold">Projects Count</th>
                     <th className="px-8 py-5 text-right text-gray-800 font-bold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {skillsTrainingBatches.map((b, idx) => {
+                  {paginatedBatches.map(b => {
                     const count = stActivities.filter(a => a.service === b.batchName).length
                     return (
                       <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-8 py-6 text-gray-400">{idx + 1}</td>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-full bg-brand-blue flex-shrink-0" />
@@ -815,6 +846,23 @@ export default function SkillsTrainingMaintenanceForm() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {skillsTrainingBatches.length > 0 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page:</span>
+                <select value={batchPerPage} onChange={e => { setBatchPerPage(Number(e.target.value)); setBatchPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">{batchRecordStart}–{batchRecordEnd} of {skillsTrainingBatches.length} records</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setBatchPage(p => Math.max(1, p - 1))} disabled={batchSafePage === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setBatchPage(p => Math.min(batchTotalPages, p + 1))} disabled={batchSafePage === batchTotalPages} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                </div>
+              </div>
             </div>
           )}
         </div>

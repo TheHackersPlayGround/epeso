@@ -385,6 +385,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<LivelihoodBeneficiary | null>(null)
+  const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<LivelihoodBeneficiary | null>(null)
 
   useEffect(() => {
     onWizardChange(isAddOpen || !!editingBeneficiary || !!viewingBeneficiary)
@@ -477,10 +478,26 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
 
   function handleAssignProject(projectId: number, projectName: string) {
     if (!assigningBeneficiary) return
+    const today = new Date().toISOString().split('T')[0]
     persistProgram(
-      programRecords.map(b =>
-        b.id === assigningBeneficiary.id ? { ...b, assignedDilpProjectId: projectId, projectName } : b
-      )
+      programRecords.map(b => {
+        if (b.id !== assigningBeneficiary.id) return b
+        const history = [...(b.projectAssignmentHistory ?? [])]
+        // Mark previous project as completed if its activity was completed
+        if (b.assignedDilpProjectId && b.assignedDilpProjectId !== projectId) {
+          const prevAct = activities.find(a => a.id === b.assignedDilpProjectId)
+          if (prevAct?.status === 'Completed') {
+            const prevIdx = history.findIndex(h => h.projectId === b.assignedDilpProjectId)
+            if (prevIdx >= 0 && !history[prevIdx].completedDate) {
+              history[prevIdx] = { ...history[prevIdx], completedDate: today }
+            }
+          }
+        }
+        if (!history.some(h => h.projectId === projectId)) {
+          history.push({ projectId, projectName, assignedDate: today })
+        }
+        return { ...b, assignedDilpProjectId: projectId, projectName, projectAssignmentHistory: history }
+      })
     )
     setAssigningBeneficiary(null)
   }
@@ -901,24 +918,31 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
       </div>
 
       {/* Context menu */}
-      {openMenuId !== null && menuPos && menuBeneficiary && (
-        <>
-          <div className="fixed inset-0 z-[200]" onClick={closeMenu} />
-          <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1"
-          >
-            <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
-            {menuBeneficiary.projectName
-              ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
-              : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
-            }
-            <div className="border-t border-gray-100 my-1" />
-            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
-          </div>
-        </>
-      )}
+      {openMenuId !== null && menuPos && menuBeneficiary && (() => {
+        const assignedAct = menuBeneficiary.assignedDilpProjectId
+          ? activities.find(a => a.id === menuBeneficiary.assignedDilpProjectId)
+          : null
+        const isCompleted = assignedAct?.status === 'Completed'
+        return (
+          <>
+            <div className="fixed inset-0 z-[200]" onClick={closeMenu} />
+            <div
+              style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
+              className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1"
+            >
+              <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
+              <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
+              {menuBeneficiary.projectName && !isCompleted
+                ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
+                : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
+              }
+              <button onClick={() => { setViewingAssignmentHistoryFor(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
+              <div className="border-t border-gray-100 my-1" />
+              <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
+            </div>
+          </>
+        )
+      })()}
 
       {assigningBeneficiary && (
         <AssignProjectModal
@@ -943,6 +967,63 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
         />
       )}
 
+      {/* Assignment History Modal */}
+      {viewingAssignmentHistoryFor && (() => {
+        const b = viewingAssignmentHistoryFor
+        const statusCls = (s?: string) =>
+          s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+          s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
+          'bg-amber-100 text-amber-700 border border-amber-200'
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+              <div className="bg-white border-b border-gray-200 rounded-t-2xl px-6 py-5 flex items-center justify-between flex-shrink-0">
+                <div>
+                  <p className="text-black font-extrabold text-lg tracking-tight">Assignment History</p>
+                  <p className="text-gray-500 text-sm mt-0.5">{b.lastName ?? ''}{b.firstName ? `, ${b.firstName}` : ''} {b.middleName ?? ''}</p>
+                </div>
+                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
+              </div>
+              <div className="px-6 py-5 overflow-y-auto flex-1">
+                {(b.projectAssignmentHistory?.length ?? 0) === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Users size={26} className="text-gray-400" />
+                    </div>
+                    <p className="text-sm font-bold text-black">No assignments yet</p>
+                    <p className="text-xs text-gray-600 text-center">Project assignments will appear here once the beneficiary is assigned to a project.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[...(b.projectAssignmentHistory ?? [])].reverse().map((entry, i) => {
+                      const act = activities.find(a => a.id === entry.projectId)
+                      const isCurrent = b.assignedDilpProjectId === entry.projectId
+                      return (
+                        <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.projectName}</p>
+                            <p className="text-xs text-gray-400 mt-1">Date Assigned: {entry.assignedDate || '—'}</p>
+                            {entry.completedDate && (
+                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
+                            {act && <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusCls(act.status)}`}>{act.status}</span>}
+                            {isCurrent && <span className="text-[10px] px-2.5 py-1 rounded-full bg-brand-blue text-white font-semibold">Current</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="px-6 pb-6 flex-shrink-0">
+                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 text-sm font-semibold transition-colors">Close</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )

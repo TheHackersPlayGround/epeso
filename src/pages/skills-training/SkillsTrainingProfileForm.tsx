@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Users, Upload } from 'lucide-react'
 import type { SkillsTrainingProfile } from '../../contexts/SkillsTrainingContext'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -262,7 +263,7 @@ export default function SkillsTrainingProfileForm({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Birthdate</label>
-              <input type="date" className={inpFocus} value={formData.birthdate} onChange={e => handleBirthdate(e.target.value)} />
+              <DatePicker className={inpFocus} value={formData.birthdate} onChange={handleBirthdate} />
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -368,7 +369,7 @@ export default function SkillsTrainingProfileForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Application Received</label>
-              <input type="date" className={inpFocus} value={formData.dateApplicationReceived} onChange={e => set({ dateApplicationReceived: e.target.value })} />
+              <DatePicker className={inpFocus} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>

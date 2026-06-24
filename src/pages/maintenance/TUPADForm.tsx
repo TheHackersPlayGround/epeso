@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react'
 import type { AttachmentItem } from './DILPForm'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,13 +92,12 @@ export default function TUPADForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="tupad-date" className={labelCls}>Date</label>
-            <input
+            <DatePicker
               id="tupad-date"
-              type="date"
+              className={inputCls}
               value={formData.date}
               readOnly={isView}
-              onChange={e => field('date', e.target.value)}
-              className={inputCls}
+              onChange={value => field('date', value)}
             />
           </div>
           <div>
@@ -194,13 +194,12 @@ export default function TUPADForm({
           </div>
           <div>
             <label htmlFor="tupad-dateReleased" className={labelCls}>Date Released</label>
-            <input
+            <DatePicker
               id="tupad-dateReleased"
-              type="date"
+              className={inputCls}
               value={formData.dateReleased}
               readOnly={isView}
-              onChange={e => field('dateReleased', e.target.value)}
-              className={inputCls}
+              onChange={value => field('dateReleased', value)}
             />
           </div>
         </div>

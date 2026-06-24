@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { ArrowLeft, Upload, X, FileText } from 'lucide-react'
+import DatePicker from '../../components/DatePicker'
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch, Attachment } from '../../contexts/SPESContext'
 
@@ -359,10 +360,10 @@ export default function SPESMaintenanceForm({
               ) : (
                 <>
                   <Field label="Application Start Date" required>
-                    <input type="date" className={inputCls} value={form.applicationStartDate} onChange={e => set('applicationStartDate', e.target.value)} />
+                    <DatePicker className={inputCls} value={form.applicationStartDate} onChange={value => set('applicationStartDate', value)} />
                   </Field>
                   <Field label="Application End Date" required>
-                    <input type="date" className={inputCls} value={form.applicationEndDate} onChange={e => set('applicationEndDate', e.target.value)} />
+                    <DatePicker className={inputCls} value={form.applicationEndDate} onChange={value => set('applicationEndDate', value)} />
                   </Field>
                 </>
               )}
@@ -383,10 +384,10 @@ export default function SPESMaintenanceForm({
               ) : (
                 <>
                   <Field label="Program Start Date" required>
-                    <input type="date" className={inputCls} value={form.programStartDate} onChange={e => set('programStartDate', e.target.value)} />
+                    <DatePicker className={inputCls} value={form.programStartDate} onChange={value => set('programStartDate', value)} />
                   </Field>
                   <Field label="Program End Date" required>
-                    <input type="date" className={inputCls} value={form.programEndDate} onChange={e => set('programEndDate', e.target.value)} />
+                    <DatePicker className={inputCls} value={form.programEndDate} onChange={value => set('programEndDate', value)} />
                   </Field>
                 </>
               )}

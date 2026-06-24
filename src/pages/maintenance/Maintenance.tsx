@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import {
   ArrowLeft, Plus, FolderOpen, PlusCircle, MoreHorizontal,
   Edit2, Trash2, CheckCircle, PlayCircle, RefreshCw, ClipboardList,
-  Users, Search,
+  Users, Search, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 
 import { useSPES } from '../../contexts/SPESContext'
@@ -93,6 +93,14 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [gipDeleteConfirm, setGipDeleteConfirm] = useState<number | null>(null)
   const [gipSearch, setGipSearch] = useState('')
   const [gipStatusFilter, setGipStatusFilter] = useState('All')
+  const [gipBatchPage, setGipBatchPage] = useState(1)
+  const [gipBatchPerPage, setGipBatchPerPage] = useState(10)
+  const [spesBatchPage, setSpesBatchPage] = useState(1)
+  const [spesBatchPerPage, setSpesBatchPerPage] = useState(10)
+  const [spesParticipantPage, setSpesParticipantPage] = useState(1)
+  const [spesParticipantPerPage, setSpesParticipantPerPage] = useState(10)
+  const [gipParticipantPage, setGipParticipantPage] = useState(1)
+  const [gipParticipantPerPage, setGipParticipantPerPage] = useState(10)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -216,6 +224,18 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     return matchSearch && matchStatus
   })
 
+  const gipBatchTotalPages = Math.max(1, Math.ceil(filteredGipBatches.length / gipBatchPerPage))
+  const gipBatchSafePage = Math.min(gipBatchPage, gipBatchTotalPages)
+  const paginatedGipBatches = filteredGipBatches.slice((gipBatchSafePage - 1) * gipBatchPerPage, gipBatchSafePage * gipBatchPerPage)
+  const gipBatchRecordStart = filteredGipBatches.length === 0 ? 0 : (gipBatchSafePage - 1) * gipBatchPerPage + 1
+  const gipBatchRecordEnd = Math.min(gipBatchSafePage * gipBatchPerPage, filteredGipBatches.length)
+
+  const spesBatchTotalPages = Math.max(1, Math.ceil(spesBatches.length / spesBatchPerPage))
+  const spesBatchSafePage = Math.min(spesBatchPage, spesBatchTotalPages)
+  const paginatedSpesBatches = spesBatches.slice((spesBatchSafePage - 1) * spesBatchPerPage, spesBatchSafePage * spesBatchPerPage)
+  const spesBatchRecordStart = spesBatches.length === 0 ? 0 : (spesBatchSafePage - 1) * spesBatchPerPage + 1
+  const spesBatchRecordEnd = Math.min(spesBatchSafePage * spesBatchPerPage, spesBatches.length)
+
   // ── Early return: SPES sub-views ───────────────────────────────────────────
 
   if (activeTab === 'SPES' && (spesBatchAction === 'view_batch' || spesBatchAction === 'edit_batch')) {
@@ -246,6 +266,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       a.assignedBatchId === selectedBatch.id ||
       a.assignmentHistory.some(h => h.batchId === selectedBatch.id)
     )
+    const spPtotal = Math.max(1, Math.ceil(participants.length / spesParticipantPerPage))
+    const spPsafe = Math.min(spesParticipantPage, spPtotal)
+    const paginatedSpesPts = participants.slice((spPsafe - 1) * spesParticipantPerPage, spPsafe * spesParticipantPerPage)
+    const spPStart = participants.length === 0 ? 0 : (spPsafe - 1) * spesParticipantPerPage + 1
+    const spPEnd = Math.min(spPsafe * spesParticipantPerPage, participants.length)
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-4">
@@ -285,7 +310,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 </tr>
               </thead>
               <tbody>
-                {participants.map((a, i) => (
+                {paginatedSpesPts.map((a, i) => (
                   <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                     <td className="px-4 py-3 font-medium text-gray-800">{a.lastName}, {a.firstName} {a.middleName}</td>
                     <td className="px-4 py-3 text-gray-600">{a.sex || '—'}</td>
@@ -304,6 +329,21 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 ))}
               </tbody>
             </table>
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page:</span>
+                <select value={spesParticipantPerPage} onChange={e => { setSpesParticipantPerPage(Number(e.target.value)); setSpesParticipantPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">{spPStart}–{spPEnd} of {participants.length} records</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setSpesParticipantPage(p => Math.max(1, p - 1))} disabled={spPsafe === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setSpesParticipantPage(p => Math.min(spPtotal, p + 1))} disabled={spPsafe === spPtotal} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -338,6 +378,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     const participants = gipApplicants.filter(
       a => a.assignedBatchId === selectedGipBatch.id
     )
+    const gpPtotal = Math.max(1, Math.ceil(participants.length / gipParticipantPerPage))
+    const gpPsafe = Math.min(gipParticipantPage, gpPtotal)
+    const paginatedGipPts = participants.slice((gpPsafe - 1) * gipParticipantPerPage, gpPsafe * gipParticipantPerPage)
+    const gpPStart = participants.length === 0 ? 0 : (gpPsafe - 1) * gipParticipantPerPage + 1
+    const gpPEnd = Math.min(gpPsafe * gipParticipantPerPage, participants.length)
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-4">
@@ -377,7 +422,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 </tr>
               </thead>
               <tbody>
-                {participants.map((a, i) => (
+                {paginatedGipPts.map((a, i) => (
                   <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                     <td className="px-4 py-3 font-medium text-gray-800">{a.lastName}, {a.firstName} {a.middleName}</td>
                     <td className="px-4 py-3 text-gray-600">{a.sex || '—'}</td>
@@ -393,6 +438,21 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 ))}
               </tbody>
             </table>
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page:</span>
+                <select value={gipParticipantPerPage} onChange={e => { setGipParticipantPerPage(Number(e.target.value)); setGipParticipantPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">{gpPStart}–{gpPEnd} of {participants.length} records</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setGipParticipantPage(p => Math.max(1, p - 1))} disabled={gpPsafe === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setGipParticipantPage(p => Math.min(gpPtotal, p + 1))} disabled={gpPsafe === gpPtotal} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -578,7 +638,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredGipBatches.map(b => {
+                        {paginatedGipBatches.map(b => {
                           const participantCount = gipApplicants.filter(a => a.assignedBatchId === b.id).length
                           return (
                             <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -634,6 +694,41 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {filteredGipBatches.length > 0 && (
+                  <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">Rows per page:</span>
+                      <select
+                        value={gipBatchPerPage}
+                        onChange={e => { setGipBatchPerPage(Number(e.target.value)); setGipBatchPage(1) }}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      >
+                        {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">
+                        {gipBatchRecordStart}–{gipBatchRecordEnd} of {filteredGipBatches.length} records
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setGipBatchPage(p => Math.max(1, p - 1))}
+                          disabled={gipBatchSafePage === 1}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <button
+                          onClick={() => setGipBatchPage(p => Math.min(gipBatchTotalPages, p + 1))}
+                          disabled={gipBatchSafePage === gipBatchTotalPages}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -814,7 +909,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {spesBatches.map(b => (
+                        {paginatedSpesBatches.map(b => (
                           <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <span className="text-gray-800 font-medium">{b.batchName}</span>
@@ -876,6 +971,41 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                {spesBatches.length > 0 && (
+                  <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">Rows per page:</span>
+                      <select
+                        value={spesBatchPerPage}
+                        onChange={e => { setSpesBatchPerPage(Number(e.target.value)); setSpesBatchPage(1) }}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      >
+                        {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">
+                        {spesBatchRecordStart}–{spesBatchRecordEnd} of {spesBatches.length} records
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setSpesBatchPage(p => Math.max(1, p - 1))}
+                          disabled={spesBatchSafePage === 1}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <button
+                          onClick={() => setSpesBatchPage(p => Math.min(spesBatchTotalPages, p + 1))}
+                          disabled={spesBatchSafePage === spesBatchTotalPages}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

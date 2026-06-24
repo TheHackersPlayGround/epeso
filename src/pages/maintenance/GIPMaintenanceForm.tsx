@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, X, FileText } from 'lucide-react'
+import DatePicker from '../../components/DatePicker'
 import type { GIPBatch, GIPBatchDocument } from '../../contexts/GIPContext'
 
 // ─── Re-export for consumers ──────────────────────────────────────────────────
@@ -113,13 +114,21 @@ export default function GIPMaintenanceForm({
         </p>
       ) : (
         <>
-          <input
-            type={type}
-            value={form[field] as string}
-            onChange={e => set(field, e.target.value)}
-            placeholder={placeholder}
-            className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
-          />
+          {type === 'date' ? (
+            <DatePicker
+              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
+              value={form[field] as string}
+              onChange={v => set(field, v)}
+            />
+          ) : (
+            <input
+              type={type}
+              value={form[field] as string}
+              onChange={e => set(field, e.target.value)}
+              placeholder={placeholder}
+              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
+            />
+          )}
           {errors[field] && <p className="text-red-500 text-xs mt-1">{errors[field]}</p>}
         </>
       )}

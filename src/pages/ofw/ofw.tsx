@@ -1,6 +1,7 @@
 ﻿import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import { ArrowLeft, Plus, Upload, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import type { OFWProfile } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
@@ -499,11 +500,10 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       />
                     )}
                     {def.type === 'date' && (
-                      <input
-                        type="date"
+                      <DatePicker
                         className="bg-transparent text-sm text-gray-700 outline-none"
                         value={filterValues[key] ?? ''}
-                        onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
+                        onChange={v => { setFilterValues(prev => ({ ...prev, [key]: v })); setCurrentPage(1) }}
                       />
                     )}
                     {def.type === 'select' && (

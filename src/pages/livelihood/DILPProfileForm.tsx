@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Upload, Users } from 'lucide-react'
 import type { LivelihoodBeneficiary, LivelihoodService, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import DatePicker from '../../components/DatePicker'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { DILPActivity } from '../../contexts/ProgramActivitiesContext'
 
@@ -379,12 +380,11 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             <label htmlFor="dilp-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="dilp-birthdate"
-              type="date"
               className={inputClass}
               value={formData.birthdate ?? ''}
-              onChange={e => handleBirthdate(e.target.value)}
+              onChange={handleBirthdate}
               required
             />
           </div>
@@ -683,12 +683,11 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
-            <input
+            <DatePicker
               id="dilp-dateApplied"
-              type="date"
               className={inputClass}
               value={formData.dateApplied ?? ''}
-              onChange={e => updateField({ dateApplied: e.target.value })}
+              onChange={value => updateField({ dateApplied: value })}
             />
           </div>
           <div>
@@ -745,12 +744,11 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             <label htmlFor="dilp-dateReceived" className={labelClass}>
               Date Application Received
             </label>
-            <input
+            <DatePicker
               id="dilp-dateReceived"
-              type="date"
               className={inputClass}
               value={formData.dateApplicationReceived ?? ''}
-              onChange={e => updateField({ dateApplicationReceived: e.target.value })}
+              onChange={value => updateField({ dateApplicationReceived: value })}
             />
           </div>
           <div>

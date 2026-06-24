@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
+import DatePicker from '../../components/DatePicker';
 import ApplicantReviewModal from './ApplicantReviewModal';
 
 interface ApplicantFormData {
@@ -544,11 +545,10 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="grid grid-cols-5 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                <DatePicker
                   className={inputClass('dateOfBirth')}
+                  value={formData.dateOfBirth}
+                  onChange={(value) => setFormData({ ...formData, dateOfBirth: value })}
                 />
                 <ErrorMsg k="dateOfBirth" />
               </div>
@@ -1521,15 +1521,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     }}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
-                  <input
-                    type="date"
+                  <DatePicker
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     value={elig.dateTaken}
-                    onChange={(e) => {
+                    onChange={(value) => {
                       const newEligibilities = [...formData.eligibilities];
-                      newEligibilities[index].dateTaken = e.target.value;
+                      newEligibilities[index].dateTaken = value;
                       setFormData({ ...formData, eligibilities: newEligibilities });
                     }}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                 </div>
               ))}
@@ -1561,15 +1560,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     }}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
-                  <input
-                    type="date"
+                  <DatePicker
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     value={license.validUntil}
-                    onChange={(e) => {
+                    onChange={(value) => {
                       const newLicenses = [...formData.professionalLicenses];
-                      newLicenses[index].validUntil = e.target.value;
+                      newLicenses[index].validUntil = value;
                       setFormData({ ...formData, professionalLicenses: newLicenses });
                     }}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                 </div>
               ))}

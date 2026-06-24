@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { X, Users, CheckCircle, FileText, Upload } from 'lucide-react'
+import { X, Users, FileText, Upload } from 'lucide-react'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { CDSPApplicant } from '../../contexts/CDSPContext'
 import AddressFields from '../../components/AddressFields'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ export const emptyForm: Omit<CDSPApplicant, 'id'> = {
   classification: [], classificationOther: '',
   highestEducation: '', schoolName: '', course: '', yearGraduated: '',
   employmentStatus: '', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-  serviceAvailed: '', assignedActivity: '',
+  serviceAvailed: '', assignedActivity: '', assignmentHistory: [],
   careerGoal: '', coachingType: '', careerAssessmentResult: '',
   targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
   school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
@@ -233,44 +234,10 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
               }`}>{svc}</span>
             ))}
           </div>
-          {(() => {
-            const act = applicant.assignedActivity
-              ? cdspActivities.find(a => a.title === applicant.assignedActivity)
-              : null
-            const statusColor =
-              act?.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
-              act?.status === 'Ongoing'   ? 'bg-green-100 text-green-700' :
-              'bg-yellow-100 text-yellow-700'
-            return (
-              <div className="mb-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Assigned Activity</p>
-                {applicant.assignedActivity ? (
-                  <>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-gray-800 font-medium">{applicant.assignedActivity}</span>
-                      {act && (
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor}`}>
-                          {act.status}
-                        </span>
-                      )}
-                    </div>
-                    {act?.status === 'Completed' && (
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-100 px-3 py-1.5 rounded-lg w-fit">
-                        <CheckCircle size={12} />
-                        <span>Service completed and recorded in Section VI</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-gray-800 text-sm">—</p>
-                )}
-              </div>
-            )
-          })()}
 
           {(applicant.attachedDocuments?.length ?? 0) > 0 && (
             <>
-              <SectionDivider numeral="VII" title="Attached Documents" />
+              <SectionDivider numeral="VI" title="Attached Documents" />
               <div className="space-y-2">
                 {applicant.attachedDocuments.map((doc, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
@@ -288,7 +255,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
             </>
           )}
 
-          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
+          <SectionDivider numeral="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Received" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -401,7 +368,7 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Birthdate</label>
-              <input type="date" className={inp} value={formData.birthdate} onChange={(e) => handleBirthdate(e.target.value)} />
+              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -506,7 +473,7 @@ export default function CDSPProfileForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Received</label>
-              <input type="date" className={inp} value={formData.dateApplicationReceived} onChange={(e) => set({ dateApplicationReceived: e.target.value })} />
+              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={(value) => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>

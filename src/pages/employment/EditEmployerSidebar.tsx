@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Briefcase, Plus, AlertCircle, CheckCircle } from 'lucide-react';
+import DatePicker from '../../components/DatePicker';
 
 interface EmployerFormData {
   companyName: string;
@@ -297,8 +298,8 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date Registered</label>
-                <input type="date" value={formData.dateRegistered}
-                  onChange={e => handleChange('dateRegistered', e.target.value)}
+                <DatePicker value={formData.dateRegistered}
+                  onChange={value => handleChange('dateRegistered', value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div className="col-span-2">

@@ -1,6 +1,12 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
+export interface CDSPAssignment {
+  activityTitle: string
+  assignedDate: string
+  completedDate?: string
+}
+
 export interface CDSPApplicant {
   id: number
   lastName: string
@@ -30,6 +36,7 @@ export interface CDSPApplicant {
   monthlyIncome: string
   serviceAvailed: string
   assignedActivity: string
+  assignmentHistory: CDSPAssignment[]
   careerGoal: string
   coachingType: string
   careerAssessmentResult: string
@@ -67,6 +74,10 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-10', receivedBy: 'Admin', counselorName: 'Engr. Lito Reyes',
     status: 'Active', remarks: '', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-01-15', completedDate: '2026-02-28' },
+      { activityTitle: 'Career Coaching Batch 1 – March 2026', assignedDate: '2026-03-10' },
+    ],
   },
   {
     id: 2, lastName: 'Reyes', firstName: 'Ana', middleName: 'D.',
@@ -84,6 +95,9 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-12', receivedBy: 'Admin', counselorName: 'Ms. Santos',
     status: 'Active', remarks: '', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'LEGS Orientation – March 2026', assignedDate: '2026-03-12' },
+    ],
   },
   {
     id: 3, lastName: 'Garcia', firstName: 'Pedro', middleName: 'S.',
@@ -101,6 +115,9 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-15', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
     status: 'Inactive', remarks: '', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-03-15', completedDate: '2026-04-19' },
+    ],
   },
   {
     id: 4, lastName: 'Santos', firstName: 'Maria', middleName: 'L.',
@@ -118,6 +135,9 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-18', receivedBy: 'Admin', counselorName: 'Engr. Lito Reyes',
     status: 'Active', remarks: '', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'Career Coaching Batch 1 – March 2026', assignedDate: '2026-03-18' },
+    ],
   },
   {
     id: 5, lastName: 'Torres', firstName: 'Miguel', middleName: 'A.',
@@ -135,6 +155,9 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-20', receivedBy: 'Admin', counselorName: 'Ms. Santos',
     status: 'Active', remarks: '', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'LEGS Orientation – April 2026', assignedDate: '2026-03-20' },
+    ],
   },
   {
     id: 6, lastName: 'Mendoza', firstName: 'Liza', middleName: 'B.',
@@ -152,6 +175,9 @@ const SEED: CDSPApplicant[] = [
     applicantSignature: '', dateSignature: '',
     dateApplicationReceived: '2026-03-22', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
     status: 'Inactive', remarks: 'Referred to DepEd Tangub', attachedDocuments: [],
+    assignmentHistory: [
+      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-03-22', completedDate: '2026-04-19' },
+    ],
   },
 ]
 

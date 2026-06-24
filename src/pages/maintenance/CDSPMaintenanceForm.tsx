@@ -1,5 +1,6 @@
 ﻿import { useState, useRef } from 'react'
 import Swal from 'sweetalert2'
+import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
@@ -133,6 +134,10 @@ export default function CDSPMaintenanceForm() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
+  const [participantPage, setParticipantPage] = useState(1)
+  const [participantPerPage, setParticipantPerPage] = useState(10)
+  const [servicePage, setServicePage] = useState(1)
+  const [servicePerPage, setServicePerPage] = useState(10)
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -167,6 +172,11 @@ export default function CDSPMaintenanceForm() {
   const paginatedActivities = filteredActivities.slice((safePage - 1) * perPage, safePage * perPage)
   const recordStart = filteredActivities.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredActivities.length)
+  const sTotalPages = Math.max(1, Math.ceil(services.length / servicePerPage))
+  const sSafePage = Math.min(servicePage, sTotalPages)
+  const paginatedServices = services.slice((sSafePage - 1) * servicePerPage, sSafePage * servicePerPage)
+  const sRecordStart = services.length === 0 ? 0 : (sSafePage - 1) * servicePerPage + 1
+  const sRecordEnd = Math.min(sSafePage * servicePerPage, services.length)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -399,9 +409,8 @@ export default function CDSPMaintenanceForm() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Date</label>
-                  <input type="date" value={formData.date} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, date: e.target.value }))}
-                    className={inputCls} />
+                  <DatePicker className={inputCls} value={formData.date} readOnly={isView}
+                    onChange={value => setFormData(p => ({ ...p, date: value }))} />
                 </div>
                 <div>
                   <label className={labelCls}>Location / Venue</label>
@@ -474,15 +483,13 @@ export default function CDSPMaintenanceForm() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>Start Date</label>
-                    <input type="date" value={formData.startDate} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, startDate: e.target.value }))}
-                      className={inputCls} />
+                    <DatePicker className={inputCls} value={formData.startDate} readOnly={isView}
+                      onChange={value => setFormData(p => ({ ...p, startDate: value }))} />
                   </div>
                   <div>
                     <label className={labelCls}>End Date</label>
-                    <input type="date" value={formData.endDate} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, endDate: e.target.value }))}
-                      className={inputCls} />
+                    <DatePicker className={inputCls} value={formData.endDate} readOnly={isView}
+                      onChange={value => setFormData(p => ({ ...p, endDate: value }))} />
                   </div>
                 </div>
               </div>
@@ -738,6 +745,11 @@ export default function CDSPMaintenanceForm() {
   const renderViewParticipants = () => {
     if (!selectedActivity) return null
     const participants = cdspApplicants.filter(a => a.assignedActivity === selectedActivity.title)
+    const ptotal = Math.max(1, Math.ceil(participants.length / participantPerPage))
+    const psafe = Math.min(participantPage, ptotal)
+    const paginatedPts = participants.slice((psafe - 1) * participantPerPage, psafe * participantPerPage)
+    const pStart = participants.length === 0 ? 0 : (psafe - 1) * participantPerPage + 1
+    const pEnd = Math.min(psafe * participantPerPage, participants.length)
     const STATUS_COLORS_APPLICANT: Record<string, string> = {
       Active:    'bg-blue-100 text-blue-700',
       Inactive:  'bg-gray-100 text-gray-500',
@@ -787,7 +799,7 @@ export default function CDSPMaintenanceForm() {
                 </tr>
               </thead>
               <tbody>
-                {participants.map((a, i) => (
+                {paginatedPts.map((a, i) => (
                   <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                     <td className="px-4 py-3 font-medium text-gray-800">
                       {a.lastName}, {a.firstName} {a.middleName}
@@ -809,6 +821,21 @@ export default function CDSPMaintenanceForm() {
                 ))}
               </tbody>
             </table>
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page:</span>
+                <select value={participantPerPage} onChange={e => { setParticipantPerPage(Number(e.target.value)); setParticipantPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">{pStart}–{pEnd} of {participants.length} records</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setParticipantPage(p => Math.max(1, p - 1))} disabled={psafe === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                  <button onClick={() => setParticipantPage(p => Math.min(ptotal, p + 1))} disabled={psafe === ptotal} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -894,18 +921,16 @@ export default function CDSPMaintenanceForm() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">#</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service Name</th>
               <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Projects Count</th>
-              <th className="px-6 py-4 w-20" />
+              <th className="px-6 py-4 text-right text-sm text-gray-700 font-semibold w-20">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {services.map((svc, idx) => {
+            {paginatedServices.map(svc => {
               const count = cdspActivities.filter(a => a.service === svc).length
               return (
                 <tr key={svc} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-400">{idx + 1}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-500" />
@@ -931,6 +956,23 @@ export default function CDSPMaintenanceForm() {
             })}
           </tbody>
         </table>
+      )}
+      {services.length > 0 && (
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Rows per page:</span>
+            <select value={servicePerPage} onChange={e => { setServicePerPage(Number(e.target.value)); setServicePage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
+              {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{sRecordStart}–{sRecordEnd} of {services.length} records</span>
+            <div className="flex gap-1">
+              <button onClick={() => setServicePage(p => Math.max(1, p - 1))} disabled={sSafePage === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+              <button onClick={() => setServicePage(p => Math.min(sTotalPages, p + 1))} disabled={sSafePage === sTotalPages} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

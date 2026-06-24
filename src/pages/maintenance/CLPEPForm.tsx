@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react'
 import type { AttachmentItem } from './DILPForm'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,24 +161,22 @@ export default function CLPEPForm({
             <label htmlFor="clpep-startDate" className={labelCls}>
               Start Date <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="clpep-startDate"
-              type="date"
+              className={inputCls}
               value={formData.startDate}
               readOnly={isView}
-              onChange={e => field('startDate', e.target.value)}
-              className={inputCls}
+              onChange={value => field('startDate', value)}
             />
           </div>
           <div>
             <label htmlFor="clpep-endDate" className={labelCls}>End Date</label>
-            <input
+            <DatePicker
               id="clpep-endDate"
-              type="date"
+              className={inputCls}
               value={formData.endDate}
               readOnly={isView}
-              onChange={e => field('endDate', e.target.value)}
-              className={inputCls}
+              onChange={value => field('endDate', value)}
             />
           </div>
         </div>

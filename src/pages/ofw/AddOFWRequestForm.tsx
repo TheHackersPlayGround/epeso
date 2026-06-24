@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import type { OFWProfile } from '../../contexts/OFWContext'
+import DatePicker from '../../components/DatePicker'
 
 interface AddOFWRequestFormProps {
   onClose: () => void
@@ -188,7 +189,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
-                <input type="date" className={inp} value={form.dateFiled} onChange={e => set('dateFiled', e.target.value)} required />
+                <DatePicker className={inp} value={form.dateFiled} onChange={value => set('dateFiled', value)} required />
               </div>
               <div>
                 <label className={lbl}>Reference No.</label>
@@ -394,7 +395,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div>
                   <label className={lbl}>Date Received</label>
-                  <input type="date" className={inp} value={dateReceived} onChange={e => setDateReceived(e.target.value)} />
+                  <DatePicker className={inp} value={dateReceived} onChange={setDateReceived} />
                 </div>
                 <div>
                   <label className={lbl}>Received By</label>

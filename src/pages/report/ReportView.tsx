@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2 } from 'lucide-react'
+import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -593,9 +594,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 </select>
               )}
               {reportPeriod === 'custom' && <>
-                <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                <DatePicker value={fromDate} onChange={setFromDate}
                   className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
-                <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                <DatePicker value={toDate} onChange={setToDate}
                   className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
               </>}
             </div>

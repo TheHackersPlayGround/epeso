@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Users, Plus, Paperclip } from 'lucide-react'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -341,12 +342,11 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             <label htmlFor="slp-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="slp-birthdate"
-              type="date"
               className={inputClass}
               value={formData.birthdate ?? ''}
-              onChange={e => handleBirthdate(e.target.value)}
+              onChange={handleBirthdate}
               required
             />
           </div>
@@ -728,12 +728,11 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="slp-dateApplied" className={labelClass}>Date Applied</label>
-            <input
+            <DatePicker
               id="slp-dateApplied"
-              type="date"
               className={inputClass}
               value={formData.dateApplied ?? ''}
-              onChange={e => updateField({ dateApplied: e.target.value })}
+              onChange={value => updateField({ dateApplied: value })}
             />
           </div>
           <div>

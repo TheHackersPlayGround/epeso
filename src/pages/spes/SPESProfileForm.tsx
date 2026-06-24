@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { X, Users, Upload, Download } from 'lucide-react'
 import { useSPES } from '../../contexts/SPESContext'
-import type { SPESApplicant, SPESBatch, SPESBatchAssignment } from '../../contexts/SPESContext'
+import type { SPESApplicant, SPESBatchAssignment } from '../../contexts/SPESContext'
 import AddressFields from '../../components/AddressFields'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -115,9 +116,8 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
 
 // ─── Exported view panel ───────────────────────────────────────────────────────
 
-export function ViewApplicantPanel({ applicant, spesBatches, onClose }: {
+export function ViewApplicantPanel({ applicant, onClose }: {
   applicant: SPESApplicant
-  spesBatches: SPESBatch[]
   onClose: () => void
 }) {
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
@@ -132,12 +132,6 @@ export function ViewApplicantPanel({ applicant, spesBatches, onClose }: {
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
   )
-  const statusStyles: Record<string, string> = {
-    Completed: 'bg-blue-100 text-blue-700 border border-blue-200',
-    Ongoing:   'bg-green-100 text-green-700 border border-green-200',
-    Open:      'bg-sky-50 text-sky-600 border border-sky-200',
-    Closed:    'bg-gray-100 text-gray-500 border border-gray-200',
-  }
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
@@ -147,7 +141,7 @@ export function ViewApplicantPanel({ applicant, spesBatches, onClose }: {
             <Users size={18} className="text-brand-blue" />
           </div>
           <div>
-            <h2 className="text-gray-900 text-lg font-semibold">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
+            <h2 className="text-lg" style={{ color: '#000000', fontWeight: 800 }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
             <p className="text-sm text-gray-400">SPES Applicant Profile</p>
           </div>
         </div>
@@ -190,38 +184,7 @@ export function ViewApplicantPanel({ applicant, spesBatches, onClose }: {
             <Field label="Annual Family Income" value={applicant.annualFamilyIncome ? `₱${applicant.annualFamilyIncome}` : ''} />
             <Field label="Number of Dependents" value={applicant.numberOfDependents} />
           </div>
-          <Sec num="V" title="Assignments" />
-          {applicant.assignmentHistory && applicant.assignmentHistory.length > 0 ? (
-            <div className="space-y-3">
-              {applicant.assignmentHistory.map((entry, i) => {
-                const batch = spesBatches.find(b => b.id === entry.batchId)
-                const batchStatus = batch?.status ?? 'Completed'
-                const isCurrent = applicant.assignedBatchId === entry.batchId
-                return (
-                  <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.batchName}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Date Assigned: {entry.assignedDate || '—'}</p>
-                      {entry.completedDate && (
-                        <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyles[batchStatus] ?? statusStyles.Closed}`}>
-                        {batchStatus}
-                      </span>
-                      {isCurrent && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-brand-blue font-semibold">Current</span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">No batch assignments on record.</p>
-          )}
-          <Sec num="VI" title="Attached Documents" />
+          <Sec num="V" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
               {applicant.attachedDocuments.map((doc, i) => (
@@ -233,7 +196,7 @@ export function ViewApplicantPanel({ applicant, spesBatches, onClose }: {
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VII" title="For PESO Office Only" gray />
+          <Sec num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Application Received" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -335,7 +298,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Birthdate</label>
-              <input type="date" className={inp} value={formData.birthdate} onChange={e => handleBirthdate(e.target.value)} />
+              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -456,7 +419,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Application Received</label>
-              <input type="date" className={inp} value={formData.dateApplicationReceived} onChange={e => set({ dateApplicationReceived: e.target.value })} />
+              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>

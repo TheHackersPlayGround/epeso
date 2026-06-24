@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Upload, Users } from 'lucide-react'
 import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           </div>
           <div>
             <label className={labelClass}>Birthdate <span className="text-red-500">*</span></label>
-            <input type="date" className={inputClass} value={formData.birthdate ?? ''} onChange={e => handleBirthdateChange(e.target.value)} />
+            <DatePicker className={inputClass} value={formData.birthdate ?? ''} onChange={handleBirthdateChange} />
           </div>
           <div>
             <label className={labelClass}>Age</label>
@@ -279,7 +280,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Date Applied</label>
-            <input type="date" className={inputClass} value={formData.dateApplied ?? ''} onChange={e => updateField({ dateApplied: e.target.value })} />
+            <DatePicker className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
           </div>
           <div>
             <label className={labelClass}>Status</label>
@@ -317,7 +318,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Date Application Received</label>
-            <input type="date" className={inputClass} value={formData.dateApplicationReceived ?? ''} onChange={e => updateField({ dateApplicationReceived: e.target.value })} />
+            <DatePicker className={inputClass} value={formData.dateApplicationReceived ?? ''} onChange={value => updateField({ dateApplicationReceived: value })} />
           </div>
           <div>
             <label className={labelClass}>Received By</label>

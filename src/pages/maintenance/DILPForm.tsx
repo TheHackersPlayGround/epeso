@@ -1,6 +1,7 @@
 ﻿import { useRef, useState } from 'react'
 import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import AddressFields, { type AddressValue } from '../../components/AddressFields'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,9 +170,8 @@ export default function DILPForm({
           </div>
           <div>
             <label className={labelCls}>Date Released</label>
-            <input type="date" value={formData.dateReleased} readOnly={isView}
-              onChange={e => onChange({ ...formData, dateReleased: e.target.value })}
-              className={inputCls} />
+            <DatePicker className={inputCls} value={formData.dateReleased} readOnly={isView}
+              onChange={value => onChange({ ...formData, dateReleased: value })} />
           </div>
         </div>
       </div>

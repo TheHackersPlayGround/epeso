@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react'
 import type { AttachmentItem } from './DILPForm'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,13 +159,12 @@ export default function SLPForm({
             <label htmlFor="slp-dateStarted" className={labelCls}>
               Date Started <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="slp-dateStarted"
-              type="date"
+              className={inputCls}
               value={formData.dateStarted}
               readOnly={isView}
-              onChange={e => field('dateStarted', e.target.value)}
-              className={inputCls}
+              onChange={value => field('dateStarted', value)}
             />
           </div>
           <div>
@@ -245,13 +245,12 @@ export default function SLPForm({
           </div>
           <div>
             <label htmlFor="slp-dateReleased" className={labelCls}>Date Released</label>
-            <input
+            <DatePicker
               id="slp-dateReleased"
-              type="date"
+              className={inputCls}
               value={formData.dateReleased}
               readOnly={isView}
-              onChange={e => field('dateReleased', e.target.value)}
-              className={inputCls}
+              onChange={value => field('dateReleased', value)}
             />
           </div>
         </div>

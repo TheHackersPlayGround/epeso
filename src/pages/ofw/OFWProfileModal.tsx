@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import type { OFWProfile, OFWAttachment } from '../../contexts/OFWContext'
+import DatePicker from '../../components/DatePicker'
 
 interface OFWProfileModalProps {
   profile: OFWProfile
@@ -359,7 +360,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
-                  <input type="date" className={inp} value={form.dateFiled} onChange={e => set('dateFiled', e.target.value)} required />
+                  <DatePicker className={inp} value={form.dateFiled} onChange={value => set('dateFiled', value)} required />
                 </div>
                 <div>
                   <label className={lbl}>Reference No.</label>
@@ -537,7 +538,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <div className="grid grid-cols-2 gap-4 mb-5">
                   <div>
                     <label className={lbl}>Date Received</label>
-                    <input type="date" className={inp} value={form.dateApplicationReceived ?? ''} onChange={e => set('dateApplicationReceived', e.target.value)} />
+                    <DatePicker className={inp} value={form.dateApplicationReceived ?? ''} onChange={value => set('dateApplicationReceived', value)} />
                   </div>
                   <div>
                     <label className={lbl}>Received By</label>

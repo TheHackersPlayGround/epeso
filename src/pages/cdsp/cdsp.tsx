@@ -123,6 +123,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<ProgramActivity | null>(null)
   const [viewingAssignedFor, setViewingAssignedFor] = useState<CDSPApplicant | null>(null)
+  const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<CDSPApplicant | null>(null)
 
   const filtered = applicants.filter((a) => {
     const fullName = `${a.lastName} ${a.firstName} ${a.middleName}`.toLowerCase()
@@ -182,9 +183,26 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   }
   const handleAssign = (activity: ProgramActivity) => {
     if (!assignTarget) return
-    setApplicants((prev) => prev.map((a) =>
-      a.id === assignTarget.id ? { ...a, assignedActivity: activity.title, status: 'Active' as const } : a
-    ))
+    const today = new Date().toISOString().split('T')[0]
+    setApplicants((prev) => prev.map((a) => {
+      if (a.id !== assignTarget.id) return a
+      const history = [...(a.assignmentHistory ?? [])]
+      // Mark previous assignment completed if its activity was completed
+      if (a.assignedActivity) {
+        const prevIdx = history.findIndex(h => h.activityTitle === a.assignedActivity)
+        if (prevIdx >= 0 && !history[prevIdx].completedDate) {
+          const prevAct = cdspActivities.find(x => x.title === a.assignedActivity)
+          if (prevAct?.status === 'Completed') {
+            history[prevIdx] = { ...history[prevIdx], completedDate: today }
+          }
+        }
+      }
+      // Add new assignment to history if not already present
+      if (!history.some(h => h.activityTitle === activity.title)) {
+        history.push({ activityTitle: activity.title, assignedDate: today })
+      }
+      return { ...a, assignedActivity: activity.title, status: 'Active' as const, assignmentHistory: history }
+    }))
     setAssignTarget(null)
     setSelectedActivity(null)
     Swal.fire({
@@ -408,6 +426,64 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   >Change Activity</button>
                 )}
                 <button onClick={close} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium">Close</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Assignment History Modal */}
+      {viewingAssignmentHistoryFor && (() => {
+        const a = viewingAssignmentHistoryFor
+        const statusColor = (s?: string) =>
+          s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+          s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
+          'bg-amber-100 text-amber-700 border border-amber-200'
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+              <div className="bg-white border-b border-gray-200 rounded-t-2xl px-6 py-5 flex items-center justify-between flex-shrink-0">
+                <div>
+                  <p className="text-black font-extrabold text-lg tracking-tight">Assignment History</p>
+                  <p className="text-gray-500 text-sm mt-0.5">{a.lastName}, {a.firstName} {a.middleName}</p>
+                </div>
+                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
+              </div>
+              <div className="px-6 py-5 overflow-y-auto flex-1">
+                {(a.assignmentHistory?.length ?? 0) === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Users size={26} className="text-gray-400" />
+                    </div>
+                    <p className="text-sm font-bold text-black">No assignments yet</p>
+                    <p className="text-xs text-gray-600 text-center">Activity assignments will appear here once the applicant is assigned to an activity.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[...(a.assignmentHistory ?? [])].reverse().map((entry, i) => {
+                      const act = cdspActivities.find(x => x.title === entry.activityTitle)
+                      const isCurrent = a.assignedActivity === entry.activityTitle
+                      return (
+                        <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.activityTitle}</p>
+                            <p className="text-xs text-gray-400 mt-1">Date Assigned: {entry.assignedDate || '—'}</p>
+                            {entry.completedDate && (
+                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {entry.completedDate}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
+                            {act && <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor(act.status)}`}>{act.status}</span>}
+                            {isCurrent && <span className="text-[10px] px-2.5 py-1 rounded-full bg-brand-blue text-white font-semibold">Current</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="px-6 pb-6 flex-shrink-0">
+                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 text-sm font-semibold transition-colors">Close</button>
               </div>
             </div>
           </div>
@@ -861,16 +937,21 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find((a) => a.id === openActionMenuId)
         if (!applicant) return null
+        const assignedAct = applicant.assignedActivity
+          ? cdspActivities.find(a => a.title === applicant.assignedActivity)
+          : null
+        const isCompleted = assignedAct?.status === 'Completed'
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
-            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
-              {applicant.assignedActivity
+              {applicant.assignedActivity && !isCompleted
                 ? <button onClick={() => { setViewingAssignedFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50">View Assigned Activity</button>
                 : <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
               }
+              <button onClick={() => { setViewingAssignmentHistoryFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
             </div>

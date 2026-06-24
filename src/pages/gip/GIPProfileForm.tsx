@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, Users, Upload, Download } from 'lucide-react'
 import type { GIPApplicant, GIPBatch } from '../../contexts/GIPContext'
 import AddressFields from '../../components/AddressFields'
+import DatePicker from '../../components/DatePicker'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -177,7 +178,7 @@ export function ViewApplicantPanel({ applicant, batches, onClose }: {
             <Users size={18} className="text-brand-blue" />
           </div>
           <div>
-            <h2 className="text-gray-800 text-lg">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
+            <h2 className="text-lg" style={{ color: '#000000', fontWeight: 800 }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
             <p className="text-sm text-gray-400">GIP Applicant Profile</p>
           </div>
         </div>
@@ -347,7 +348,7 @@ export default function GIPProfileForm({ initial, mode, batches, onSave, onClose
             </div>
             <div>
               <label className={lbl}>Birthdate</label>
-              <input type="date" className={inp} value={formData.birthdate} onChange={e => handleBirthdate(e.target.value)} />
+              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -436,7 +437,7 @@ export default function GIPProfileForm({ initial, mode, batches, onSave, onClose
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Application Received</label>
-              <input type="date" className={inp} value={formData.dateApplicationReceived} onChange={e => set({ dateApplicationReceived: e.target.value })} />
+              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>

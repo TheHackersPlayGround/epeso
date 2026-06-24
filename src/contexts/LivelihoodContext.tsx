@@ -139,6 +139,7 @@ export type LivelihoodBeneficiary = {
   assignedDilpProjectId?: number | null   // links to ProgramActivity id
   dilpBeneficiaryType?: string            // "Individual" or "Group"
   projectName?: string                    // kept for display in table
+  projectAssignmentHistory?: { projectName: string; projectId?: number | null; assignedDate: string; completedDate?: string }[]
   projectDuration?: string               // e.g. "10 days"
   wageRate?: string                      // e.g. "₱500/day"
   region?: string
@@ -230,6 +231,10 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     assignedDilpProjectId: 204,
     projectName: 'TUPAD Road Maintenance and Repair',
     attachedForms: [],
+    projectAssignmentHistory: [
+      { projectId: 202, projectName: 'TUPAD Cemetery and Memorial Park Maintenance', assignedDate: '2026-01-20', completedDate: '2026-02-28' },
+      { projectId: 204, projectName: 'TUPAD Road Maintenance and Repair', assignedDate: '2026-03-05' },
+    ],
   },
   {
     id: 3,
@@ -436,6 +441,9 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplicationReceived: '2026-04-12',
     receivedBy: 'Maria Santos',
     attachedForms: [],
+    projectAssignmentHistory: [
+      { projectId: 202, projectName: 'TUPAD Cemetery and Memorial Park Maintenance', assignedDate: '2026-04-12' },
+    ],
   },
   {
     id: 11,
@@ -459,6 +467,9 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplicationReceived: '2026-03-20',
     receivedBy: 'Carlo Bautista',
     attachedForms: [],
+    projectAssignmentHistory: [
+      { projectId: 203, projectName: 'TUPAD Street Cleaning and Beautification', assignedDate: '2026-03-20', completedDate: '2026-04-10' },
+    ],
   },
   {
     id: 12,
@@ -483,6 +494,9 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplicationReceived: '2026-04-16',
     receivedBy: 'Maria Santos',
     attachedForms: [],
+    projectAssignmentHistory: [
+      { projectId: 204, projectName: 'TUPAD Road Maintenance and Repair', assignedDate: '2026-04-16' },
+    ],
   },
   {
     id: 13,
@@ -507,6 +521,9 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplicationReceived: '2026-05-16',
     receivedBy: 'Carlo Bautista',
     attachedForms: [],
+    projectAssignmentHistory: [
+      { projectId: 203, projectName: 'TUPAD Street Cleaning and Beautification', assignedDate: '2026-05-16' },
+    ],
   },
   // ── SLP additional ───────────────────────────────────────────────────────
   {

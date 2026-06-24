@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
+import DatePicker from '../../components/DatePicker'
 import type { Placement } from '../../contexts/EmploymentContext'
 import { PLACEMENT_SEED } from '../../contexts/EmploymentContext'
 import * as XLSX from 'xlsx'
@@ -520,12 +521,11 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
             <label htmlFor="placement-date-hired" className="block text-sm font-medium text-gray-600 mb-1">
               Date Hired <span className="text-red-500">*</span>
             </label>
-            <input
+            <DatePicker
               id="placement-date-hired"
-              type="date"
-              value={dateHired}
-              onChange={e => setDateHired(e.target.value)}
               className={fieldCls(!dateHired)}
+              value={dateHired}
+              onChange={setDateHired}
             />
             <ErrMsg show={showFieldErrors && !dateHired} />
           </div>

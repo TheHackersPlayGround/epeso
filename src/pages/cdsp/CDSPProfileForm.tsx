@@ -464,11 +464,7 @@ export default function CDSPProfileForm({
             ))}
           </div>
 
-          <SectionDivider numeral="VII" title="Attached Documents" />
-          <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
-          <DocAttachSection documents={formData.attachedDocuments} onChange={(docs) => set({ attachedDocuments: docs })} />
-
-          <SectionDivider numeral="VIII" title="For PESO Office Only" gray />
+          <SectionDivider numeral="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
@@ -482,6 +478,11 @@ export default function CDSPProfileForm({
               <label className={lbl}>Remarks</label>
               <input className={inp} value={formData.remarks} onChange={(e) => set({ remarks: e.target.value })} placeholder="Optional" />
             </div>
+          </div>
+          <div className="mt-6">
+            <label className={lbl}>Attached Documents</label>
+            <p className="text-xs text-gray-400 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
+            <DocAttachSection documents={formData.attachedDocuments} onChange={(docs) => set({ attachedDocuments: docs })} />
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">

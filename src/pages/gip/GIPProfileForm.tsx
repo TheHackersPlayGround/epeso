@@ -112,49 +112,12 @@ function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (doc
   )
 }
 
-function AssignmentCards({ history, batches, currentBatchId }: {
-  history: GIPApplicant['assignmentHistory']
-  batches: GIPBatch[]
-  currentBatchId: number | null
-}) {
-  if (history.length === 0) {
-    return <p className="text-sm text-gray-400">No assignment history.</p>
-  }
-  return (
-    <div className="space-y-2">
-      {[...history].reverse().map((h, i) => {
-        const batch = batches.find(b => b.id === h.batchId)
-        const displayStatus: GIPBatch['status'] = h.completedDate ? 'Completed' : (batch?.status ?? 'Planned')
-        const isCurrent = currentBatchId === h.batchId && !h.completedDate
-        return (
-          <div key={i} className={`flex items-start justify-between gap-3 px-4 py-3 border rounded-lg ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200 bg-white'}`}>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-gray-800">{h.batchName}</p>
-                {isCurrent && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-brand-blue text-white font-semibold">Current</span>
-                )}
-              </div>
-              <p className="text-xs text-brand-blue mt-0.5">Date Assigned: {h.assignedDate || '—'}</p>
-              {h.completedDate && (
-                <p className="text-xs text-brand-blue">Date Completed: {h.completedDate}</p>
-              )}
-            </div>
-            <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold flex-shrink-0 mt-0.5 ${BATCH_STATUS_COLORS[displayStatus]}`}>
-              {displayStatus}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+
 
 // ─── Exported view panel ───────────────────────────────────────────────────────
 
-export function ViewApplicantPanel({ applicant, batches, onClose }: {
+export function ViewApplicantPanel({ applicant, onClose }: {
   applicant: GIPApplicant
-  batches: GIPBatch[]
   onClose: () => void
 }) {
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
@@ -222,9 +185,7 @@ export function ViewApplicantPanel({ applicant, batches, onClose }: {
             <Field label="Course / Degree" value={applicant.course} />
             <Field label="Year Graduated" value={applicant.yearGraduated} />
           </div>
-          <Sec num="V" title="Assignment" />
-          <AssignmentCards history={applicant.assignmentHistory} batches={batches} currentBatchId={applicant.assignedBatchId} />
-          <Sec num="VI" title="Attached Documents" />
+          <Sec num="V" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
               {applicant.attachedDocuments.map((doc, i) => (
@@ -236,7 +197,7 @@ export function ViewApplicantPanel({ applicant, batches, onClose }: {
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VII" title="For PESO Office Only" gray />
+          <Sec num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -251,10 +212,9 @@ export function ViewApplicantPanel({ applicant, batches, onClose }: {
 
 // ─── Default export: form ──────────────────────────────────────────────────────
 
-export default function GIPProfileForm({ initial, mode, batches, onSave, onClose }: {
+export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
   initial: Omit<GIPApplicant, 'id'>
   mode: 'add' | 'edit'
-  batches: GIPBatch[]
   onSave: (data: Omit<GIPApplicant, 'id'>) => void
   onClose: () => void
 }) {
@@ -423,17 +383,7 @@ export default function GIPProfileForm({ initial, mode, batches, onSave, onClose
             </div>
           </div>
 
-          <SectionDivider num="V" title="Assignment" />
-          <AssignmentCards history={formData.assignmentHistory} batches={batches} currentBatchId={formData.assignedBatchId} />
-
-          <SectionDivider num="VI" title="Attached Documents" />
-          <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
-          <AttachedDocsEditor
-            docs={formData.attachedDocuments}
-            onChange={docs => set({ attachedDocuments: docs })}
-          />
-
-          <SectionDivider num="VII" title="For PESO Office Only" gray />
+          <SectionDivider num="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
@@ -447,6 +397,14 @@ export default function GIPProfileForm({ initial, mode, batches, onSave, onClose
               <label className={lbl}>Remarks</label>
               <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
             </div>
+          </div>
+          <div className="mt-6">
+            <label className={lbl}>Attached Documents</label>
+            <p className="text-xs text-gray-400 mb-3">Attach supporting documents (e.g. resume, certificate). This section is optional / if applicable.</p>
+            <AttachedDocsEditor
+              docs={formData.attachedDocuments}
+              onChange={docs => set({ attachedDocuments: docs })}
+            />
           </div>
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">

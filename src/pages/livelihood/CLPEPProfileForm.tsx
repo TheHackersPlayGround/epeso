@@ -25,7 +25,7 @@ const SCHOOL_STATUS_OPTIONS = [
 
 const RELATIONSHIP_OPTIONS = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Relative', 'Others'] as const
 
-const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] as const
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
 
 // ─── Custom Select Dropdown ───────────────────────────────────────────────────
 
@@ -121,9 +121,7 @@ const STEPS = [
   { id: 2, label: 'ADDRESS INFORMATION' },
   { id: 3, label: 'CHILD LABOR INFORMATION' },
   { id: 4, label: 'PARENT / GUARDIAN' },
-  { id: 5, label: 'APPLICATION DETAILS' },
-  { id: 6, label: 'ATTACHMENTS' },
-  { id: 7, label: 'PESO OFFICE ONLY' },
+  { id: 5, label: 'PESO OFFICE ONLY' },
 ] as const
 
 // ─── Shared CSS class strings ─────────────────────────────────────────────────
@@ -632,54 +630,11 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   }
 
   function renderStep5() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="V. APPLICATION DETAILS" />
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
-            <DatePicker
-              id="clpep-dateApplied"
-              className={inputClass}
-              value={formData.dateApplied ?? ''}
-              onChange={value => updateField({ dateApplied: value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-status" className={labelClass}>Status</label>
-            <SelectDropdown
-              id="clpep-status"
-              value={formData.status}
-              options={STATUS_OPTIONS}
-              placeholder="Select"
-              onChange={v => updateField({ status: v as LivelihoodStatus })}
-              disabled={isViewMode}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="clpep-remarks" className={labelClass}>Remarks</label>
-          <textarea
-            id="clpep-remarks"
-            className={inputClass + ' resize-none'}
-            rows={4}
-            placeholder="Enter remarks"
-            value={formData.remarks ?? ''}
-            onChange={e => updateField({ remarks: e.target.value })}
-          />
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep6() {
     const attachedForms = formData.attachedForms ?? []
 
     return (
       <div className="space-y-5">
-        <SectionHeader title="VI. ATTACHMENTS" />
+        <SectionHeader title="V. PESO OFFICE ONLY" />
 
         <div>
           <p className={labelClass}>Case Report / Referral Form</p>
@@ -790,14 +745,41 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             )}
           </div>
         </div>
-      </div>
-    )
-  }
 
-  function renderStep7() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="VII. PESO OFFICE ONLY" />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
+            <DatePicker
+              id="clpep-dateApplied"
+              className={inputClass}
+              value={formData.dateApplied ?? ''}
+              onChange={value => updateField({ dateApplied: value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="clpep-status" className={labelClass}>Status</label>
+            <SelectDropdown
+              id="clpep-status"
+              value={formData.status}
+              options={STATUS_OPTIONS}
+              placeholder="Select"
+              onChange={v => updateField({ status: v as LivelihoodStatus })}
+              disabled={isViewMode}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="clpep-remarks" className={labelClass}>Remarks</label>
+          <textarea
+            id="clpep-remarks"
+            className={inputClass + ' resize-none'}
+            rows={4}
+            placeholder="Enter remarks"
+            value={formData.remarks ?? ''}
+            onChange={e => updateField({ remarks: e.target.value })}
+          />
+        </div>
 
         <div>
           <label htmlFor="clpep-receivedBy" className={labelClass}>Received By</label>
@@ -820,8 +802,6 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       case 3: return renderStep3()
       case 4: return renderStep4()
       case 5: return renderStep5()
-      case 6: return renderStep6()
-      case 7: return renderStep7()
       default: return null
     }
   }

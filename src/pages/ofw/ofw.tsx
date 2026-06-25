@@ -1,6 +1,7 @@
 ﻿import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import { ArrowLeft, Plus, Upload, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import Swal from 'sweetalert2'
+import { ArrowLeft, Plus, Upload, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import type { OFWProfile } from '../../contexts/OFWContext'
@@ -76,13 +77,12 @@ interface ActionMenuProps {
   menuRef: React.RefObject<HTMLDivElement | null>
   onView: () => void
   onEdit: () => void
-  onStartProcessing: () => void
-  onMarkCompleted: () => void
+  onChangeStatus: (newStatus: OFWProfile['status']) => void
   onDelete: () => void
   onClose: () => void
 }
 
-function ActionMenu({ profile, pos, menuRef, onView, onEdit, onStartProcessing, onMarkCompleted, onDelete, onClose }: ActionMenuProps) {
+function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onDelete, onClose }: ActionMenuProps) {
   return ReactDOM.createPortal(
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
@@ -100,14 +100,26 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onStartProcessing, 
           Edit
         </button>
         {profile.status === 'Pending' && (
-          <button onClick={() => { onStartProcessing(); onClose() }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <button onClick={() => { onChangeStatus('Ongoing'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+            <PlayCircle className="w-4 h-4 text-blue-500" />
             Start Processing
           </button>
         )}
+        {profile.status === 'Pending' && (
+          <button onClick={() => { onChangeStatus('Rejected'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+            <XCircle className="w-4 h-4 text-red-500" />
+            Reject
+          </button>
+        )}
         {profile.status === 'Ongoing' && (
-          <button onClick={() => { onMarkCompleted(); onClose() }} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <button onClick={() => { onChangeStatus('Approved'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-blue-500" />
+            Mark as Approved
+          </button>
+        )}
+        {profile.status === 'Approved' && (
+          <button onClick={() => { onChangeStatus('Completed'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-500" />
             Mark as Completed
           </button>
         )}
@@ -130,6 +142,11 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const [viewProfile, setViewProfile] = useState<OFWProfile | null>(null)
   const [editProfile, setEditProfile] = useState<OFWProfile | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<OFWProfile | null>(null)
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    profile: OFWProfile
+    newStatus: OFWProfile['status']
+    label: string
+  } | null>(null)
 
   // Search & filter
   const [searchTerm, setSearchTerm] = useState('')
@@ -214,8 +231,23 @@ export default function OFWView({ onBack }: OFWViewProps) {
     setDeleteTarget(null)
   }
 
-  const handleStatusChange = (id: number, status: OFWProfile['status']) => {
-    setProfiles(prev => prev.map(p => p.id === id ? { ...p, status } : p))
+  const handleStatusChange = (profile: OFWProfile, newStatus: OFWProfile['status'], label: string) => {
+    setPendingStatusChange({ profile, newStatus, label })
+  }
+
+  const confirmStatusChange = () => {
+    if (!pendingStatusChange) return
+    const { profile, newStatus } = pendingStatusChange
+    setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, status: newStatus } : p))
+    setPendingStatusChange(null)
+    Swal.fire({
+      icon: newStatus === 'Rejected' ? 'error' : 'success',
+      title: 'Status Updated',
+      text: `${profile.name}'s request is now ${newStatus}.`,
+      confirmButtonColor: '#0077BE',
+      timer: 2000,
+      timerProgressBar: true,
+    })
   }
 
   // ── Filtering ─────────────────────────────────────────────────
@@ -241,7 +273,14 @@ export default function OFWView({ onBack }: OFWViewProps) {
     return matchSearch && matchFilters
   })
 
+  const STATUS_ORDER: Record<string, number> = {
+    Pending: 0, Ongoing: 1, Approved: 2, Completed: 3, Rejected: 4,
+  }
+
   const sorted = [...filtered].sort((a, b) => {
+    const statusDiff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
+    if (statusDiff !== 0) return statusDiff
+    if (!sortOrder) return 0
     const parts = (n: string) => n.trim().split(/\s+/)
     const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
     const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
@@ -582,8 +621,10 @@ export default function OFWView({ onBack }: OFWViewProps) {
                             menuRef={menuRef}
                             onView={() => setViewProfile(profile)}
                             onEdit={() => setEditProfile(profile)}
-                            onStartProcessing={() => handleStatusChange(profile.id, 'Ongoing')}
-                            onMarkCompleted={() => handleStatusChange(profile.id, 'Completed')}
+                            onChangeStatus={(newStatus) => {
+                              const label = newStatus === 'Ongoing' ? 'Start Processing' : newStatus === 'Rejected' ? 'Reject' : `Mark as ${newStatus}`
+                              handleStatusChange(profile, newStatus, label)
+                            }}
                             onDelete={() => setDeleteTarget(profile)}
                             onClose={closeMenu}
                           />
@@ -631,6 +672,86 @@ export default function OFWView({ onBack }: OFWViewProps) {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      {/* ── Status change confirmation modal ────────────────────── */}
+      {pendingStatusChange !== null && (() => {
+        const { profile, newStatus, label } = pendingStatusChange
+        const isRejected = newStatus === 'Rejected'
+        const isCompleted = newStatus === 'Completed'
+        const steps: OFWProfile['status'][] = isRejected
+          ? ['Pending', 'Rejected']
+          : ['Pending', 'Ongoing', 'Approved', 'Completed']
+        const curIdx  = steps.indexOf(profile.status)
+        const nextIdx = steps.indexOf(newStatus)
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-2.5 rounded-full ${isCompleted ? 'bg-green-100' : isRejected ? 'bg-red-100' : 'bg-blue-100'}`}>
+                  {isCompleted
+                    ? <CheckCircle size={22} className="text-green-600" />
+                    : isRejected
+                    ? <XCircle     size={22} className="text-red-600" />
+                    : <PlayCircle  size={22} className="text-brand-blue" />}
+                </div>
+                <h3 className="text-gray-800 m-0 text-lg">{label}</h3>
+              </div>
+
+              <div className="flex items-center gap-2 mb-5 bg-gray-50 rounded-xl px-4 py-3">
+                {steps.map((s, i) => {
+                  const isCur  = s === profile.status
+                  const isNext = s === newStatus
+                  const isPast = i < Math.min(curIdx, nextIdx)
+                  const dotCls = isPast || isCur
+                    ? 'bg-blue-500'
+                    : isNext
+                    ? (isCompleted ? 'bg-green-500 ring-2 ring-green-200' : isRejected ? 'bg-red-500 ring-2 ring-red-200' : 'bg-brand-blue ring-2 ring-blue-200')
+                    : 'bg-gray-200'
+                  const lblCls = isNext
+                    ? (isCompleted ? 'text-green-600 font-semibold' : isRejected ? 'text-red-600 font-semibold' : 'text-brand-blue font-semibold')
+                    : isCur ? 'text-blue-500 font-semibold'
+                    : isPast ? 'text-gray-400'
+                    : 'text-gray-300'
+                  return (
+                    <div key={s} className="flex items-center gap-2 flex-1">
+                      <div className="flex flex-col items-center gap-1 flex-1">
+                        <div className={`w-3 h-3 rounded-full transition-all ${dotCls}`} />
+                        <span className={`text-xs whitespace-nowrap ${lblCls}`}>{s}</span>
+                      </div>
+                      {i < steps.length - 1 && (
+                        <div className={`h-0.5 flex-1 mb-4 ${i < Math.max(curIdx, nextIdx) ? (isRejected ? 'bg-red-300' : 'bg-blue-400') : 'bg-gray-200'}`} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <p className="text-gray-600 text-sm mb-6">
+                Change <span className="font-medium text-gray-800">{profile.name}</span> ({profile.referenceNumber}) status from{' '}
+                <span className="font-medium text-blue-500">{profile.status}</span> to{' '}
+                <span className={`font-medium ${isCompleted ? 'text-green-600' : isRejected ? 'text-red-600' : 'text-brand-blue'}`}>{newStatus}</span>?
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setPendingStatusChange(null)}
+                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmStatusChange}
+                  className={`px-5 py-2 text-white rounded-lg transition-colors text-sm ${
+                    isCompleted ? 'bg-green-600 hover:bg-green-700' : isRejected ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-blue hover:bg-brand-blue-dark'
+                  }`}
+                >
+                  {label}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Import modal ────────────────────────────────────────── */}
       {isImportModalOpen && (

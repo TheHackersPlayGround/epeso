@@ -35,6 +35,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
   const [assigningProfile, setAssigningProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assignSearch, setAssignSearch] = useState('')
+  const [assignStep, setAssignStep] = useState<1 | 2>(1)
+  const [selectedTraining, setSelectedTraining] = useState<ProgramActivity | null>(null)
+  const [assignViewOnly, setAssignViewOnly] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -209,16 +212,20 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     setSuccessModal({ open: true, message: `Successfully imported ${newProfiles.length} profile(s)!` })
   }
 
+  const closeAssignModal = () => {
+    setAssigningProfile(null); setAssignSearch(''); setAssignStep(1); setSelectedTraining(null); setAssignViewOnly(false)
+  }
+
   const handleAssignTraining = (trainingId: number) => {
     if (!assigningProfile) return
     setProfiles(prev => prev.map(p => p.id === assigningProfile.id ? { ...p, assignedTrainingId: trainingId } : p))
-    setAssigningProfile(null); setAssignSearch('')
+    closeAssignModal()
     setSuccessModal({ open: true, message: 'Training activity assigned successfully.' })
   }
   const handleUnassignTraining = () => {
     if (!assigningProfile) return
     setProfiles(prev => prev.map(p => p.id === assigningProfile.id ? { ...p, assignedTrainingId: null } : p))
-    setAssigningProfile(null); setAssignSearch('')
+    closeAssignModal()
     setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
   }
 
@@ -278,78 +285,137 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       {/* Assign Training Modal */}
       {assigningProfile && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div>
-                <p className="text-gray-800 font-semibold">Assign Activity</p>
+                <h3 className="text-gray-800 font-semibold">
+                  {assignStep === 1 ? 'Assign Training' : 'Confirm Assignment'}
+                </h3>
                 <p className="text-sm text-gray-400 mt-0.5">{assigningProfile.firstName} {assigningProfile.lastName}</p>
               </div>
-              <button onClick={() => { setAssigningProfile(null); setAssignSearch('') }} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            {assigningProfile.status !== 'Accepted' && (
-              <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0 flex items-start gap-2">
-                <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  Applicant status is <span className="font-semibold">{assigningProfile.status}</span>. Update to <span className="font-semibold">Accepted</span> before assigning an activity.
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${assignStep >= 1 ? 'bg-brand-blue text-white' : 'bg-gray-200 text-gray-500'}`}>1</span>
+                  <ChevronRight size={12} />
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${assignStep >= 2 ? 'bg-brand-blue text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
+                </div>
+                <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
               </div>
-            )}
-            {assigningProfile.assignedTrainingId && (() => {
-              const assigned = skillsTrainings.find(t => t.id === assigningProfile.assignedTrainingId)
-              return assigned ? (
-                <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
-                  <div className="border border-gray-200 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800">{assigned.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{assigned.date}{assigned.facilitator ? ` · ${assigned.facilitator}` : ''}</p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${trainingStatusBadge(assigned.status)}`}>{assigned.status}</span>
+            </div>
+
+            {/* Step 1 — pick a training */}
+            {assignStep === 1 && (
+              <>
+                {assigningProfile.status !== 'Accepted' && (
+                  <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 flex-shrink-0 flex items-start gap-2">
+                    <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      Applicant status is <span className="font-semibold">{assigningProfile.status}</span>. Update to <span className="font-semibold">Accepted</span> before assigning an activity.
+                    </p>
+                  </div>
+                )}
+                <div className="px-6 pt-4 flex-shrink-0">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search trainings..."
+                      value={assignSearch}
+                      onChange={e => setAssignSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue"
+                    />
                   </div>
                 </div>
-              ) : null
-            })()}
-            <div className="px-6 py-2 bg-amber-50 border-b border-amber-100 flex-shrink-0 flex items-center gap-2">
-              <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
-              <p className="text-xs text-amber-700">Only <span className="font-semibold">Planned</span> trainings can be assigned.</p>
-            </div>
-            <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input type="text" placeholder="Search trainings..." value={assignSearch} onChange={e => setAssignSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent outline-none" />
-              </div>
-            </div>
-            <div className={`flex-1 overflow-y-auto${assigningProfile.status !== 'Accepted' ? ' pointer-events-none opacity-40' : ''}`}>
-              {plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).map(training => {
-                const isAssigned = assigningProfile.assignedTrainingId === training.id
-                return (
-                  <button key={training.id} onClick={() => handleAssignTraining(training.id)} className={`w-full px-6 py-4 text-left border-b border-gray-100 transition-colors flex items-start justify-between gap-4 ${isAssigned ? 'bg-purple-50' : 'hover:bg-purple-50'}`}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm text-gray-800 font-medium">{training.title}</span>
-                        {isAssigned && <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-600 rounded-full">Currently assigned</span>}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">{training.date}</span>
-                        {training.facilitator && <><span className="text-xs text-gray-400">·</span><span className="text-xs text-gray-500">{training.facilitator}</span></>}
-                      </div>
+                <div className={`flex-1 overflow-y-auto p-6 pt-3 space-y-2${assigningProfile.status !== 'Accepted' ? ' pointer-events-none opacity-40' : ''}`}>
+                  {plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).length === 0 ? (
+                    <div className="text-center py-8">
+                      <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm text-gray-400">{assignSearch ? 'No planned trainings match your search' : 'No planned trainings available'}</p>
+                      <p className="text-xs text-gray-300 mt-1">Only Planned trainings can be assigned.</p>
                     </div>
-                    <span className="text-xs px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0 bg-yellow-100 text-yellow-700">Planned</span>
-                  </button>
-                )
-              })}
-              {plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).length === 0 && (
-                <div className="py-12 text-center">
-                  <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
-                  <p className="text-gray-400 text-sm">{assignSearch ? 'No planned trainings match your search' : 'No planned trainings available'}</p>
+                  ) : plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).map(training => {
+                    const isAssigned = assigningProfile.assignedTrainingId === training.id
+                    return (
+                      <button
+                        key={training.id}
+                        onClick={() => { setSelectedTraining(training); setAssignStep(2) }}
+                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${isAssigned ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-gray-800">{training.title}</p>
+                              {isAssigned && <span className="text-xs px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full">Currently assigned</span>}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">{training.service}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {training.location}{training.startDate && training.endDate ? ` · ${training.startDate} – ${training.endDate}` : training.date ? ` · ${training.date}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold bg-yellow-100 text-yellow-700">Planned</span>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex flex-col gap-2">
-              {assigningProfile.assignedTrainingId && (
-                <button onClick={handleUnassignTraining} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">Remove Assigned Activity</button>
-              )}
-              <button onClick={() => { setAssigningProfile(null); setAssignSearch('') }} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
-            </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex flex-col gap-2">
+                  {assigningProfile.assignedTrainingId && (
+                    <button onClick={handleUnassignTraining} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">Remove Assigned Activity</button>
+                  )}
+                  <button onClick={closeAssignModal} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2 — confirm */}
+            {assignStep === 2 && selectedTraining && (
+              <>
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-gray-800">{selectedTraining.title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{selectedTraining.service}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${trainingStatusBadge(selectedTraining.status)}`}>
+                        {selectedTraining.status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      {selectedTraining.location && <div className="col-span-2"><span className="text-gray-400">Location: </span>{selectedTraining.location}</div>}
+                      {selectedTraining.startDate && <div><span className="text-gray-400">Start: </span>{selectedTraining.startDate}</div>}
+                      {selectedTraining.endDate && <div><span className="text-gray-400">End: </span>{selectedTraining.endDate}</div>}
+                      {!selectedTraining.startDate && selectedTraining.date && <div><span className="text-gray-400">Date: </span>{selectedTraining.date}</div>}
+                      {selectedTraining.participants && <div><span className="text-gray-400">Slots: </span>{selectedTraining.participants}</div>}
+                      {selectedTraining.allowance && <div><span className="text-gray-400">Allowance: </span>₱{selectedTraining.allowance}/mo</div>}
+                      {selectedTraining.facilitator && <div className="col-span-2"><span className="text-gray-400">Facilitator: </span>{selectedTraining.facilitator}</div>}
+                      {selectedTraining.description && <div className="col-span-2"><span className="text-gray-400">Description: </span>{selectedTraining.description}</div>}
+                    </div>
+                  </div>
+                  {assigningProfile.assignedTrainingId && assigningProfile.assignedTrainingId !== selectedTraining.id && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                      This applicant is currently assigned to another training. Assigning will replace the current assignment.
+                    </div>
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+                  {assignViewOnly ? (
+                    <button onClick={closeAssignModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Close</button>
+                  ) : (
+                    <>
+                      <button onClick={() => { setAssignStep(1); setSelectedTraining(null) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
+                      <button
+                        onClick={() => handleAssignTraining(selectedTraining.id)}
+                        className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark"
+                      >
+                        {assigningProfile.assignedTrainingId ? 'Re-assign' : 'Assign'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -563,7 +629,6 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                           <div>
                             <p className="text-gray-800 line-clamp-1">{getTrainingName(profile.assignedTrainingId)}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              {profile.trainingBatchNo && <span className="text-gray-400 text-xs">{profile.trainingBatchNo}</span>}
                               {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-2 py-0.5 rounded-full text-xs ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
                             </div>
                           </div>
@@ -631,7 +696,18 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
-              <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Activity</button>
+              {(() => {
+                const hasActive = !!profile.assignedTrainingId
+                if (hasActive) {
+                  const current = skillsTrainings.find(t => t.id === profile.assignedTrainingId) ?? null
+                  return (
+                    <button onClick={() => { setAssigningProfile(profile); setSelectedTraining(current); setAssignStep(2); setAssignViewOnly(true); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50">View Assigned Training</button>
+                  )
+                }
+                return (
+                  <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setAssignViewOnly(false); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Training</button>
+                )
+              })()}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
             </div>

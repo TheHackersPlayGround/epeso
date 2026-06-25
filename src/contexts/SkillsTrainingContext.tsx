@@ -103,7 +103,7 @@ const SEED: SkillsTrainingProfile[] = [
     purposeOfTraining: ['For employment', 'To start a livelihood / business'], purposeOther: [],
     attachedDocuments: [], applicantSignature: 'Carlos Ramos', dateSignature: '2026-04-20',
     dateApplicationReceived: '2026-04-20', receivedBy: 'Maria Santos',
-    trainingBatchNo: 'BATCH-003', assignedTrainingId: 15,
+    trainingBatchNo: '', assignedTrainingId: null,
     status: 'Waitlisted', assessmentResult: '', remarks: '',
   },
   {

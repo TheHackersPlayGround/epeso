@@ -53,15 +53,7 @@ function RR({ label, checked }: { label: string; checked: boolean }) {
   );
 }
 
-// ── Read-only checkbox — `className="mr-2"` matches Add form ─────────────────
-function RC({ label, checked, className = '' }: { label: string; checked: boolean; className?: string }) {
-  return (
-    <label className={`flex items-center text-sm cursor-default select-none ${className}`}>
-      <input type="checkbox" readOnly checked={checked} className="mr-2 pointer-events-none" />
-      <span>{label}</span>
-    </label>
-  );
-}
+
 
 // ── Section blue header ───────────────────────────────────────────────────────
 function SH({ children }: { children: React.ReactNode }) {
@@ -596,64 +588,24 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
         );
       }
 
-      // ── IX. Referred Program — nested checkboxes exactly matching Add form ───
+      // ── IX. Referred Program ─────────────────────────────────────────────────
       case 'referredProgram': {
-        const program    = s('referredProgram');
-        const cdsp       = sa('cdspPrograms');
-        const livelihood = sa('livelihoodPrograms');
-        const dileep     = sa('dileepPrograms');
+        const program = s('referredProgram');
         return (
           <div className="space-y-6">
             <SH>IX. REFERRED PROGRAM</SH>
-
             <div className="space-y-4">
-              {/* CDSP */}
-              <label className="flex items-center text-sm cursor-default select-none">
-                <input type="checkbox" readOnly checked={program === 'CDSP'} className="mr-2 pointer-events-none" />
-                <span className="font-semibold">CDSP</span>
-              </label>
-              {program === 'CDSP' && (
-                <div className="ml-6 space-y-2">
-                  {['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students'].map(p => (
-                    <RC key={p} label={p} checked={cdsp.includes(p)} />
-                  ))}
+              {(['SPES', 'GIP', 'DILEEP', 'TESDA Training', 'TUPAD', 'JobStart', 'Others'] as const).map(prog => (
+                <label key={prog} className="flex items-center text-sm cursor-default select-none">
+                  <input type="checkbox" readOnly checked={program === prog} className="mr-2 pointer-events-none" />
+                  <span className="font-semibold">{prog === 'Others' ? 'Others, specify:' : prog}</span>
+                </label>
+              ))}
+              {program === 'Others' && (
+                <div className="ml-6">
+                  <p className="text-sm text-gray-700">{s('referredProgramOther') || '—'}</p>
                 </div>
               )}
-
-              <div className="space-y-3 mt-4">
-                {/* Livelihood */}
-                <label className="flex items-center text-sm cursor-default select-none">
-                  <input type="checkbox" readOnly checked={program === 'Livelihood'} className="mr-2 pointer-events-none" />
-                  <span className="font-semibold">Livelihood</span>
-                </label>
-                {program === 'Livelihood' && (
-                  <div className="ml-6 space-y-2">
-                    <RC label="DILEEP" checked={livelihood.includes('DILEEP')} />
-                    {livelihood.includes('DILEEP') && (
-                      <div className="ml-6 grid grid-cols-2 gap-3">
-                        {['DILP', 'TUPAD'].map(p => (
-                          <RC key={p} label={p} checked={dileep.includes(p)} />
-                        ))}
-                      </div>
-                    )}
-                    <RC label="SLP"   checked={livelihood.includes('SLP')} />
-                    <RC label="CLPEP" checked={livelihood.includes('CLPEP')} />
-                  </div>
-                )}
-
-                <label className="flex items-center text-sm cursor-default select-none">
-                  <input type="checkbox" readOnly checked={program === 'GIP'} className="mr-2 pointer-events-none" />
-                  <span className="font-semibold">GIP</span>
-                </label>
-                <label className="flex items-center text-sm cursor-default select-none">
-                  <input type="checkbox" readOnly checked={program === 'SPES'} className="mr-2 pointer-events-none" />
-                  <span className="font-semibold">SPES</span>
-                </label>
-                <label className="flex items-center text-sm cursor-default select-none">
-                  <input type="checkbox" readOnly checked={program === 'Skills Training'} className="mr-2 pointer-events-none" />
-                  <span className="font-semibold">Skills Training</span>
-                </label>
-              </div>
             </div>
           </div>
         );

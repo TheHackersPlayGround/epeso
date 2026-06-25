@@ -14,12 +14,10 @@ const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annu
 const STEPS = [
   { id: 1, label: 'PERSONAL INFORMATION' },
   { id: 2, label: 'ADDRESS INFORMATION' },
-  { id: 3, label: 'APPLICATION DETAILS' },
-  { id: 4, label: 'ATTACHMENTS' },
-  { id: 5, label: 'PESO OFFICE ONLY' },
+  { id: 3, label: 'PESO OFFICE ONLY' },
 ] as const
 
-const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
+const ROMAN_NUMERALS = ['I', 'II', 'III'] as const
 
 export const EMPTY_TUPAD_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   name: '',
@@ -275,7 +273,16 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   function renderStep3() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="III. APPLICATION DETAILS" />
+        <SectionHeader title="III. PESO OFFICE ONLY" />
+
+        <div>
+          <p className={labelClass}>Supporting Documents</p>
+          <p className="text-xs text-gray-400">Attach TUPAD Application Form, Valid ID, and other supporting documents.</p>
+          <FormUploadSection
+            forms={formData.attachedForms}
+            onChange={attachedForms => updateField({ attachedForms })}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -289,31 +296,11 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
             </select>
           </div>
         </div>
+
         <div>
           <label className={labelClass}>Remarks</label>
           <textarea rows={3} className={inputClass + ' resize-none'} value={formData.remarks ?? ''} onChange={e => updateField({ remarks: e.target.value })} />
         </div>
-      </div>
-    )
-  }
-
-  function renderStep4() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="IV. ATTACHMENTS" />
-        <p className="text-xs text-gray-400">Attach TUPAD Application Form, Valid ID, and other supporting documents.</p>
-        <FormUploadSection
-          forms={formData.attachedForms}
-          onChange={attachedForms => updateField({ attachedForms })}
-        />
-      </div>
-    )
-  }
-
-  function renderStep5() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="V. PESO OFFICE ONLY" />
 
         <div>
           <label className={labelClass}>Received By</label>
@@ -328,8 +315,6 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       case 1: return renderStep1()
       case 2: return renderStep2()
       case 3: return renderStep3()
-      case 4: return renderStep4()
-      case 5: return renderStep5()
       default: return null
     }
   }

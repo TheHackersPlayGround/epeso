@@ -72,6 +72,7 @@ function TrainingForm({
   onCancel: () => void
 }) {
   const isView = mode === 'view'
+  const isAdd  = mode === 'add'
 
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -184,13 +185,16 @@ function TrainingForm({
                     <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">{form.status}</div>
                   ) : (
                     <div className="flex gap-6 mt-1">
-                      {(['Planned', 'Ongoing', 'Completed'] as const).map(s => (
-                        <label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                      {(['Planned', 'Ongoing', 'Completed'] as const).map(s => {
+                        const isDisabled = isAdd && s !== 'Planned'
+                        return (
+                        <label key={s} className={`flex items-center gap-2 text-sm text-gray-700 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
                           <input type="radio" name="st-status" value={s} checked={form.status === s}
-                            onChange={() => onChange('status', s)} className="accent-brand-blue" />
+                            onChange={() => onChange('status', s)} disabled={isDisabled} className="accent-brand-blue disabled:cursor-default" />
                           {s}
                         </label>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>

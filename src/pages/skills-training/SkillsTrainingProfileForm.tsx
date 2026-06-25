@@ -188,7 +188,6 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Applied" value={profile.dateApplicationReceived} />
             <Field label="Received By" value={profile.receivedBy} />
-            <Field label="Batch No." value={profile.trainingBatchNo} />
             <Field label="Status" value={profile.status} />
           </div>
         </div>
@@ -326,46 +325,7 @@ export default function SkillsTrainingProfileForm({
           </div>
           <OtherSpecifyField values={formData.purposeOther} placeholder="Specify other purpose..." onUpdate={vals => set({ purposeOther: vals })} />
 
-          <SectionDivider numeral="V" title="Attached Documents" />
-          <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (optional / if applicable).</p>
-          <div className="flex gap-2">
-            <input
-              className={`${inpFocus} flex-1`}
-              placeholder="Document name (e.g. Birth Certificate, Certificate of Residency...)"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  const val = (e.currentTarget.value || '').trim()
-                  if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); e.currentTarget.value = '' }
-                  e.preventDefault()
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={e => {
-                const inputEl = e.currentTarget.previousSibling as HTMLInputElement
-                const val = inputEl?.value?.trim()
-                if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); inputEl.value = '' }
-              }}
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 whitespace-nowrap text-sm flex-shrink-0"
-              style={{ backgroundColor: BRAND }}
-            >
-              <Upload size={15} /> Attach File
-            </button>
-          </div>
-          <p className="text-xs text-gray-400 mt-1.5">Supported: PDF, images (JPG, PNG), Word documents.</p>
-          {formData.attachedDocuments.length > 0 && (
-            <ul className="mt-3 space-y-1.5">
-              {formData.attachedDocuments.map((doc, i) => (
-                <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-                  {doc}
-                  <button type="button" onClick={() => set({ attachedDocuments: formData.attachedDocuments.filter((_, j) => j !== i) })} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <SectionDivider numeral="VI" title="For PESO Office Only" gray />
+          <SectionDivider numeral="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
@@ -376,19 +336,52 @@ export default function SkillsTrainingProfileForm({
               <input className={inpFocus} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Staff name" />
             </div>
             <div>
-              <label className={lbl}>Training Batch No.</label>
-              <select className={`${inpFocus} bg-white`} value={formData.trainingBatchNo} onChange={e => set({ trainingBatchNo: e.target.value })}>
-                <option value="">— Select Batch —</option>
-                {BATCH_OPTIONS.map(b => <option key={b}>{b}</option>)}
-              </select>
-            </div>
-            <div>
               <label className={lbl}>Status</label>
               <select className={`${inpFocus} bg-white`} value={formData.status} onChange={e => set({ status: e.target.value as SkillsTrainingProfile['status'] })}>
                 <option value="Waitlisted">Waitlisted</option>
                 <option value="Accepted">Accepted</option>
               </select>
             </div>
+          </div>
+          <div className="mt-6">
+            <label className={lbl}>Attached Documents</label>
+            <p className="text-xs text-gray-400 mb-3">Attach supporting documents (optional / if applicable).</p>
+            <div className="flex gap-2">
+              <input
+                className={`${inpFocus} flex-1`}
+                placeholder="Document name (e.g. Birth Certificate, Certificate of Residency...)"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (e.currentTarget.value || '').trim()
+                    if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); e.currentTarget.value = '' }
+                    e.preventDefault()
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={e => {
+                  const inputEl = e.currentTarget.previousSibling as HTMLInputElement
+                  const val = inputEl?.value?.trim()
+                  if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); inputEl.value = '' }
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 whitespace-nowrap text-sm flex-shrink-0"
+                style={{ backgroundColor: BRAND }}
+              >
+                <Upload size={15} /> Attach File
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">Supported: PDF, images (JPG, PNG), Word documents.</p>
+            {formData.attachedDocuments.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {formData.attachedDocuments.map((doc, i) => (
+                  <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
+                    {doc}
+                    <button type="button" onClick={() => set({ attachedDocuments: formData.attachedDocuments.filter((_, j) => j !== i) })} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">

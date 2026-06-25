@@ -53,6 +53,7 @@ export default function DILPForm({
   attachments = [], onAddAttachment, onRemoveAttachment,
 }: DILPFormProps) {
   const isView = mode === 'view'
+  const isAdd  = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
 
@@ -180,16 +181,19 @@ export default function DILPForm({
       <div className="border-t pt-5 mb-6">
         <p className={sectionHeadingCls}>Project Status</p>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
-          {STATUS_OPTIONS.map(s => (
-            <label key={s} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
+          {STATUS_OPTIONS.map(s => {
+            const isDisabled = isView || (isAdd && s !== 'Planned')
+            return (
+            <label key={s} className={`flex items-center gap-2 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
               <input type="radio" name="dilp-status" value={s}
                 checked={formData.status === s}
                 onChange={() => onChange({ ...formData, status: s })}
-                disabled={isView}
+                disabled={isDisabled}
                 className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default" />
               <span className="text-gray-700 text-sm">{s}</span>
             </label>
-          ))}
+            )
+          })}
         </div>
       </div>
 

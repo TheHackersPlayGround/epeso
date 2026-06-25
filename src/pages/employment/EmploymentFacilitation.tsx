@@ -14,7 +14,7 @@ import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
 import ViewApplicantSidebar from "./ViewApplicantSidebar";
 
-const LS_KEY = "ef_applicants_v3";
+const LS_KEY = "ef_applicants_v4";
 
 function loadApplicants(): Applicant[] {
   try {

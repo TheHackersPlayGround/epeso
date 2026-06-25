@@ -367,14 +367,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="V" title="Attached Documents" />
-          <p className="text-xs text-gray-400 -mt-1 mb-3">Attach supporting documents (e.g. school ID, certificate of enrollment). This section is optional / if applicable.</p>
-          <AttachedDocsEditor
-            docs={formData.attachedDocuments}
-            onChange={docs => set({ attachedDocuments: docs })}
-          />
-
-          <SectionDivider num="VI" title="For PESO Office Only" gray />
+          <SectionDivider num="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
@@ -388,6 +381,14 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
               <label className={lbl}>Remarks</label>
               <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
             </div>
+          </div>
+          <div className="mt-6">
+            <label className={lbl}>Attached Documents</label>
+            <p className="text-xs text-gray-400 mb-3">Attach supporting documents (e.g. school ID, certificate of enrollment). This section is optional / if applicable.</p>
+            <AttachedDocsEditor
+              docs={formData.attachedDocuments}
+              onChange={docs => set({ attachedDocuments: docs })}
+            />
           </div>
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">

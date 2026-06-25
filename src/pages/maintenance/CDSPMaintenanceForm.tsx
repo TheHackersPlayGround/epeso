@@ -441,20 +441,23 @@ export default function CDSPMaintenanceForm() {
               <div>
                 <label className={labelCls}>Status</label>
                 <div className="flex gap-6 mt-1">
-                  {(['Planned', 'Ongoing', 'Completed'] as ActivityStatus[]).map(s => (
-                    <label key={s} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
+                  {(['Planned', 'Ongoing', 'Completed'] as ActivityStatus[]).map(s => {
+                    const isDisabled = isView || (mode === 'add' && s !== 'Planned')
+                    return (
+                    <label key={s} className={`flex items-center gap-2 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
                       <input
                         type="radio"
                         name="cdsp-status"
                         value={s}
                         checked={formData.status === s}
                         onChange={() => setFormData(p => ({ ...p, status: s }))}
-                        disabled={isView}
+                        disabled={isDisabled}
                         className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default"
                       />
                       <span className="text-sm text-gray-700">{s}</span>
                     </label>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 

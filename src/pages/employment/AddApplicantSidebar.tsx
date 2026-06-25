@@ -1759,143 +1759,38 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="bg-brand-blue text-white px-4 py-3 font-bold uppercase text-sm">
               IX. REFERRED PROGRAM
             </div>
-            
             <div className="space-y-4">
-              <label className="flex items-center text-sm">
+              {(['SPES', 'GIP', 'DILEEP', 'TESDA Training', 'TUPAD', 'JobStart'] as const).map((prog) => (
+                <label key={prog} className="flex items-center text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mr-2"
+                    checked={formData.referredProgram === prog}
+                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? prog : '' })}
+                  />
+                  <span className="font-semibold">{prog}</span>
+                </label>
+              ))}
+              <label className="flex items-center text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   className="mr-2"
-                  checked={formData.referredProgram === 'CDSP'}
-                  onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'CDSP' : '' })}
+                  checked={formData.referredProgram === 'Others'}
+                  onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Others' : '', referredProgramOther: '' })}
                 />
-                <span className="font-semibold">CDSP</span>
+                <span className="font-semibold">Others, specify:</span>
               </label>
-
-              {formData.referredProgram === 'CDSP' && (
-                <div className="ml-6 space-y-2">
-                  {['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students'].map((program) => (
-                    <label key={program} className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={formData.cdspPrograms?.includes(program) || false}
-                        onChange={() => toggleCheckbox('cdspPrograms', program)}
-                      />
-                      <span>{program}</span>
-                    </label>
-                  ))}
+              {formData.referredProgram === 'Others' && (
+                <div className="ml-6">
+                  <input
+                    type="text"
+                    value={formData.referredProgramOther}
+                    onChange={(e) => setFormData({ ...formData, referredProgramOther: e.target.value })}
+                    placeholder="Please specify"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  />
                 </div>
               )}
-
-              <div className="space-y-3 mt-4">
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={formData.referredProgram === 'Livelihood'}
-                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Livelihood' : '' })}
-                  />
-                  <span className="font-semibold">Livelihood</span>
-                </label>
-
-                {formData.referredProgram === 'Livelihood' && (
-                  <div className="ml-6 space-y-2">
-                    <label className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={formData.livelihoodPrograms?.includes('DILEEP') || false}
-                        onChange={() => toggleCheckbox('livelihoodPrograms', 'DILEEP')}
-                      />
-                      <span>DILEEP</span>
-                    </label>
-
-                    {formData.livelihoodPrograms?.includes('DILEEP') && (
-                      <div className="ml-6 grid grid-cols-2 gap-3">
-                        {['DILP', 'TUPAD'].map((program) => (
-                          <label key={program} className="flex items-center text-sm">
-                            <input
-                              type="checkbox"
-                              className="mr-2"
-                              checked={formData.dileepPrograms?.includes(program) || false}
-                              onChange={() => toggleCheckbox('dileepPrograms', program)}
-                            />
-                            <span>{program}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-
-                    <label className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={formData.livelihoodPrograms?.includes('SLP') || false}
-                        onChange={() => toggleCheckbox('livelihoodPrograms', 'SLP')}
-                      />
-                      <span>SLP</span>
-                    </label>
-
-                    <label className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={formData.livelihoodPrograms?.includes('CLPEP') || false}
-                        onChange={() => toggleCheckbox('livelihoodPrograms', 'CLPEP')}
-                      />
-                      <span>CLPEP</span>
-                    </label>
-                  </div>
-                )}
-
-                <label className="flex items-center text-sm">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2"
-                    checked={formData.referredProgram === 'GIP'}
-                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'GIP' : '' })}
-                  />
-                  <span className="font-semibold">GIP</span>
-                </label>
-                <label className="flex items-center text-sm">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2"
-                    checked={formData.referredProgram === 'SPES'}
-                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'SPES' : '' })}
-                  />
-                  <span className="font-semibold">SPES</span>
-                </label>
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={formData.referredProgram === 'Skills Training'}
-                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Skills Training' : '' })}
-                  />
-                  <span className="font-semibold">Skills Training</span>
-                </label>
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={formData.referredProgram === 'Others'}
-                    onChange={(e) => setFormData({ ...formData, referredProgram: e.target.checked ? 'Others' : '', referredProgramOther: '' })}
-                  />
-                  <span className="font-semibold">Others</span>
-                </label>
-                {formData.referredProgram === 'Others' && (
-                  <div className="ml-6">
-                    <input
-                      type="text"
-                      value={formData.referredProgramOther}
-                      onChange={(e) => setFormData({ ...formData, referredProgramOther: e.target.value })}
-                      placeholder="Please specify"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                    />
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         );

@@ -287,19 +287,23 @@ export default function GIPMaintenanceForm({
               <p className="text-sm text-gray-800 py-2 px-3 bg-gray-50 rounded-lg">{form.status}</p>
             ) : (
               <div className="flex gap-6 mt-1">
-                {(['Planned', 'Ongoing', 'Completed'] as const).map(s => (
-                  <label key={s} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                {(['Planned', 'Ongoing', 'Completed'] as const).map(s => {
+                  const isDisabled = isAdd && s !== 'Planned'
+                  return (
+                  <label key={s} className={`flex items-center gap-2 text-sm text-gray-700 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
                     <input
                       type="radio"
                       name="gip-status"
                       value={s}
                       checked={form.status === s}
                       onChange={() => set('status', s)}
-                      className="accent-brand-blue"
+                      disabled={isDisabled}
+                      className="accent-brand-blue disabled:cursor-default"
                     />
                     {s}
                   </label>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

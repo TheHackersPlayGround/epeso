@@ -42,6 +42,7 @@ export default function TUPADForm({
   attachments = [], onAddAttachment, onRemoveAttachment,
 }: TUPADFormProps) {
   const isView = mode === 'view'
+  const isAdd  = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function field<K extends keyof TUPADFormData>(key: K, value: TUPADFormData[K]) {
@@ -152,20 +153,23 @@ export default function TUPADForm({
             Status <span className="text-red-500">*</span>
           </label>
           <div className="flex gap-6 mt-1">
-            {(['Planned', 'Ongoing', 'Completed'] as const).map(s => (
-              <label key={s} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
+            {(['Planned', 'Ongoing', 'Completed'] as const).map(s => {
+              const isDisabled = isView || (isAdd && s !== 'Planned')
+              return (
+              <label key={s} className={`flex items-center gap-2 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
                 <input
                   type="radio"
                   name="tupad-status"
                   value={s}
                   checked={formData.status === s}
                   onChange={() => field('status', s)}
-                  disabled={isView}
+                  disabled={isDisabled}
                   className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default"
                 />
                 <span className="text-sm text-gray-700">{s}</span>
               </label>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

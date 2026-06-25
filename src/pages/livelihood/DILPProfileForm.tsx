@@ -18,18 +18,14 @@ const STATUS_OPTIONS: LivelihoodStatus[] = [
   'Accepted', 'Waitlisted', 'Rejected',
 ]
 
-const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
 
 const STEPS = [
   { id: 1, label: 'DILP PROJECT INFO' },
   { id: 2, label: 'PERSONAL INFORMATION' },
   { id: 3, label: 'ADDRESS INFORMATION' },
-  { id: 4, label: 'SOCIAL & ECONOMIC' },
-  { id: 5, label: 'DEPENDENT INFORMATION' },
-  { id: 6, label: 'GOVERNMENT MEMBERSHIP' },
-  { id: 7, label: 'APPLICATION DETAILS' },
-  { id: 8, label: 'ATTACHMENTS' },
-  { id: 9, label: 'PESO OFFICE ONLY' },
+  { id: 4, label: 'DEPENDENT INFORMATION' },
+  { id: 5, label: 'PESO OFFICE ONLY' },
 ] as const
 
 // ─── Shared CSS class strings ─────────────────────────────────────────────────
@@ -453,6 +449,39 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             ))}
           </select>
         </div>
+
+        <div>
+          <label className={labelClass}>4Ps Beneficiary?</label>
+          <div className="flex gap-6 mt-1">
+            {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map(option => (
+              <label key={option.label} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="dilp4Ps"
+                  checked={formData.is4PsBeneficiary === option.value}
+                  onChange={() => updateField({ is4PsBeneficiary: option.value })}
+                  className="w-4 h-4 accent-brand-blue"
+                />
+                <span className="text-sm text-gray-700">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {formData.is4PsBeneficiary && (
+          <div>
+            <label htmlFor="dilp-yearGrad4Ps" className={labelClass}>
+              Year Graduated / Exited
+            </label>
+            <input
+              id="dilp-yearGrad4Ps"
+              className={inputClass}
+              value={formData.yearGraduated4Ps ?? ''}
+              onChange={e => updateField({ yearGraduated4Ps: e.target.value })}
+              placeholder="e.g. 2023"
+            />
+          </div>
+        )}
       </div>
     )
   }
@@ -514,89 +543,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   function renderStep4() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="IV. SOCIAL AND ECONOMIC INFORMATION" />
-
-        <div>
-          <label className={labelClass}>4Ps Beneficiary?</label>
-          <div className="flex gap-6 mt-1">
-            {[{ label: 'Yes', value: true }, { label: 'No', value: false }].map(option => (
-              <label key={option.label} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="dilp4Ps"
-                  checked={formData.is4PsBeneficiary === option.value}
-                  onChange={() => updateField({ is4PsBeneficiary: option.value })}
-                  className="w-4 h-4 accent-brand-blue"
-                />
-                <span className="text-sm text-gray-700">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {formData.is4PsBeneficiary && (
-          <div>
-            <label htmlFor="dilp-yearGrad4Ps" className={labelClass}>
-              Year Graduated / Exited
-            </label>
-            <input
-              id="dilp-yearGrad4Ps"
-              className={inputClass}
-              value={formData.yearGraduated4Ps ?? ''}
-              onChange={e => updateField({ yearGraduated4Ps: e.target.value })}
-              placeholder="e.g. 2023"
-            />
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="dilp-monthlyIncome" className={labelClass}>Monthly Income</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
-              ₱
-            </span>
-            <input
-              id="dilp-monthlyIncome"
-              type="number"
-              min="0"
-              className={inputClass + ' pl-7'}
-              value={formData.monthlyIncome ?? ''}
-              onChange={e => updateField({ monthlyIncome: e.target.value })}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="dilp-facebook" className={labelClass}>Facebook Account</label>
-            <input
-              id="dilp-facebook"
-              className={inputClass}
-              value={formData.facebookAccount ?? ''}
-              onChange={e => updateField({ facebookAccount: e.target.value })}
-              placeholder="facebook.com/..."
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-instagram" className={labelClass}>Instagram Account</label>
-            <input
-              id="dilp-instagram"
-              className={inputClass}
-              value={formData.instagramAccount ?? ''}
-              onChange={e => updateField({ instagramAccount: e.target.value })}
-              placeholder="@username"
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep5() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="V. DEPENDENT INFORMATION" />
+        <SectionHeader title="IV. DEPENDENT INFORMATION" />
 
         <div>
           <label htmlFor="dilp-dependentNames" className={labelClass}>Dependent Name</label>
@@ -624,61 +571,22 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
     )
   }
 
-  function renderStep6() {
+  function renderStep5() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="VI. GOVERNMENT MEMBERSHIP" />
+        <SectionHeader title="V. PESO OFFICE ONLY" />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="dilp-pagibig" className={labelClass}>Pag-IBIG Number</label>
-            <input
-              id="dilp-pagibig"
-              className={inputClass}
-              placeholder="Enter Pag-IBIG number"
-              value={formData.pagibigNo ?? ''}
-              onChange={e => updateField({ pagibigNo: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-philhealth" className={labelClass}>PhilHealth Number</label>
-            <input
-              id="dilp-philhealth"
-              className={inputClass}
-              placeholder="Enter PhilHealth number"
-              value={formData.philhealthNo ?? ''}
-              onChange={e => updateField({ philhealthNo: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-sss" className={labelClass}>SSS Number</label>
-            <input
-              id="dilp-sss"
-              className={inputClass}
-              placeholder="Enter SSS number"
-              value={formData.sssNo ?? ''}
-              onChange={e => updateField({ sssNo: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-otherId" className={labelClass}>Other Membership</label>
-            <input
-              id="dilp-otherId"
-              className={inputClass}
-              placeholder="Enter other membership"
-              value={formData.otherId ?? ''}
-              onChange={e => updateField({ otherId: e.target.value })}
-            />
-          </div>
+        <div>
+          <p className={labelClass}>Supporting Documents</p>
+          <p className="text-xs text-gray-400">
+            Attach DILP Application Form, Valid ID, and other supporting documents.
+          </p>
+          <FormUploadSection
+            service={formData.service}
+            forms={formData.attachedForms}
+            onChange={attachedForms => updateField({ attachedForms })}
+          />
         </div>
-      </div>
-    )
-  }
-
-  function renderStep7() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="VII. APPLICATION DETAILS" />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -704,6 +612,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             </select>
           </div>
         </div>
+
         <div>
           <label htmlFor="dilp-remarks" className={labelClass}>Remarks</label>
           <textarea
@@ -714,30 +623,6 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             onChange={e => updateField({ remarks: e.target.value })}
           />
         </div>
-      </div>
-    )
-  }
-
-  function renderStep8() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="VIII. ATTACHMENTS" />
-        <p className="text-xs text-gray-400">
-          Attach DILP Application Form, Valid ID, and other supporting documents.
-        </p>
-        <FormUploadSection
-          service={formData.service}
-          forms={formData.attachedForms}
-          onChange={attachedForms => updateField({ attachedForms })}
-        />
-      </div>
-    )
-  }
-
-  function renderStep9() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="IX. PESO OFFICE ONLY" />
 
         <div>
           <label htmlFor="dilp-receivedBy" className={labelClass}>Received By</label>
@@ -760,10 +645,6 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       case 3: return renderStep3()
       case 4: return renderStep4()
       case 5: return renderStep5()
-      case 6: return renderStep6()
-      case 7: return renderStep7()
-      case 8: return renderStep8()
-      case 9: return renderStep9()
       default: return null
     }
   }

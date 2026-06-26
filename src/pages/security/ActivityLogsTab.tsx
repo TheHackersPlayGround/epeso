@@ -1,0 +1,423 @@
+import { useState, useMemo, useEffect } from 'react'
+import {
+  Download, Search, ChevronDown, ChevronLeft, ChevronRight,
+  Trash, Trash2, RotateCcw, Clock, AlertTriangle,
+} from 'lucide-react'
+import ConfirmModal from '../shared/ConfirmModal'
+
+interface ActivityLog {
+  id: number
+  timestamp: string
+  user: string
+  role: string
+  action: string
+  module: string
+  details: string
+  status: 'Success' | 'Failed'
+}
+
+const mockActivityLogs: ActivityLog[] = [
+  { id: 1,  timestamp: '2026-05-11 09:02 AM', user: 'admin',    role: 'Administrator', action: 'Login',         module: 'System',          details: 'Successful login',                         status: 'Success' },
+  { id: 2,  timestamp: '2026-05-11 09:05 AM', user: 'admin',    role: 'Administrator', action: 'Add Record',    module: 'Applicants',      details: 'Added applicant: Juan Dela Cruz',          status: 'Success' },
+  { id: 3,  timestamp: '2026-05-11 09:18 AM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Employers',       details: 'Viewed employer: ABC Corporation',         status: 'Success' },
+  { id: 4,  timestamp: '2026-05-11 09:31 AM', user: 'staff002', role: 'Staff',         action: 'Edit Record',   module: 'Applicants',      details: 'Edited applicant: Maria Santos',           status: 'Success' },
+  { id: 5,  timestamp: '2026-05-11 09:45 AM', user: 'staff001', role: 'Staff',         action: 'Login',         module: 'System',          details: 'Failed login attempt',                     status: 'Failed'  },
+  { id: 6,  timestamp: '2026-05-11 10:00 AM', user: 'admin',    role: 'Administrator', action: 'Delete Record', module: 'Applicants',      details: 'Deleted applicant: Pedro Reyes',           status: 'Success' },
+  { id: 7,  timestamp: '2026-05-11 10:12 AM', user: 'staff002', role: 'Staff',         action: 'Export',        module: 'Reports',         details: 'Exported ELPOR report to Excel',           status: 'Success' },
+  { id: 8,  timestamp: '2026-05-11 10:25 AM', user: 'admin',    role: 'Administrator', action: 'Add Record',    module: 'OFW Services',    details: 'Added OFW profile: Ana Reyes',             status: 'Success' },
+  { id: 9,  timestamp: '2026-05-11 10:40 AM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Skills Training', details: 'Viewed skills training participant list',  status: 'Success' },
+  { id: 10, timestamp: '2026-05-11 10:55 AM', user: 'admin',    role: 'Administrator', action: 'Edit Record',   module: 'Employers',       details: 'Updated employer: XYZ Enterprise',         status: 'Success' },
+  { id: 11, timestamp: '2026-05-11 11:08 AM', user: 'staff002', role: 'Staff',         action: 'Add Record',    module: 'Skills Training', details: 'Assigned training to: Jose Garcia',        status: 'Success' },
+  { id: 12, timestamp: '2026-05-11 11:20 AM', user: 'staff001', role: 'Staff',         action: 'Export',        module: 'Applicants',      details: 'Exported applicant list to CSV',           status: 'Failed'  },
+  { id: 13, timestamp: '2026-05-11 11:35 AM', user: 'admin',    role: 'Administrator', action: 'Add User',      module: 'User Management', details: 'Created user: staff004',                   status: 'Success' },
+  { id: 14, timestamp: '2026-05-11 11:50 AM', user: 'admin',    role: 'Administrator', action: 'Edit Record',   module: 'OFW Services',    details: 'Updated ELPOR entry: Ramon Cruz',          status: 'Success' },
+  { id: 15, timestamp: '2026-05-11 12:02 PM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Reports',         details: 'Viewed monthly PESO report',               status: 'Success' },
+  { id: 16, timestamp: '2026-05-11 01:10 PM', user: 'staff002', role: 'Staff',         action: 'Login',         module: 'System',          details: 'Successful login after session timeout',   status: 'Success' },
+  { id: 17, timestamp: '2026-05-11 01:25 PM', user: 'admin',    role: 'Administrator', action: 'Delete Record', module: 'Employers',       details: "Deleted employer: Old Co.",                status: 'Success' },
+  { id: 18, timestamp: '2026-05-11 01:38 PM', user: 'staff001', role: 'Staff',         action: 'Edit Record',   module: 'OFW Services',    details: 'Updated OFW request status: Liza Mendoza', status: 'Success' },
+  { id: 19, timestamp: '2026-05-11 02:00 PM', user: 'admin',    role: 'Administrator', action: 'Export',        module: 'Skills Training', details: 'Exported skills training list to Excel',   status: 'Success' },
+  { id: 20, timestamp: '2026-05-11 02:15 PM', user: 'staff002', role: 'Staff',         action: 'Delete Record', module: 'Skills Training', details: 'Unauthorized delete attempt blocked',      status: 'Failed'  },
+]
+
+interface RecycleBinItem {
+  id: number
+  name: string
+  module: string
+  description: string
+  deletedBy: string
+  deletedAt: string
+}
+
+const TODAY_DATE = new Date('2026-05-11')
+
+function daysAgo(n: number): string {
+  const d = new Date(TODAY_DATE)
+  d.setDate(d.getDate() - n)
+  return d.toISOString().split('T')[0]
+}
+
+function getDaysRemaining(deletedAt: string): number {
+  const deleted = new Date(deletedAt)
+  const diff = Math.floor((TODAY_DATE.getTime() - deleted.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.max(0, 30 - diff)
+}
+
+const initialRecycleBin: RecycleBinItem[] = [
+  { id: 1,  name: 'Pedro Reyes',           module: 'Applicants',      description: 'Applicant record – Machinist, Batch 2025',         deletedBy: 'admin',    deletedAt: daysAgo(29) },
+  { id: 2,  name: 'Old Co. Enterprises',   module: 'Employers',       description: 'Employer profile – Manufacturing sector',           deletedBy: 'admin',    deletedAt: daysAgo(27) },
+  { id: 3,  name: 'ELPOR Entry #0032',     module: 'OFW Services',    description: 'ELPOR Form A2 – Ramon Cruz, Deployment 2024',      deletedBy: 'admin',    deletedAt: daysAgo(24) },
+  { id: 4,  name: 'Livelihood Training Q1',module: 'Skills Training', description: 'NC II Batch BATCH-003 – Cancelled program',        deletedBy: 'staff001', deletedAt: daysAgo(20) },
+  { id: 5,  name: 'Jose Garcia',           module: 'Applicants',      description: 'Applicant record – Welder, duplicate entry',       deletedBy: 'staff002', deletedAt: daysAgo(16) },
+  { id: 6,  name: 'XYZ Trading Corp.',     module: 'Employers',       description: 'Employer profile – closed business',               deletedBy: 'admin',    deletedAt: daysAgo(12) },
+  { id: 7,  name: 'OWWA Case #2025-018',   module: 'OFW Services',    description: 'OWWA Welfare Case – Liza Mendoza, resolved',       deletedBy: 'staff001', deletedAt: daysAgo(8)  },
+  { id: 8,  name: 'Community Fair 2025',   module: 'Programs',        description: 'Job fair event record – concluded',                deletedBy: 'staff002', deletedAt: daysAgo(5)  },
+  { id: 9,  name: 'Ana Reyes',             module: 'Applicants',      description: 'Applicant record – Caregiver, transferred abroad', deletedBy: 'admin',    deletedAt: daysAgo(3)  },
+  { id: 10, name: 'PESO Request #1045',    module: 'OFW Services',    description: 'Request for Assistance – withdrawn by applicant',  deletedBy: 'staff001', deletedAt: daysAgo(1)  },
+]
+
+const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
+const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
+const logStatuses = ['All', 'Success', 'Failed']
+const binModules  = ['All', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Programs']
+
+export default function ActivityLogsTab() {
+  const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
+
+  const [logSearch,       setLogSearch]       = useState('')
+  const [logActionFilter, setLogActionFilter] = useState('All')
+  const [logModuleFilter, setLogModuleFilter] = useState('All')
+  const [logStatusFilter, setLogStatusFilter] = useState('All')
+  const [logsPerPage,     setLogsPerPage]     = useState(10)
+  const [logPage,         setLogPage]         = useState(1)
+
+  const [recycleBin,    setRecycleBin]    = useState<RecycleBinItem[]>(initialRecycleBin)
+  const [binPerPage,    setBinPerPage]    = useState(10)
+  const [binPage,       setBinPage]       = useState(1)
+  const [binModuleFilter, setBinModuleFilter] = useState('All')
+  const [binSearch,     setBinSearch]     = useState('')
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean; type: 'confirm' | 'success' | 'error'
+    title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
+  }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
+
+  const filteredLogs = useMemo(() => mockActivityLogs.filter(log => {
+    const matchSearch = logSearch === '' || log.user.toLowerCase().includes(logSearch.toLowerCase()) || log.details.toLowerCase().includes(logSearch.toLowerCase())
+    return matchSearch && (logActionFilter === 'All' || log.action === logActionFilter) && (logModuleFilter === 'All' || log.module === logModuleFilter) && (logStatusFilter === 'All' || log.status === logStatusFilter)
+  }), [logSearch, logActionFilter, logModuleFilter, logStatusFilter])
+
+  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / logsPerPage))
+  const paginatedLogs = filteredLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage)
+
+  const filteredBin = useMemo(() => recycleBin.filter(item => {
+    const matchModule = binModuleFilter === 'All' || item.module === binModuleFilter
+    const matchSearch = binSearch === '' || item.name.toLowerCase().includes(binSearch.toLowerCase()) || item.description.toLowerCase().includes(binSearch.toLowerCase())
+    return matchModule && matchSearch
+  }), [recycleBin, binModuleFilter, binSearch])
+
+  const totalBinPages = Math.max(1, Math.ceil(filteredBin.length / binPerPage))
+  const paginatedBin  = filteredBin.slice((binPage - 1) * binPerPage, binPage * binPerPage)
+  const expiringCount = recycleBin.filter(i => getDaysRemaining(i.deletedAt) <= 7).length
+
+  useEffect(() => { setLogPage(1) }, [logSearch, logActionFilter, logModuleFilter, logStatusFilter])
+  useEffect(() => { setBinPage(1) }, [binModuleFilter, binSearch])
+
+  const handleExportLogs = () => {
+    const rows = [['Timestamp', 'User', 'Role', 'Action', 'Module', 'Details', 'Status'], ...filteredLogs.map(l => [l.timestamp, l.user, l.role, l.action, l.module, l.details, l.status])]
+    const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href  = URL.createObjectURL(blob)
+    link.download = `ActivityLogs_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
+
+  const handleRestoreItem = (item: RecycleBinItem) => {
+    setConfirmModal({
+      isOpen: true, type: 'confirm', title: 'Restore Record',
+      message: `Restore "${item.name}" back to ${item.module}?\n\nThis record will be fully accessible again.`,
+      confirmText: 'Yes, Restore', cancelText: 'Cancel',
+      onConfirm: () => {
+        setRecycleBin(prev => prev.filter(i => i.id !== item.id))
+        setConfirmModal({ isOpen: true, type: 'success', title: 'Record Restored', message: `"${item.name}" has been successfully restored to ${item.module}.`, onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      },
+    })
+  }
+
+  const handlePermanentDelete = (item: RecycleBinItem) => {
+    setConfirmModal({
+      isOpen: true, type: 'confirm', title: 'Permanently Delete',
+      message: `Permanently delete "${item.name}"?\n\nThis action CANNOT be undone. The record will be lost forever.`,
+      confirmText: 'Yes, Delete Permanently', cancelText: 'Cancel',
+      onConfirm: () => {
+        setRecycleBin(prev => prev.filter(i => i.id !== item.id))
+        setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      },
+    })
+  }
+
+  const handleEmptyBin = () => {
+    if (recycleBin.length === 0) return
+    setConfirmModal({
+      isOpen: true, type: 'confirm', title: 'Empty Recycle Bin',
+      message: `Permanently delete all ${recycleBin.length} item(s) in the recycle bin?\n\nThis action CANNOT be undone.`,
+      confirmText: 'Yes, Empty Bin', cancelText: 'Cancel',
+      onConfirm: () => {
+        setRecycleBin([])
+        setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      },
+    })
+  }
+
+  return (
+    <>
+      {subTab === 'logs' && (
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h3 className="text-gray-800 m-0 mb-0.5">Activity Logs</h3>
+              <p className="text-gray-500 text-sm m-0">{filteredLogs.length} record{filteredLogs.length !== 1 ? 's' : ''} found</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSubTab('bin')} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors text-sm">
+                <Trash size={15} />
+                Recycle Bin
+                {recycleBin.length > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-xs ${expiringCount > 0 ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                    {recycleBin.length}
+                  </span>
+                )}
+              </button>
+              <button onClick={handleExportLogs} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors text-sm">
+                <Download size={16} />
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="Search user or details..." value={logSearch} onChange={e => setLogSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none bg-white text-gray-900 placeholder:text-gray-400" />
+            </div>
+            <div className="relative">
+              <select value={logActionFilter} onChange={e => setLogActionFilter(e.target.value)} className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] outline-none bg-white text-gray-700 cursor-pointer">
+                {logActions.map(a => <option key={a} value={a}>{a === 'All' ? 'All Actions' : a}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select value={logModuleFilter} onChange={e => setLogModuleFilter(e.target.value)} className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] outline-none bg-white text-gray-700 cursor-pointer">
+                {logModules.map(m => <option key={m} value={m}>{m === 'All' ? 'All Modules' : m}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select value={logStatusFilter} onChange={e => setLogStatusFilter(e.target.value)} className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] outline-none bg-white text-gray-700 cursor-pointer">
+                {logStatuses.map(s => <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Timestamp</th>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">User</th>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Action</th>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Module</th>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500">Details</th>
+                  <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.length > 0 ? paginatedLogs.map(log => (
+                  <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{log.timestamp}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-800">{log.user}</span>
+                        <span className={`text-xs ${log.role === 'Administrator' ? 'text-purple-500' : 'text-blue-400'}`}>{log.role}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        log.action === 'Login'         ? 'bg-gray-100 text-gray-600' :
+                        log.action === 'Add Record' || log.action === 'Add User' ? 'bg-green-50 text-green-700' :
+                        log.action === 'Edit Record'   ? 'bg-blue-50 text-blue-700' :
+                        log.action === 'Delete Record' ? 'bg-red-50 text-red-700' :
+                        log.action === 'Export'        ? 'bg-purple-50 text-purple-700' :
+                        'bg-gray-50 text-gray-600'
+                      }`}>{log.action}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{log.module}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600 max-w-[240px]">{log.details}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${log.status === 'Success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.status}</span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 text-sm">No activity logs match your filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {totalLogPages > 1 && (
+            <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Show</span>
+                <select value={logsPerPage} onChange={e => { setLogsPerPage(Number(e.target.value)); setLogPage(1) }} className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#0077BE] outline-none bg-white">
+                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
+                </select>
+                <span className="text-xs text-gray-500">per page</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage === 1} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft size={15} /></button>
+                <span className="text-xs text-gray-500 px-2">{(logPage - 1) * logsPerPage + 1}–{Math.min(logPage * logsPerPage, filteredLogs.length)} of {filteredLogs.length}</span>
+                <button onClick={() => setLogPage(p => Math.min(totalLogPages, p + 1))} disabled={logPage === totalLogPages} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight size={15} /></button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === 'bin' && (
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSubTab('logs')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+                <ChevronLeft size={16} />
+                Back to Logs
+              </button>
+              <span className="text-gray-300">|</span>
+              <div>
+                <h3 className="text-gray-800 m-0 mb-0.5 flex items-center gap-2">
+                  <Trash size={18} className="text-gray-500" /> Recycle Bin
+                </h3>
+                <p className="text-gray-500 text-sm m-0">{recycleBin.length} item{recycleBin.length !== 1 ? 's' : ''} · Auto-deleted after 30 days</p>
+              </div>
+            </div>
+            <button onClick={handleEmptyBin} disabled={recycleBin.length === 0} className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              <Trash size={16} />
+              Empty Bin
+            </button>
+          </div>
+
+          {expiringCount > 0 && (
+            <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <AlertTriangle size={18} className="text-amber-500 flex-shrink-0" />
+              <p className="text-sm text-amber-700 m-0">
+                <span className="font-medium">{expiringCount} item{expiringCount !== 1 ? 's' : ''}</span> will be permanently deleted within 7 days. Restore them now if needed.
+              </p>
+            </div>
+          )}
+
+          <div className="px-6 py-4 flex flex-wrap gap-3 items-center border-b border-gray-100 bg-gray-50 mt-0">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="Search deleted records..." value={binSearch} onChange={e => setBinSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none bg-white text-gray-900 placeholder:text-gray-400" />
+            </div>
+            <div className="relative">
+              <select value={binModuleFilter} onChange={e => setBinModuleFilter(e.target.value)} className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] outline-none bg-white text-gray-700 cursor-pointer">
+                {binModules.map(m => <option key={m} value={m}>{m === 'All' ? 'All Modules' : m}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {filteredBin.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Trash size={48} className="mb-4 text-gray-300" />
+              <p className="text-sm">{recycleBin.length === 0 ? 'The recycle bin is empty.' : 'No records match your filters.'}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500">Record Name</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Module</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500">Description</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Deleted By</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Deleted On</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Expires In</th>
+                    <th className="px-4 py-3 text-left text-xs text-gray-500 whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedBin.map(item => {
+                    const daysLeft  = getDaysRemaining(item.deletedAt)
+                    const isUrgent  = daysLeft <= 3
+                    const isWarning = daysLeft <= 7 && daysLeft > 3
+                    return (
+                      <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 ${isUrgent ? 'bg-red-50/40' : isWarning ? 'bg-amber-50/40' : ''}`}>
+                        <td className="px-4 py-3"><span className="text-sm text-gray-800">{item.name}</span></td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            item.module === 'Applicants'      ? 'bg-blue-50 text-blue-700' :
+                            item.module === 'Employers'       ? 'bg-purple-50 text-purple-700' :
+                            item.module === 'OFW Services'    ? 'bg-orange-50 text-orange-700' :
+                            item.module === 'Skills Training' ? 'bg-green-50 text-green-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>{item.module}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[220px]">{item.description}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{item.deletedBy}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{item.deletedAt}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className={`flex items-center gap-1.5 text-xs font-medium ${isUrgent ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-gray-500'}`}>
+                            <Clock size={13} />
+                            {daysLeft === 0 ? 'Expires today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
+                          </div>
+                          <div className="mt-1 h-1.5 w-20 rounded-full bg-gray-200 overflow-hidden">
+                            <div className={`h-full rounded-full ${isUrgent ? 'bg-red-500' : isWarning ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${(daysLeft / 30) * 100}%` }} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handleRestoreItem(item)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                              <RotateCcw size={13} /> Restore
+                            </button>
+                            <button onClick={() => handlePermanentDelete(item)} className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {filteredBin.length > 0 && (
+            <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Show</span>
+                <select value={binPerPage} onChange={e => { setBinPerPage(Number(e.target.value)); setBinPage(1) }} className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-[#0077BE] outline-none bg-white">
+                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
+                </select>
+                <span className="text-xs text-gray-500">per page</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setBinPage(p => Math.max(1, p - 1))} disabled={binPage === 1} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft size={15} /></button>
+                <span className="text-xs text-gray-500 px-2">{(binPage - 1) * binPerPage + 1}–{Math.min(binPage * binPerPage, filteredBin.length)} of {filteredBin.length}</span>
+                <button onClick={() => setBinPage(p => Math.min(totalBinPages, p + 1))} disabled={binPage === totalBinPages} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight size={15} /></button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title}
+        message={confirmModal.message} confirmText={confirmModal.confirmText} cancelText={confirmModal.cancelText}
+        onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
+    </>
+  )
+}

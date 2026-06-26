@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Upload, Users } from 'lucide-react'
 import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -362,7 +363,8 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
               <button
                 type="button"
                 onClick={onEdit}
-                className="px-5 py-2 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-brand-blue-dark transition-colors"
+                disabled={!canManage('livelihood')}
+                className="px-5 py-2 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
               >
                 Edit
               </button>

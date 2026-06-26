@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Users, Plus, Paperclip, Upload, ChevronDown } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
+import { canManage } from '../../utils/permissions'
 import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -893,7 +894,8 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                   <button
                     type="button"
                     onClick={onEdit}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                    disabled={!canManage('livelihood')}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                   >
                     Edit
                   </button>

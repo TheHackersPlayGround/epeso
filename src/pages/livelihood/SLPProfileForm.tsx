@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Users, Plus, Paperclip } from 'lucide-react'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
+import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -862,7 +863,8 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
                   <button
                     type="button"
                     onClick={onEdit}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                    disabled={!canManage('livelihood')}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                   >
                     Edit
                   </button>

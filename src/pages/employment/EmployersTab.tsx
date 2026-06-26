@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Employer } from '../../contexts/EmploymentContext'
 import { EMPLOYER_SEED } from '../../contexts/EmploymentContext'
+import { canManage } from '../../utils/permissions'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
@@ -153,10 +154,10 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
           >
             <button onClick={() => { onView(menuEmployer); closeMenu() }}
               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { onEdit(menuEmployer); closeMenu() }}
-              className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
-            <button onClick={() => { onDelete(menuEmployer.id); closeMenu() }}
-              className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Delete</button>
+            <button onClick={() => { onEdit(menuEmployer); closeMenu() }} disabled={!canManage('employment')}
+              className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
+            <button onClick={() => { onDelete(menuEmployer.id); closeMenu() }} disabled={!canManage('employment')}
+              className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
           </div>
         </>
       )}
@@ -277,8 +278,8 @@ type ToolbarProps = {
 function EmployersToolbar({ onAdd, onImport, isExportOpen, onToggleExport, onCloseExport, onExportExcel, onExportCsv }: ToolbarProps) {
   return (
     <div className="flex gap-2">
-      <button onClick={onAdd}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm">
+      <button onClick={onAdd} disabled={!canManage('employment')}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
         <Plus size={16} />
         Add Employer
       </button>

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
 
@@ -308,7 +309,8 @@ export default function TUPADForm({
           <button
             type="button"
             onClick={onSave}
-            className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm"
+            disabled={!canManage('maintenance')}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
           >
             {mode === 'edit' ? 'Update Project' : 'Save Project'}
           </button>

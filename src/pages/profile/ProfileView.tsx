@@ -41,22 +41,26 @@ function getCurrentUser(): ProfileUser {
 const PHOTO_LS_KEY = 'peso_profile_photo'
 
 const PERMISSION_GROUPS = [
-  { title: 'APPLICANT MANAGEMENT',        viewPerm: 'view-applicants',    editorPerms: ['add-applicant', 'edit-applicant', 'delete-applicant'] },
-  { title: 'EMPLOYER MANAGEMENT',         viewPerm: 'view-employers',     editorPerms: ['add-employer', 'edit-employer', 'delete-employer'] },
-  { title: 'PROGRAM / EVENTS MANAGEMENT', viewPerm: 'view-programs',      editorPerms: ['add-program', 'edit-program', 'delete-program'] },
-  { title: 'MAINTENANCE',                 viewPerm: 'access-maintenance', editorPerms: ['add-records', 'edit-records', 'delete-records'] },
-  { title: 'ACTIVITY LOG',                viewPerm: 'view-activity-log',  editorPerms: ['export-activity-log'] },
-  { title: 'REPORTS',                     viewPerm: 'view-reports',       editorPerms: ['generate-reports', 'export-reports'] },
-  { title: 'USER MANAGEMENT',             viewPerm: 'view-users',         editorPerms: ['add-user', 'edit-user', 'delete-user', 'assign-permissions'] },
-  { title: 'SYSTEM SETTINGS',             viewPerm: 'view-settings',      editorPerms: ['edit-settings', 'backup-restore'] },
+  { title: 'EMPLOYMENT FACILITATION', viewPerm: 'view-employment',  editorPerms: ['manage-employment'] },
+  { title: 'CDSP',                    viewPerm: 'view-cdsp',        editorPerms: ['manage-cdsp'] },
+  { title: 'GIP',                     viewPerm: 'view-gip',         editorPerms: ['manage-gip'] },
+  { title: 'SPES',                    viewPerm: 'view-spes',        editorPerms: ['manage-spes'] },
+  { title: 'LIVELIHOOD',              viewPerm: 'view-livelihood',  editorPerms: ['manage-livelihood'] },
+  { title: 'SKILLS TRAINING',         viewPerm: 'view-skills',      editorPerms: ['manage-skills'] },
+  { title: 'OFW',                     viewPerm: 'view-ofw',         editorPerms: ['manage-ofw'] },
+  { title: 'DOCUMENTS',               viewPerm: 'view-documents',   editorPerms: ['manage-documents'] },
+  { title: 'MAINTENANCE',             viewPerm: 'view-maintenance', editorPerms: ['manage-maintenance'] },
+  { title: 'SECURITY',                viewPerm: 'view-security',    editorPerms: ['manage-security'] },
+  { title: 'REPORT',                  viewPerm: 'view-report',      editorPerms: ['manage-report'] },
 ]
 
 type AccessLevel = 'Full Access' | 'Editor' | 'Viewer' | 'No Access'
 
 function getAccessLevel(perms: string[], group: (typeof PERMISSION_GROUPS)[0], isAdmin: boolean): AccessLevel {
   if (isAdmin) return 'Full Access'
-  if (group.editorPerms.some((p) => perms.includes(p))) return 'Editor'
-  if (perms.includes(group.viewPerm)) return 'Viewer'
+  const list = perms ?? []
+  if (group.editorPerms.some((p) => list.includes(p))) return 'Editor'
+  if (list.includes(group.viewPerm)) return 'Viewer'
   return 'No Access'
 }
 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
 import * as XLSX from 'xlsx'
+import { canManage } from '../../utils/permissions'
 import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
 import { useDocuments } from '../../contexts/DocumentsContext'
 import ConfirmModal from '../shared/ConfirmModal'
@@ -330,8 +331,8 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
                     <Edit2 size={14} /> Rename
                   </button>
                   <div className="border-t border-gray-200 my-1" />
-                  <button onClick={e => { e.stopPropagation(); setActiveFolderMenuId(null); setDeleteFolderConfirm({ open: true, id: folder.id }) }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                  <button onClick={e => { e.stopPropagation(); setActiveFolderMenuId(null); setDeleteFolderConfirm({ open: true, id: folder.id }) }} disabled={!canManage('documents')}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Trash2 size={14} /> Delete
                   </button>
                 </div>
@@ -357,17 +358,17 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
           className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
           <Download size={16} /> Download
         </button>
-        <button onClick={() => { setFileToRename(file); setRenameFileValue(file.name); setIsRenameFileModalOpen(true); setActiveMenuId(null) }}
-          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+        <button onClick={() => { setFileToRename(file); setRenameFileValue(file.name); setIsRenameFileModalOpen(true); setActiveMenuId(null) }} disabled={!canManage('documents')}
+          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
           <Edit2 size={16} /> Rename
         </button>
-        <button onClick={() => { setFileToMove(file); setMoveDestination(file.folderId); setIsMoveModalOpen(true); setActiveMenuId(null) }}
-          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+        <button onClick={() => { setFileToMove(file); setMoveDestination(file.folderId); setIsMoveModalOpen(true); setActiveMenuId(null) }} disabled={!canManage('documents')}
+          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
           <Move size={16} /> Move
         </button>
         <div className="border-t border-gray-200 my-1" />
-        <button onClick={() => { setDeleteFileConfirm({ open: true, id: file.id }); setActiveMenuId(null) }}
-          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+        <button onClick={() => { setDeleteFileConfirm({ open: true, id: file.id }); setActiveMenuId(null) }} disabled={!canManage('documents')}
+          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
           <Trash2 size={16} /> Delete
         </button>
       </div>
@@ -522,8 +523,8 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
           <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
             <button onClick={() => { setIsRenameFileModalOpen(false); setFileToRename(null) }}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
-            <button onClick={handleRenameFile}
-              className="px-6 py-2.5 text-white rounded-lg text-sm"
+            <button onClick={handleRenameFile} disabled={!canManage('documents')}
+              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
               Rename
             </button>
@@ -667,16 +668,16 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
             {/* Action bar */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <input type="file" id="doc-upload" onChange={handleFileSelect} className="hidden" />
-                <label htmlFor="doc-upload"
-                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg cursor-pointer transition-colors text-sm"
+                <input type="file" id="doc-upload" onChange={handleFileSelect} disabled={!canManage('documents')} className="hidden" />
+                <label htmlFor={canManage('documents') ? 'doc-upload' : undefined}
+                  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm ${canManage('documents') ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'}`}
                   style={{ backgroundColor: BRAND }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
                   <Upload size={18} /> Upload
                 </label>
-                <button onClick={() => { setNewFolderName(''); setNewFolderParent(selectedFolder); setIsNewFolderModalOpen(true) }}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
+                <button onClick={() => { setNewFolderName(''); setNewFolderParent(selectedFolder); setIsNewFolderModalOpen(true) }} disabled={!canManage('documents')}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                   <FolderPlus size={18} /> New Folder
                 </button>
                 <div className="flex-1 relative">

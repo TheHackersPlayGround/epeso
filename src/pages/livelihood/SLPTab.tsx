@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
 import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED } from '../../contexts/LivelihoodContext'
@@ -686,12 +687,12 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
             className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
           >
             <button onClick={() => { onView(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { onEdit(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
+            <button onClick={() => { onEdit(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             {menuBeneficiary.projectName
               ? <button onClick={() => { onViewAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
               : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Assign Project</button>
             }
-            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
+            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
           </div>
         </>
       )}
@@ -923,7 +924,8 @@ const availableFilters: FilterOption[] = useMemo(() => [
         <div className="flex items-center gap-3">
         <button
           onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-2 px-5 py-2 bg-brand-blue text-white rounded-full text-sm font-medium hover:bg-[#01a0ff] transition-colors whitespace-nowrap"
+          disabled={!canManage('livelihood')}
+          className="flex items-center gap-2 px-5 py-2 bg-brand-blue text-white rounded-full text-sm font-medium hover:bg-[#01a0ff] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
         >
           <Plus size={16} />
           Add Profile

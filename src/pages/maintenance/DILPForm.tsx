@@ -1,6 +1,7 @@
 ﻿import { useRef, useState } from 'react'
 import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import AddressFields, { type AddressValue } from '../../components/AddressFields'
+import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -250,7 +251,7 @@ export default function DILPForm({
           </button>
         )}
         {mode !== 'view' && (
-          <button onClick={onSave} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
+          <button onClick={onSave} disabled={!canManage('maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
             {mode === 'edit' ? 'Update Project' : 'Save Project'}
           </button>
         )}

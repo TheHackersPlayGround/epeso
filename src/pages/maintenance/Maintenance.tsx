@@ -6,6 +6,7 @@ import {
   Users, Search, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 
+import { canManage } from '../../utils/permissions'
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch } from '../../contexts/SPESContext'
 import { useGIP } from '../../contexts/GIPContext'
@@ -606,7 +607,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   </div>
                   <button
                     onClick={() => setGipAction('add_batch')}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                    disabled={!canManage('maintenance')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                   >
                     <Plus size={16} /> Add Batch
                   </button>
@@ -618,7 +620,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <p className="text-gray-500">No GIP batches found.</p>
                     <button
                       onClick={() => setGipAction('add_batch')}
-                      className="mt-4 px-6 py-2 text-white rounded-lg transition-colors text-sm"
+                      disabled={!canManage('maintenance')}
+                      className="mt-4 px-6 py-2 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: GIP_CONFIRM_COLOR }}
                     >
                       Add First Batch
@@ -797,7 +800,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setGipDeleteConfirm(b.id); setGipOpenMenuId(null) }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
+                        disabled={!canManage('maintenance')}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Trash2 size={15} className="text-red-500" />
                         Delete
@@ -877,7 +881,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   </div>
                   <button
                     onClick={() => setSpesAction('add_batch')}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+                    disabled={!canManage('maintenance')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                   >
                     <Plus size={16} /> Add Batch
                   </button>
@@ -889,7 +894,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <p className="text-gray-500">No SPES batches found.</p>
                     <button
                       onClick={() => setSpesAction('add_batch')}
-                      className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm"
+                      disabled={!canManage('maintenance')}
+                      className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                     >
                       Add First Batch
                     </button>
@@ -1082,7 +1088,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setDeleteConfirm(b.id); setOpenMenuId(null) }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
+                        disabled={!canManage('maintenance')}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Trash2 size={15} className="text-red-500" />
                         Delete

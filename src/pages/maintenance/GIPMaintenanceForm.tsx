@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Upload, X, FileText } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
+import { canManage } from '../../utils/permissions'
 import type { GIPBatch, GIPBatchDocument } from '../../contexts/GIPContext'
 
 // ─── Re-export for consumers ──────────────────────────────────────────────────
@@ -389,14 +390,16 @@ export default function GIPMaintenanceForm({
             {isAdd && (
               <button
                 onClick={() => handleSave(true)}
-                className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors font-medium text-sm"
+                disabled={!canManage('maintenance')}
+                className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Save as Draft
               </button>
             )}
             <button
               onClick={() => handleSave(false)}
-              className="px-6 py-2.5 text-white bg-brand-blue hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm"
+              disabled={!canManage('maintenance')}
+              className="px-6 py-2.5 text-white bg-brand-blue hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
             >
               {isAdd ? 'Save Batch' : 'Save Changes'}
             </button>

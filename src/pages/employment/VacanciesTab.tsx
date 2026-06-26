@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
 import { VACANCY_SEED } from '../../contexts/EmploymentContext'
+import { canManage } from '../../utils/permissions'
 
 const LS_KEY = 'ef_vacancies'
 
@@ -54,7 +55,8 @@ function VacanciesSearchBar({
     <div className="flex flex-wrap gap-3">
       <button
         onClick={onAdd}
-        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap"
+        disabled={!canManage('employment')}
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
       >
         <Plus size={16} />
         Add Vacancy
@@ -305,7 +307,7 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
             className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
           >
             <button onClick={() => { onView(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { onEdit(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
+            <button onClick={() => { onEdit(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             <button onClick={() => { onMatch(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Match</button>
             {menuVacancy.status === 'Open' ? (
               <button

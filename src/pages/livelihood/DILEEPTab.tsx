@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
+import { canManage } from '../../utils/permissions'
 import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED } from '../../contexts/LivelihoodContext'
 import DILPProfileForm, { EMPTY_DILP_RECORD } from './DILPProfileForm'
@@ -681,7 +682,8 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
       <div className="bg-white rounded-xl shadow-sm px-5 py-4 flex items-center gap-3">
         <button
           onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium hover:bg-brand-blue-dark transition-colors"
+          disabled={!canManage('livelihood')}
+          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
         >
           <Plus size={16} />
           Add Profile
@@ -952,7 +954,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
               className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1"
             >
               <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-              <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Edit</button>
+              <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               {menuBeneficiary.projectName && !isCompleted
                 ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
                 : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
@@ -961,7 +963,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
                 <button onClick={() => { setViewingAssignmentHistoryFor(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               )}
               <div className="border-t border-gray-100 my-1" />
-              <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50">Remove</button>
+              <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
             </div>
           </>
         )

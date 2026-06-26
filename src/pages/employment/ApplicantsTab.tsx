@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
+import { canManage } from "../../utils/permissions";
 import type { Applicant } from "../../contexts/EmploymentContext";
 export type { Applicant };
 
@@ -262,7 +263,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
             className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
           >
             <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-            <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
+            <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
           </div>
         </>
@@ -518,8 +519,9 @@ function ApplicantsToolbar({
       <div className="flex gap-2">
         <button
           onClick={onAddApplicant}
+          disabled={!canManage('employment')}
           aria-label="Add new applicant"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

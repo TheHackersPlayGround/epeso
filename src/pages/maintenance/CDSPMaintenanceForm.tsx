@@ -6,6 +6,7 @@ import {
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
   Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
+import { canManage } from '../../utils/permissions'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -510,7 +511,8 @@ export default function CDSPMaintenanceForm() {
                 {!isView && (
                   <button
                     onClick={handleSave}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm"
+                    disabled={!canManage('maintenance')}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                   >
                     {mode === 'edit' ? 'Update Activity' : 'Save Activity'}
                   </button>
@@ -871,7 +873,8 @@ export default function CDSPMaintenanceForm() {
             />
             <button
               onClick={handleAddService}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap"
+              disabled={!canManage('maintenance')}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
             >
               <Plus size={16} /> Add Service
             </button>

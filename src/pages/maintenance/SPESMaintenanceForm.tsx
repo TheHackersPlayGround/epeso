@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { ArrowLeft, Upload, X, FileText } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
+import { canManage } from '../../utils/permissions'
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch, Attachment } from '../../contexts/SPESContext'
 
@@ -588,7 +589,8 @@ export default function SPESMaintenanceForm({
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="px-6 py-2.5 text-sm bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium"
+                  disabled={!canManage('maintenance')}
+                  className="px-6 py-2.5 text-sm bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                 >
                   {isEdit ? 'Update Batch' : 'Save Batch'}
                 </button>

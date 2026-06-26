@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService'
+import { canManage } from '../../utils/permissions'
 
 // Format the backend timestamp ("2026-06-26 16:21:41.5+08") into a readable string.
 function fmtLastLogin(v: string | null): string {
@@ -50,22 +51,26 @@ export const mockUsers: User[] = [
 ]
 
 export const permissionGroups = [
-  { title: 'APPLICANT MANAGEMENT',       editorDescription: 'View, Add, Edit & Delete',          permissions: [{ id: 'view-applicants',   label: 'View Applicants' }, { id: 'add-applicant',    label: 'Add Applicant' },    { id: 'edit-applicant',   label: 'Edit Applicant' },   { id: 'delete-applicant', label: 'Delete Applicant' }] },
-  { title: 'EMPLOYER MANAGEMENT',        editorDescription: 'View, Add, Edit & Delete',          permissions: [{ id: 'view-employers',    label: 'View Employers' },  { id: 'add-employer',     label: 'Add Employer' },     { id: 'edit-employer',    label: 'Edit Employer' },    { id: 'delete-employer',  label: 'Delete Employer' }] },
-  { title: 'PROGRAM / EVENTS MANAGEMENT',editorDescription: 'View, Add, Edit & Delete',          permissions: [{ id: 'view-programs',     label: 'View Programs' },   { id: 'add-program',      label: 'Add Program/Event' },{ id: 'edit-program',     label: 'Edit Program/Event'},{ id: 'delete-program',   label: 'Delete Program/Event' }] },
-  { title: 'MAINTENANCE',                editorDescription: 'View, Add, Edit & Delete',          permissions: [{ id: 'access-maintenance',label: 'Access Maintenance Page' }, { id: 'add-records', label: 'Add Records' }, { id: 'edit-records', label: 'Edit Records' }, { id: 'delete-records', label: 'Delete Records' }] },
-  { title: 'ACTIVITY LOG',               editorDescription: 'View & Export',                     permissions: [{ id: 'view-activity-log', label: 'View Activity Log' },{ id: 'export-activity-log', label: 'Export Activity Log' }] },
-  { title: 'REPORTS',                    editorDescription: 'View, Generate & Export',            permissions: [{ id: 'view-reports',      label: 'View Reports' },    { id: 'generate-reports', label: 'Generate Reports' },  { id: 'export-reports',   label: 'Export Reports' }] },
-  { title: 'USER MANAGEMENT',            editorDescription: 'View, Add, Edit, Delete & Assign',  permissions: [{ id: 'view-users',        label: 'View Users' },      { id: 'add-user',         label: 'Add User' },         { id: 'edit-user',        label: 'Edit User' },        { id: 'delete-user', label: 'Delete User' }, { id: 'assign-roles', label: 'Assign Roles & Permissions' }] },
-  { title: 'SYSTEM SETTINGS',            editorDescription: 'View & Modify',                     permissions: [{ id: 'access-settings',  label: 'Access System Settings' }, { id: 'modify-config', label: 'Modify System Configuration' }] },
+  { title: 'EMPLOYMENT FACILITATION', editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-employment',   label: 'View Employment Facilitation' }, { id: 'manage-employment',   label: 'Manage Employment Facilitation' }] },
+  { title: 'CDSP',                    editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-cdsp',         label: 'View CDSP' },                    { id: 'manage-cdsp',         label: 'Manage CDSP' }] },
+  { title: 'GIP',                     editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-gip',          label: 'View GIP' },                     { id: 'manage-gip',          label: 'Manage GIP' }] },
+  { title: 'SPES',                    editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-spes',         label: 'View SPES' },                    { id: 'manage-spes',         label: 'Manage SPES' }] },
+  { title: 'LIVELIHOOD',              editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-livelihood',   label: 'View Livelihood' },              { id: 'manage-livelihood',   label: 'Manage Livelihood' }] },
+  { title: 'SKILLS TRAINING',         editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-skills',       label: 'View Skills Training' },         { id: 'manage-skills',       label: 'Manage Skills Training' }] },
+  { title: 'OFW',                     editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-ofw',          label: 'View OFW' },                     { id: 'manage-ofw',          label: 'Manage OFW' }] },
+  { title: 'DOCUMENTS',               editorDescription: 'View, Upload, Rename & Delete', permissions: [{ id: 'view-documents',    label: 'View Documents' },               { id: 'manage-documents',    label: 'Manage Documents' }] },
+  { title: 'MAINTENANCE',             editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-maintenance',  label: 'View Maintenance' },             { id: 'manage-maintenance',  label: 'Manage Maintenance' }] },
+  { title: 'SECURITY',                editorDescription: 'Manage Users, Logs & Data',     permissions: [{ id: 'view-security',     label: 'View Security' },                { id: 'manage-security',     label: 'Manage Security' }] },
+  { title: 'REPORT',                  editorDescription: 'View, Generate & Export',       permissions: [{ id: 'view-report',       label: 'View Report' },                  { id: 'manage-report',       label: 'Manage Report' }] },
 ]
 
 type GroupAccessLevel = 'viewer' | 'editor'
 
-function AccessLevelDropdown({ value, onChange, editorDescription }: {
+function AccessLevelDropdown({ value, onChange, editorDescription, disabled }: {
   value: GroupAccessLevel
   onChange: (v: GroupAccessLevel) => void
   editorDescription: string
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -97,10 +102,10 @@ function AccessLevelDropdown({ value, onChange, editorDescription }: {
 
   return (
     <>
-      <button ref={buttonRef} type="button" onClick={handleToggle}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-blue-200 bg-blue-50 text-[#0077BE] hover:shadow-sm">
+      <button ref={buttonRef} type="button" onClick={handleToggle} disabled={disabled}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all border-blue-200 bg-blue-50 text-[#0077BE] hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-none">
         <span>{value === 'editor' ? 'Editor' : 'Viewer'}</span>
-        <ChevronDown size={13} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+        {!disabled && <ChevronDown size={13} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />}
       </button>
       {open && createPortal(
         <div ref={panelRef} style={panelStyle} className="bg-white rounded-xl shadow-2xl border border-gray-100 py-1.5 overflow-hidden">
@@ -128,7 +133,7 @@ interface UserFormModalProps {
   formData: { firstName: string; lastName: string; username: string; email: string; password: string; role: string; status: string }
   selectedPermissions: string[]
   onClose: () => void
-  onSubmit: () => void
+  onSubmit: (newPassword?: string) => void
   onFormChange: (field: string, value: string) => void
   onRoleChange: (role: string) => void
   onSetGroupAccess: (groupPermissions: { id: string; label: string }[], level: GroupAccessLevel) => void
@@ -147,8 +152,20 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [newPassword,         setNewPassword]         = useState('')
   const [confirmPassword,     setConfirmPassword]     = useState('')
+  const [passwordError,       setPasswordError]       = useState('')
 
   const inp = 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none text-gray-900 placeholder:text-gray-400'
+
+  // Validate the optional password change (edit only) before handing control to the parent.
+  // The new password is passed up so it actually reaches the backend.
+  const handleSubmitClick = () => {
+    if (isEdit && changePassword) {
+      if (newPassword.length < 8) { setPasswordError('New password must be at least 8 characters.'); return }
+      if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return }
+    }
+    setPasswordError('')
+    onSubmit(isEdit && changePassword ? newPassword : undefined)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -196,11 +213,9 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
                     )}
                   </div>
                   {!changePassword ? (
-                    <div className="relative">
-                      <input type="text" value={showCurrentPassword ? 'CurrentPassword123' : '••••••••••••'} disabled className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg bg-gray-50 text-gray-500" />
-                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                        {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                    <div>
+                      <input type="text" value="••••••••••••" disabled className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-400" />
+                      <p className="mt-1.5 text-xs text-gray-400">The password is encrypted and can't be displayed. Click "Change Password" to set a new one.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -216,6 +231,7 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
                           {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
+                      {passwordError && <p className="text-xs text-red-600">{passwordError}</p>}
                     </div>
                   )}
                 </div>
@@ -240,24 +256,38 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
 
           <div>
             <h4 className="text-gray-700 mb-4">Access Control & Permissions</h4>
+            {formData.role === 'Administrator' && (
+              <div className="mb-3 px-4 py-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-700">
+                Administrators automatically have full access to all modules. Permissions can't be customized for this role.
+              </div>
+            )}
             <div className="bg-gray-50 rounded-lg divide-y divide-gray-100">
-              {permissionGroups.map(group => (
-                <div key={group.title} className="flex items-center justify-between px-4 py-3">
-                  <span className="text-xs text-[#0077BE] font-medium">{group.title}</span>
-                  <AccessLevelDropdown
-                    value={getGroupAccessLevel(group.permissions)}
-                    onChange={lvl => onSetGroupAccess(group.permissions, lvl)}
-                    editorDescription={group.editorDescription}
-                  />
-                </div>
-              ))}
+              {permissionGroups.map(group => {
+                const isAdmin = formData.role === 'Administrator'
+                const securityForStaff = group.title === 'SECURITY' && !isAdmin
+                return (
+                  <div key={group.title} className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-[#0077BE] font-medium">{group.title}</span>
+                    {securityForStaff ? (
+                      <span className="text-xs text-gray-400 italic px-3 py-1.5">Administrator only</span>
+                    ) : (
+                      <AccessLevelDropdown
+                        value={getGroupAccessLevel(group.permissions)}
+                        onChange={lvl => onSetGroupAccess(group.permissions, lvl)}
+                        editorDescription={group.editorDescription}
+                        disabled={isAdmin}
+                      />
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-          <button onClick={onSubmit} className="px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
+          <button onClick={handleSubmitClick} className="px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
             {isEdit ? 'Save Changes' : 'Add User'}
           </button>
         </div>
@@ -300,7 +330,9 @@ export default function SystemUsersTab() {
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
 
   const totalPermissionsCount = permissionGroups.flatMap(g => g.permissions).length
-  const defaultViewerPermissions = permissionGroups.map(g => g.permissions[0].id)
+  // Security is administrator-only, so Staff never start with (or can be given) it.
+  const staffGroups = permissionGroups.filter(g => g.title !== 'SECURITY')
+  const defaultViewerPermissions = staffGroups.map(g => g.permissions[0].id)
 
   const resetForm = () => {
     setFormData({ firstName: '', lastName: '', username: '', email: '', password: '', role: 'Staff', status: 'Active' })
@@ -310,7 +342,7 @@ export default function SystemUsersTab() {
   const handleRoleChange = (newRole: string) => {
     setFormData(prev => ({ ...prev, role: newRole }))
     if (newRole === 'Administrator') setSelectedPermissions(permissionGroups.flatMap(g => g.permissions.map(p => p.id)))
-    else setSelectedPermissions(permissionGroups.map(g => g.permissions[0].id))
+    else setSelectedPermissions(staffGroups.map(g => g.permissions[0].id))
   }
 
   const handleSetGroupAccess = (groupPermissions: { id: string; label: string }[], level: GroupAccessLevel) => {
@@ -330,12 +362,13 @@ export default function SystemUsersTab() {
     setShowEditModal(true)
   }
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (newPassword?: string) => {
     if (!editingUser) return
     try {
       await updateUser(editingUser.id, {
         firstName: formData.firstName, lastName: formData.lastName, username: formData.username,
         role: formData.role, status: formData.status, permissions: selectedPermissions,
+        ...(newPassword ? { newPassword } : {}),
       })
       await loadUsers()
       setShowEditModal(false)
@@ -422,7 +455,7 @@ export default function SystemUsersTab() {
             <h3 className="text-gray-800 m-0">System Users</h3>
             <span className="text-sm text-gray-400">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found</span>
           </div>
-          <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
+          <button onClick={handleOpenAddModal} disabled={!canManage('security')} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0077BE]">
             <UserPlus size={18} />
             Add User
           </button>
@@ -491,8 +524,8 @@ export default function SystemUsersTab() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
-                    <button onClick={() => handleEditUser(user)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={18} /></button>
-                    <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                    <button onClick={() => handleEditUser(user)} disabled={!canManage('security')} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"><Edit2 size={18} /></button>
+                    <button onClick={() => handleDeleteUser(user.id)} disabled={!canManage('security')} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"><Trash2 size={18} /></button>
                   </div>
                 </td>
               </tr>

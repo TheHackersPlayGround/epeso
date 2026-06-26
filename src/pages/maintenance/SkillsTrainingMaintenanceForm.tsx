@@ -6,6 +6,7 @@ import {
   Trash2, PlayCircle, CheckCircle, RefreshCw, Search, Plus,
   ArrowLeft, Edit2, Users, ChevronLeft, ChevronRight,
 } from 'lucide-react'
+import { canManage } from '../../utils/permissions'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import type { SkillsTrainingBatch } from '../../contexts/SkillsTrainingContext'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
@@ -207,8 +208,8 @@ function TrainingForm({
                 {isView ? 'Close' : 'Cancel'}
               </button>
               {!isView && onSave && (
-                <button onClick={onSave}
-                  className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                <button onClick={onSave} disabled={!canManage('maintenance')}
+                  className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                   {mode === 'add' ? 'Save Activity' : 'Save Changes'}
                 </button>
               )}

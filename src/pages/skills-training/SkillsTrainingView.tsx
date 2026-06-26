@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { canManage } from '../../utils/permissions'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { SkillsTrainingProfile } from '../../contexts/SkillsTrainingContext'
@@ -477,7 +478,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
           <div className="bg-white rounded-xl shadow-md p-3 mb-4">
             <div className="flex gap-2">
-              <button onClick={() => setIsFormOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm">
+              <button onClick={() => setIsFormOpen(true)} disabled={!canManage('skills')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                 <Plus size={16} /><span>Add Profile</span>
               </button>
               <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm">
@@ -695,7 +696,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
-              <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Edit</button>
+              <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               {(() => {
                 const hasActive = !!profile.assignedTrainingId
                 if (hasActive) {
@@ -709,7 +710,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 )
               })()}
               <div className="my-1 border-t border-gray-100" />
-              <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id }); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50">Delete</button>
+              <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id }); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>
           </>,
           document.body

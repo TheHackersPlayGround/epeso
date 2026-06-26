@@ -18,6 +18,7 @@ import h1 from '../../assets/h1.png'
 import h2 from '../../assets/h2.jpg'
 import h3 from '../../assets/h3.jpg'
 import h4 from '../../assets/h4-1.jpg'
+import { canView } from '../../utils/permissions'
 
 interface DashboardProps {
   onModuleClick: (module: string) => void
@@ -175,7 +176,7 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
           Quick Access
         </p>
         <div className="grid mt-5 grid-cols-4 gap-5">
-          {quickAccess.map((module) => {
+          {quickAccess.filter(module => module.id !== 'security' || canView('security')).map((module) => {
             const Icon = module.icon
             return (
               <button

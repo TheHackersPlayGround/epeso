@@ -4,6 +4,7 @@ import logo1 from '../../assets/logo1.png'
 import logo2 from '../../assets/logo22.png'
 import bg from '../../assets/tangub.png'
 import Forgot from './forgot'
+import { login as apiLogin } from '../../services/userService'
 
 interface LoginProps {
   onLogin: () => void
@@ -48,10 +49,22 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState<string>('')
   const [showPassword, setShowPassword] = useState<boolean>(false)
   const [showForgot, setShowForgot] = useState<boolean>(false)
+  const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState<boolean>(false)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
-    onLogin()
+    setError('')
+    setLoading(true)
+    try {
+      const user = await apiLogin(username.trim(), password)
+      try { localStorage.setItem('peso_current_user', JSON.stringify(user)) } catch { /* quota */ }
+      onLogin()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (showForgot) {
@@ -187,6 +200,22 @@ export default function Login({ onLogin }: LoginProps) {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4 relative z-10">
+            {/* Error message */}
+            {error && (
+              <div
+                role="alert"
+                style={{
+                  background: 'rgba(220,38,38,0.18)',
+                  border: '1px solid rgba(248,113,113,0.6)',
+                  borderRadius: '8px',
+                  padding: '0.6rem 0.9rem',
+                  color: '#ffe4e4',
+                  fontSize: '0.82rem',
+                }}
+              >
+                {error}
+              </div>
+            )}
             {/* Username */}
             <div className="relative">
               <input
@@ -287,6 +316,7 @@ export default function Login({ onLogin }: LoginProps) {
             {/* Log In button */}
             <button
               type="submit"
+              disabled={loading}
               className="w-full py-3 text-white font-bold tracking-widest uppercase"
               style={{
                 background: 'linear-gradient(90deg, #0065A5 0%, #0077bf 100%)',
@@ -294,22 +324,25 @@ export default function Login({ onLogin }: LoginProps) {
                 fontSize: '0.88rem',
                 letterSpacing: '0.12em',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
                 transition: 'opacity 0.2s, transform 0.15s, box-shadow 0.2s',
                 boxShadow: '0 4px 14px rgba(0,101,165,0.4)',
               }}
               onMouseEnter={(e) => {
+                if (loading) return
                 e.currentTarget.style.opacity = '0.9'
                 e.currentTarget.style.transform = 'translateY(-1px)'
                 e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,101,165,0.55)'
               }}
               onMouseLeave={(e) => {
+                if (loading) return
                 e.currentTarget.style.opacity = '1'
                 e.currentTarget.style.transform = 'translateY(0)'
                 e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,101,165,0.4)'
               }}
             >
-              Log In
+              {loading ? 'Signing in…' : 'Log In'}
             </button>
           </form>
         </div>

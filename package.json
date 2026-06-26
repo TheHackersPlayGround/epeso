@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@types/react-slick": "^0.23.13",
+    "axios": "^1.18.1",
     "docx-preview": "^0.3.7",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Login from './pages/auth/login'
 import Dashboard from './pages/dashboard/dashboard'
 import Navbar from './pages/shared/navbar'
@@ -23,21 +23,8 @@ import { SkillsTrainingProvider } from './contexts/SkillsTrainingContext'
 import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED, CLPEP_INTERVENTIONS_SEED } from './contexts/LivelihoodContext'
+import { logout as apiLogout, getMe } from './services/userService'
 import './styles/App.css'
-
-const DEFAULT_CURRENT_USER = {
-  id: 1, firstName: 'Vicky', lastName: 'Administrator',
-  username: 'admin', email: 'admin@peso.gov.ph',
-  role: 'Administrator', status: 'Active',
-  lastLogin: new Date().toLocaleString(), permissions: [],
-}
-function initCurrentUser() {
-  try {
-    if (!localStorage.getItem('peso_current_user'))
-      localStorage.setItem('peso_current_user', JSON.stringify(DEFAULT_CURRENT_USER))
-  } catch { /* quota */ }
-}
-initCurrentUser()
 
 function initLivelihoodLS() {
   const set = (key: string, data: unknown[]) => {
@@ -251,6 +238,37 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+
+  // On load, ask the backend who is logged in. If a session cookie is still
+  // valid, restore it (survives a page refresh); otherwise show the login page.
+  useEffect(() => {
+    let active = true
+    getMe()
+      .then(user => {
+        if (!active) return
+        try { localStorage.setItem('peso_current_user', JSON.stringify(user)) } catch { /* quota */ }
+        setIsLoggedIn(true)
+      })
+      .catch(() => { /* no active session — stay logged out */ })
+      .finally(() => { if (active) setCheckingSession(false) })
+    return () => { active = false }
+  }, [])
+
+  const handleLogout = () => {
+    // End the backend session; ignore network errors so the UI still logs out.
+    apiLogout().catch(() => { /* already effectively logged out */ })
+    try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+    setIsLoggedIn(false)
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+        <span className="text-gray-400 text-sm">Loading…</span>
+      </div>
+    )
+  }
 
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />
@@ -264,7 +282,7 @@ export default function App() {
           <OFWProvider>
             <SkillsTrainingProvider>
               <ProgramActivitiesProvider>
-                <AppContent onLogout={() => setIsLoggedIn(false)} />
+                <AppContent onLogout={handleLogout} />
               </ProgramActivitiesProvider>
             </SkillsTrainingProvider>
           </OFWProvider>

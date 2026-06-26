@@ -5,6 +5,14 @@ import {
   X, Search, ChevronDown, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
+import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService'
+
+// Format the backend timestamp ("2026-06-26 16:21:41.5+08") into a readable string.
+function fmtLastLogin(v: string | null): string {
+  if (!v) return 'Never'
+  const d = new Date(v.replace(' ', 'T'))
+  return isNaN(d.getTime()) ? v : d.toLocaleString()
+}
 
 export interface User {
   id: number
@@ -259,10 +267,29 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
 }
 
 export default function SystemUsersTab() {
-  const [users,          setUsers]          = useState<User[]>(mockUsers)
+  const [users,          setUsers]          = useState<User[]>([])
+  const [loading,        setLoading]        = useState(true)
   const [showAddModal,   setShowAddModal]   = useState(false)
   const [showEditModal,  setShowEditModal]  = useState(false)
   const [editingUser,    setEditingUser]    = useState<User | null>(null)
+
+  // Load real users from the backend on mount.
+  const loadUsers = async () => {
+    try {
+      const data = await getUsers()
+      setUsers(data.map(u => ({ ...u, lastLogin: fmtLastLogin(u.lastLogin) })))
+    } catch (err) {
+      setConfirmModal({
+        isOpen: true, type: 'error', title: 'Failed to load users',
+        message: err instanceof Error ? err.message : 'Could not load users from the server.',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadUsers() }, [])
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean; type: 'confirm' | 'success' | 'error'
@@ -303,16 +330,21 @@ export default function SystemUsersTab() {
     setShowEditModal(true)
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingUser) return
-    setUsers(users.map(u => u.id === editingUser.id
-      ? { ...u, firstName: formData.firstName, lastName: formData.lastName, username: formData.username, email: formData.email, role: formData.role, status: formData.status, permissions: selectedPermissions }
-      : u
-    ))
-    setShowEditModal(false)
-    setEditingUser(null)
-    resetForm()
-    setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User updated successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+    try {
+      await updateUser(editingUser.id, {
+        firstName: formData.firstName, lastName: formData.lastName, username: formData.username,
+        role: formData.role, status: formData.status, permissions: selectedPermissions,
+      })
+      await loadUsers()
+      setShowEditModal(false)
+      setEditingUser(null)
+      resetForm()
+      setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User updated successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+    } catch (err) {
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Could not update user.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+    }
   }
 
   const handleAddUserClick = () => {
@@ -324,17 +356,20 @@ export default function SystemUsersTab() {
       isOpen: true, type: 'confirm', title: 'Confirm Add User',
       message: `Add new user "${formData.firstName} ${formData.lastName}" (${formData.username}) as ${formData.role}?`,
       confirmText: 'Yes, Add User', cancelText: 'Cancel',
-      onConfirm: () => {
-        const newUser: User = {
-          id: users.length + 1,
-          firstName: formData.firstName, lastName: formData.lastName, username: formData.username,
-          email: `${formData.username}@peso.gov.ph`, role: formData.role, status: formData.status,
-          lastLogin: 'Never', permissions: selectedPermissions,
+      onConfirm: async () => {
+        try {
+          await createUser({
+            firstName: formData.firstName, lastName: formData.lastName, username: formData.username,
+            password: formData.password, role: formData.role, status: formData.status,
+            permissions: selectedPermissions,
+          })
+          await loadUsers()
+          setShowAddModal(false)
+          resetForm()
+          setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User added successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+        } catch (err) {
+          setConfirmModal({ isOpen: true, type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Could not add user.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
         }
-        setUsers([...users, newUser])
-        setShowAddModal(false)
-        resetForm()
-        setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User added successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
       },
     })
   }
@@ -349,9 +384,14 @@ export default function SystemUsersTab() {
       isOpen: true, type: 'confirm', title: 'Confirm Delete',
       message: `Are you sure you want to delete user "${userToDelete?.username}"?\n\nThis action cannot be undone.`,
       confirmText: 'Yes, Delete', cancelText: 'Cancel',
-      onConfirm: () => {
-        setUsers(users.filter(u => u.id !== userId))
-        setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User deleted successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      onConfirm: async () => {
+        try {
+          await deleteUser(userId)
+          await loadUsers()
+          setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'User deleted successfully!', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+        } catch (err) {
+          setConfirmModal({ isOpen: true, type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Could not delete user.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+        }
       },
     })
   }
@@ -425,7 +465,9 @@ export default function SystemUsersTab() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.length === 0 ? (
+            {loading ? (
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 text-sm">Loading users…</td></tr>
+            ) : filteredUsers.length === 0 ? (
               <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 text-sm">No users match your search or filters.</td></tr>
             ) : paginatedUsers.map(user => (
               <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">

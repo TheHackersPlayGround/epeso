@@ -38,6 +38,7 @@ export type Employer = {
   city: string
   province: string
   region: string
+  barangayId?: number | null
   jobOpenings: Array<{ jobName: string; slots: string }>
   status: 'Active' | 'Inactive'
   dateRegistered: string
@@ -56,6 +57,7 @@ export type Vacancy = {
   id: number
   jobTitle: string
   employer: string
+  employerId?: number
   vacanciesCount: number
   industry: string
   jobType: string
@@ -86,14 +88,13 @@ export type Referral = {
   employer: string
   referralDate: string        // ISO date string, e.g. "2026-06-18"
   status: 'Pending' | 'Interviewed' | 'Not Hired'
-  notes?: string
 }
 
 export const REFERRAL_SEED: Referral[] = [
-  { id: 1, applicantId: 1, applicantName: 'Santos, Maria C.',      vacancyId: 4, jobTitle: 'Nurse',      employer: 'City Hospital',        referralDate: '2026-06-10', status: 'Pending',     notes: '' },
-  { id: 2, applicantId: 2, applicantName: 'Dela Cruz, Juan S.',    vacancyId: 1, jobTitle: 'Accountant', employer: 'ABC Corporation',      referralDate: '2026-06-08', status: 'Interviewed', notes: '' },
-  { id: 4, applicantId: 4, applicantName: 'Manalo, Roberto G.',    vacancyId: 8, jobTitle: 'IT Support', employer: 'DOST Regional Office', referralDate: '2026-06-01', status: 'Not Hired',   notes: 'Position filled by another candidate.' },
-  { id: 5, applicantId: 5, applicantName: 'Flores, Ligaya B.',     vacancyId: 7, jobTitle: 'Nurse Aide', employer: 'Tangub City Hospital', referralDate: '2026-06-12', status: 'Pending',     notes: '' },
+  { id: 1, applicantId: 1, applicantName: 'Santos, Maria C.',      vacancyId: 4, jobTitle: 'Nurse',      employer: 'City Hospital',        referralDate: '2026-06-10', status: 'Pending' },
+  { id: 2, applicantId: 2, applicantName: 'Dela Cruz, Juan S.',    vacancyId: 1, jobTitle: 'Accountant', employer: 'ABC Corporation',      referralDate: '2026-06-08', status: 'Interviewed' },
+  { id: 4, applicantId: 4, applicantName: 'Manalo, Roberto G.',    vacancyId: 8, jobTitle: 'IT Support', employer: 'DOST Regional Office', referralDate: '2026-06-01', status: 'Not Hired' },
+  { id: 5, applicantId: 5, applicantName: 'Flores, Ligaya B.',     vacancyId: 7, jobTitle: 'Nurse Aide', employer: 'Tangub City Hospital', referralDate: '2026-06-12', status: 'Pending' },
 ]
 
 export type Placement = {
@@ -105,15 +106,13 @@ export type Placement = {
   dateHired: string
   status: 'Active' | 'Resigned' | 'Terminated' | 'Completed'
   employmentType?: string
-  source?: string
   referralId?: number
   vacancyId?: number
   salaryRange?: string
-  notes?: string
 }
 
 export const PLACEMENT_SEED: Placement[] = [
-  { id: 1, applicantId: 3, applicantName: 'Reyes, Ana L.', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', source: 'Referral', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000', notes: 'Passed interview and accepted the offer.' },
+  { id: 1, applicantId: 3, applicantName: 'Reyes, Ana L.', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000' },
 ]
 
 export const SEED: Applicant[] = [

@@ -1,28 +1,22 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
-import { VACANCY_SEED } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
-
-const LS_KEY = 'ef_vacancies'
-
-function loadVacancies(): Vacancy[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    return raw ? (JSON.parse(raw) as Vacancy[]) : VACANCY_SEED
-  } catch {
-    return VACANCY_SEED
-  }
-}
+import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
+import { listEmployers } from '../../services/employerService'
+import { listApplicants } from '../../services/applicantService'
+import { createReferral } from '../../services/referralService'
 
 type FilterOption = { id: string; label: string; options: string[] }
 
 const AVAILABLE_FILTERS: FilterOption[] = [
   { id: 'industry', label: 'Industry', options: ['Manufacturing', 'Information Technology', 'Agriculture', 'Retail', 'Healthcare', 'Education', 'Construction', 'Hospitality', 'Transportation', 'Financial Services', 'Government', 'Other'] },
-  { id: 'jobType', label: 'Job Type', options: ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'] },
+  { id: 'jobType', label: 'Job Type', options: ['Full-time', 'Part-time', 'Contract'] },
   { id: 'status', label: 'Status', options: ['Open', 'Closed'] },
 ]
+
+type EmployerOption = { id: number; companyName: string }
 
 // ── Toolbar ──────────────────────────────────────────────────────────────────
 
@@ -402,20 +396,17 @@ function ViewVacancyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () 
 
 type SimpleApplicant = { id: number; name: string; skills: string; education: string }
 
-function loadApplicantsForMatch(): SimpleApplicant[] {
-  try {
-    const raw = localStorage.getItem('ef_applicants_v2')
-    if (raw) {
-      const list = JSON.parse(raw) as Array<{ id: number; name: string; skills: string; education: string }>
-      return list.map(a => ({ id: a.id, name: a.name, skills: a.skills ?? '', education: a.education ?? '' }))
-    }
-  } catch { /* ignore */ }
-  return []
-}
-
 function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => void }) {
-  const applicants = loadApplicantsForMatch()
+  const [applicants, setApplicants] = useState<SimpleApplicant[]>([])
+  const [loadingApplicants, setLoadingApplicants] = useState(true)
   const [referred, setReferred] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    listApplicants()
+      .then(list => setApplicants(list.map(a => ({ id: a.id, name: a.name, skills: a.skills ?? '', education: a.education ?? '' }))))
+      .catch(() => {})
+      .finally(() => setLoadingApplicants(false))
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -435,7 +426,9 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
             Showing applicants who might be a good match for this vacancy. You can refer them directly from here.
           </p>
 
-          {applicants.length === 0 ? (
+          {loadingApplicants ? (
+            <p className="text-sm text-gray-400 text-center py-8">Loading applicants…</p>
+          ) : applicants.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No applicants found.</p>
           ) : (
             applicants.map(applicant => (
@@ -450,26 +443,14 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
                   )}
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (referred.has(applicant.id)) return
-                    // Write referral to ef_referrals
                     try {
-                      const raw = localStorage.getItem('ef_referrals')
-                      const existing = raw ? JSON.parse(raw) : []
-                      const newReferral = {
-                        id: Date.now(),
-                        applicantId: applicant.id,
-                        applicantName: applicant.name,
-                        vacancyId: vacancy.id,
-                        jobTitle: vacancy.jobTitle,
-                        employer: vacancy.employer,
-                        referralDate: new Date().toISOString().slice(0, 10),
-                        status: 'Pending',
-                        notes: '',
-                      }
-                      localStorage.setItem('ef_referrals', JSON.stringify([newReferral, ...existing]))
-                    } catch { /* quota */ }
-                    setReferred(prev => new Set(prev).add(applicant.id))
+                      await createReferral(applicant.id, vacancy.id)
+                      setReferred(prev => new Set(prev).add(applicant.id))
+                    } catch {
+                      Swal.fire('Error', 'Failed to create referral. The applicant may already be referred to this vacancy.', 'error')
+                    }
                   }}
                   disabled={referred.has(applicant.id)}
                   className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -498,9 +479,10 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
 
 // ── Edit Vacancy Modal ────────────────────────────────────────────────────────
 
-function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onClose: () => void; onSave: (v: Vacancy) => void }) {
+function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Vacancy; onClose: () => void; onSave: (v: Vacancy) => void; employers: EmployerOption[] }) {
   const [jobTitle, setJobTitle] = useState(vacancy.jobTitle)
   const [employer, setEmployer] = useState(vacancy.employer)
+  const [employerId, setEmployerId] = useState<number | null>(vacancy.employerId ?? null)
   const [employerSearch, setEmployerSearch] = useState('')
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
   const [vacanciesCount, setVacanciesCount] = useState(String(vacancy.vacanciesCount))
@@ -509,12 +491,11 @@ function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onCl
   const [description, setDescription] = useState(vacancy.description)
   const [requirements, setRequirements] = useState(vacancy.requirements)
 
-  const employerNames = loadEmployerNames()
-  const filteredEmployers = employerNames.filter(n =>
-    n.toLowerCase().includes(employerSearch.toLowerCase())
+  const filteredEmployers = employers.filter(e =>
+    e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
 
-  const isValid = jobTitle.trim() && employer && vacanciesCount
+  const isValid = jobTitle.trim() && employerId !== null && vacanciesCount
 
   function handleSave() {
     if (!isValid) return
@@ -522,6 +503,7 @@ function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onCl
       ...vacancy,
       jobTitle: jobTitle.trim(),
       employer,
+      employerId: employerId ?? undefined,
       vacanciesCount: parseInt(vacanciesCount) || 1,
       jobType,
       salaryRange: salaryRange.trim(),
@@ -577,10 +559,10 @@ function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onCl
                     {filteredEmployers.length === 0 ? (
                       <p className="px-3 py-2 text-sm text-gray-400">No employers found</p>
                     ) : (
-                      filteredEmployers.map(name => (
-                        <button key={name} onClick={() => { setEmployer(name); setEmployerSearch(''); setShowEmployerDropdown(false) }}
+                      filteredEmployers.map(e => (
+                        <button key={e.id} onClick={() => { setEmployer(e.companyName); setEmployerId(e.id); setEmployerSearch(''); setShowEmployerDropdown(false) }}
                           className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                          {name}
+                          {e.companyName}
                         </button>
                       ))
                     )}
@@ -611,8 +593,6 @@ function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onCl
                 <option>Full-time</option>
                 <option>Part-time</option>
                 <option>Contract</option>
-                <option>Freelance</option>
-                <option>Internship</option>
               </select>
             </div>
           </div>
@@ -666,27 +646,16 @@ function EditVacancyModal({ vacancy, onClose, onSave }: { vacancy: Vacancy; onCl
 
 // ── Add Vacancy Modal ─────────────────────────────────────────────────────────
 
-const EMPLOYER_LS_KEY = 'ef_employers'
-
-function loadEmployerNames(): string[] {
-  try {
-    const raw = localStorage.getItem(EMPLOYER_LS_KEY)
-    if (raw) {
-      const list = JSON.parse(raw) as Array<{ companyName: string }>
-      return list.map(e => e.companyName)
-    }
-  } catch { /* ignore */ }
-  return ['ABC Corporation', 'TechHub Solutions', 'Green Valley Farm', 'City Hospital', 'XYZ School']
-}
-
 type AddVacancyModalProps = {
   onClose: () => void
   onSave: (v: Omit<Vacancy, 'id'>) => void
+  employers: EmployerOption[]
 }
 
-function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
+function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
   const [jobTitle, setJobTitle] = useState('')
   const [employer, setEmployer] = useState('')
+  const [employerId, setEmployerId] = useState<number | null>(null)
   const [employerSearch, setEmployerSearch] = useState('')
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
   const [vacanciesCount, setVacanciesCount] = useState('')
@@ -696,9 +665,8 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
   const [requirements, setRequirements] = useState('')
   const [showFieldErrors, setShowFieldErrors] = useState(false)
 
-  const employerNames = loadEmployerNames()
-  const filteredEmployers = employerNames.filter(n =>
-    n.toLowerCase().includes(employerSearch.toLowerCase())
+  const filteredEmployers = employers.filter(e =>
+    e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
 
   function fieldErr(isEmpty: boolean) { return showFieldErrors && isEmpty }
@@ -712,13 +680,14 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
   }
 
   function handleSave() {
-    if (!jobTitle.trim() || !employer.trim() || !vacanciesCount) {
+    if (!jobTitle.trim() || !employerId || !vacanciesCount) {
       setShowFieldErrors(true)
       return
     }
     onSave({
       jobTitle: jobTitle.trim(),
       employer,
+      employerId,
       vacanciesCount: parseInt(vacanciesCount) || 1,
       industry: '',
       jobType,
@@ -764,7 +733,7 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
                 </span>
                 <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
               </div>
-              <ErrMsg show={fieldErr(!employer)} />
+              <ErrMsg show={fieldErr(!employerId)} />
               {showEmployerDropdown && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowEmployerDropdown(false)} />
@@ -782,10 +751,10 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
                     {filteredEmployers.length === 0 ? (
                       <p className="px-3 py-2 text-sm text-gray-400">No employers found</p>
                     ) : (
-                      filteredEmployers.map(name => (
-                        <button key={name} onClick={() => { setEmployer(name); setEmployerSearch(''); setShowEmployerDropdown(false) }}
+                      filteredEmployers.map(e => (
+                        <button key={e.id} onClick={() => { setEmployer(e.companyName); setEmployerId(e.id); setEmployerSearch(''); setShowEmployerDropdown(false) }}
                           className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                          {name}
+                          {e.companyName}
                         </button>
                       ))
                     )}
@@ -817,8 +786,6 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
                 <option>Full-time</option>
                 <option>Part-time</option>
                 <option>Contract</option>
-                <option>Freelance</option>
-                <option>Internship</option>
               </select>
             </div>
           </div>
@@ -873,7 +840,9 @@ function AddVacancyModal({ onClose, onSave }: AddVacancyModalProps) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function VacanciesTab() {
-  const [vacancies, setVacancies] = useState<Vacancy[]>(loadVacancies)
+  const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [employers, setEmployers] = useState<EmployerOption[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
@@ -883,10 +852,15 @@ export default function VacanciesTab() {
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
 
-  function persist(next: Vacancy[]) {
-    setVacancies(next)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* quota */ }
-  }
+  useEffect(() => {
+    Promise.all([listVacancies(), listEmployers()])
+      .then(([vacs, emps]) => {
+        setVacancies(vacs)
+        setEmployers(emps.map(e => ({ id: e.id, companyName: e.companyName })))
+      })
+      .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load vacancies.' }))
+      .finally(() => setLoading(false))
+  }, [])
 
   function handleAddFilter(id: string) {
     setActiveFilters((prev) => [...prev, id])
@@ -901,15 +875,25 @@ export default function VacanciesTab() {
     setFilterValues((prev) => ({ ...prev, [id]: value }))
   }
 
-  function handleToggleStatus(id: number, currentStatus: Vacancy['status']) {
-    const next: Vacancy['status'] = currentStatus === 'Open' ? 'Closed' : 'Open'
-    persist(vacancies.map(v => v.id === id ? { ...v, status: next } : v))
+  async function handleToggleStatus(id: number, _currentStatus: Vacancy['status']) {
+    try {
+      const next = await toggleVacancyStatus(id)
+      setVacancies(prev => prev.map(v => v.id === id ? { ...v, status: next } : v))
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update vacancy status.' })
+    }
   }
 
-  function handleAddVacancy(data: Omit<Vacancy, 'id'>) {
-    const next = [{ id: Date.now(), ...data }, ...vacancies]
-    persist(next)
-    setShowAddModal(false)
+  async function handleAddVacancy(data: Omit<Vacancy, 'id'>) {
+    try {
+      await createVacancy(data)
+      const fresh = await listVacancies()
+      setVacancies(fresh)
+      setShowAddModal(false)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save vacancy.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+    }
   }
 
   const filtered = useMemo(() => {
@@ -934,6 +918,14 @@ export default function VacanciesTab() {
 
     return result
   }, [vacancies, searchQuery, activeFilters, filterValues])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading vacancies…
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -982,10 +974,18 @@ export default function VacanciesTab() {
       {editingVacancy && (
         <EditVacancyModal
           vacancy={editingVacancy}
+          employers={employers}
           onClose={() => setEditingVacancy(null)}
-          onSave={updated => {
-            persist(vacancies.map(v => v.id === updated.id ? updated : v))
-            setEditingVacancy(null)
+          onSave={async updated => {
+            try {
+              await updateVacancy(updated.id, updated)
+              const fresh = await listVacancies()
+              setVacancies(fresh)
+              setEditingVacancy(null)
+            } catch (err: unknown) {
+              const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update vacancy.'
+              Swal.fire({ icon: 'error', title: 'Error', text: msg })
+            }
           }}
         />
       )}
@@ -993,6 +993,7 @@ export default function VacanciesTab() {
         <AddVacancyModal
           onClose={() => setShowAddModal(false)}
           onSave={handleAddVacancy}
+          employers={employers}
         />
       )}
     </div>

@@ -1,0 +1,44 @@
+// API calls for Employment Facilitation applicants.
+// An applicant is a beneficiary enrolled in the Employment Facilitation service;
+// the backend handles the full beneficiary spine in one transaction.
+// All requests go through axiosClient, which carries the PHP session cookie.
+
+import axiosClient from './axiosClient'
+import { ENDPOINTS } from '../config/api'
+import type { Applicant } from '../contexts/EmploymentContext'
+import type { ApplicantFormData } from '../pages/employment/AddApplicantSidebar'
+
+// GET /api/employment/listApplicants
+export async function listApplicants(): Promise<Applicant[]> {
+  const res = await axiosClient.get<{ status: string; data: Applicant[] }>(
+    ENDPOINTS.employment.listApplicants,
+  )
+  return res.data.data ?? []
+}
+
+// GET /api/employment/getApplicant/{id}
+export async function getApplicant(id: number): Promise<Applicant> {
+  const res = await axiosClient.get<{ status: string; data: Applicant }>(
+    `${ENDPOINTS.employment.getApplicant}/${id}`,
+  )
+  return res.data.data
+}
+
+// POST /api/employment/createApplicant -> new beneficiary id
+export async function createApplicant(formData: ApplicantFormData): Promise<number> {
+  const res = await axiosClient.post<{ status: string; data: { id: number } }>(
+    ENDPOINTS.employment.createApplicant,
+    formData,
+  )
+  return res.data.data.id
+}
+
+// POST /api/employment/updateApplicant/{id}
+export async function updateApplicant(id: number, formData: ApplicantFormData): Promise<void> {
+  await axiosClient.post(`${ENDPOINTS.employment.updateApplicant}/${id}`, formData)
+}
+
+// POST /api/employment/deleteApplicant/{id}
+export async function deleteApplicant(id: number): Promise<void> {
+  await axiosClient.post(`${ENDPOINTS.employment.deleteApplicant}/${id}`)
+}

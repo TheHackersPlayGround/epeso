@@ -1,26 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import type { Employer } from '../../contexts/EmploymentContext'
-import { EMPLOYER_SEED } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
+import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '../../services/employerService'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
-
-const LS_KEY = 'ef_employers'
-
-function loadEmployers(): Employer[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (raw) return JSON.parse(raw) as Employer[]
-  } catch { /* ignore */ }
-  return EMPLOYER_SEED
-}
-
-function saveEmployers(employers: Employer[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(employers))
-}
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
@@ -324,7 +310,8 @@ function EmployersToolbar({ onAdd, onImport, isExportOpen, onToggleExport, onClo
 // ─── EmployersTab ──────────────────────────────────────────────────────────────
 
 export default function EmployersTab() {
-  const [employers, setEmployers] = useState<Employer[]>(loadEmployers)
+  const [employers, setEmployers] = useState<Employer[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -335,6 +322,13 @@ export default function EmployersTab() {
   const [sidebarMode, setSidebarMode] = useState<'view' | 'edit' | null>(null)
 
   const availableFilters = STATIC_FILTERS
+
+  useEffect(() => {
+    listEmployers()
+      .then(setEmployers)
+      .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employers.' }))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
@@ -351,21 +345,30 @@ export default function EmployersTab() {
     })
   }, [employers, searchQuery, activeFilters, filterValues])
 
-  function handleAdd(data: Omit<Employer, 'id'>) {
-    const newEmployer: Employer = { ...data, id: Date.now() } as Employer
-    const updated = [newEmployer, ...employers]
-    setEmployers(updated)
-    saveEmployers(updated)
-    setShowAdd(false)
+  async function handleAdd(data: Omit<Employer, 'id'>) {
+    try {
+      await createEmployer(data)
+      const fresh = await listEmployers()
+      setEmployers(fresh)
+      setShowAdd(false)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save employer.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+    }
   }
 
-  function handleEdit(data: Omit<Employer, 'id'>) {
+  async function handleEdit(data: Omit<Employer, 'id'>) {
     if (!selectedEmployer) return
-    const updated = employers.map(e => e.id === selectedEmployer.id ? { ...data, id: e.id } as Employer : e)
-    setEmployers(updated)
-    saveEmployers(updated)
-    setSelectedEmployer(null)
-    setSidebarMode(null)
+    try {
+      await updateEmployer(selectedEmployer.id, data)
+      const fresh = await listEmployers()
+      setEmployers(fresh)
+      setSelectedEmployer(null)
+      setSidebarMode(null)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update employer.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+    }
   }
 
   async function handleDelete(id: number) {
@@ -380,9 +383,13 @@ export default function EmployersTab() {
       cancelButtonColor: '#6b7280',
     })
     if (!result.isConfirmed) return
-    const updated = employers.filter(e => e.id !== id)
-    setEmployers(updated)
-    saveEmployers(updated)
+    try {
+      await deleteEmployer(id)
+      setEmployers(prev => prev.filter(e => e.id !== id))
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to delete employer.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+    }
   }
 
   function openView(employer: Employer) {
@@ -401,6 +408,14 @@ export default function EmployersTab() {
   }
 
   const isFiltered = searchQuery.trim().length > 0 || activeFilters.some(f => filterValues[f])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading employers…
+      </div>
+    )
+  }
 
   if (showAdd) {
     return (

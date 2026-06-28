@@ -1,6 +1,8 @@
 ﻿import { useState } from 'react';
+import Swal from 'sweetalert2';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import DatePicker from '../../components/DatePicker';
+import BarangayCombobox from '../../components/BarangayCombobox';
 import ApplicantReviewModal from './ApplicantReviewModal';
 
 interface ApplicantFormData {
@@ -16,6 +18,7 @@ interface ApplicantFormData {
   height: string;
   houseNo: string;
   barangay: string;
+  barangayId: number | null;
   municipality: string;
   province: string;
   hasDisability: string[];
@@ -155,6 +158,8 @@ interface ApplicantFormData {
     customName?: string;
     fileName: string;
     fileSize: string;
+    dataUrl?: string; // base64 content for newly-uploaded files (sent to the backend)
+    url?: string;     // public URL for files already stored in the documents table
   }>;
 
   // 2x2 ID Photo
@@ -164,7 +169,7 @@ interface ApplicantFormData {
 export type { ApplicantFormData }
 
 interface AddApplicantSidebarProps {
-  onSave: (data: ApplicantFormData) => void;
+  onSave: (data: ApplicantFormData) => void | Promise<void>;
   onClose: () => void;
   initialData?: ApplicantFormData;
   isEditMode?: boolean;
@@ -179,6 +184,8 @@ interface UploadedDocument {
   file?: File;
   fileName?: string;
   fileSize?: string;
+  dataUrl?: string; // base64 content for new uploads
+  url?: string;     // public URL for already-stored files
 }
 
 export default function AddApplicantSidebar({ onSave, onClose, initialData, isEditMode = false }: AddApplicantSidebarProps) {
@@ -186,7 +193,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>(
-    initialData?.savedDocuments?.map(d => ({ id: d.id, documentType: d.documentType, customName: d.customName, fileName: d.fileName, fileSize: d.fileSize })) ?? []
+    initialData?.savedDocuments?.map(d => ({ id: d.id, documentType: d.documentType, customName: d.customName, fileName: d.fileName, fileSize: d.fileSize, url: d.url })) ?? []
   );
   const [currentDocType, setCurrentDocType] = useState('');
   const [currentCustomName, setCurrentCustomName] = useState('');
@@ -207,6 +214,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     height: '',
     houseNo: '',
     barangay: '',
+    barangayId: null,
     municipality: '',
     province: '',
     hasDisability: [],
@@ -315,10 +323,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     setShowConfirmation(true);
   };
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     setShowConfirmation(false);
-    onSave({ ...formData, profileImage });
-    setShowSuccess(true);
+    try {
+      // onSave persists to the backend; await so a failure doesn't show success.
+      await onSave({ ...formData, profileImage });
+      setShowSuccess(true);
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the applicant. Please try again.' });
+    }
   };
 
   const handleNext = () => {
@@ -404,59 +417,76 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
     const file = files[0];
 
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Only PDF, JPG, and PNG files are allowed');
+    // Validate file type by MIME, with an extension fallback (browsers report
+    // Office MIME types inconsistently — sometimes empty or octet-stream).
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg', 'image/jpg', 'image/png',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    const allowedExt = /\.(pdf|jpe?g|png|docx?|xlsx?)$/i;
+    if (!allowedTypes.includes(file.type) && !allowedExt.test(file.name)) {
+      alert('Only PDF, Word, Excel, JPG, and PNG files are allowed');
       return;
     }
 
-    // Create new document entry
-    const newDocument: UploadedDocument = {
-      id: Date.now().toString() + Math.random().toString(36),
-      documentType: currentDocType,
-      customName: currentDocType === 'Others' ? currentCustomName : undefined,
-      file: file,
-      fileName: file.name,
-      fileSize: formatFileSize(file.size),
-    };
+    // Read the file as base64 so the backend can store it in the documents table.
+    const input = event.target;
+    const docType = currentDocType;
+    const docCustomName = currentDocType === 'Others' ? currentCustomName : undefined;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
 
-    const nextDocs = [...uploadedDocuments, newDocument];
-    setUploadedDocuments(nextDocs);
-    setFormData(prev => ({
-      ...prev,
-      savedDocuments: nextDocs.map(d => ({
-        id: d.id,
-        documentType: d.documentType,
-        customName: d.customName,
-        fileName: d.fileName ?? d.file?.name ?? '',
-        fileSize: d.fileSize ?? formatFileSize(d.file?.size ?? 0),
-      })),
-    }));
-
-    // If the document is a 2x2 ID Picture, compress and store as base64
-    if (currentDocType === '2x2 ID Picture') {
-      const objectUrl = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 400;
-        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setProfileImage(canvas.toDataURL('image/jpeg', 0.8));
-        URL.revokeObjectURL(objectUrl);
+      const newDocument: UploadedDocument = {
+        id: Date.now().toString() + Math.random().toString(36),
+        documentType: docType,
+        customName: docCustomName,
+        file,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        dataUrl,
       };
-      img.src = objectUrl;
-    }
 
-    // Reset current selection to allow uploading more documents
-    setCurrentDocType('');
-    setCurrentCustomName('');
+      const nextDocs = [...uploadedDocuments, newDocument];
+      setUploadedDocuments(nextDocs);
+      setFormData(prev => ({
+        ...prev,
+        savedDocuments: nextDocs.map(d => ({
+          id: d.id,
+          documentType: d.documentType,
+          customName: d.customName,
+          fileName: d.fileName ?? d.file?.name ?? '',
+          fileSize: d.fileSize ?? formatFileSize(d.file?.size ?? 0),
+          dataUrl: d.dataUrl,
+          url: d.url,
+        })),
+      }));
 
-    // Reset the file input
-    event.target.value = '';
+      // For a 2x2 ID Picture, also build a small compressed preview (profileImage).
+      if (docType === '2x2 ID Picture') {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 400;
+          const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * ratio);
+          canvas.height = Math.round(img.height * ratio);
+          canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setProfileImage(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = dataUrl;
+      }
+
+      // Reset current selection to allow uploading more documents
+      setCurrentDocType('');
+      setCurrentCustomName('');
+      input.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   function handleDeleteDocument(documentId: string) {
@@ -472,6 +502,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         customName: d.customName,
         fileName: d.fileName ?? d.file?.name ?? '',
         fileSize: d.fileSize ?? formatFileSize(d.file?.size ?? 0),
+        dataUrl: d.dataUrl,
+        url: d.url,
       })),
     }));
   }
@@ -616,11 +648,23 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
+                  <BarangayCombobox
                     value={formData.barangay}
-                    onChange={(e) => setFormData({ ...formData, barangay: e.target.value })}
-                    className={inputClass('barangay')}
+                    hasError={fieldError('barangay')}
+                    onTextChange={(text) =>
+                      // Typing clears the resolved city/province/id until a real
+                      // barangay is picked, so we never keep a mismatched address.
+                      setFormData({ ...formData, barangay: text, municipality: '', province: '', barangayId: null })
+                    }
+                    onSelect={(m) =>
+                      setFormData({
+                        ...formData,
+                        barangay: m.barangay,
+                        barangayId: m.id,
+                        municipality: m.city,
+                        province: m.province,
+                      })
+                    }
                   />
                   <ErrorMsg k="barangay" />
                 </div>
@@ -628,9 +672,10 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Municipality/City <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    readOnly
+                    placeholder="Auto-filled from barangay"
                     value={formData.municipality}
-                    onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
-                    className={inputClass('municipality')}
+                    className={`${inputClass('municipality')} bg-gray-50 cursor-not-allowed`}
                   />
                   <ErrorMsg k="municipality" />
                 </div>
@@ -638,9 +683,10 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Province <span className="text-red-500">*</span></label>
                   <input
                     type="text"
+                    readOnly
+                    placeholder="Auto-filled from barangay"
                     value={formData.province}
-                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-                    className={inputClass('province')}
+                    className={`${inputClass('province')} bg-gray-50 cursor-not-allowed`}
                   />
                   <ErrorMsg k="province" />
                 </div>
@@ -1864,7 +1910,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <input
                   type="file"
                   id="documentUpload"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -2230,6 +2276,20 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div className="flex items-center justify-center h-full">
                   <img src={profileImage} alt="2x2 ID photo" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
                 </div>
+              ) : !previewDocument.file && previewDocument.url ? (
+                /(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDocument.fileName ?? '') ? (
+                  <div className="flex items-center justify-center h-full">
+                    <img src={previewDocument.url} alt={previewDocument.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                  </div>
+                ) : /\.pdf$/i.test(previewDocument.fileName ?? '') ? (
+                  <iframe src={previewDocument.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                    <FileText size={64} className="mb-4 text-gray-400" />
+                    <p className="text-lg font-medium mb-2">Preview not available</p>
+                    <a href={previewDocument.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+                  </div>
+                )
               ) : !previewDocument.file ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500">
                   <FileText size={64} className="mb-4 text-gray-400" />

@@ -1,29 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import type { Placement } from '../../contexts/EmploymentContext'
-import { PLACEMENT_SEED } from '../../contexts/EmploymentContext'
+import { listPlacements, updatePlacement, updatePlacementStatus } from '../../services/placementService'
 import * as XLSX from 'xlsx'
-
-const LS_KEY = 'ef_placements'
-
-// ── Data loader ───────────────────────────────────────────────────────────────
-
-function loadPlacements(): Placement[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return PLACEMENT_SEED
-    const parsed = JSON.parse(raw) as Placement[]
-    return parsed
-  } catch {
-    return PLACEMENT_SEED
-  }
-}
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
 type FilterOption = { id: string; label: string; options: string[] }
+type SortOrder = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
 
 const STATUS_OPTIONS: Placement['status'][] = ['Active', 'Resigned', 'Terminated', 'Completed']
 
@@ -43,8 +29,6 @@ function PlacementStatusBadge({ status }: { status: Placement['status'] }) {
 }
 
 // ── Search Bar ────────────────────────────────────────────────────────────────
-
-type SortOrder = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
 
 type PlacementsSearchBarProps = {
   searchQuery: string
@@ -381,10 +365,6 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
               <PlacementStatusBadge status={placement.status} />
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-0.5">Source</p>
-              <p className="text-sm font-medium text-gray-800">{placement.source || '-'}</p>
-            </div>
-            <div>
               <p className="text-xs text-gray-500 mb-0.5">Job Reference ID</p>
               <p className="text-sm font-medium text-gray-800">
                 {placement.referralId && placement.vacancyId
@@ -400,12 +380,6 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
             )}
           </div>
 
-          {placement.notes && (
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Notes</p>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{placement.notes}</p>
-            </div>
-          )}
         </div>
 
         <div className="flex justify-end px-6 py-4 border-t border-gray-200">
@@ -426,37 +400,34 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
 type EditPlacementModalProps = {
   placement: Placement
   onClose: () => void
-  onSave: (id: number, updates: Pick<Placement, 'jobTitle' | 'employer' | 'dateHired' | 'employmentType' | 'status'>) => void
+  onSave: (id: number, updates: Pick<Placement, 'dateHired' | 'status'>) => Promise<void>
 }
 
-const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship']
-
 function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalProps) {
-  const [jobTitle, setJobTitle] = useState(placement.jobTitle)
-  const [employer, setEmployer] = useState(placement.employer)
   const [dateHired, setDateHired] = useState(placement.dateHired)
-  const [employmentType, setEmploymentType] = useState(placement.employmentType ?? '')
   const [status, setStatus] = useState<Placement['status']>(placement.status)
   const [showFieldErrors, setShowFieldErrors] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
-    if (!jobTitle.trim() || !employer.trim() || !dateHired) {
+  async function handleSave() {
+    if (!dateHired) {
       setShowFieldErrors(true)
       return
     }
-    onSave(placement.id, { jobTitle: jobTitle.trim(), employer: employer.trim(), dateHired, employmentType, status })
-    onClose()
+    setSaving(true)
+    try {
+      await onSave(placement.id, { dateHired, status })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function fieldCls(isEmpty: boolean) {
-    return `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 ${
-      showFieldErrors && isEmpty ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300 focus:ring-brand-blue'
-    }`
-  }
+  const dateFieldCls = `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 ${
+    showFieldErrors && !dateHired ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300 focus:ring-brand-blue'
+  }`
 
-  function ErrMsg({ show }: { show: boolean }) {
-    return show ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null
-  }
+  const readOnlyCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 outline-none cursor-not-allowed'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -473,83 +444,41 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
         </div>
 
         <div className="px-6 py-5 grid grid-cols-2 gap-x-6 gap-y-4 overflow-y-auto">
-          {/* Applicant Name — read-only */}
           <div>
-            <label htmlFor="placement-applicant-name" className="block text-sm font-medium text-gray-600 mb-1">
-              Applicant Name
-            </label>
-            <input
-              id="placement-applicant-name"
-              type="text"
-              value={placement.applicantName}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-400 outline-none cursor-not-allowed"
-            />
+            <label className="block text-sm font-medium text-gray-600 mb-1">Applicant Name</label>
+            <input type="text" value={placement.applicantName} readOnly className={readOnlyCls} />
           </div>
 
-          {/* Job Title */}
           <div>
-            <label htmlFor="placement-job-title" className="block text-sm font-medium text-gray-600 mb-1">
-              Job Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="placement-job-title"
-              type="text"
-              value={jobTitle}
-              onChange={e => setJobTitle(e.target.value)}
-              className={fieldCls(!jobTitle.trim())}
-            />
-            <ErrMsg show={showFieldErrors && !jobTitle.trim()} />
+            <label className="block text-sm font-medium text-gray-600 mb-1">Job Title</label>
+            <input type="text" value={placement.jobTitle} readOnly className={readOnlyCls} />
           </div>
 
-          {/* Employer */}
           <div>
-            <label htmlFor="placement-employer" className="block text-sm font-medium text-gray-600 mb-1">
-              Employer <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="placement-employer"
-              type="text"
-              value={employer}
-              onChange={e => setEmployer(e.target.value)}
-              className={fieldCls(!employer.trim())}
-            />
-            <ErrMsg show={showFieldErrors && !employer.trim()} />
+            <label className="block text-sm font-medium text-gray-600 mb-1">Employer</label>
+            <input type="text" value={placement.employer} readOnly className={readOnlyCls} />
           </div>
 
-          {/* Date Hired */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Employment Type</label>
+            <input type="text" value={placement.employmentType ?? ''} readOnly className={readOnlyCls} />
+          </div>
+
           <div>
             <label htmlFor="placement-date-hired" className="block text-sm font-medium text-gray-600 mb-1">
               Date Hired <span className="text-red-500">*</span>
             </label>
             <DatePicker
               id="placement-date-hired"
-              className={fieldCls(!dateHired)}
+              className={dateFieldCls}
               value={dateHired}
               onChange={setDateHired}
             />
-            <ErrMsg show={showFieldErrors && !dateHired} />
+            {showFieldErrors && !dateHired && (
+              <p className="text-red-500 text-xs mt-1">This field is required.</p>
+            )}
           </div>
 
-          {/* Employment Type */}
-          <div>
-            <label htmlFor="placement-employment-type" className="block text-sm font-medium text-gray-600 mb-1">
-              Employment Type <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="placement-employment-type"
-              value={employmentType}
-              onChange={e => setEmploymentType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900"
-            >
-              <option value="">— Select —</option>
-              {EMPLOYMENT_TYPES.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status */}
           <div>
             <label htmlFor="placement-edit-status" className="block text-sm font-medium text-gray-600 mb-1">
               Status <span className="text-red-500">*</span>
@@ -576,9 +505,10 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-brand-blue text-white rounded-full text-sm hover:bg-brand-blue-dark transition-colors font-medium"
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-full text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -591,15 +521,21 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
 type UpdatePlacementStatusModalProps = {
   placement: Placement
   onClose: () => void
-  onSave: (id: number, newStatus: Placement['status']) => void
+  onSave: (id: number, newStatus: Placement['status']) => Promise<void>
 }
 
 function UpdatePlacementStatusModal({ placement, onClose, onSave }: UpdatePlacementStatusModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<Placement['status']>(placement.status)
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
-    onSave(placement.id, selectedStatus)
-    onClose()
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await onSave(placement.id, selectedStatus)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -647,9 +583,10 @@ function UpdatePlacementStatusModal({ placement, onClose, onSave }: UpdatePlacem
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -660,7 +597,8 @@ function UpdatePlacementStatusModal({ placement, onClose, onSave }: UpdatePlacem
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function PlacementsTab() {
-  const [placements, setPlacements] = useState<Placement[]>(loadPlacements)
+  const [placements, setPlacements] = useState<Placement[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -670,6 +608,15 @@ export default function PlacementsTab() {
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null)
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
 
+  async function reload() {
+    const data = await listPlacements()
+    setPlacements(data)
+  }
+
+  useEffect(() => {
+    reload().finally(() => setLoading(false))
+  }, [])
+
   const availableFilters: FilterOption[] = useMemo(() => {
     const employers = [...new Set(placements.map(p => p.employer).filter(Boolean))].sort()
     return [
@@ -677,11 +624,6 @@ export default function PlacementsTab() {
       { id: 'employer', label: 'Employer', options: employers },
     ]
   }, [placements])
-
-  function persist(next: Placement[]) {
-    setPlacements(next)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* quota */ }
-  }
 
   function handleAddFilter(id: string) {
     setActiveFilters(prev => [...prev, id])
@@ -696,12 +638,17 @@ export default function PlacementsTab() {
     setFilterValues(prev => ({ ...prev, [id]: value }))
   }
 
-  function handleEditSave(id: number, updates: Pick<Placement, 'jobTitle' | 'employer' | 'dateHired' | 'employmentType' | 'status'>) {
-    persist(placements.map(p => p.id === id ? { ...p, ...updates } : p))
+  async function handleEditSave(
+    id: number,
+    updates: Pick<Placement, 'dateHired' | 'status'>,
+  ) {
+    await updatePlacement(id, updates)
+    setPlacements(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
   }
 
-  function handleUpdateStatus(id: number, newStatus: Placement['status']) {
-    persist(placements.map(p => p.id === id ? { ...p, status: newStatus } : p))
+  async function handleUpdateStatus(id: number, newStatus: Placement['status']) {
+    await updatePlacementStatus(id, newStatus)
+    setPlacements(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p))
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────
@@ -713,7 +660,6 @@ export default function PlacementsTab() {
       'Employer': p.employer,
       'Date Hired': p.dateHired,
       'Status': p.status,
-      'Notes': p.notes ?? '',
     }))
   }
 
@@ -770,6 +716,8 @@ export default function PlacementsTab() {
   }, [placements, searchQuery, activeFilters, filterValues, sortOrder])
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
+
+  if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading placements…</div>
 
   return (
     <div className="flex flex-col gap-5">

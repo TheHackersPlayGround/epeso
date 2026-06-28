@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Briefcase, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import DatePicker from '../../components/DatePicker';
+import BarangayCombobox from '../../components/BarangayCombobox';
 
 interface EmployerFormData {
   companyName: string;
@@ -17,6 +18,7 @@ interface EmployerFormData {
   buildingNo: string;
   street: string;
   barangay: string;
+  barangayId: number | null;
   city: string;
   province: string;
   region: string;
@@ -27,7 +29,7 @@ interface EmployerFormData {
 }
 
 interface EditEmployerSidebarProps {
-  initialData: EmployerFormData;
+  initialData: Omit<EmployerFormData, 'barangayId'> & { barangayId?: number | null };
   onSave: (data: EmployerFormData) => void;
   onClose: () => void;
 }
@@ -86,7 +88,10 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [formData, setFormData] = useState<EmployerFormData>({ ...initialData });
+  const [formData, setFormData] = useState<EmployerFormData>({
+    ...initialData,
+    barangayId: initialData.barangayId ?? null,
+  });
 
   const sections = [
     { id: 'companyInfo' as Section, label: 'Company information' },
@@ -213,21 +218,47 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY ADDRESS</h3>
             <div className="grid grid-cols-2 gap-4">
-              {([
-                ['buildingNo', 'Building No.'],
-                ['street', 'Street'],
-                ['barangay', 'Barangay'],
-                ['city', 'City/Municipality'],
-                ['province', 'Province'],
-                ['region', 'Region'],
-              ] as [keyof EmployerFormData, string][]).map(([field, label]) => (
-                <div key={field}>
-                  <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">{label}</label>
-                  <input type="text" value={formData[field] as string}
-                    onChange={e => handleChange(field, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
-                </div>
-              ))}
+              <div>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Building No.</label>
+                <input type="text" value={formData.buildingNo}
+                  onChange={e => handleChange('buildingNo', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street</label>
+                <input type="text" value={formData.street}
+                  onChange={e => handleChange('street', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay</label>
+                <BarangayCombobox
+                  value={formData.barangay}
+                  onTextChange={text =>
+                    setFormData(prev => ({ ...prev, barangay: text, barangayId: null, city: '', province: '', region: '' }))
+                  }
+                  onSelect={m =>
+                    setFormData(prev => ({
+                      ...prev,
+                      barangay: m.barangay,
+                      barangayId: m.id,
+                      city: m.city,
+                      province: m.province,
+                      region: m.region,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality</label>
+                <input type="text" value={formData.city} readOnly
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 outline-none" />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province</label>
+                <input type="text" value={formData.province} readOnly
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 outline-none" />
+              </div>
             </div>
           </div>
         );

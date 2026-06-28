@@ -1,33 +1,16 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
 import Swal from 'sweetalert2'
-// Plus is used only by the Filter By button
-import type { Referral, Placement } from '../../contexts/EmploymentContext'
-import { REFERRAL_SEED, VACANCY_SEED } from '../../contexts/EmploymentContext'
+import type { Referral } from '../../contexts/EmploymentContext'
+import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
-
-const LS_KEY = 'ef_referrals'
-
-// ── Data loaders ──────────────────────────────────────────────────────────────
-
-function loadReferrals(): Referral[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    if (!raw) return REFERRAL_SEED
-    const parsed = JSON.parse(raw) as Array<Referral & { status: string }>
-    // Filter out any legacy 'Hired' records — those now live in ef_placements
-    const valid = parsed.filter(r => (r.status as string) !== 'Hired') as Referral[]
-    return valid
-  } catch {
-    return REFERRAL_SEED
-  }
-}
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
 type FilterOption = { id: string; label: string; options: string[] }
+type SortOrder = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
 
-// 'Hired' triggers a move to Placements rather than updating referral status
+// 'Hired' triggers placement creation rather than just updating referral status
 type ReferralStatusOption = Referral['status'] | 'Hired'
 const STATUS_OPTIONS: ReferralStatusOption[] = ['Pending', 'Interviewed', 'Not Hired', 'Hired']
 const FILTER_STATUS_OPTIONS: Referral['status'][] = ['Pending', 'Interviewed', 'Not Hired']
@@ -51,10 +34,12 @@ type ReferralsSearchBarProps = {
   activeFilters: string[]
   isFilterOpen: boolean
   availableFilters: FilterOption[]
+  sortOrder: SortOrder
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
+  onSortChange: (v: SortOrder) => void
   onExportExcel: () => void
   onExportCsv: () => void
 }
@@ -64,10 +49,12 @@ function ReferralsSearchBar({
   activeFilters,
   isFilterOpen,
   availableFilters,
+  sortOrder,
   onSearchChange,
   onToggleFilter,
   onCloseFilter,
   onAddFilter,
+  onSortChange,
   onExportExcel,
   onExportCsv,
 }: ReferralsSearchBarProps) {
@@ -86,6 +73,22 @@ function ReferralsSearchBar({
           aria-label="Search referrals"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      {/* Sort By */}
+      <div className="relative">
+        <select
+          value={sortOrder}
+          onChange={e => onSortChange(e.target.value as SortOrder)}
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="" disabled>Sort By</option>
+          <option value="firstName_asc">First Name ASC</option>
+          <option value="firstName_desc">First Name DSC</option>
+          <option value="lastName_asc">Last Name ASC</option>
+          <option value="lastName_desc">Last Name DSC</option>
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       {/* Filter By */}
@@ -256,11 +259,6 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
     closeMenu()
   }
 
-  function formatDate(dateStr: string) {
-    if (!dateStr) return '-'
-    return dateStr
-  }
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -300,7 +298,7 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
               <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.applicantName}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.jobTitle}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(r.referralDate)}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.referralDate}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <ReferralStatusBadge status={r.status} />
                 </td>
@@ -345,15 +343,21 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
 type UpdateStatusModalProps = {
   referral: Referral
   onClose: () => void
-  onSave: (id: number, newStatus: ReferralStatusOption) => void
+  onSave: (id: number, newStatus: ReferralStatusOption) => Promise<void>
 }
 
 function UpdateStatusModal({ referral, onClose, onSave }: UpdateStatusModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<ReferralStatusOption>(referral.status)
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
-    onSave(referral.id, selectedStatus)
-    onClose()
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await onSave(referral.id, selectedStatus)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -401,19 +405,22 @@ function UpdateStatusModal({ referral, onClose, onSave }: UpdateStatusModalProps
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReferralsTab() {
-  const [referrals, setReferrals] = useState<Referral[]>(loadReferrals)
+  const [referrals, setReferrals] = useState<Referral[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -421,7 +428,15 @@ export default function ReferralsTab() {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
 
-  // Employer filter options built from current referral records
+  async function reload() {
+    const data = await listReferrals()
+    setReferrals(data)
+  }
+
+  useEffect(() => {
+    reload().finally(() => setLoading(false))
+  }, [])
+
   const availableFilters: FilterOption[] = useMemo(() => {
     const employers = [...new Set(referrals.map(r => r.employer).filter(Boolean))].sort()
     return [
@@ -429,11 +444,6 @@ export default function ReferralsTab() {
       { id: 'employer', label: 'Employer', options: employers },
     ]
   }, [referrals])
-
-  function persist(next: Referral[]) {
-    setReferrals(next)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* quota */ }
-  }
 
   function handleAddFilter(id: string) {
     setActiveFilters(prev => [...prev, id])
@@ -448,55 +458,23 @@ export default function ReferralsTab() {
     setFilterValues(prev => ({ ...prev, [id]: value }))
   }
 
-  function handleRemoveReferral(id: number) {
-    persist(referrals.filter(r => r.id !== id))
+  async function handleRemoveReferral(id: number) {
+    try {
+      await deleteReferral(id)
+      setReferrals(prev => prev.filter(r => r.id !== id))
+    } catch {
+      Swal.fire('Error', 'Failed to remove referral. Please try again.', 'error')
+    }
   }
 
-  function handleUpdateStatus(id: number, newStatus: ReferralStatusOption) {
+  async function handleUpdateStatus(id: number, newStatus: ReferralStatusOption) {
+    await updateReferralStatus(id, newStatus)
     if (newStatus === 'Hired') {
-      const referral = referrals.find(r => r.id === id)
-      if (!referral) return
-      // Look up vacancy to capture employmentType and salaryRange
-      let employmentType = ''
-      let salaryRange = ''
-      try {
-        const rawVac = localStorage.getItem('ef_vacancies')
-        const vacList: Array<{ id: number; jobType?: string; salaryRange?: string; vacanciesCount?: number }> =
-          rawVac ? JSON.parse(rawVac) : VACANCY_SEED
-        const vac = vacList.find(v => v.id === referral.vacancyId)
-        if (vac) { employmentType = vac.jobType ?? ''; salaryRange = vac.salaryRange ?? '' }
-        // Decrement vacancy count; auto-close when it hits 0
-        const updated = vacList.map(v => {
-          if (v.id !== referral.vacancyId) return v
-          const newCount = Math.max(0, (v.vacanciesCount ?? 1) - 1)
-          return { ...v, vacanciesCount: newCount, status: newCount === 0 ? 'Closed' : v.status }
-        })
-        localStorage.setItem('ef_vacancies', JSON.stringify(updated))
-      } catch { /* ignore */ }
-      const newPlacement: Placement = {
-        id: Date.now(),
-        applicantId: referral.applicantId,
-        applicantName: referral.applicantName,
-        jobTitle: referral.jobTitle,
-        employer: referral.employer,
-        dateHired: new Date().toISOString().slice(0, 10),
-        status: 'Active',
-        employmentType,
-        source: 'Referral',
-        referralId: referral.id,
-        vacancyId: referral.vacancyId,
-        salaryRange,
-        notes: referral.notes ?? '',
-      }
-      try {
-        const raw = localStorage.getItem('ef_placements')
-        const existing: Placement[] = raw ? JSON.parse(raw) : []
-        localStorage.setItem('ef_placements', JSON.stringify([newPlacement, ...existing]))
-      } catch { /* quota */ }
-      persist(referrals.filter(r => r.id !== id))
-      return
+      // Hired referrals are removed from the list (they become placements)
+      setReferrals(prev => prev.filter(r => r.id !== id))
+    } else {
+      setReferrals(prev => prev.map(r => r.id === id ? { ...r, status: newStatus as Referral['status'] } : r))
     }
-    persist(referrals.map(r => r.id === id ? { ...r, status: newStatus } : r))
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────
@@ -508,7 +486,6 @@ export default function ReferralsTab() {
       'Employer': r.employer,
       'Date Referred': r.referralDate,
       'Status': r.status,
-      'Notes': r.notes ?? '',
     }))
   }
 
@@ -565,6 +542,8 @@ export default function ReferralsTab() {
   }, [referrals, searchQuery, activeFilters, filterValues, sortOrder])
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
+
+  if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading referrals…</div>
 
   return (
     <div className="flex flex-col gap-5">

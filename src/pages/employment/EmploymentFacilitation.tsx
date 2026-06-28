@@ -3,7 +3,9 @@ import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { Applicant } from "./ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./ApplicantsTab";
-import { SEED, VACANCY_SEED } from "../../contexts/EmploymentContext";
+import { listApplicants, createApplicant, updateApplicant } from "../../services/applicantService";
+import { listVacancies } from "../../services/vacancyService";
+import { createReferral } from "../../services/referralService";
 import ApplicantsTab from "./ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
@@ -13,17 +15,6 @@ import AddApplicantSidebar from "./AddApplicantSidebar";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
 import ViewApplicantSidebar from "./ViewApplicantSidebar";
-
-const LS_KEY = "ef_applicants_v4";
-
-function loadApplicants(): Applicant[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as Applicant[]) : SEED;
-  } catch {
-    return SEED;
-  }
-}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,54 +40,51 @@ type ReferApplicantPanelProps = {
   onClose: () => void;
 };
 
-function loadVacanciesForRefer(): Array<{ id: number; jobTitle: string; employer: string; vacanciesCount: number; status: string }> {
-  try {
-    const raw = localStorage.getItem('ef_vacancies')
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
-  return VACANCY_SEED
-}
+type VacancyOption = { id: number; jobTitle: string; employer: string; vacanciesCount: number }
 
 function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
-  const vacancies = loadVacanciesForRefer().filter(v => v.status !== 'Closed')
+  const [vacancies, setVacancies] = useState<VacancyOption[]>([])
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<{ id: number; label: string } | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [referred, setReferred] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    listVacancies().then(all => {
+      setVacancies(all.filter(v => v.status === 'Open').map(v => ({
+        id: v.id,
+        jobTitle: v.jobTitle,
+        employer: v.employer,
+        vacanciesCount: v.vacanciesCount,
+      })))
+    }).catch(() => { /* vacancies unavailable — leave empty */ })
+  }, [])
 
   const filtered = vacancies.filter(v =>
     `${v.jobTitle} ${v.employer}`.toLowerCase().includes(search.toLowerCase())
   )
 
-  function handleSelect(v: typeof vacancies[number]) {
+  function handleSelect(v: VacancyOption) {
     setSelected({ id: v.id, label: `${v.jobTitle} – ${v.employer} (${v.vacanciesCount} slots)` })
     setSearch("")
     setIsOpen(false)
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!selected) return
-
-    const vacancy = vacancies.find(v => v.id === selected.id)
-    const newReferral = {
-      id: Date.now(),
-      applicantId: applicant.id,
-      applicantName: applicant.name,
-      vacancyId: selected.id,
-      jobTitle: vacancy?.jobTitle ?? selected.label.split(' – ')[0],
-      employer: vacancy?.employer ?? '',
-      referralDate: new Date().toISOString().slice(0, 10),
-      status: 'Pending' as const,   // PESO workflow: Pending → Interviewed → Hired / Not Hired
-      notes: '',
-    }
-
+    setSubmitting(true)
+    setError("")
     try {
-      const raw = localStorage.getItem('ef_referrals')
-      const existing = raw ? JSON.parse(raw) : []
-      localStorage.setItem('ef_referrals', JSON.stringify([newReferral, ...existing]))
-    } catch { /* quota — silent */ }
-
-    setReferred(true)
+      await createReferral(applicant.id, selected.id)
+      setReferred(true)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setError(msg ?? 'Failed to create referral. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -171,14 +159,16 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
                 </div>
               </div>
 
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={onClose}
                   className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
                   Cancel
                 </button>
-                <button type="button" onClick={handleConfirm} disabled={!selected}
+                <button type="button" onClick={handleConfirm} disabled={!selected || submitting}
                   className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                  Confirm Referral
+                  {submitting ? 'Submitting…' : 'Confirm Referral'}
                 </button>
               </div>
             </div>
@@ -283,16 +273,20 @@ function toApplicantData(a: Applicant): ApplicantData {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function EmploymentFacilitation({ onBack }: EmploymentFacilitationProps) {
-  // ── Applicant state (source of truth, persisted to localStorage) ──
-  const [applicants, setApplicants] = useState<Applicant[]>(loadApplicants);
+  // ── Applicant state (source of truth = the database) ──
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+
+  // Reload the Employment Facilitation applicants from the backend.
+  async function reloadApplicants() {
+    const data = await listApplicants();
+    setApplicants(data);
+  }
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(applicants));
-    } catch {
-      console.warn('localStorage quota exceeded — applicant data (including photos) could not be saved.');
-    }
-  }, [applicants]);
+    reloadApplicants().catch(() => {
+      console.warn('Failed to load applicants from the server.');
+    });
+  }, []);
 
   // ── Search / filter / pagination state ────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -386,47 +380,16 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [isResumeMakerOpen, setIsResumeMakerOpen] = useState(false);
 
   // ── CRUD handlers ─────────────────────────────────────────────────
-  function handleSaveApplicant(formData: ApplicantFormData) {
-    const mapped: Omit<Applicant, "id"> = {
-      name: formData.surname
-        ? `${formData.surname}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName.charAt(0) + '.' : ''}`
-        : formData.firstName,
-      gender: formData.sex,
-      age: formData.dateOfBirth
-        ? new Date().getFullYear() - new Date(formData.dateOfBirth).getFullYear()
-        : 0,
-      education: formData.tertiary.course
-        ? `${formData.tertiary.course} (Tertiary)`
-        : formData.secondary.graduated
-          ? "Senior High School Graduate"
-          : formData.elementary.graduated
-            ? "Elementary Graduate"
-            : "",
-      skills: formData.otherSkills.join(", "),
-      employmentStatus: "Unemployed",
-      contactNumber: formData.contactNumber,
-      email: formData.email,
-      address: [formData.barangay, formData.municipality, formData.province].filter(Boolean).join(", "),
-      civilStatus: formData.civilStatus,
-      hasDisability: formData.hasDisability.length > 0,
-      is4PsBeneficiary: formData.is4PsBeneficiary === "Yes",
-      isOFW: formData.isOFW === "Yes",
-      isFormerOFW: formData.isFormerOFW === "Yes",
-      jobPreference: formData.jobPreferences[0]?.occupation ?? "",
-      language: formData.languages.find((l) => l.speak)?.language ?? "",
-      fullFormData: formData as unknown as Record<string, unknown>,
-    };
-
+  // Persists to the database via the API, then refreshes the list from the
+  // server (the authoritative source — resolved address, derived fields, etc.).
+  // The sidebar awaits this and shows its own success screen, then closes.
+  async function handleSaveApplicant(formData: ApplicantFormData) {
     if (editingApplicant) {
-      setApplicants((prev) =>
-        prev.map((a) => (a.id === editingApplicant.id ? { id: a.id, ...mapped } : a)),
-      );
-      setEditingApplicant(null);
+      await updateApplicant(editingApplicant.id, formData);
     } else {
-      const newId = Math.max(0, ...applicants.map((a) => a.id)) + 1;
-      setApplicants((prev) => [...prev, { id: newId, ...mapped }]);
-      setIsAddModalOpen(false);
+      await createApplicant(formData);
     }
+    await reloadApplicants();
   }
 
   function handleCloseSidebar() {

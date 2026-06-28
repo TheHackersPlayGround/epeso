@@ -39,11 +39,8 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
     { id: 'companyInfo' as Section, label: 'Company information' },
     { id: 'contactPerson' as Section, label: 'Contact person' },
     { id: 'companyAddress' as Section, label: 'Company address' },
-    { id: 'jobOpenings' as Section, label: 'Job openings' },
     { id: 'registration' as Section, label: 'Registration details' },
   ];
-
-  const totalJobOpenings = data.jobOpenings.reduce((total, job) => total + (parseInt(job.slots) || 0), 0);
 
   const ReadOnlyField = ({ label, value }: { label: string; value: string }) => (
     <div>
@@ -99,38 +96,6 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
               <ReadOnlyField label="City/Municipality" value={data.city} />
               <ReadOnlyField label="Province" value={data.province} />
               <ReadOnlyField label="Region" value={data.region} />
-            </div>
-          </div>
-        );
-
-      case 'jobOpenings':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">JOB OPENINGS</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-700 mb-2 text-sm font-semibold">Number of Job Openings: {totalJobOpenings}</label>
-                <p className="text-xs text-gray-500 mb-3">Automatically calculated based on total available slots.</p>
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-3 text-sm font-semibold">Positions Available</label>
-                {data.jobOpenings.filter(job => job.jobName || job.slots).length > 0 ? (
-                  <div className="border border-gray-300 rounded overflow-hidden">
-                    <div className="grid grid-cols-2 bg-gray-200 border-b border-gray-300">
-                      <div className="px-4 py-2 font-bold text-xs">NAME OF JOB</div>
-                      <div className="px-4 py-2 font-bold text-xs border-l border-gray-300">NUMBER OF AVAILABLE SLOTS</div>
-                    </div>
-                    {data.jobOpenings.filter(job => job.jobName || job.slots).map((job, index) => (
-                      <div key={index} className="grid grid-cols-2 border-b border-gray-300 last:border-b-0 bg-gray-50">
-                        <div className="p-3 text-sm">{job.jobName || '-'}</div>
-                        <div className="p-3 text-sm border-l border-gray-300">{job.slots || '-'}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No job openings listed</p>
-                )}
-              </div>
             </div>
           </div>
         );

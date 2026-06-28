@@ -9,13 +9,16 @@ export type { Applicant };
 export type FilterOption = {
   id: string;
   label: string;
-  options: string[];
+  // "select" (default) renders a dropdown of `options`; "text" renders a
+  // free-text box and matches by substring (for free-form fields like courses).
+  type?: "select" | "text";
+  options?: string[];
 };
 
 export const AVAILABLE_FILTERS: FilterOption[] = [
   { id: "disability", label: "PWD / Disability", options: ["Yes", "No"] },
   { id: "civilStatus", label: "Civil Status", options: ["Single", "Married", "Widowed", "Separated", "Annulled"] },
-  { id: "sex", label: "Sex", options: ["Male", "Female"] },
+  // "Sex" intentionally omitted as a filter — it is already a default table column.
   { id: "ofw", label: "OFW Status", options: ["Active OFW", "Former OFW", "Not OFW"] },
   { id: "4ps", label: "4Ps Beneficiary", options: ["Yes", "No"] },
   { id: "educationalLevel", label: "Educational Level", options: [
@@ -28,10 +31,11 @@ export const AVAILABLE_FILTERS: FilterOption[] = [
     "Computer Literacy", "Driving", "Cooking", "Caregiving",
     "Electrical", "Plumbing", "Welding", "Sewing",
   ]},
-  { id: "jobPreference", label: "Job Preference", options: [
-    "Office Work", "Skilled Trade", "Healthcare", "Education",
-    "Agriculture", "Manufacturing", "Service Industry", "IT / Technology",
+  { id: "referredProgram", label: "Referred Program", options: [
+    "SPES", "GIP", "DILEEP", "TESDA Training", "TUPAD", "JobStart", "Others",
   ]},
+  { id: "barangay", label: "Barangay", type: "text" },
+  { id: "trainingCourse", label: "Training Course", type: "text" },
 ];
 
 export const ITEMS_PER_PAGE = 10;
@@ -125,9 +129,8 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.gender}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.education}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.skills}</td>
-      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-        {(applicant.fullFormData?.referredProgram as string) || '—'}
-      </td>
+      <td className="px-4 py-3 text-gray-600">{applicant.trainingCourses || '—'}</td>
+      <td className="px-4 py-3 text-gray-600">{applicant.jobPreference || '—'}</td>
 
       {activeFilters.includes("disability") && (
         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
@@ -149,9 +152,14 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
           {applicant.is4PsBeneficiary ? "Yes" : "No"}
         </td>
       )}
-      {activeFilters.includes("jobPreference") && (
-        <td className="px-4 py-3 text-gray-600">
-          {applicant.jobPreference || "N/A"}
+      {activeFilters.includes("referredProgram") && (
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+          {(applicant.fullFormData?.referredProgram as string) || "—"}
+        </td>
+      )}
+      {activeFilters.includes("barangay") && (
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+          {(applicant.fullFormData?.barangay as string) || "—"}
         </td>
       )}
       {activeFilters.includes("employmentStatus") && (
@@ -192,7 +200,7 @@ type ApplicantsTableProps = {
   onRefer: (applicant: Applicant) => void;
 };
 
-const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Referred Program"];
+const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Training Course", "Job Preference"];
 
 function getFilterLabel(filterId: string): string {
   return AVAILABLE_FILTERS.find((f) => f.id === filterId)?.label ?? filterId;
@@ -228,7 +236,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
                   {header}
                 </th>
               ))}
-              {activeFilters.map((filterId) => (
+              {activeFilters.filter((f) => f !== "trainingCourse").map((filterId) => (
                 <th key={filterId} className="px-4 py-3 text-left text-white whitespace-nowrap">
                   {getFilterLabel(filterId)}
                 </th>
@@ -370,18 +378,30 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
             <span className="text-sm text-blue-700 font-medium whitespace-nowrap">
               {filter?.label ?? filterId}:
             </span>
-            <select
-              value={filterValues[filterId] ?? ""}
-              onChange={(e) => onFilterValueChange(filterId, e.target.value)}
-              aria-label={`Select value for ${filter?.label ?? filterId} filter`}
-              className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <option value="">All</option>
-              {(filter?.options ?? []).map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
+            {filter?.type === "text" ? (
+              <input
+                type="text"
+                value={filterValues[filterId] ?? ""}
+                onChange={(e) => onFilterValueChange(filterId, e.target.value)}
+                placeholder="Type to search…"
+                aria-label={`Enter value for ${filter?.label ?? filterId} filter`}
+                className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 placeholder:text-blue-400 placeholder:font-normal w-36"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <select
+                value={filterValues[filterId] ?? ""}
+                onChange={(e) => onFilterValueChange(filterId, e.target.value)}
+                aria-label={`Select value for ${filter?.label ?? filterId} filter`}
+                className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="">All</option>
+                {(filter?.options ?? []).map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => onRemoveFilter(filterId)}
               aria-label={`Remove ${filter?.label ?? filterId} filter`}
@@ -433,7 +453,7 @@ function ApplicantsSearchBar({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by name, barangay, skills, occupation..."
+          placeholder="Search by name, age, sex, education, skills, training, job preference..."
           aria-label="Search applicants"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
@@ -469,7 +489,7 @@ function ApplicantsSearchBar({
         {isFilterDropdownOpen && (
           <>
             <div className="fixed inset-0 z-10" aria-hidden="true" onClick={onCloseFilterDropdown} />
-            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+            <div className="absolute right-0 top-full mt-2 w-52 max-h-80 overflow-y-auto bg-white rounded-lg shadow-lg border border-gray-200 z-20">
               {unselectedFilters.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
               ) : (

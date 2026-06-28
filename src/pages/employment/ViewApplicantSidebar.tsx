@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye, FileText } from 'lucide-react';
 import type { Applicant } from '../../contexts/EmploymentContext';
 
 type Section =
@@ -26,9 +26,9 @@ const OTHER_SKILLS_LIST = [
   'PHOTOGRAPHY', 'PLUMBING', 'SEWING DRESSES', 'STENOGRAPHY', 'TAILORING',
 ];
 
-// ── Exact class strings from AddApplicantSidebar ──────────────────────────────
-const INP = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500';
-const INP_SM = 'text-black w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm';
+// ── Read-only field styling (grey, no focus ring) so View is clearly not editable ──
+const INP = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none text-gray-900 placeholder:text-gray-500 bg-gray-50 cursor-default';
+const INP_SM = 'text-black w-full px-2 py-1 border border-gray-300 rounded-lg outline-none text-sm bg-gray-50 cursor-default';
 const LBL  = 'block text-gray-700 mb-2 text-xs font-semibold uppercase';
 const LBL2 = 'block text-gray-600 mb-1 text-xs uppercase';
 
@@ -61,8 +61,11 @@ function SH({ children }: { children: React.ReactNode }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+type PreviewDoc = { documentType: string; customName?: string; fileName: string; url?: string };
+
 export default function ViewApplicantSidebar({ applicant, onClose }: { applicant: Applicant; onClose: () => void }) {
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
+  const [previewDocument, setPreviewDocument] = useState<PreviewDoc | null>(null);
 
   const fd = (applicant.fullFormData ?? {}) as Record<string, unknown>;
   const s   = (k: string) => (fd[k] as string) ?? '';
@@ -159,7 +162,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 </div>
                 <div className={`text-xs text-gray-600 mb-1 ${s('isOFW') !== 'Yes' ? 'opacity-50' : ''}`}>Specify the country</div>
                 <input type="text" readOnly value={s('ofwCountry')}
-                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${s('isOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${s('isOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
               </div>
               <div>
                 <div className="flex items-center gap-4 mb-2">
@@ -169,7 +172,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 </div>
                 <div className={`text-xs text-gray-600 mb-1 ${s('isFormerOFW') !== 'Yes' ? 'opacity-50' : ''}`}>Latest country of deployment</div>
                 <input type="text" readOnly value={s('formerOFWCountry')}
-                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 ${s('isFormerOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-default outline-none text-gray-900 ${s('isFormerOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
               </div>
             </div>
 
@@ -183,14 +186,14 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 </div>
                 <div className={`text-xs text-gray-600 mb-1 ${s('is4PsBeneficiary') !== 'Yes' ? 'opacity-50' : ''}`}>Household ID No.</div>
                 <input type="text" readOnly value={s('householdIdNo')}
-                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${s('is4PsBeneficiary') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
+                  className={`text-black w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${s('is4PsBeneficiary') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
               </div>
               <div>
                 <label className={`block text-gray-700 mb-2 text-xs font-semibold ${s('isFormerOFW') !== 'Yes' ? 'opacity-50' : ''}`}>
                   Month and year of return to Philippines
                 </label>
                 <input type="text" readOnly value={s('formerOFWReturnDate')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 ${s('isFormerOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-default outline-none text-gray-900 ${s('isFormerOFW') !== 'Yes' ? 'bg-gray-100 opacity-50' : ''}`} />
               </div>
             </div>
           </div>
@@ -330,9 +333,10 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
               <RR label="No"  checked={s('currentlyInSchool') === 'No'} />
             </div>
 
-            {/* Elementary — title → Graduated? → 3-col grid (no school name, matching Add form) */}
+            {/* Elementary — title → School Name → Graduated? → 3-col grid (matching Add form) */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
+              <TF label="School Name" value={el.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <RR label="Yes" checked={el.graduated === 'Yes'} />
@@ -343,12 +347,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 <div>
                   <label className={LBL2}>Level Reached</label>
                   <input type="text" readOnly value={el.levelReached ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${el.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${el.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
                 <div>
                   <label className={LBL2}>Year Last Attended</label>
                   <input type="text" readOnly value={el.yearLastAttended ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${el.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${el.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
               </div>
             </div>
@@ -356,6 +360,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Secondary — title → type radios → K-12 strand → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
+              <TF label="School Name" value={sec.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4 flex-wrap">
                 <RR label="Non-K12"            checked={sec.type === 'Non-K12'} />
                 <RR label="K-12 (Senior High)" checked={sec.type === 'K-12'} />
@@ -376,12 +381,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 <div>
                   <label className={LBL2}>Level Reached</label>
                   <input type="text" readOnly value={sec.levelReached ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${sec.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${sec.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
                 <div>
                   <label className={LBL2}>Year Last Attended</label>
                   <input type="text" readOnly value={sec.yearLastAttended ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${sec.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${sec.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
               </div>
             </div>
@@ -389,6 +394,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Tertiary — title → Course → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
+              <TF label="School Name" value={ter.schoolName} lbl={LBL2} />
               <div>
                 <label className={LBL2}>Course / Degree</label>
                 <input type="text" readOnly value={ter.course ?? ''} className={INP} />
@@ -403,12 +409,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 <div>
                   <label className={LBL2}>Level Reached</label>
                   <input type="text" readOnly value={ter.levelReached ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${ter.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${ter.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
                 <div>
                   <label className={LBL2}>Year Last Attended</label>
                   <input type="text" readOnly value={ter.yearLastAttended ?? ''}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${ter.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${ter.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                 </div>
               </div>
             </div>
@@ -417,6 +423,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {grad.map((g, gsIdx) => (
               <div key={gsIdx} className="border border-gray-300 rounded p-4 space-y-3">
                 <div className="font-bold text-sm uppercase">Graduate Studies/Post-Graduate #{gsIdx + 1}</div>
+                <TF label="School Name" value={g.schoolName} lbl={LBL2} />
                 <div>
                   <label className={LBL2}>Course / Degree</label>
                   <input type="text" readOnly value={g.course ?? ''} className={INP} />
@@ -431,12 +438,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                   <div>
                     <label className={LBL2}>Level Reached</label>
                     <input type="text" readOnly value={g.levelReached ?? ''}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${g.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${g.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                   </div>
                   <div>
                     <label className={LBL2}>Year Last Attended</label>
                     <input type="text" readOnly value={g.yearLastAttended ?? ''}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm ${g.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm ${g.graduated !== 'No' ? 'bg-gray-100' : ''}`} />
                   </div>
                 </div>
               </div>
@@ -492,9 +499,9 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
               {elRows.map((e, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-4 mb-2">
                   <input type="text" readOnly value={e.eligibility}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={e.dateTaken}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                 </div>
               ))}
             </div>
@@ -507,9 +514,9 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
               {licRows.map((l, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-4 mb-2">
                   <input type="text" readOnly value={l.license}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={l.validUntil}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                 </div>
               ))}
             </div>
@@ -535,15 +542,15 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
               {rows.map((exp, idx) => (
                 <div key={idx} className="grid grid-cols-5 gap-4 mb-2">
                   <input type="text" readOnly value={exp.companyName}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.position}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.from}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.to}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.status}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm" />
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                 </div>
               ))}
             </div>
@@ -574,12 +581,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                     <span>OTHERS:</span>
                   </label>
                   <input type="text" readOnly value={specify[0] ?? ''}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900" />
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-default outline-none text-gray-900" />
                 </div>
                 {specify.slice(1).map((v, i) => (
                   <div key={i + 1} className="flex items-center gap-2 pl-[calc(1rem+0.5rem+6ch)]">
                     <input type="text" readOnly value={v}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900" />
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 cursor-default outline-none text-gray-900" />
                   </div>
                 ))}
               </div>
@@ -613,7 +620,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
 
       // ── X. Documents / Attachments ───────────────────────────────────────────
       case 'documents': {
-        const docs: Array<{ id: string; documentType: string; customName?: string; fileName: string; fileSize: string }> = sar('savedDocuments');
+        const docs: Array<{ id: string; documentType: string; customName?: string; fileName: string; fileSize: string; url?: string }> = sar('savedDocuments');
         return (
           <div className="space-y-6">
             <SH>X. DOCUMENTS / ATTACHMENTS</SH>
@@ -627,11 +634,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                     {docs.map((doc) => (
                       <div key={doc.id}
                         className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div
+                          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                          onClick={() => setPreviewDocument(doc)}
+                        >
                           <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-brand-blue">
-                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z" />
-                            </svg>
+                            <FileText size={20} className="text-brand-blue" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -643,6 +651,14 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                             <p className="text-xs text-gray-500">{doc.fileSize}</p>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDocument(doc)}
+                          className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Preview document"
+                        >
+                          <Eye size={18} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -661,6 +677,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
   const currentIdx = SECTIONS.findIndex(sec => sec.id === activeSection);
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-md flex">
 
       {/* Left navigation — w-72, pt-[88px], matching AddApplicantSidebar exactly */}
@@ -719,5 +736,63 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
         </div>
       </div>
     </div>
+
+    {/* Document Preview Modal — matches the Edit form's preview */}
+    {previewDocument && (
+      <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">
+                {previewDocument.customName || previewDocument.documentType}
+              </h3>
+              <p className="text-sm text-gray-500">{previewDocument.fileName}</p>
+            </div>
+            <button
+              onClick={() => setPreviewDocument(null)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Preview Content */}
+          <div className="flex-1 overflow-auto p-4 bg-gray-50">
+            {previewDocument.url ? (
+              /(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDocument.fileName ?? '') ? (
+                <div className="flex items-center justify-center h-full">
+                  <img src={previewDocument.url} alt={previewDocument.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                </div>
+              ) : /\.pdf$/i.test(previewDocument.fileName ?? '') ? (
+                <iframe src={previewDocument.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <FileText size={64} className="mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">Preview not available</p>
+                  <a href={previewDocument.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+                </div>
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <FileText size={64} className="mb-4 text-gray-400" />
+                <p className="text-lg font-medium mb-2">File not available for preview</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-gray-200 flex justify-end">
+            <button
+              onClick={() => setPreviewDocument(null)}
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

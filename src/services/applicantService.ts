@@ -24,6 +24,16 @@ export async function getApplicant(id: number): Promise<Applicant> {
   return res.data.data
 }
 
+// GET /api/employment/getApplicantPhoto/{id} -> 2x2 photo as a base64 data URL
+// (or null). Used so the Resume Builder can embed the photo in the PDF without
+// cross-origin canvas tainting.
+export async function getApplicantPhoto(id: number): Promise<string | null> {
+  const res = await axiosClient.get<{ status: string; data: { dataUrl: string | null } }>(
+    `${ENDPOINTS.employment.getApplicantPhoto}/${id}`,
+  )
+  return res.data.data?.dataUrl ?? null
+}
+
 // POST /api/employment/createApplicant -> new beneficiary id
 export async function createApplicant(formData: ApplicantFormData): Promise<number> {
   const res = await axiosClient.post<{ status: string; data: { id: number } }>(

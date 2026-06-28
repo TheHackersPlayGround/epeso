@@ -410,7 +410,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     }
 
     // Validation: If "Others" is selected, check if custom name is provided
-    if (currentDocType === 'Others' && !currentCustomName.trim()) {
+    if (currentDocType === 'Others (Specify)' && !currentCustomName.trim()) {
       alert('Please specify the document name for "Others"');
       return;
     }
@@ -436,7 +436,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     // Read the file as base64 so the backend can store it in the documents table.
     const input = event.target;
     const docType = currentDocType;
-    const docCustomName = currentDocType === 'Others' ? currentCustomName : undefined;
+    const docCustomName = currentDocType === 'Others (Specify)' ? currentCustomName : undefined;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
@@ -1157,6 +1157,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Elementary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
+              <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  type="text"
+                  placeholder="Enter school name"
+                  value={formData.elementary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <label className="flex items-center text-sm">
@@ -1164,7 +1174,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="elementaryGraduated"
                     checked={formData.elementary.graduated === 'Yes'}
-                    onChange={() => setFormData({ ...formData, elementary: { ...formData.elementary, graduated: 'Yes' }})}
+                    onChange={() => setFormData({ ...formData, elementary: { ...formData.elementary, graduated: 'Yes', levelReached: '', yearLastAttended: '' }})}
                     className="mr-1" 
                   />
                   <span>Yes</span>
@@ -1174,7 +1184,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="elementaryGraduated"
                     checked={formData.elementary.graduated === 'No'}
-                    onChange={() => setFormData({ ...formData, elementary: { ...formData.elementary, graduated: 'No' }})}
+                    onChange={() => setFormData({ ...formData, elementary: { ...formData.elementary, graduated: 'No', yearGraduated: '' }})}
                     className="mr-1" 
                   />
                   <span>No</span>
@@ -1184,11 +1194,12 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                   <input
-                    placeholder="Enter year graduated"   
-                    type="text" 
+                    placeholder="Enter year graduated"
+                    type="text"
                     value={formData.elementary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
+                    disabled={formData.elementary.graduated === 'No'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1199,7 +1210,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.elementary.levelReached}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, levelReached: e.target.value }})}
                     disabled={formData.elementary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1210,7 +1221,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.elementary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, yearLastAttended: e.target.value }})}
                     disabled={formData.elementary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -1219,6 +1230,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Secondary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
+              <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  type="text"
+                  placeholder="Enter school name"
+                  value={formData.secondary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <label className="flex items-center text-sm">
                   <input 
@@ -1261,7 +1282,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="secondaryGraduated"
                     checked={formData.secondary.graduated === 'Yes'}
-                    onChange={() => setFormData({ ...formData, secondary: { ...formData.secondary, graduated: 'Yes' }})}
+                    onChange={() => setFormData({ ...formData, secondary: { ...formData.secondary, graduated: 'Yes', levelReached: '', yearLastAttended: '' }})}
                     className="mr-1" 
                   />
                   <span>Yes</span>
@@ -1271,7 +1292,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="secondaryGraduated"
                     checked={formData.secondary.graduated === 'No'}
-                    onChange={() => setFormData({ ...formData, secondary: { ...formData.secondary, graduated: 'No' }})}
+                    onChange={() => setFormData({ ...formData, secondary: { ...formData.secondary, graduated: 'No', yearGraduated: '' }})}
                     className="mr-1" 
                   />
                   <span>No</span>
@@ -1280,12 +1301,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.secondary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, yearGraduated: e.target.value }})}
                     placeholder="Enter year graduated"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
+                    disabled={formData.secondary.graduated === 'No'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1296,7 +1318,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.secondary.levelReached}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, levelReached: e.target.value }})}
                     disabled={formData.secondary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1307,7 +1329,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.secondary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, yearLastAttended: e.target.value }})}
                     disabled={formData.secondary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -1316,6 +1338,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Tertiary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
+              <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  type="text"
+                  placeholder="Enter school name"
+                  value={formData.tertiary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
               <div>
                 <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
                 <input 
@@ -1333,7 +1365,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="tertiaryGraduated"
                     checked={formData.tertiary.graduated === 'Yes'}
-                    onChange={() => setFormData({ ...formData, tertiary: { ...formData.tertiary, graduated: 'Yes' }})}
+                    onChange={() => setFormData({ ...formData, tertiary: { ...formData.tertiary, graduated: 'Yes', levelReached: '', yearLastAttended: '' }})}
                     className="mr-1" 
                   />
                   <span>Yes</span>
@@ -1343,7 +1375,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     type="radio" 
                     name="tertiaryGraduated"
                     checked={formData.tertiary.graduated === 'No'}
-                    onChange={() => setFormData({ ...formData, tertiary: { ...formData.tertiary, graduated: 'No' }})}
+                    onChange={() => setFormData({ ...formData, tertiary: { ...formData.tertiary, graduated: 'No', yearGraduated: '' }})}
                     className="mr-1" 
                   />
                   <span>No</span>
@@ -1352,12 +1384,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
-                  <input 
+                  <input
                     placeholder="Enter year graduated"
-                    type="text" 
+                    type="text"
                     value={formData.tertiary.yearGraduated}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, yearGraduated: e.target.value }})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" 
+                    disabled={formData.tertiary.graduated === 'No'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1368,7 +1401,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.tertiary.levelReached}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, levelReached: e.target.value }})}
                     disabled={formData.tertiary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1379,7 +1412,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     value={formData.tertiary.yearLastAttended}
                     onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, yearLastAttended: e.target.value }})}
                     disabled={formData.tertiary.graduated !== 'No'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -1394,6 +1427,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     className="text-red-500 hover:text-red-700 text-xs">Remove</button>
                 </div>
                 <div>
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                  <input type="text" placeholder="Enter school name"
+                    value={gs.schoolName}
+                    onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],schoolName:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                </div>
+                <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
                   <input type="text" placeholder="e.g. Master of Arts in Education"
                     value={gs.course}
@@ -1404,12 +1444,12 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <label className="block text-gray-700 text-xs">Graduated?</label>
                   <label className="flex items-center text-sm">
                     <input type="radio" name={`gsGraduated-${gsIdx}`} checked={gs.graduated==='Yes'}
-                      onChange={() => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],graduated:'Yes'}; setFormData({...formData,graduateStudies:u}); }}
+                      onChange={() => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],graduated:'Yes',levelReached:'',yearLastAttended:''}; setFormData({...formData,graduateStudies:u}); }}
                       className="mr-1" /><span>Yes</span>
                   </label>
                   <label className="flex items-center text-sm">
                     <input type="radio" name={`gsGraduated-${gsIdx}`} checked={gs.graduated==='No'}
-                      onChange={() => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],graduated:'No'}; setFormData({...formData,graduateStudies:u}); }}
+                      onChange={() => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],graduated:'No',yearGraduated:''}; setFormData({...formData,graduateStudies:u}); }}
                       className="mr-1" /><span>No</span>
                   </label>
                 </div>
@@ -1418,21 +1458,22 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                     <input type="text" value={gs.yearGraduated}
                       onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],yearGraduated:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                      disabled={gs.graduated === 'No'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 disabled:cursor-not-allowed" />
                   </div>
                   <div>
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Level Reached</label>
                     <input type="text" value={gs.levelReached}
                       onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],levelReached:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
                       disabled={gs.graduated !== 'No'}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed" />
                   </div>
                   <div>
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Year Last Attended</label>
                     <input type="text" value={gs.yearLastAttended}
                       onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],yearLastAttended:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
                       disabled={gs.graduated !== 'No'}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed" />
                   </div>
                 </div>
               </div>
@@ -2016,24 +2057,27 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       {(formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0 || formData.jobPreferences.some(p => p.occupation)) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">II. Job Preference</h4>
-          {formData.jobPrefEmploymentType.length > 0 && <div className="mb-1 text-sm"><span className="font-semibold">Type:</span> {formData.jobPrefEmploymentType.join(', ')}</div>}
-          {formData.jobPrefWorkLocation.length > 0 && <div className="mb-2 text-sm"><span className="font-semibold">Location:</span> {formData.jobPrefWorkLocation.join(', ')}</div>}
-          {formData.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
-            <div key={idx} className="mb-1 text-sm">
-              <span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}
-              {pref.localCity && <span className="text-gray-600"> · Local: {pref.localCity}</span>}
-              {pref.overseasCountry && <span className="text-gray-600"> · Overseas: {pref.overseasCountry}</span>}
-            </div>
-          ))}
+          <div className="text-sm space-y-1">
+            {formData.jobPrefEmploymentType.length > 0 && <div><span className="font-semibold">Type:</span> {formData.jobPrefEmploymentType.join(', ')}</div>}
+            {formData.jobPrefWorkLocation.length > 0 && <div><span className="font-semibold">Location:</span> {formData.jobPrefWorkLocation.join(', ')}</div>}
+            {formData.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
+              <div key={idx}>
+                {(idx > 0 || formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0) && <hr className="border-t border-gray-300 my-2" />}
+                <div><span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}</div>
+                {pref.localCity && <div><span className="font-semibold">Local:</span> {pref.localCity}</div>}
+                {pref.overseasCountry && <div><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Language */}
-      {formData.languages.some(l => l.language) && (
+      {formData.languages.some(l => l.language && (l.read || l.write || l.speak || l.understand)) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">III. Language / Dialect Proficiency</h4>
           <div className="text-sm space-y-1">
-            {formData.languages.filter(l => l.language).map((l, idx) => (
+            {formData.languages.filter(l => l.language && (l.read || l.write || l.speak || l.understand)).map((l, idx) => (
               <div key={idx}>
                 <span className="font-semibold uppercase">{l.language}:</span>{' '}
                 {[l.read && 'Read', l.write && 'Write', l.speak && 'Speak', l.understand && 'Understand'].filter(Boolean).join(', ')}
@@ -2047,9 +2091,34 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       <div>
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">IV. Educational Background</h4>
         <div className="text-sm space-y-2">
-          {formData.elementary.graduated && <div><span className="font-semibold">Elementary:</span> {formData.elementary.schoolName || 'School'}{formData.elementary.schoolCity ? `, ${formData.elementary.schoolCity}` : ''} â Graduated {formData.elementary.yearGraduated}</div>}
-          {formData.secondary.graduated && <div><span className="font-semibold">Secondary:</span> {formData.secondary.schoolName || 'School'}{formData.secondary.schoolCity ? `, ${formData.secondary.schoolCity}` : ''} â {formData.secondary.type}{formData.secondary.seniorHighStrand ? ` (${formData.secondary.seniorHighStrand})` : ''} â Graduated {formData.secondary.yearGraduated}</div>}
-          {formData.tertiary.graduated && <div><span className="font-semibold">Tertiary:</span> {formData.tertiary.course}{formData.tertiary.schoolName ? ` â ${formData.tertiary.schoolName}` : ''}{formData.tertiary.schoolCity ? `, ${formData.tertiary.schoolCity}` : ''} â Graduated {formData.tertiary.yearGraduated}</div>}
+          {formData.elementary.graduated && (
+            <div>
+              <div className="font-semibold">Elementary</div>
+              {formData.elementary.graduated === 'Yes'
+                ? <div><span className="font-semibold">Graduated:</span> {formData.elementary.yearGraduated}</div>
+                : <><div><span className="font-semibold">Level Reached:</span> {formData.elementary.levelReached}</div><div><span className="font-semibold">Last Attended:</span> {formData.elementary.yearLastAttended}</div></>}
+            </div>
+          )}
+          {formData.secondary.graduated && (
+            <div>
+              {formData.elementary.graduated && <hr className="border-t border-gray-300 my-2" />}
+              <div className="font-semibold">Secondary</div>
+              {formData.secondary.type && <div><span className="font-semibold">Type:</span> {formData.secondary.type}{formData.secondary.seniorHighStrand && <span> ({formData.secondary.seniorHighStrand})</span>}</div>}
+              {formData.secondary.graduated === 'Yes'
+                ? <div><span className="font-semibold">Graduated:</span> {formData.secondary.yearGraduated}</div>
+                : <><div><span className="font-semibold">Level Reached:</span> {formData.secondary.levelReached}</div><div><span className="font-semibold">Last Attended:</span> {formData.secondary.yearLastAttended}</div></>}
+            </div>
+          )}
+          {formData.tertiary.graduated && (
+            <div>
+              {(formData.elementary.graduated || formData.secondary.graduated) && <hr className="border-t border-gray-300 my-2" />}
+              <div className="font-semibold">Tertiary</div>
+              {formData.tertiary.course && <div><span className="font-semibold">Course:</span> {formData.tertiary.course}</div>}
+              {formData.tertiary.graduated === 'Yes'
+                ? <div><span className="font-semibold">Graduated:</span> {formData.tertiary.yearGraduated}</div>
+                : <><div><span className="font-semibold">Level Reached:</span> {formData.tertiary.levelReached}</div><div><span className="font-semibold">Last Attended:</span> {formData.tertiary.yearLastAttended}</div></>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2061,9 +2130,12 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {formData.trainings.map((t, idx) => (
               t.course && (
                 <div key={idx}>
-                  <span className="font-semibold">{t.course}</span>
-                  {t.institution && <span className="text-gray-600"> · {t.institution}</span>}
-                  {t.hoursOfTraining && <span className="text-gray-600"> · {t.hoursOfTraining} hrs</span>}
+                  {idx > 0 && <hr className="border-t border-gray-300 my-2" />}
+                  <div><span className="font-semibold">Course:</span> {t.course}</div>
+                  {t.institution && <div><span className="font-semibold">Institution:</span> {t.institution}</div>}
+                  {t.hoursOfTraining && <div><span className="font-semibold">Hours:</span> {t.hoursOfTraining} hrs</div>}
+                  {t.skillsAcquired && <div><span className="font-semibold">Skills:</span> {t.skillsAcquired}</div>}
+                  {t.certificateReceived && <div><span className="font-semibold">Certificate:</span> {t.certificateReceived}</div>}
                 </div>
               )
             ))}
@@ -2226,7 +2298,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
       {/* Success Modal */}
       {showSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2252,7 +2324,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
       {/* Document Preview Modal */}
       {previewDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">

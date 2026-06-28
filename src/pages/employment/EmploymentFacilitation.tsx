@@ -303,12 +303,22 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (a) =>
-          a.name.toLowerCase().includes(query) ||
-          a.skills.toLowerCase().includes(query) ||
-          a.address.toLowerCase().includes(query) ||
-          a.education.toLowerCase().includes(query),
+      // Search across the permanent table columns (Name, Age, Sex, Educational
+      // Background, Skills, Training Course, Job Preference) plus the address.
+      result = result.filter((a) =>
+        [
+          a.name,
+          String(a.age ?? ""),
+          a.gender,
+          a.education,
+          a.skills,
+          a.trainingCourses ?? "",
+          a.jobPreference ?? "",
+          a.address,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
       );
     }
 
@@ -347,8 +357,14 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
         case "skills":
           result = result.filter((a) => a.skills.toLowerCase().includes(value.toLowerCase()));
           break;
-        case "jobPreference":
-          result = result.filter((a) => a.jobPreference === value);
+        case "referredProgram":
+          result = result.filter((a) => ((a.fullFormData?.referredProgram as string) ?? "") === value);
+          break;
+        case "barangay":
+          result = result.filter((a) => ((a.fullFormData?.barangay as string) ?? "").toLowerCase().includes(value.toLowerCase()));
+          break;
+        case "trainingCourse":
+          result = result.filter((a) => (a.trainingCourses ?? "").toLowerCase().includes(value.toLowerCase()));
           break;
       }
     }

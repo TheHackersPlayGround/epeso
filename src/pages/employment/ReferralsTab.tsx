@@ -219,11 +219,19 @@ function ReferralsFilterBadges({
 type ReferralsTableProps = {
   referrals: Referral[]
   isFiltered: boolean
+  activeFilters: string[]
   onUpdateStatus: (r: Referral) => void
   onRemove: (id: number) => void
 }
 
-function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: ReferralsTableProps) {
+// Active filters that map to a column NOT already shown by default get added to
+// the table. (Status is already a default column, so it is intentionally absent.)
+const EXTRA_COLUMNS: Record<string, { label: string; get: (r: Referral) => string }> = {
+  employer: { label: 'Employer', get: r => r.employer },
+}
+
+function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, onRemove }: ReferralsTableProps) {
+  const extraCols = activeFilters.filter(f => f in EXTRA_COLUMNS)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -268,13 +276,16 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Job Title</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Referred</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
+            {extraCols.map(id => (
+              <th key={id} className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">{EXTRA_COLUMNS[id].label}</th>
+            ))}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>
           {referrals.length === 0 ? (
             <tr>
-              <td colSpan={5} className="py-16 text-center">
+              <td colSpan={5 + extraCols.length} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -302,6 +313,9 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
                 <td className="px-4 py-3 whitespace-nowrap">
                   <ReferralStatusBadge status={r.status} />
                 </td>
+                {extraCols.map(id => (
+                  <td key={id} className="px-4 py-3 text-gray-600 whitespace-nowrap">{EXTRA_COLUMNS[id].get(r) || '—'}</td>
+                ))}
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button
                     onClick={e => handleToggleMenu(e, r.id)}
@@ -580,6 +594,7 @@ export default function ReferralsTab() {
         <ReferralsTable
           referrals={filtered}
           isFiltered={isFiltered}
+          activeFilters={activeFilters}
           onUpdateStatus={setUpdatingReferral}
           onRemove={handleRemoveReferral}
         />

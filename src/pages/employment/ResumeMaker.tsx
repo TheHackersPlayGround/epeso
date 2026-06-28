@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText, Pencil, Minus, User } from 'lucide-react';
-import html2canvas from 'html2canvas';
+// html2canvas-pro supports modern CSS color functions (oklch/lab/lch) that
+// Tailwind v4 emits; the original html2canvas throws on "oklch".
+import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import ResumeCheckbox from './ResumeCheckbox';
+import { getApplicantPhoto } from '../../services/applicantService';
 
 export interface ApplicantData {
   id: number;
@@ -208,7 +211,23 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => { setResumePhoto(selectedApplicant?.profileImage ?? null); }, [selectedApplicant?.id]);
+  // Load the applicant's photo when the selection changes. A freshly-uploaded
+  // photo is already a base64 data URL; a stored 2x2 comes back as a cross-origin
+  // http URL, which html2canvas can't embed in the PDF — so we re-fetch it as
+  // base64 from the API (same trusted origin) and use that instead.
+  useEffect(() => {
+    const id = selectedApplicant?.id;
+    const img = selectedApplicant?.profileImage ?? '';
+    if (!id) { setResumePhoto(null); return; }
+    if (img.startsWith('data:')) { setResumePhoto(img); return; }
+
+    setResumePhoto(img || null); // show the http URL immediately for on-screen preview
+    let cancelled = false;
+    getApplicantPhoto(id)
+      .then((dataUrl) => { if (!cancelled && dataUrl) setResumePhoto(dataUrl); })
+      .catch(() => { /* keep the preview URL; PDF just won't include the photo */ });
+    return () => { cancelled = true; };
+  }, [selectedApplicant?.id, selectedApplicant?.profileImage]);
 
   function handleResumePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -241,6 +260,11 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   }
 
   function toggleField(field: keyof FieldSelection) {
+    // When re-enabling Profile Picture, restore the applicant's attached 2x2
+    // photo (or null → default user icon when no 2x2 is attached).
+    if (field === 'profilePicture' && !selectedFields.profilePicture) {
+      setResumePhoto(selectedApplicant?.profileImage ?? null);
+    }
     setSelectedFields((prev) => ({ ...prev, [field]: !prev[field] }));
   }
 

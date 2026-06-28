@@ -16,6 +16,7 @@ export type Applicant = {
   is4PsBeneficiary?: boolean;
   jobPreference?: string;
   language?: string;
+  trainingCourses?: string;
   fullFormData?: Record<string, unknown>;
 };
 

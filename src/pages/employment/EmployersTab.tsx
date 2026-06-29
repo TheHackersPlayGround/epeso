@@ -7,6 +7,7 @@ import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '.
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
@@ -319,6 +320,7 @@ export default function EmployersTab() {
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedEmployer, setSelectedEmployer] = useState<Employer | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [sidebarMode, setSidebarMode] = useState<'view' | 'edit' | null>(null)
 
   const availableFilters = STATIC_FILTERS
@@ -345,16 +347,21 @@ export default function EmployersTab() {
     })
   }, [employers, searchQuery, activeFilters, filterValues])
 
+  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
+    [filtered, currentPage],
+  )
+
+  // Persist + refresh; the AddEmployerSidebar shows the success alert then closes
+  // itself via onClose, and surfaces any thrown error in its own catch.
   async function handleAdd(data: Omit<Employer, 'id'>) {
-    try {
-      await createEmployer(data)
-      const fresh = await listEmployers()
-      setEmployers(fresh)
-      setShowAdd(false)
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save employer.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg })
-    }
+    await createEmployer(data)
+    const fresh = await listEmployers()
+    setEmployers(fresh)
   }
 
   async function handleEdit(data: Omit<Employer, 'id'>) {
@@ -484,12 +491,18 @@ export default function EmployersTab() {
           )}
         </div>
         <EmployersTable
-          employers={filtered}
+          employers={paginated}
           activeFilters={activeFilters}
           isFiltered={isFiltered}
           onView={openView}
           onEdit={openEdit}
           onDelete={handleDelete}
+        />
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+          itemLabel="employer"
         />
       </div>
     </div>

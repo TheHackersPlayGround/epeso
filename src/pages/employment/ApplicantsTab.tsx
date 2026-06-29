@@ -185,6 +185,7 @@ type ApplicantsTableProps = {
   onView: (applicant: Applicant) => void;
   onEdit: (applicant: Applicant) => void;
   onRefer: (applicant: Applicant) => void;
+  onShowHistory: (applicant: Applicant) => void;
 };
 
 const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Training Course", "Job Preference"];
@@ -193,7 +194,7 @@ function getFilterLabel(filterId: string): string {
   return AVAILABLE_FILTERS.find((f) => f.id === filterId)?.label ?? filterId;
 }
 
-function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer }: ApplicantsTableProps) {
+function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer, onShowHistory }: ApplicantsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
@@ -259,7 +260,14 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
           >
             <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-            <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
+            {menuApplicant.referralState === 'Hired' ? (
+              <button disabled className="w-full px-3 py-2 text-left text-xs text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Hired</button>
+            ) : menuApplicant.referralState === 'Referred' ? (
+              <button disabled className="w-full px-3 py-2 text-left text-xs text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Referred</button>
+            ) : (
+              <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
+            )}
+            <button onClick={() => { onShowHistory(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Employment History</button>
           </div>
         </>
       )}
@@ -612,6 +620,7 @@ type ApplicantsTabProps = {
   onEditApplicant: (a: Applicant) => void;
   onViewApplicant: (a: Applicant) => void;
   onReferApplicant: (a: Applicant) => void;
+  onShowHistory: (a: Applicant) => void;
   onImportClick: () => void;
   onShowResumeMaker: () => void;
   onSearchChange: (v: string) => void;
@@ -643,6 +652,7 @@ export default function ApplicantsTab({
   onEditApplicant,
   onViewApplicant,
   onReferApplicant,
+  onShowHistory,
   onImportClick,
   onShowResumeMaker,
   onSearchChange,
@@ -708,6 +718,7 @@ export default function ApplicantsTab({
           onView={onViewApplicant}
           onEdit={onEditApplicant}
           onRefer={onReferApplicant}
+          onShowHistory={onShowHistory}
         />
 
         <ApplicantsPagination

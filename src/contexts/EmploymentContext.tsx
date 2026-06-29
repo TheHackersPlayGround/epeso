@@ -17,6 +17,9 @@ export type Applicant = {
   jobPreference?: string;
   language?: string;
   trainingCourses?: string;
+  // Refer-action lock state computed by the backend from referrals/placements:
+  // 'Refer' = free, 'Referred' = live referral, 'Hired' = active placement.
+  referralState?: 'Refer' | 'Referred' | 'Hired';
   fullFormData?: Record<string, unknown>;
 };
 

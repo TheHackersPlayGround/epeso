@@ -204,7 +204,6 @@ interface UploadedDocument {
 export default function AddApplicantSidebar({ onSave, onClose, initialData, isEditMode = false }: AddApplicantSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>(
     initialData?.savedDocuments?.map(d => ({ id: d.id, documentType: d.documentType, customName: d.customName, fileName: d.fileName, fileSize: d.fileSize, url: d.url })) ?? []
   );
@@ -350,7 +349,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     try {
       // onSave persists to the backend; await so a failure doesn't show success.
       await onSave({ ...formData, profileImage });
-      setShowSuccess(true);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: isEditMode
+          ? 'Applicant profile has been successfully updated.'
+          : 'Applicant has been successfully added to the system.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      });
+      onClose();
     } catch {
       Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the applicant. Please try again.' });
     }
@@ -1225,7 +1233,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div key={index} className="grid grid-cols-5 border-t border-gray-300">
                   <div className="px-2 py-2 border-r border-gray-300 flex items-center">
                     {lang.language && index < 3 ? (
-                      <span className="font-medium text-sm px-2">{lang.language}</span>
+                      <span className="font-medium text-sm px-2 text-gray-900">{lang.language}</span>
                     ) : (
                       <input
                         type="text"
@@ -1902,9 +1910,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               {['AUTO MECHANIC', 'BEAUTICIAN', 'CARPENTRY WORK', 'COMPUTER LITERATE', 'DOMESTIC CHORES', 
                 'DRIVER', 'ELECTRICIAN', 'EMBROIDERY', 'GARDENING', 'MASONRY', 'PAINTER/ARTIST', 'PAINTING JOBS',
                 'PHOTOGRAPHY', 'PLUMBING', 'SEWING DRESSES', 'STENOGRAPHY', 'TAILORING'].map((skill) => (
-                <label key={skill} className="flex items-center text-sm">
-                  <input 
-                    type="checkbox" 
+                <label key={skill} className="flex items-center text-sm text-gray-900">
+                  <input
+                    type="checkbox"
                     className="mr-2"
                     checked={formData.otherSkills.includes(skill)}
                     onChange={() => toggleCheckbox('otherSkills', skill)}
@@ -1914,7 +1922,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               ))}
               <div className="col-span-2 space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center text-sm flex-shrink-0">
+                  <label className="flex items-center text-sm flex-shrink-0 text-gray-900">
                     <input
                       type="checkbox"
                       className="mr-2"
@@ -1976,7 +1984,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             </div>
             <div className="space-y-4">
               {(['SPES', 'GIP', 'DILEEP', 'TESDA Training', 'TUPAD', 'JobStart'] as const).map((prog) => (
-                <label key={prog} className="flex items-center text-sm cursor-pointer">
+                <label key={prog} className="flex items-center text-sm cursor-pointer text-gray-900">
                   <input
                     type="checkbox"
                     className="mr-2"
@@ -1986,7 +1994,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <span className="font-semibold">{prog}</span>
                 </label>
               ))}
-              <label className="flex items-center text-sm cursor-pointer">
+              <label className="flex items-center text-sm cursor-pointer text-gray-900">
                 <input
                   type="checkbox"
                   className="mr-2"
@@ -2478,30 +2486,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       />
 
       {/* Success Modal */}
-      {showSuccess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Success!</h3>
-              <p className="text-gray-600 mb-6">{isEditMode ? 'Applicant profile has been successfully updated.' : 'Applicant has been successfully added to the system.'}</p>
-              <button
-                onClick={() => {
-                  setShowSuccess(false);
-                  onClose();
-                }}
-                className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Document Preview Modal */}
       {previewDocument && (

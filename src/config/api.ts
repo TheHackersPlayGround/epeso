@@ -29,6 +29,7 @@ export const ENDPOINTS = {
     listApplicants: '/employment/listApplicants',
     getApplicant: '/employment/getApplicant',
     getApplicantPhoto: '/employment/getApplicantPhoto',
+    getApplicantHistory: '/employment/getApplicantHistory',
     createApplicant: '/employment/createApplicant',
     updateApplicant: '/employment/updateApplicant',
     deleteApplicant: '/employment/deleteApplicant',

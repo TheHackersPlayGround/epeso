@@ -34,6 +34,35 @@ export async function getApplicantPhoto(id: number): Promise<string | null> {
   return res.data.data?.dataUrl ?? null
 }
 
+// One employer attempt in an applicant's history: a referral plus, when the
+// applicant was hired through it, the resulting placement.
+export type EmploymentHistoryEntry = {
+  referralId: number
+  employer: string
+  jobTitle: string
+  referralDate: string
+  status: 'Pending' | 'Interviewed' | 'Hired' | 'Not Hired'
+  placement: {
+    placementId: number
+    status: 'Active' | 'Resigned' | 'Terminated' | 'Completed'
+    dateHired: string
+  } | null
+}
+
+export type EmploymentHistory = {
+  applicantId: number
+  applicantName: string
+  history: EmploymentHistoryEntry[]
+}
+
+// GET /api/employment/getApplicantHistory/{id} -> referral->placement timeline
+export async function getApplicantHistory(id: number): Promise<EmploymentHistory> {
+  const res = await axiosClient.get<{ status: string; data: EmploymentHistory }>(
+    `${ENDPOINTS.employment.getApplicantHistory}/${id}`,
+  )
+  return res.data.data
+}
+
 // POST /api/employment/createApplicant -> new beneficiary id
 export async function createApplicant(formData: ApplicantFormData): Promise<number> {
   const res = await axiosClient.post<{ status: string; data: { id: number } }>(

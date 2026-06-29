@@ -5,6 +5,7 @@ import { canManage } from '../../utils/permissions'
 import type { Placement } from '../../contexts/EmploymentContext'
 import { listPlacements, updatePlacement, updatePlacementStatus } from '../../services/placementService'
 import * as XLSX from 'xlsx'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -604,6 +605,7 @@ export default function PlacementsTab() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [currentPage, setCurrentPage] = useState(1)
   const [viewingPlacement, setViewingPlacement] = useState<Placement | null>(null)
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null)
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
@@ -717,6 +719,15 @@ export default function PlacementsTab() {
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
+  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues, sortOrder])
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
+    [filtered, currentPage],
+  )
+
   if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading placements…</div>
 
   return (
@@ -752,11 +763,17 @@ export default function PlacementsTab() {
         </div>
 
         <PlacementsTable
-          placements={filtered}
+          placements={paginated}
           isFiltered={isFiltered}
           onView={setViewingPlacement}
           onEdit={setEditingPlacement}
           onUpdateStatus={setUpdatingPlacement}
+        />
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+          itemLabel="placement"
         />
       </div>
 

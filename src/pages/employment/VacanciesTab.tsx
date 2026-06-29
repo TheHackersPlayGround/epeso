@@ -7,6 +7,7 @@ import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from
 import { listEmployers } from '../../services/employerService'
 import { listApplicants } from '../../services/applicantService'
 import { createReferral } from '../../services/referralService'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
 
@@ -851,6 +852,7 @@ export default function VacanciesTab() {
   const [viewingVacancy, setViewingVacancy] = useState<Vacancy | null>(null)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     Promise.all([listVacancies(), listEmployers()])
@@ -889,6 +891,13 @@ export default function VacanciesTab() {
       await createVacancy(data)
       const fresh = await listVacancies()
       setVacancies(fresh)
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Vacancy has been successfully added to the system.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      })
       setShowAddModal(false)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save vacancy.'
@@ -918,6 +927,15 @@ export default function VacanciesTab() {
 
     return result
   }, [vacancies, searchQuery, activeFilters, filterValues])
+
+  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
+    [filtered, currentPage],
+  )
 
   if (loading) {
     return (
@@ -955,13 +973,20 @@ export default function VacanciesTab() {
         </div>
 
         <VacanciesTable
-          vacancies={filtered}
+          vacancies={paginated}
           activeFilters={activeFilters}
           onView={setViewingVacancy}
           onEdit={setEditingVacancy}
           onMatch={setMatchingVacancy}
           onToggleStatus={handleToggleStatus}
           isFiltered={searchQuery.trim() !== '' || activeFilters.length > 0}
+        />
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+          itemLabel="vacancy"
+          itemLabelPlural="vacancies"
         />
       </div>
 
@@ -981,6 +1006,13 @@ export default function VacanciesTab() {
               await updateVacancy(updated.id, updated)
               const fresh = await listVacancies()
               setVacancies(fresh)
+              await Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'Vacancy has been successfully updated.',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#0077BE',
+              })
               setEditingVacancy(null)
             } catch (err: unknown) {
               const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update vacancy.'

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Swal from 'sweetalert2';
 import { X, Briefcase } from 'lucide-react';
 import DatePicker from '../../components/DatePicker';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -33,7 +34,7 @@ interface EmployerFormData {
 }
 
 interface AddEmployerSidebarProps {
-  onSave: (data: EmployerFormData) => void;
+  onSave: (data: EmployerFormData) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -42,7 +43,6 @@ type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'registratio
 export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState<EmployerFormData>({
     companyName: '',
     industry: '',
@@ -81,10 +81,22 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     setFormData({ ...formData, [field]: value });
   };
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     setShowConfirmation(false);
-    onSave(formData);
-    setShowSuccess(true);
+    try {
+      // onSave persists to the backend; await so success only shows on success.
+      await onSave(formData);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Employer has been successfully added to the system.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      });
+      onClose();
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the employer. Please try again.' });
+    }
   };
 
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -453,25 +465,6 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
         onConfirm={handleConfirmSave}
       />
 
-      {showSuccess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Success!</h3>
-              <p className="text-gray-600 mb-6">Employer has been successfully added to the system.</p>
-              <button onClick={() => { setShowSuccess(false); onClose(); }}
-                className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

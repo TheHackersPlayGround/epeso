@@ -15,6 +15,7 @@ import AddApplicantSidebar from "./AddApplicantSidebar";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
 import ViewApplicantSidebar from "./ViewApplicantSidebar";
+import EmploymentHistoryPanel from "./EmploymentHistoryPanel";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -283,12 +284,6 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     setApplicants(data);
   }
 
-  useEffect(() => {
-    reloadApplicants().catch(() => {
-      console.warn('Failed to load applicants from the server.');
-    });
-  }, []);
-
   // ── Search / filter / pagination state ────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -389,10 +384,23 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
   // ── Modal states ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>("applicants");
+
+  // Load applicants on mount and whenever the user returns to the Applicants tab,
+  // so the computed referralState (Refer/Referred/Hired) reflects status changes
+  // made in the Referrals/Placements tabs.
+  useEffect(() => {
+    if (activeTab === "applicants") {
+      reloadApplicants().catch(() => {
+        console.warn('Failed to load applicants from the server.');
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingApplicant, setEditingApplicant] = useState<Applicant | null>(null);
   const [viewingApplicant, setViewingApplicant] = useState<Applicant | null>(null);
   const [referringApplicant, setReferringApplicant] = useState<Applicant | null>(null);
+  const [historyApplicant, setHistoryApplicant] = useState<Applicant | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isResumeMakerOpen, setIsResumeMakerOpen] = useState(false);
 
@@ -549,6 +557,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onEditApplicant={setEditingApplicant}
               onViewApplicant={setViewingApplicant}
               onReferApplicant={setReferringApplicant}
+              onShowHistory={setHistoryApplicant}
               onImportClick={() => setIsImportModalOpen(true)}
               onShowResumeMaker={() => setIsResumeMakerOpen(true)}
               onSearchChange={handleSearchChange}
@@ -575,7 +584,10 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
       {/* Overlay panels */}
       {referringApplicant && (
-        <ReferApplicantPanel applicant={referringApplicant} onClose={() => setReferringApplicant(null)} />
+        <ReferApplicantPanel applicant={referringApplicant} onClose={() => { setReferringApplicant(null); reloadApplicants().catch(() => {}); }} />
+      )}
+      {historyApplicant && (
+        <EmploymentHistoryPanel applicant={historyApplicant} onClose={() => setHistoryApplicant(null)} />
       )}
       {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} />}
     </div>

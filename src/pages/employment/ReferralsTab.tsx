@@ -4,6 +4,7 @@ import Swal from 'sweetalert2'
 import type { Referral } from '../../contexts/EmploymentContext'
 import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -441,6 +442,7 @@ export default function ReferralsTab() {
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   async function reload() {
     const data = await listReferrals()
@@ -557,6 +559,15 @@ export default function ReferralsTab() {
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
+  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues, sortOrder])
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
+    [filtered, currentPage],
+  )
+
   if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading referrals…</div>
 
   return (
@@ -592,11 +603,17 @@ export default function ReferralsTab() {
         </div>
 
         <ReferralsTable
-          referrals={filtered}
+          referrals={paginated}
           isFiltered={isFiltered}
           activeFilters={activeFilters}
           onUpdateStatus={setUpdatingReferral}
           onRemove={handleRemoveReferral}
+        />
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+          itemLabel="referral"
         />
       </div>
 

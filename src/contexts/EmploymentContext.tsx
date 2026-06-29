@@ -40,6 +40,8 @@ export type Employer = {
   province: string
   region: string
   barangayId?: number | null
+  cityId?: number | null
+  provinceId?: number | null
   jobOpenings: Array<{ jobName: string; slots: string }>
   status: 'Active' | 'Inactive'
   dateRegistered: string

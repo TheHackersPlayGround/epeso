@@ -336,7 +336,6 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Elementary — title → School Name → Graduated? → 3-col grid (matching Add form) */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
-              <TF label="School Name" value={el.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <RR label="Yes" checked={el.graduated === 'Yes'} />
@@ -360,7 +359,6 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Secondary — title → type radios → K-12 strand → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
-              <TF label="School Name" value={sec.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4 flex-wrap">
                 <RR label="Non-K12"            checked={sec.type === 'Non-K12'} />
                 <RR label="K-12 (Senior High)" checked={sec.type === 'K-12'} />
@@ -394,7 +392,6 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Tertiary — title → Course → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
-              <TF label="School Name" value={ter.schoolName} lbl={LBL2} />
               <div>
                 <label className={LBL2}>Course / Degree</label>
                 <input type="text" readOnly value={ter.course ?? ''} className={INP} />
@@ -423,7 +420,6 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {grad.map((g, gsIdx) => (
               <div key={gsIdx} className="border border-gray-300 rounded p-4 space-y-3">
                 <div className="font-bold text-sm uppercase">Graduate Studies/Post-Graduate #{gsIdx + 1}</div>
-                <TF label="School Name" value={g.schoolName} lbl={LBL2} />
                 <div>
                   <label className={LBL2}>Course / Degree</label>
                   <input type="text" readOnly value={g.course ?? ''} className={INP} />
@@ -526,28 +522,28 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
 
       // ── VII. Work Experience ─────────────────────────────────────────────────
       case 'workExperience': {
-        const exps: Array<{ companyName: string; position: string; from: string; to: string; status: string }> = sar('workExperiences');
-        const rows = exps.length > 0 ? exps : [{ companyName:'', position:'', from:'', to:'', status:'' }];
+        const exps: Array<{ companyName: string; companyCity: string; position: string; numberOfMonths: string; status: string }> = sar('workExperiences');
+        const rows = exps.length > 0 ? exps : [{ companyName:'', companyCity:'', position:'', numberOfMonths:'', status:'' }];
         return (
           <div className="space-y-6">
             <SH>VII. WORK EXPERIENCE (within last 10 years only)</SH>
             <div className="border border-gray-300 rounded p-4">
               <div className="text-black grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded">
                 <div className="font-bold uppercase text-xs">Company Name</div>
+                <div className="font-bold uppercase text-xs">Address (City/Municipality)</div>
                 <div className="font-bold uppercase text-xs">Position</div>
-                <div className="font-bold uppercase text-xs">From</div>
-                <div className="font-bold uppercase text-xs">To</div>
+                <div className="font-bold uppercase text-xs">No. of Months</div>
                 <div className="font-bold uppercase text-xs">Status</div>
               </div>
               {rows.map((exp, idx) => (
                 <div key={idx} className="grid grid-cols-5 gap-4 mb-2">
                   <input type="text" readOnly value={exp.companyName}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
+                  <input type="text" readOnly value={exp.companyCity}
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.position}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
-                  <input type="text" readOnly value={exp.from}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
-                  <input type="text" readOnly value={exp.to}
+                  <input type="text" readOnly value={exp.numberOfMonths}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                   <input type="text" readOnly value={exp.status}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />

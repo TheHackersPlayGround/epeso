@@ -20,6 +20,10 @@ export const ENDPOINTS = {
   },
   locations: {
     barangays: '/locations/barangays',
+    provinces: '/locations/provinces',
+    cities: '/locations/cities',
+    barangaysByCity: '/locations/barangaysByCity',
+    allCities: '/locations/allCities',
   },
   employment: {
     listApplicants: '/employment/listApplicants',

@@ -70,7 +70,7 @@
 
 body {
   margin: 0;
-  background: #f9fafb;
+  background: var(--color-brand-bg);
 }
 
 /* Minimal blue scrollbar */
@@ -199,12 +199,13 @@ button, a, [role="button"] {
    headings — matches a classic formal resume layout.
    ============================================================ */
 #resume-preview {
-  font-family: Georgia, serif;
+  font-family: 'Times New Roman', Times, serif;
   padding: 48px 60px;
 }
 
 #resume-preview .resume-name {
-  font-family: Arial, sans-serif;
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: bold;
   font-size: 26px;
   line-height: 1.2;
   letter-spacing: 0.1em;
@@ -213,7 +214,7 @@ button, a, [role="button"] {
 }
 
 #resume-preview .resume-section-heading {
-  font-family: Arial, sans-serif;
+  font-family: 'Times New Roman', Times, serif;
   color: #0077BE;
 }
 

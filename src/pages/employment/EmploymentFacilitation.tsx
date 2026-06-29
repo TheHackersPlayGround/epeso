@@ -80,8 +80,9 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
       await createReferral(applicant.id, selected.id)
       setReferred(true)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      setError(msg ?? 'Failed to create referral. Please try again.')
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error ? err.message : ''
+      setError(msg || 'Failed to create referral. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -352,7 +353,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
           result = result.filter((a) => a.employmentStatus === value);
           break;
         case "language":
-          result = result.filter((a) => a.language === value);
+          result = result.filter((a) => (a.language ?? "").toLowerCase().includes(value.toLowerCase()));
           break;
         case "skills":
           result = result.filter((a) => a.skills.toLowerCase().includes(value.toLowerCase()));

@@ -2,7 +2,8 @@
 import Swal from 'sweetalert2';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import DatePicker from '../../components/DatePicker';
-import BarangayCombobox from '../../components/BarangayCombobox';
+import SearchableSelect from '../../components/SearchableSelect';
+import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../services/locationService';
 import ApplicantReviewModal from './ApplicantReviewModal';
 
 interface ApplicantFormData {
@@ -20,7 +21,9 @@ interface ApplicantFormData {
   barangay: string;
   barangayId: number | null;
   municipality: string;
+  cityId: number | null;
   province: string;
+  provinceId: number | null;
   hasDisability: string[];
   disabilityOther: string;
   tin: string;
@@ -33,7 +36,16 @@ interface ApplicantFormData {
   formerOFWReturnDate: string;
   is4PsBeneficiary: string;
   householdIdNo: string;
-  
+
+  // Employment Status / Type
+  employmentStatus: string;        // 'Employed' | 'Unemployed'
+  employmentType: string;          // 'Wage Employed' | 'Self-employed'
+  selfEmploymentType: string;      // dropdown option, or 'Others'
+  selfEmploymentOther: string;     // free text when selfEmploymentType === 'Others'
+  unemploymentReason: string;      // enum value, or 'Others'
+  unemploymentReasonOther: string; // free text when unemploymentReason === 'Others'
+  monthsLookingForWork: string;
+
   // Job Preference
   jobPrefEmploymentType: string[];
   jobPrefWorkLocation: string[];
@@ -117,9 +129,10 @@ interface ApplicantFormData {
   // Work Experience
   workExperiences: Array<{
     companyName: string;
+    companyCity: string;
+    companyCityId: number | null;
     position: string;
-    from: string;
-    to: string;
+    numberOfMonths: string;
     status: string;
   }>;
   
@@ -216,7 +229,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     barangay: '',
     barangayId: null,
     municipality: '',
+    cityId: null,
     province: '',
+    provinceId: null,
     hasDisability: [],
     disabilityOther: '',
     tin: '',
@@ -229,6 +244,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     formerOFWReturnDate: '',
     is4PsBeneficiary: 'No',
     householdIdNo: '',
+    employmentStatus: '',
+    employmentType: '',
+    selfEmploymentType: '',
+    selfEmploymentOther: '',
+    unemploymentReason: '',
+    unemploymentReasonOther: '',
+    monthsLookingForWork: '',
     jobPrefEmploymentType: [],
     jobPrefWorkLocation: [],
     jobPreferences: [
@@ -622,14 +644,22 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <ErrorMsg k="civilStatus" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Height</label>
-                <input
-                  placeholder="Enter Height"
-                  type="text"
-                  value={formData.height}
-                  onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                />
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Height (cm)</label>
+                <div className="relative">
+                  <input
+                    placeholder="e.g. 165"
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.height}
+                    onChange={(e) => {
+                      // Allow only digits and a single decimal point (height in cm).
+                      const cleaned = e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+                      setFormData({ ...formData, height: cleaned });
+                    }}
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">cm</span>
+                </div>
               </div>
             </div>
 
@@ -646,49 +676,49 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                   />
                 </div>
+                {/* Cascade: Province -> City/Municipality -> Barangay */}
                 <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay <span className="text-red-500">*</span></label>
-                  <BarangayCombobox
-                    value={formData.barangay}
-                    hasError={fieldError('barangay')}
-                    onTextChange={(text) =>
-                      // Typing clears the resolved city/province/id until a real
-                      // barangay is picked, so we never keep a mismatched address.
-                      setFormData({ ...formData, barangay: text, municipality: '', province: '', barangayId: null })
-                    }
-                    onSelect={(m) =>
-                      setFormData({
-                        ...formData,
-                        barangay: m.barangay,
-                        barangayId: m.id,
-                        municipality: m.city,
-                        province: m.province,
-                      })
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">Province <span className="text-red-500">*</span></label>
+                  <SearchableSelect
+                    value={formData.province}
+                    placeholder="Search province…"
+                    hasError={fieldError('province')}
+                    fetchOptions={(s) => searchProvinces(s)}
+                    onSelect={(opt) =>
+                      // Picking a province resets the dependent city + barangay.
+                      setFormData({ ...formData, province: opt.name, provinceId: opt.id, municipality: '', cityId: null, barangay: '', barangayId: null })
                     }
                   />
-                  <ErrorMsg k="barangay" />
+                  <ErrorMsg k="province" />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Municipality/City <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    readOnly
-                    placeholder="Auto-filled from barangay"
+                  <SearchableSelect
                     value={formData.municipality}
-                    className={`${inputClass('municipality')} bg-gray-50 cursor-not-allowed`}
+                    placeholder={formData.provinceId ? 'Search city/municipality…' : 'Select province first'}
+                    disabled={!formData.provinceId}
+                    hasError={fieldError('municipality')}
+                    refetchKey={formData.provinceId ?? ''}
+                    fetchOptions={(s) => searchCities(formData.provinceId ?? 0, s)}
+                    onSelect={(opt) =>
+                      // Picking a city resets the dependent barangay.
+                      setFormData({ ...formData, municipality: opt.name, cityId: opt.id, barangay: '', barangayId: null })
+                    }
                   />
                   <ErrorMsg k="municipality" />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">Province <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    readOnly
-                    placeholder="Auto-filled from barangay"
-                    value={formData.province}
-                    className={`${inputClass('province')} bg-gray-50 cursor-not-allowed`}
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay <span className="text-red-500">*</span></label>
+                  <SearchableSelect
+                    value={formData.barangay}
+                    placeholder={formData.cityId ? 'Search barangay…' : 'Select city first'}
+                    disabled={!formData.cityId}
+                    hasError={fieldError('barangay')}
+                    refetchKey={formData.cityId ?? ''}
+                    fetchOptions={(s) => searchBarangaysByCity(formData.cityId ?? 0, s)}
+                    onSelect={(opt) => setFormData({ ...formData, barangay: opt.name, barangayId: opt.id })}
                   />
-                  <ErrorMsg k="province" />
+                  <ErrorMsg k="barangay" />
                 </div>
               </div>
             </div>
@@ -830,6 +860,125 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               </div>
             </div>
 
+            {/* Employment Status / Type */}
+            <div>
+              <label className="block text-gray-700 mb-3 text-xs font-semibold uppercase">Employment Status / Type</label>
+              <div className="grid grid-cols-2 gap-8">
+                {/* Employed */}
+                <div>
+                  <label className="flex items-center text-sm font-semibold mb-3">
+                    <input
+                      type="radio"
+                      name="employmentStatus"
+                      value="Employed"
+                      checked={formData.employmentStatus === 'Employed'}
+                      onChange={(e) => setFormData({ ...formData, employmentStatus: e.target.value, unemploymentReason: '', unemploymentReasonOther: '', monthsLookingForWork: '' })}
+                      className="mr-2"
+                    />
+                    Employed
+                  </label>
+                  <div className={`ml-6 space-y-2 ${formData.employmentStatus !== 'Employed' ? 'opacity-50' : ''}`}>
+                    <label className="flex items-center text-sm">
+                      <input
+                        type="radio"
+                        name="employmentType"
+                        value="Wage Employed"
+                        checked={formData.employmentType === 'Wage Employed'}
+                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value, selfEmploymentType: '', selfEmploymentOther: '' })}
+                        disabled={formData.employmentStatus !== 'Employed'}
+                        className="mr-2"
+                      />
+                      Wage Employed
+                    </label>
+                    <label className="flex items-center text-sm">
+                      <input
+                        type="radio"
+                        name="employmentType"
+                        value="Self-employed"
+                        checked={formData.employmentType === 'Self-employed'}
+                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                        disabled={formData.employmentStatus !== 'Employed'}
+                        className="mr-2"
+                      />
+                      Self-employed (please specify)
+                    </label>
+                    <select
+                      value={formData.selfEmploymentType}
+                      onChange={(e) => setFormData({ ...formData, selfEmploymentType: e.target.value, selfEmploymentOther: e.target.value === 'Others' ? formData.selfEmploymentOther : '' })}
+                      disabled={formData.employmentStatus !== 'Employed' || formData.employmentType !== 'Self-employed'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select self-employment type</option>
+                      {['Fisherman/Fisherfolk', 'Vendor/Retailer', 'Home-based worker', 'Transport', 'Domestic Worker', 'Freelancer', 'Artisan/Craft Worker', 'Others'].map(o => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                    {formData.selfEmploymentType === 'Others' && formData.employmentType === 'Self-employed' && (
+                      <input
+                        type="text"
+                        placeholder="Please specify"
+                        value={formData.selfEmploymentOther}
+                        onChange={(e) => setFormData({ ...formData, selfEmploymentOther: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Unemployed */}
+                <div>
+                  <label className="flex items-center text-sm font-semibold mb-3">
+                    <input
+                      type="radio"
+                      name="employmentStatus"
+                      value="Unemployed"
+                      checked={formData.employmentStatus === 'Unemployed'}
+                      onChange={(e) => setFormData({ ...formData, employmentStatus: e.target.value, employmentType: '', selfEmploymentType: '', selfEmploymentOther: '' })}
+                      className="mr-2"
+                    />
+                    Unemployed
+                  </label>
+                  <div className={`ml-6 space-y-3 ${formData.employmentStatus !== 'Unemployed' ? 'opacity-50' : ''}`}>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">How long looking for work? (months)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="e.g. 6"
+                        value={formData.monthsLookingForWork}
+                        onChange={(e) => setFormData({ ...formData, monthsLookingForWork: e.target.value.replace(/[^\d]/g, '') })}
+                        disabled={formData.employmentStatus !== 'Unemployed'}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Reason</label>
+                      <select
+                        value={formData.unemploymentReason}
+                        onChange={(e) => setFormData({ ...formData, unemploymentReason: e.target.value, unemploymentReasonOther: e.target.value === 'Others' ? formData.unemploymentReasonOther : '' })}
+                        disabled={formData.employmentStatus !== 'Unemployed'}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select reason</option>
+                        {['New Entrant/Fresh Graduate', 'Finished Contract', 'Resigned', 'Retired', 'Terminated/Laid-off', 'Terminated due to Calamity', 'Others'].map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                      {formData.unemploymentReason === 'Others' && (
+                        <input
+                          type="text"
+                          placeholder="Please specify"
+                          value={formData.unemploymentReasonOther}
+                          onChange={(e) => setFormData({ ...formData, unemploymentReasonOther: e.target.value })}
+                          className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center gap-4 mb-2">
@@ -951,6 +1100,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 />
               </div>
             </div>
+
           </div>
         );
 
@@ -1009,23 +1159,35 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <tbody>
                   {formData.jobPreferences.map((row, idx) => (
                     <tr key={idx}>
-                      {(['occupation', 'localCity', 'overseasCountry'] as const).map(field => (
-                        <td key={field} className="border border-gray-300 px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-900 text-xs flex-shrink-0">{idx + 1}.</span>
-                            <input
-                              type="text"
-                              value={row[field]}
-                              onChange={e => {
-                                const rows = [...formData.jobPreferences];
-                                rows[idx] = { ...rows[idx], [field]: e.target.value };
-                                setFormData({ ...formData, jobPreferences: rows });
-                              }}
-                              className="flex-1 border-0 border-b border-gray-300 focus:border-brand-blue focus:outline-none text-sm text-gray-900 py-1 bg-transparent"
-                            />
-                          </div>
-                        </td>
-                      ))}
+                      {(['occupation', 'localCity', 'overseasCountry'] as const).map(field => {
+                        // Each column's input is enabled only when its header
+                        // checkbox is selected (occupation ← employment type,
+                        // localCity ← Local, overseasCountry ← Overseas).
+                        const disabled =
+                          field === 'occupation'
+                            ? formData.jobPrefEmploymentType.length === 0
+                            : field === 'localCity'
+                            ? formData.jobPrefWorkLocation[0] !== 'Local'
+                            : formData.jobPrefWorkLocation[0] !== 'Overseas';
+                        return (
+                          <td key={field} className="border border-gray-300 px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-900 text-xs flex-shrink-0">{idx + 1}.</span>
+                              <input
+                                type="text"
+                                value={row[field]}
+                                disabled={disabled}
+                                onChange={e => {
+                                  const rows = [...formData.jobPreferences];
+                                  rows[idx] = { ...rows[idx], [field]: e.target.value };
+                                  setFormData({ ...formData, jobPreferences: rows });
+                                }}
+                                className="flex-1 border-0 border-b border-gray-300 focus:border-brand-blue focus:outline-none text-sm text-gray-900 py-1 bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
@@ -1157,16 +1319,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Elementary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
-              <div>
-                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
-                <input
-                  type="text"
-                  placeholder="Enter school name"
-                  value={formData.elementary.schoolName}
-                  onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, schoolName: e.target.value }})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                />
-              </div>
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <label className="flex items-center text-sm">
@@ -1230,16 +1382,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Secondary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
-              <div>
-                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
-                <input
-                  type="text"
-                  placeholder="Enter school name"
-                  value={formData.secondary.schoolName}
-                  onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, schoolName: e.target.value }})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                />
-              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <label className="flex items-center text-sm">
                   <input 
@@ -1339,16 +1481,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
               <div>
-                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
-                <input
-                  type="text"
-                  placeholder="Enter school name"
-                  value={formData.tertiary.schoolName}
-                  onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, schoolName: e.target.value }})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
-                />
-              </div>
-              <div>
                 <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
                 <input 
                   type="text" 
@@ -1425,13 +1557,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <div className="font-bold text-sm uppercase">Graduate Studies/Post-Graduate #{gsIdx + 1}</div>
                   <button type="button" onClick={() => setFormData({ ...formData, graduateStudies: formData.graduateStudies.filter((_, i) => i !== gsIdx) })}
                     className="text-red-500 hover:text-red-700 text-xs">Remove</button>
-                </div>
-                <div>
-                  <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
-                  <input type="text" placeholder="Enter school name"
-                    value={gs.schoolName}
-                    onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],schoolName:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
@@ -1680,66 +1805,69 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="border border-gray-300 rounded p-4">
               <div className="text-black grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded">
                 <div className="font-bold uppercase text-xs">Company Name</div>
+                <div className="font-bold uppercase text-xs">Address (City/Municipality)</div>
                 <div className="font-bold uppercase text-xs">Position</div>
-                <div className="font-bold uppercase text-xs">From</div>
-                <div className="font-bold uppercase text-xs">To</div>
+                <div className="font-bold uppercase text-xs">No. of Months</div>
                 <div className="font-bold uppercase text-xs">Status</div>
               </div>
               {formData.workExperiences.map((exp, index) => (
-                <div key={index} className="grid grid-cols-5 gap-4 mb-2">
+                <div key={index} className="grid grid-cols-5 gap-4 mb-2 items-start">
                   <input
                     type="text"
                     value={exp.companyName}
                     onChange={(e) => {
                       const newExperiences = [...formData.workExperiences];
-                      newExperiences[index].companyName = e.target.value;
+                      newExperiences[index] = { ...newExperiences[index], companyName: e.target.value };
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                  />
+                  <SearchableSelect
+                    value={exp.companyCity}
+                    placeholder="Search city…"
+                    fetchOptions={(s) => searchAllCities(s)}
+                    onSelect={(opt) => {
+                      const newExperiences = [...formData.workExperiences];
+                      newExperiences[index] = { ...newExperiences[index], companyCity: opt.name, companyCityId: opt.id };
+                      setFormData({ ...formData, workExperiences: newExperiences });
+                    }}
                   />
                   <input
                     type="text"
                     value={exp.position}
                     onChange={(e) => {
                       const newExperiences = [...formData.workExperiences];
-                      newExperiences[index].position = e.target.value;
+                      newExperiences[index] = { ...newExperiences[index], position: e.target.value };
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <input
-                    type="month"
-                    value={exp.from}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 12"
+                    value={exp.numberOfMonths}
                     onChange={(e) => {
                       const newExperiences = [...formData.workExperiences];
-                      newExperiences[index].from = e.target.value;
+                      newExperiences[index] = { ...newExperiences[index], numberOfMonths: e.target.value.replace(/[^\d]/g, '') };
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
-                  />
-                  <input
-                    type="month"
-                    value={exp.to}
-                    onChange={(e) => {
-                      const newExperiences = [...formData.workExperiences];
-                      newExperiences[index].to = e.target.value;
-                      setFormData({ ...formData, workExperiences: newExperiences });
-                    }}
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm placeholder:text-gray-500"
                   />
                   <select
                     value={exp.status}
                     onChange={(e) => {
                       const newExperiences = [...formData.workExperiences];
-                      newExperiences[index].status = e.target.value;
+                      newExperiences[index] = { ...newExperiences[index], status: e.target.value };
                       setFormData({ ...formData, workExperiences: newExperiences });
                     }}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm bg-white"
                   >
                     <option value="">Select</option>
-                    <option value="FULLTIME">Full-time</option>
-                    <option value="PARTTIME">Part-time</option>
-                    <option value="CONTRACT">Contract</option>
+                    <option value="Permanent">Permanent</option>
+                    <option value="Contractual">Contractual</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Probationary">Probationary</option>
                   </select>
                 </div>
               ))}
@@ -1750,7 +1878,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     ...formData,
                     workExperiences: [
                       ...formData.workExperiences,
-                      { companyName: '', position: '', from: '', to: '', status: '' }
+                      { companyName: '', companyCity: '', companyCityId: null, position: '', numberOfMonths: '', status: '' }
                     ]
                   });
                 }}
@@ -2050,6 +2178,32 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           <div><span className="font-semibold">Civil Status:</span> {formData.civilStatus}</div>
           <div><span className="font-semibold">Contact:</span> {formData.contactNumber}</div>
           <div><span className="font-semibold">Email:</span> {formData.email}</div>
+          {formData.height && <div><span className="font-semibold">Height:</span> {formData.height} cm</div>}
+          {formData.religion && <div><span className="font-semibold">Religion:</span> {formData.religion}</div>}
+          {[formData.houseNo, formData.barangay, formData.municipality, formData.province].some(Boolean) && (
+            <div className="col-span-2">
+              <span className="font-semibold">Address:</span>{' '}
+              {[formData.houseNo, formData.barangay, formData.municipality, formData.province].filter(Boolean).join(', ')}
+            </div>
+          )}
+          {formData.employmentStatus === 'Employed' && (
+            <div className="col-span-2">
+              <span className="font-semibold">Employment Status:</span> Employed
+              {formData.employmentType && ` — ${formData.employmentType}`}
+              {formData.employmentType === 'Self-employed' && (formData.selfEmploymentType === 'Others' ? formData.selfEmploymentOther : formData.selfEmploymentType)
+                ? ` (${formData.selfEmploymentType === 'Others' ? formData.selfEmploymentOther : formData.selfEmploymentType})`
+                : ''}
+            </div>
+          )}
+          {formData.employmentStatus === 'Unemployed' && (
+            <div className="col-span-2">
+              <span className="font-semibold">Employment Status:</span> Unemployed
+              {(formData.unemploymentReason === 'Others' ? formData.unemploymentReasonOther : formData.unemploymentReason)
+                ? ` — ${formData.unemploymentReason === 'Others' ? formData.unemploymentReasonOther : formData.unemploymentReason}`
+                : ''}
+              {formData.monthsLookingForWork && ` (looking for ${formData.monthsLookingForWork} month/s)`}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2123,22 +2277,32 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       </div>
 
       {/* Technical/Vocational Training */}
-      {formData.trainings.length > 0 && (
+      {formData.trainings.some(t => t.course) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">V. Technical/Vocational and Other Training</h4>
-          <div className="text-sm space-y-1">
-            {formData.trainings.map((t, idx) => (
-              t.course && (
-                <div key={idx}>
-                  {idx > 0 && <hr className="border-t border-gray-300 my-2" />}
-                  <div><span className="font-semibold">Course:</span> {t.course}</div>
-                  {t.institution && <div><span className="font-semibold">Institution:</span> {t.institution}</div>}
-                  {t.hoursOfTraining && <div><span className="font-semibold">Hours:</span> {t.hoursOfTraining} hrs</div>}
-                  {t.skillsAcquired && <div><span className="font-semibold">Skills:</span> {t.skillsAcquired}</div>}
-                  {t.certificateReceived && <div><span className="font-semibold">Certificate:</span> {t.certificateReceived}</div>}
-                </div>
-              )
-            ))}
+          <div className="border border-gray-300 rounded overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-gray-700">
+                  <th className="px-3 py-2 text-left font-semibold">Course</th>
+                  <th className="px-3 py-2 text-left font-semibold">Hours</th>
+                  <th className="px-3 py-2 text-left font-semibold">Institution</th>
+                  <th className="px-3 py-2 text-left font-semibold">Skills Acquired</th>
+                  <th className="px-3 py-2 text-left font-semibold">Certificate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.trainings.filter(t => t.course).map((t, idx) => (
+                  <tr key={idx} className="border-t border-gray-200 text-gray-800">
+                    <td className="px-3 py-2">{t.course || '—'}</td>
+                    <td className="px-3 py-2">{t.hoursOfTraining || '—'}</td>
+                    <td className="px-3 py-2">{t.institution || '—'}</td>
+                    <td className="px-3 py-2">{t.skillsAcquired || '—'}</td>
+                    <td className="px-3 py-2">{t.certificateReceived || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -2169,16 +2333,33 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       )}
 
       {/* Work Experience */}
-      {formData.workExperiences.length > 0 && (
+      {formData.workExperiences.some(e => e.companyName) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">VII. Work Experience</h4>
-          {formData.workExperiences.map((exp, idx) => (
-            exp.companyName && (
-              <div key={idx} className="mb-2 text-sm">
-                <span className="font-semibold">{exp.companyName}</span> - {exp.position} ({exp.from} to {exp.to})
-              </div>
-            )
-          ))}
+          <div className="border border-gray-300 rounded overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-gray-700">
+                  <th className="px-3 py-2 text-left font-semibold">Company Name</th>
+                  <th className="px-3 py-2 text-left font-semibold">Address</th>
+                  <th className="px-3 py-2 text-left font-semibold">Position</th>
+                  <th className="px-3 py-2 text-left font-semibold">No. of Months</th>
+                  <th className="px-3 py-2 text-left font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.workExperiences.filter(e => e.companyName).map((exp, idx) => (
+                  <tr key={idx} className="border-t border-gray-200 text-gray-800">
+                    <td className="px-3 py-2">{exp.companyName || '—'}</td>
+                    <td className="px-3 py-2">{exp.companyCity || '—'}</td>
+                    <td className="px-3 py-2">{exp.position || '—'}</td>
+                    <td className="px-3 py-2">{exp.numberOfMonths || '—'}</td>
+                    <td className="px-3 py-2">{exp.status || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

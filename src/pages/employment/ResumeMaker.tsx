@@ -106,9 +106,9 @@ export interface ApplicantData {
   }>;
   workExperiences: Array<{
     companyName: string;
+    companyCity: string;
     position: string;
-    from: string;
-    to: string;
+    numberOfMonths: string;
     status: string;
   }>;
   otherSkills: string[];
@@ -167,6 +167,7 @@ interface FieldSelection {
   trainings: boolean;
   eligibilities: boolean;
   languages: boolean;
+  footer: boolean;
 }
 
 export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
@@ -195,11 +196,17 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     trainings: false,
     eligibilities: false,
     languages: false,
+    footer: true,
   });
   const resumeRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const resumePhotoInputRef = useRef<HTMLInputElement>(null);
   const [resumePhoto, setResumePhoto] = useState<string | null>(null);
+  // School names are not stored on the applicant; they are entered here per
+  // education level (keyed 'elementary'/'secondary'/'tertiary'/'graduate-<idx>')
+  // and used only for the generated resume.
+  const [schoolNames, setSchoolNames] = useState<Record<string, string>>({});
+  useEffect(() => { setSchoolNames({}); }, [selectedApplicant?.id]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -362,6 +369,24 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     setShowDropdown(true);
   }
 
+  // Resume preview: show the school name (entered in the sidebar) as plain text.
+  const schoolNameField = (key: string) =>
+    schoolNames[key]?.trim()
+      ? <div className="text-sm mt-1 text-gray-700">{schoolNames[key]}</div>
+      : null;
+
+  // Sidebar: a labeled text input to enter a school name for an education level.
+  const schoolNameInput = (key: string, label: string) => (
+    <div className="ml-8 mb-2 mr-3">
+      <input
+        value={schoolNames[key] ?? ''}
+        onChange={e => setSchoolNames(prev => ({ ...prev, [key]: e.target.value }))}
+        placeholder={`${label} school name`}
+        className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-gray-800 outline-none focus:ring-1 focus:ring-brand-blue placeholder:text-gray-400"
+      />
+    </div>
+  );
+
   return (
     <>
       <div className="min-h-full bg-gray-200">
@@ -481,9 +506,15 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                       <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Education</p>
                       <div>
                         <ResumeCheckbox label="Elementary" isAvailable={isFieldAvailable('elementary')} isChecked={selectedFields.elementary} onToggle={() => toggleField('elementary')} />
+                        {selectedFields.elementary && isFieldAvailable('elementary') && schoolNameInput('elementary', 'Elementary')}
                         <ResumeCheckbox label="High School" isAvailable={isFieldAvailable('highSchool')} isChecked={selectedFields.highSchool} onToggle={() => toggleField('highSchool')} />
+                        {selectedFields.highSchool && isFieldAvailable('highSchool') && schoolNameInput('secondary', 'High School')}
                         <ResumeCheckbox label="College" isAvailable={isFieldAvailable('college')} isChecked={selectedFields.college} onToggle={() => toggleField('college')} />
+                        {selectedFields.college && isFieldAvailable('college') && schoolNameInput('tertiary', 'College')}
                         {isFieldAvailable('graduateStudies') && <ResumeCheckbox label="Graduate Studies" isAvailable={isFieldAvailable('graduateStudies')} isChecked={selectedFields.graduateStudies} onToggle={() => toggleField('graduateStudies')} />}
+                        {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant?.graduateStudies?.map((_, idx) => (
+                          <div key={idx}>{schoolNameInput('graduate-' + idx, `Graduate #${idx + 1}`)}</div>
+                        ))}
                       </div>
                     </div>
                     <div>
@@ -496,6 +527,12 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                         {isFieldAvailable('trainings') && <ResumeCheckbox label="Trainings & Certifications" isAvailable={isFieldAvailable('trainings')} isChecked={selectedFields.trainings} onToggle={() => toggleField('trainings')} />}
                         {isFieldAvailable('eligibilities') && <ResumeCheckbox label="Eligibilities" isAvailable={isFieldAvailable('eligibilities')} isChecked={selectedFields.eligibilities} onToggle={() => toggleField('eligibilities')} />}
                         {isFieldAvailable('languages') && <ResumeCheckbox label="Language Proficiency" isAvailable={isFieldAvailable('languages')} isChecked={selectedFields.languages} onToggle={() => toggleField('languages')} />}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Other</p>
+                      <div>
+                        <ResumeCheckbox label="PESO Footer" isAvailable={isFieldAvailable('footer')} isChecked={selectedFields.footer} onToggle={() => toggleField('footer')} />
                       </div>
                     </div>
                   </div>
@@ -541,7 +578,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                     <p className="text-sm text-gray-500">Select an applicant to preview resume</p>
                   </div>
                 ) : (
-                  <div id="resume-preview" ref={resumeRef} className="w-full max-w-[210mm] mx-auto shadow-xl text-gray-800 bg-white border border-gray-200">
+                  <div id="resume-preview" ref={resumeRef} style={{ fontFamily: "'Times New Roman', Times, serif" }} className="w-full max-w-[210mm] min-h-[297mm] flex flex-col mx-auto shadow-xl text-gray-800 bg-white border border-gray-200">
                     {/* Header with Photo */}
                     <div className="pb-4 mb-5 border-b-4 border-brand-blue">
                       <div className="flex gap-5 items-start">
@@ -656,44 +693,43 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                           <div className="space-y-3">
                             {selectedFields.college && isFieldAvailable('college') && selectedApplicant.tertiary?.course && (
                               <div>
+                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Tertiary</div>
                                 <div className="font-bold text-base text-gray-900">{selectedApplicant.tertiary.course}</div>
-                                {selectedApplicant.tertiary.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.tertiary.schoolName}</div>}
-                                <div className="text-sm mt-1 text-gray-900">
-                                  {[selectedApplicant.tertiary.schoolCity, selectedApplicant.tertiary.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
-                                </div>
-                                {selectedApplicant.tertiary.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.tertiary.yearGraduated}</div>}
+                                {schoolNameField('tertiary')}
+                                {selectedApplicant.tertiary.yearGraduated
+                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.tertiary.yearGraduated}</div>
+                                  : selectedApplicant.tertiary.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.tertiary.yearLastAttended}</div>}
                               </div>
                             )}
                             {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant.graduateStudies?.map((study, idx) => (
                               <div key={idx}>
+                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Graduate Studies</div>
                                 <div className="font-bold text-base text-gray-900">{study.course}</div>
-                                {study.schoolName && <div className="text-sm mt-1 text-gray-700">{study.schoolName}</div>}
-                                <div className="text-sm mt-1 text-gray-900">
-                                  {[study.schoolCity, study.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
-                                </div>
-                                {study.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{study.yearGraduated}</div>}
+                                {schoolNameField('graduate-' + idx)}
+                                {study.yearGraduated
+                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {study.yearGraduated}</div>
+                                  : study.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {study.yearLastAttended}</div>}
                               </div>
                             ))}
                             {selectedFields.highSchool && isFieldAvailable('highSchool') && (
                               <div>
-                                <div className="font-bold text-base text-gray-900">
-                                   High School{selectedApplicant.secondary?.seniorHighStrand ? (' — ' + selectedApplicant.secondary.seniorHighStrand + ' Strand') : ''}
-                                </div>
-                                {selectedApplicant.secondary?.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.secondary.schoolName}</div>}
-                                <div className="text-sm mt-1 text-gray-900">
-                                  {[selectedApplicant.secondary?.schoolCity, selectedApplicant.secondary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
-                                </div>
-                                {selectedApplicant.secondary?.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.secondary.yearGraduated}</div>}
+                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Secondary</div>
+                                {selectedApplicant.secondary?.seniorHighStrand && (
+                                  <div className="font-bold text-base text-gray-900">{selectedApplicant.secondary.seniorHighStrand}</div>
+                                )}
+                                {schoolNameField('secondary')}
+                                {selectedApplicant.secondary?.yearGraduated
+                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.secondary.yearGraduated}</div>
+                                  : selectedApplicant.secondary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.secondary.yearLastAttended}</div>}
                               </div>
                             )}
                             {selectedFields.elementary && isFieldAvailable('elementary') && (
                               <div>
-                                <div className="font-bold text-base text-gray-900">Elementary</div>
-                                {selectedApplicant.elementary?.schoolName && <div className="text-sm mt-1 text-gray-700">{selectedApplicant.elementary.schoolName}</div>}
-                                <div className="text-sm mt-1 text-gray-900">
-                                  {[selectedApplicant.elementary?.schoolCity, selectedApplicant.elementary?.schoolProvince].filter(Boolean).join(', ') || [selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}
-                                </div>
-                                {selectedApplicant.elementary?.yearGraduated && <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.elementary.yearGraduated}</div>}
+                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Elementary</div>
+                                {schoolNameField('elementary')}
+                                {selectedApplicant.elementary?.yearGraduated
+                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.elementary.yearGraduated}</div>
+                                  : selectedApplicant.elementary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.elementary.yearLastAttended}</div>}
                               </div>
                             )}
                           </div>
@@ -705,20 +741,22 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                         <div className="mt-6">
                           <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Work Experience</h2>
                           <div className="space-y-4">
-                            {selectedFields.workExperience1 && selectedApplicant.workExperiences[0] && (
-                              <div>
-                                <div className="font-bold text-base text-gray-900">{selectedApplicant.workExperiences[0].position}</div>
-                                <div className="text-sm mt-1 text-gray-700">{selectedApplicant.workExperiences[0].companyName}</div>
-                                <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.workExperiences[0].from}{' - '}{selectedApplicant.workExperiences[0].to}</div>
-                              </div>
-                            )}
-                            {selectedFields.workExperience2 && selectedApplicant.workExperiences[1] && (
-                              <div>
-                                <div className="font-bold text-base text-gray-900">{selectedApplicant.workExperiences[1].position}</div>
-                                <div className="text-sm mt-1 text-gray-700">{selectedApplicant.workExperiences[1].companyName}</div>
-                                <div className="text-sm italic mt-1 text-gray-900">{selectedApplicant.workExperiences[1].from}{' - '}{selectedApplicant.workExperiences[1].to}</div>
-                              </div>
-                            )}
+                            {[0, 1].map((i) => {
+                              const w = selectedApplicant.workExperiences[i];
+                              const show = i === 0 ? selectedFields.workExperience1 : selectedFields.workExperience2;
+                              if (!show || !w) return null;
+                              return (
+                                <div key={i}>
+                                  <div className="font-bold text-base text-gray-900">{w.position}</div>
+                                  <div className="text-sm mt-1 text-gray-700">
+                                    {[w.companyName, w.companyCity].filter(Boolean).join(' — ')}
+                                  </div>
+                                  <div className="text-sm italic mt-1 text-gray-900">
+                                    {[w.numberOfMonths && `${w.numberOfMonths} month/s`, w.status].filter(Boolean).join(' · ')}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -727,8 +765,14 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                       {selectedFields.skillsCompetencies && isFieldAvailable('skillsCompetencies') && selectedApplicant.otherSkills?.length > 0 && (
                         <div className="mt-6">
                           <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Skills & Competencies</h2>
-                          <div className="text-sm leading-relaxed text-gray-700">
-                            {selectedApplicant.otherSkills.join(' • ')}
+                          {/* 3 columns, filled left-to-right then top-to-bottom */}
+                          <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm text-gray-700">
+                            {selectedApplicant.otherSkills.map((skill, i) => (
+                              <div key={i} className="flex items-start gap-2">
+                                <span className="text-brand-blue leading-tight">•</span>
+                                <span>{skill}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -802,11 +846,13 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                         </div>
                       )}
 
-                      {/* Footer */}
-                      <div className="mt-12 pt-6 text-center border-t border-gray-300">
-                        <p className="text-xs text-gray-600">Generated by PESO Tangub City {'–'} Comprehensive Profiling System</p>
-                        <p className="text-xs text-gray-600">Public Employment Service Office | Tangub City, Misamis Occidental</p>
-                      </div>
+                      {/* Footer — pinned to the bottom of the page */}
+                      {selectedFields.footer && (
+                        <div className="mt-auto pt-6 text-center border-t border-gray-300">
+                          <p className="text-xs text-gray-600">Generated by PESO Tangub City {'–'} Comprehensive Profiling System</p>
+                          <p className="text-xs text-gray-600">Public Employment Service Office | Tangub City, Misamis Occidental</p>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>

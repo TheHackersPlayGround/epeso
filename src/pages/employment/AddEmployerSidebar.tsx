@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { X, Briefcase } from 'lucide-react';
 import DatePicker from '../../components/DatePicker';
-import BarangayCombobox from '../../components/BarangayCombobox';
+import SearchableSelect from '../../components/SearchableSelect';
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService';
 import ApplicantReviewModal from './ApplicantReviewModal';
 
 interface EmployerFormData {
@@ -21,7 +22,9 @@ interface EmployerFormData {
   barangay: string;
   barangayId: number | null;
   city: string;
+  cityId: number | null;
   province: string;
+  provinceId: number | null;
   region: string;
   jobOpenings: Array<{ jobName: string; slots: string }>;
   status: string;
@@ -57,7 +60,9 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     barangay: '',
     barangayId: null,
     city: '',
+    cityId: null,
     province: '',
+    provinceId: null,
     region: '',
     jobOpenings: [{ jobName: '', slots: '' }],
     status: 'Active',
@@ -320,34 +325,41 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                   onChange={e => handleChange('street', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
-              <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay</label>
-                <BarangayCombobox
-                  value={formData.barangay}
-                  onTextChange={text =>
-                    setFormData(prev => ({ ...prev, barangay: text, barangayId: null, city: '', province: '', region: '' }))
-                  }
-                  onSelect={m =>
-                    setFormData(prev => ({
-                      ...prev,
-                      barangay: m.barangay,
-                      barangayId: m.id,
-                      city: m.city,
-                      province: m.province,
-                      region: m.region,
-                    }))
+              {/* Cascade: Province -> City/Municipality -> Barangay */}
+              <div>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province</label>
+                <SearchableSelect
+                  value={formData.province}
+                  placeholder="Search province…"
+                  fetchOptions={s => searchProvinces(s)}
+                  onSelect={opt =>
+                    setFormData(prev => ({ ...prev, province: opt.name, provinceId: opt.id, city: '', cityId: null, barangay: '', barangayId: null }))
                   }
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality</label>
-                <input type="text" value={formData.city} readOnly
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 outline-none" />
+                <SearchableSelect
+                  value={formData.city}
+                  placeholder={formData.provinceId ? 'Search city/municipality…' : 'Select province first'}
+                  disabled={!formData.provinceId}
+                  refetchKey={formData.provinceId ?? ''}
+                  fetchOptions={s => searchCities(formData.provinceId ?? 0, s)}
+                  onSelect={opt =>
+                    setFormData(prev => ({ ...prev, city: opt.name, cityId: opt.id, barangay: '', barangayId: null }))
+                  }
+                />
               </div>
-              <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province</label>
-                <input type="text" value={formData.province} readOnly
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-600 outline-none" />
+              <div className="col-span-2">
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay</label>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={formData.cityId ? 'Search barangay…' : 'Select city first'}
+                  disabled={!formData.cityId}
+                  refetchKey={formData.cityId ?? ''}
+                  fetchOptions={s => searchBarangaysByCity(formData.cityId ?? 0, s)}
+                  onSelect={opt => setFormData(prev => ({ ...prev, barangay: opt.name, barangayId: opt.id }))}
+                />
               </div>
             </div>
           </div>

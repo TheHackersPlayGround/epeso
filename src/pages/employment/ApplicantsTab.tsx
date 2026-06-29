@@ -25,12 +25,9 @@ export const AVAILABLE_FILTERS: FilterOption[] = [
     "Elementary Graduate", "High School Graduate", "Senior High School Graduate",
     "Vocational / Technical", "College Graduate", "Post Graduate",
   ]},
-  { id: "employmentStatus", label: "Employment Status", options: ["Unemployed", "Underemployed", "Employed"] },
-  { id: "language", label: "Language", options: ["Filipino", "English", "Bisaya", "Hiligaynon", "Ilocano"] },
-  { id: "skills", label: "Skills", options: [
-    "Computer Literacy", "Driving", "Cooking", "Caregiving",
-    "Electrical", "Plumbing", "Welding", "Sewing",
-  ]},
+  { id: "employmentStatus", label: "Employment Status", options: ["Employed", "Unemployed"] },
+  { id: "language", label: "Language", type: "text" },
+  { id: "skills", label: "Skills", type: "text" },
   { id: "referredProgram", label: "Referred Program", options: [
     "SPES", "GIP", "DILEEP", "TESDA Training", "TUPAD", "JobStart", "Others",
   ]},
@@ -121,6 +118,33 @@ function getOFWLabel(applicant: Applicant): string {
   return "Not OFW";
 }
 
+// Filters that render their own extra table column. Filters that map to an
+// existing default column (sex, educationalLevel, skills, trainingCourse,
+// jobPreference) are NOT here — they only filter, they don't add a column.
+const COLUMN_FILTER_IDS = ["disability", "civilStatus", "ofw", "4ps", "referredProgram", "barangay", "employmentStatus", "language"];
+
+// Active filters that add a column, in the order they were applied. Header and
+// row cells both iterate this same list so they always line up.
+function columnFilters(activeFilters: string[]): string[] {
+  return activeFilters.filter((f) => COLUMN_FILTER_IDS.includes(f));
+}
+
+// Cell content for a given column-filter id.
+function renderFilterCell(id: string, a: Applicant): React.ReactNode {
+  switch (id) {
+    case "disability":       return a.hasDisability ? "Yes" : "No";
+    case "civilStatus":      return a.civilStatus || "N/A";
+    case "ofw":              return getOFWLabel(a);
+    case "4ps":              return a.is4PsBeneficiary ? "Yes" : "No";
+    case "referredProgram":  return (a.fullFormData?.referredProgram as string) || "—";
+    case "barangay":         return (a.fullFormData?.barangay as string) || "—";
+    case "language":         return a.language || "N/A";
+    case "employmentStatus":
+      return <span className={`px-2 py-0.5 rounded-full text-xs ${getEmploymentStatusClass(a.employmentStatus)}`}>{a.employmentStatus}</span>;
+    default: return null;
+  }
+}
+
 function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: ApplicantsTableRowProps) {
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -132,48 +156,11 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
       <td className="px-4 py-3 text-gray-600">{applicant.trainingCourses || '—'}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.jobPreference || '—'}</td>
 
-      {activeFilters.includes("disability") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {applicant.hasDisability ? "Yes" : "No"}
+      {columnFilters(activeFilters).map((id) => (
+        <td key={id} className={`px-4 py-3 text-gray-600 align-top ${id === "language" ? "min-w-[220px]" : "whitespace-nowrap"}`}>
+          {renderFilterCell(id, applicant)}
         </td>
-      )}
-      {activeFilters.includes("civilStatus") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {applicant.civilStatus || "N/A"}
-        </td>
-      )}
-      {activeFilters.includes("ofw") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {getOFWLabel(applicant)}
-        </td>
-      )}
-      {activeFilters.includes("4ps") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {applicant.is4PsBeneficiary ? "Yes" : "No"}
-        </td>
-      )}
-      {activeFilters.includes("referredProgram") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {(applicant.fullFormData?.referredProgram as string) || "—"}
-        </td>
-      )}
-      {activeFilters.includes("barangay") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {(applicant.fullFormData?.barangay as string) || "—"}
-        </td>
-      )}
-      {activeFilters.includes("employmentStatus") && (
-        <td className="px-4 py-3 whitespace-nowrap">
-          <span className={`px-2 py-0.5 rounded-full text-xs ${getEmploymentStatusClass(applicant.employmentStatus)}`}>
-            {applicant.employmentStatus}
-          </span>
-        </td>
-      )}
-      {activeFilters.includes("language") && (
-        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-          {applicant.language || "N/A"}
-        </td>
-      )}
+      ))}
 
       <td className="px-4 py-3 whitespace-nowrap">
         <button
@@ -236,7 +223,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
                   {header}
                 </th>
               ))}
-              {activeFilters.filter((f) => f !== "trainingCourse").map((filterId) => (
+              {columnFilters(activeFilters).map((filterId) => (
                 <th key={filterId} className="px-4 py-3 text-left text-white whitespace-nowrap">
                   {getFilterLabel(filterId)}
                 </th>

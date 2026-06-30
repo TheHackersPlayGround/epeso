@@ -246,7 +246,9 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
               </div>
               <div>
                 <label className="block text-sm text-gray-700 mb-2">Status {!isEdit && '*'}</label>
-                <select value={formData.status} onChange={e => onFormChange('status', e.target.value)} className={inp}>
+                {/* New users always start Active; the status can be changed later via Edit. */}
+                <select value={formData.status} onChange={e => onFormChange('status', e.target.value)} disabled={!isEdit}
+                  className={`${inp} ${!isEdit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>

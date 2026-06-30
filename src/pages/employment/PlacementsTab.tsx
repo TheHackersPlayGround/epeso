@@ -4,6 +4,7 @@ import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import type { Placement } from '../../contexts/EmploymentContext'
 import { listPlacements, updatePlacement, updatePlacementStatus } from '../../services/placementService'
+import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
 
@@ -231,14 +232,19 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      return
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const menuHeight = 110
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
-    setOpenMenuId(openMenuId === id ? null : id)
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
+    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
+    setMenuPos({ top, right: window.innerWidth - rect.right })
+    setOpenMenuId(id)
   }
 
   function closeMenu() { setOpenMenuId(null) }
@@ -309,8 +315,8 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
+            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onView(menuPlacement); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
@@ -649,8 +655,34 @@ export default function PlacementsTab() {
   }
 
   async function handleUpdateStatus(id: number, newStatus: Placement['status']) {
-    await updatePlacementStatus(id, newStatus)
+    const name = placements.find(p => p.id === id)?.applicantName ?? 'The applicant'
+
+    try {
+      await updatePlacementStatus(id, newStatus)
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to update placement status. Please try again.'
+      Swal.fire('Error', msg, 'error')
+      throw err // keep the Update Status modal open so the user can retry
+    }
+
     setPlacements(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p))
+
+    // Customised confirmation per status.
+    const notes: Record<Placement['status'], { title: string; text: string }> = {
+      Active:     { title: 'Status Updated', text: `${name}'s placement is now set to Active.` },
+      Resigned:   { title: 'Status Updated', text: `${name} has been marked as Resigned.` },
+      Terminated: { title: 'Status Updated', text: `${name} has been marked as Terminated.` },
+      Completed:  { title: 'Status Updated', text: `${name}'s placement has been marked as Completed.` },
+    }
+    const note = notes[newStatus]
+    Swal.fire({
+      icon: 'success',
+      title: note.title,
+      text: note.text,
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#0077BE',
+    })
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────

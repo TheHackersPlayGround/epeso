@@ -103,8 +103,13 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
 
   const REQUIRED: Partial<Record<keyof EmployerFormData, string>> = {
     companyName: 'companyInfo',
+    tinNumber: 'companyInfo',
     contactPersonName: 'contactPerson',
     contactNumber: 'contactPerson',
+    street: 'companyAddress',
+    province: 'companyAddress',
+    city: 'companyAddress',
+    barangay: 'companyAddress',
   };
 
   function fieldError(key: keyof EmployerFormData) {
@@ -271,11 +276,12 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.tinNumber}
                   onChange={e => handleChange('tinNumber', e.target.value)}
                   placeholder="e.g., 123-456-789-000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  className={inputCls('tinNumber')} />
+                <ErrMsg k="tinNumber" />
               </div>
             </div>
           </div>
@@ -332,14 +338,15 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.street}
                   onChange={e => handleChange('street', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  className={inputCls('street')} />
+                <ErrMsg k="street" />
               </div>
               {/* Cascade: Province -> City/Municipality -> Barangay */}
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.province}
                   placeholder="Search province…"
@@ -348,9 +355,10 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                     setFormData(prev => ({ ...prev, province: opt.name, provinceId: opt.id, city: '', cityId: null, barangay: '', barangayId: null }))
                   }
                 />
+                <ErrMsg k="province" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.city}
                   placeholder={formData.provinceId ? 'Search city/municipality…' : 'Select province first'}
@@ -361,9 +369,10 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                     setFormData(prev => ({ ...prev, city: opt.name, cityId: opt.id, barangay: '', barangayId: null }))
                   }
                 />
+                <ErrMsg k="city" />
               </div>
               <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.barangay}
                   placeholder={formData.cityId ? 'Search barangay…' : 'Select city first'}
@@ -372,6 +381,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                   fetchOptions={s => searchBarangaysByCity(formData.cityId ?? 0, s)}
                   onSelect={opt => setFormData(prev => ({ ...prev, barangay: opt.name, barangayId: opt.id }))}
                 />
+                <ErrMsg k="barangay" />
               </div>
             </div>
           </div>
@@ -384,8 +394,9 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Status</label>
-                <select value={formData.status} onChange={e => handleChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500">
+                {/* New employers always start Active; the status can be changed later via Edit. */}
+                <select value={formData.status} disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none">
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>

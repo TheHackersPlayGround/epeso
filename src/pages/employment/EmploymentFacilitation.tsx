@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
+import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicantImport";
 import type { Applicant } from "./ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./ApplicantsTab";
-import { listApplicants, createApplicant, updateApplicant } from "../../services/applicantService";
+import Swal from "sweetalert2";
+import { listApplicants, createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { listVacancies } from "../../services/vacancyService";
 import { createReferral } from "../../services/referralService";
 import ApplicantsTab from "./ApplicantsTab";
@@ -183,29 +185,134 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
-function ImportModal({ onClose }: { onClose: () => void }) {
+function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function pickFile(f: File | null) {
+    setFile(f);
+    setResult(null);
+    setError(null);
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return;
+    setIsImporting(true);
+    setError(null);
+    setResult(null);
+    setProgress({ done: 0, total: 0 });
+    try {
+      const res = await importApplicants(file, (done, total) => setProgress({ done, total }));
+      setResult(res);
+      if (res.succeeded > 0) onImported();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx or .csv.");
+    } finally {
+      setIsImporting(false);
+      setProgress(null);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Import Applicants</h3>
           <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
         </div>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400 hover:border-brand-blue transition-colors cursor-pointer">
-          <p className="text-3xl mb-2">📂</p>
-          <p className="text-sm font-medium text-gray-600">Click to upload or drag & drop</p>
-          <p className="text-xs mt-1">Excel (.xlsx) or CSV files</p>
+
+        <div className="overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <label className={`block border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 text-gray-400 hover:border-brand-blue"}`}>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+                <p className="text-3xl mb-2">📂</p>
+                {file ? (
+                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-gray-600">Click to upload or drag & drop</p>
+                    <p className="text-xs mt-1">Excel (.xlsx) or CSV files</p>
+                  </>
+                )}
+              </label>
+
+              <p className="text-xs text-gray-400 mt-3 text-center">
+                Download the{" "}
+                <button type="button" onClick={() => { void downloadImportTemplate(); }} className="text-brand-blue cursor-pointer hover:underline">template file</button>{" "}
+                to ensure correct column format.
+              </p>
+
+              {error && <p className="text-red-500 text-sm mt-3 text-center">{error}</p>}
+
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 mt-3 text-center">
+                  Importing {progress.done} of {progress.total}…
+                </p>
+              )}
+            </>
+          )}
         </div>
-        <p className="text-xs text-gray-400 mt-3 text-center">
-          Download the{" "}
-          <span className="text-brand-blue cursor-pointer hover:underline">template file</span>{" "}
-          to ensure correct column format.
-        </p>
+
         <div className="flex gap-3 mt-5">
-          <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-          <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">Import</button>
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? "Importing…" : "Import"}
+              </button>
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? "s" : ""} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{" "}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -417,6 +524,29 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     await reloadApplicants();
   }
 
+  async function handleDeleteApplicant(applicant: Applicant) {
+    const result = await Swal.fire({
+      title: "Delete Applicant?",
+      text: `Are you sure you want to delete ${applicant.name}? This will move the applicant to the recycle bin.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await deleteApplicant(applicant.id);
+      await reloadApplicants();
+      Swal.fire({ icon: "success", title: "Deleted", text: "The applicant has been deleted.", timer: 1500, showConfirmButton: false });
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : "Failed to delete applicant.";
+      Swal.fire({ icon: "error", title: "Error", text: msg });
+    }
+  }
+
   function handleCloseSidebar() {
     setIsAddModalOpen(false);
     setEditingApplicant(null);
@@ -558,6 +688,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onViewApplicant={setViewingApplicant}
               onReferApplicant={setReferringApplicant}
               onShowHistory={setHistoryApplicant}
+              onDeleteApplicant={handleDeleteApplicant}
               onImportClick={() => setIsImportModalOpen(true)}
               onShowResumeMaker={() => setIsResumeMakerOpen(true)}
               onSearchChange={handleSearchChange}
@@ -589,7 +720,12 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       {historyApplicant && (
         <EmploymentHistoryPanel applicant={historyApplicant} onClose={() => setHistoryApplicant(null)} />
       )}
-      {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} />}
+      {isImportModalOpen && (
+        <ImportModal
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={() => { reloadApplicants().catch(() => {}); }}
+        />
+      )}
     </div>
   );
 }

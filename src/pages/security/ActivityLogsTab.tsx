@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Download, Search, ChevronDown, ChevronLeft, ChevronRight,
   Trash, Trash2, RotateCcw, Clock, AlertTriangle,
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
+import { listDeleted, restoreRecord, purgeRecord, type RecycleBinRecord } from '../../services/recycleBinService'
 
 interface ActivityLog {
   id: number
@@ -39,46 +40,22 @@ const mockActivityLogs: ActivityLog[] = [
   { id: 20, timestamp: '2026-05-11 02:15 PM', user: 'staff002', role: 'Staff',         action: 'Delete Record', module: 'Skills Training', details: 'Unauthorized delete attempt blocked',      status: 'Failed'  },
 ]
 
-interface RecycleBinItem {
-  id: number
-  name: string
-  module: string
-  description: string
-  deletedBy: string
-  deletedAt: string
-}
+// The recycle bin shows real soft-deleted records from the Employment
+// Facilitation module (applicants, employers, referrals). Other modules don't
+// have soft delete yet, so they won't appear here until they do.
+type RecycleBinItem = RecycleBinRecord
 
-const TODAY_DATE = new Date('2026-05-11')
-
-function daysAgo(n: number): string {
-  const d = new Date(TODAY_DATE)
-  d.setDate(d.getDate() - n)
-  return d.toISOString().split('T')[0]
-}
-
+// Days left before the (display-only) 30-day window elapses, from the real date.
 function getDaysRemaining(deletedAt: string): number {
   const deleted = new Date(deletedAt)
-  const diff = Math.floor((TODAY_DATE.getTime() - deleted.getTime()) / (1000 * 60 * 60 * 24))
+  const diff = Math.floor((Date.now() - deleted.getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(0, 30 - diff)
 }
-
-const initialRecycleBin: RecycleBinItem[] = [
-  { id: 1,  name: 'Pedro Reyes',           module: 'Applicants',      description: 'Applicant record – Machinist, Batch 2025',         deletedBy: 'admin',    deletedAt: daysAgo(29) },
-  { id: 2,  name: 'Old Co. Enterprises',   module: 'Employers',       description: 'Employer profile – Manufacturing sector',           deletedBy: 'admin',    deletedAt: daysAgo(27) },
-  { id: 3,  name: 'ELPOR Entry #0032',     module: 'OFW Services',    description: 'ELPOR Form A2 – Ramon Cruz, Deployment 2024',      deletedBy: 'admin',    deletedAt: daysAgo(24) },
-  { id: 4,  name: 'Livelihood Training Q1',module: 'Skills Training', description: 'NC II Batch BATCH-003 – Cancelled program',        deletedBy: 'staff001', deletedAt: daysAgo(20) },
-  { id: 5,  name: 'Jose Garcia',           module: 'Applicants',      description: 'Applicant record – Welder, duplicate entry',       deletedBy: 'staff002', deletedAt: daysAgo(16) },
-  { id: 6,  name: 'XYZ Trading Corp.',     module: 'Employers',       description: 'Employer profile – closed business',               deletedBy: 'admin',    deletedAt: daysAgo(12) },
-  { id: 7,  name: 'OWWA Case #2025-018',   module: 'OFW Services',    description: 'OWWA Welfare Case – Liza Mendoza, resolved',       deletedBy: 'staff001', deletedAt: daysAgo(8)  },
-  { id: 8,  name: 'Community Fair 2025',   module: 'Programs',        description: 'Job fair event record – concluded',                deletedBy: 'staff002', deletedAt: daysAgo(5)  },
-  { id: 9,  name: 'Ana Reyes',             module: 'Applicants',      description: 'Applicant record – Caregiver, transferred abroad', deletedBy: 'admin',    deletedAt: daysAgo(3)  },
-  { id: 10, name: 'PESO Request #1045',    module: 'OFW Services',    description: 'Request for Assistance – withdrawn by applicant',  deletedBy: 'staff001', deletedAt: daysAgo(1)  },
-]
 
 const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
 const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
 const logStatuses = ['All', 'Success', 'Failed']
-const binModules  = ['All', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Programs']
+const binModules  = ['All', 'Applicants', 'Employers', 'Referrals']
 
 export default function ActivityLogsTab() {
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
@@ -90,7 +67,8 @@ export default function ActivityLogsTab() {
   const [logsPerPage,     setLogsPerPage]     = useState(10)
   const [logPage,         setLogPage]         = useState(1)
 
-  const [recycleBin,    setRecycleBin]    = useState<RecycleBinItem[]>(initialRecycleBin)
+  const [recycleBin,    setRecycleBin]    = useState<RecycleBinItem[]>([])
+  const [binLoading,    setBinLoading]    = useState(true)
   const [binPerPage,    setBinPerPage]    = useState(10)
   const [binPage,       setBinPage]       = useState(1)
   const [binModuleFilter, setBinModuleFilter] = useState('All')
@@ -122,6 +100,19 @@ export default function ActivityLogsTab() {
   useEffect(() => { setLogPage(1) }, [logSearch, logActionFilter, logModuleFilter, logStatusFilter])
   useEffect(() => { setBinPage(1) }, [binModuleFilter, binSearch])
 
+  const reloadBin = useCallback(async () => {
+    setBinLoading(true)
+    try {
+      setRecycleBin(await listDeleted())
+    } catch {
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load the recycle bin. Please try again.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+    } finally {
+      setBinLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reloadBin() }, [reloadBin])
+
   const handleExportLogs = () => {
     const rows = [['Timestamp', 'User', 'Role', 'Action', 'Module', 'Details', 'Status'], ...filteredLogs.map(l => [l.timestamp, l.user, l.role, l.action, l.module, l.details, l.status])]
     const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -132,14 +123,23 @@ export default function ActivityLogsTab() {
     link.click()
   }
 
+  const closeModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+  const showError = (message: string) =>
+    setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message, onConfirm: closeModal })
+
   const handleRestoreItem = (item: RecycleBinItem) => {
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Restore Record',
       message: `Restore "${item.name}" back to ${item.module}?\n\nThis record will be fully accessible again.`,
       confirmText: 'Yes, Restore', cancelText: 'Cancel',
-      onConfirm: () => {
-        setRecycleBin(prev => prev.filter(i => i.id !== item.id))
-        setConfirmModal({ isOpen: true, type: 'success', title: 'Record Restored', message: `"${item.name}" has been successfully restored to ${item.module}.`, onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      onConfirm: async () => {
+        try {
+          await restoreRecord(item.recordType, item.id)
+          await reloadBin()
+          setConfirmModal({ isOpen: true, type: 'success', title: 'Record Restored', message: `"${item.name}" has been successfully restored to ${item.module}.`, onConfirm: closeModal })
+        } catch (err: unknown) {
+          showError(err instanceof Error && err.message ? err.message : `Failed to restore "${item.name}".`)
+        }
       },
     })
   }
@@ -149,9 +149,14 @@ export default function ActivityLogsTab() {
       isOpen: true, type: 'confirm', title: 'Permanently Delete',
       message: `Permanently delete "${item.name}"?\n\nThis action CANNOT be undone. The record will be lost forever.`,
       confirmText: 'Yes, Delete Permanently', cancelText: 'Cancel',
-      onConfirm: () => {
-        setRecycleBin(prev => prev.filter(i => i.id !== item.id))
-        setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      onConfirm: async () => {
+        try {
+          await purgeRecord(item.recordType, item.id)
+          await reloadBin()
+          setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: closeModal })
+        } catch (err: unknown) {
+          showError(err instanceof Error && err.message ? err.message : `Failed to delete "${item.name}".`)
+        }
       },
     })
   }
@@ -162,9 +167,18 @@ export default function ActivityLogsTab() {
       isOpen: true, type: 'confirm', title: 'Empty Recycle Bin',
       message: `Permanently delete all ${recycleBin.length} item(s) in the recycle bin?\n\nThis action CANNOT be undone.`,
       confirmText: 'Yes, Empty Bin', cancelText: 'Cancel',
-      onConfirm: () => {
-        setRecycleBin([])
-        setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+      onConfirm: async () => {
+        try {
+          // No bulk endpoint — purge each record, then reload once.
+          for (const item of recycleBin) {
+            await purgeRecord(item.recordType, item.id)
+          }
+          await reloadBin()
+          setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: closeModal })
+        } catch {
+          await reloadBin()
+          showError('Some items could not be deleted. Please try again.')
+        }
       },
     })
   }
@@ -328,7 +342,11 @@ export default function ActivityLogsTab() {
             </div>
           </div>
 
-          {filteredBin.length === 0 ? (
+          {binLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <p className="text-sm">Loading…</p>
+            </div>
+          ) : filteredBin.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <Trash size={48} className="mb-4 text-gray-300" />
               <p className="text-sm">{recycleBin.length === 0 ? 'The recycle bin is empty.' : 'No records match your filters.'}</p>
@@ -353,14 +371,13 @@ export default function ActivityLogsTab() {
                     const isUrgent  = daysLeft <= 3
                     const isWarning = daysLeft <= 7 && daysLeft > 3
                     return (
-                      <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 ${isUrgent ? 'bg-red-50/40' : isWarning ? 'bg-amber-50/40' : ''}`}>
+                      <tr key={`${item.recordType}-${item.id}`} className={`border-b border-gray-100 hover:bg-gray-50 ${isUrgent ? 'bg-red-50/40' : isWarning ? 'bg-amber-50/40' : ''}`}>
                         <td className="px-4 py-3"><span className="text-sm text-gray-800">{item.name}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-xs ${
-                            item.module === 'Applicants'      ? 'bg-blue-50 text-blue-700' :
-                            item.module === 'Employers'       ? 'bg-purple-50 text-purple-700' :
-                            item.module === 'OFW Services'    ? 'bg-orange-50 text-orange-700' :
-                            item.module === 'Skills Training' ? 'bg-green-50 text-green-700' :
+                            item.module === 'Applicants' ? 'bg-blue-50 text-blue-700' :
+                            item.module === 'Employers'  ? 'bg-purple-50 text-purple-700' :
+                            item.module === 'Referrals'  ? 'bg-amber-50 text-amber-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>{item.module}</span>
                         </td>

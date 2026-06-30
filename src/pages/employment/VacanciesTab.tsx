@@ -180,14 +180,19 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      return
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const menuHeight = 140
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
-    setOpenMenuId(openMenuId === id ? null : id)
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
+    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
+    setMenuPos({ top, right: window.innerWidth - rect.right })
+    setOpenMenuId(id)
   }
 
   function closeMenu() { setOpenMenuId(null) }
@@ -298,8 +303,8 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
+            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onView(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
@@ -681,7 +686,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
   }
 
   function handleSave() {
-    if (!jobTitle.trim() || !employerId || !vacanciesCount) {
+    if (!jobTitle.trim() || !employerId || !vacanciesCount || !salaryRange.trim() || !requirements.trim()) {
       setShowFieldErrors(true)
       return
     }
@@ -792,14 +797,15 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range</label>
+            <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={salaryRange}
               onChange={e => setSalaryRange(e.target.value)}
               placeholder="e.g. ₱25,000 - ₱35,000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400 text-gray-900"
+              className={inputCls(!salaryRange.trim())}
             />
+            <ErrMsg show={fieldErr(!salaryRange.trim())} />
           </div>
 
           <div>
@@ -813,13 +819,14 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Requirements</label>
+            <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Requirements <span className="text-red-500">*</span></label>
             <textarea
               value={requirements}
               onChange={e => setRequirements(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y text-gray-900 placeholder:text-gray-400"
+              className={`${inputCls(!requirements.trim())} resize-y`}
             />
+            <ErrMsg show={fieldErr(!requirements.trim())} />
           </div>
         </div>
 

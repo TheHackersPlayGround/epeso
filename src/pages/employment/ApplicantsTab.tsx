@@ -186,6 +186,7 @@ type ApplicantsTableProps = {
   onEdit: (applicant: Applicant) => void;
   onRefer: (applicant: Applicant) => void;
   onShowHistory: (applicant: Applicant) => void;
+  onDelete: (applicant: Applicant) => void;
 };
 
 const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Training Course", "Job Preference"];
@@ -194,19 +195,30 @@ function getFilterLabel(filterId: string): string {
   return AVAILABLE_FILTERS.find((f) => f.id === filterId)?.label ?? filterId;
 }
 
-function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer, onShowHistory }: ApplicantsTableProps) {
+function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer, onShowHistory, onDelete }: ApplicantsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
+    // Toggling closed — no need to recompute position.
+    if (openMenuId === id) {
+      setOpenMenuId(null);
+      return;
+    }
+
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const menuHeight = 110;
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8;
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    });
-    setOpenMenuId(openMenuId === id ? null : id);
+    // Approx. height of the 5-item menu (each item ~33px + 8px vertical padding).
+    const menuHeight = 175;
+    const margin = 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    // Prefer opening below the trigger; flip above when there isn't room.
+    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4;
+    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
+
+    setMenuPos({ top, right: window.innerWidth - rect.right });
+    setOpenMenuId(id);
   }
 
   function closeMenu() { setOpenMenuId(null); }
@@ -255,8 +267,8 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
+            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onView(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
@@ -268,6 +280,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
               <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
             )}
             <button onClick={() => { onShowHistory(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Employment History</button>
+            <button onClick={() => { onDelete(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
           </div>
         </>
       )}
@@ -621,6 +634,7 @@ type ApplicantsTabProps = {
   onViewApplicant: (a: Applicant) => void;
   onReferApplicant: (a: Applicant) => void;
   onShowHistory: (a: Applicant) => void;
+  onDeleteApplicant: (a: Applicant) => void;
   onImportClick: () => void;
   onShowResumeMaker: () => void;
   onSearchChange: (v: string) => void;
@@ -653,6 +667,7 @@ export default function ApplicantsTab({
   onViewApplicant,
   onReferApplicant,
   onShowHistory,
+  onDeleteApplicant,
   onImportClick,
   onShowResumeMaker,
   onSearchChange,
@@ -719,6 +734,7 @@ export default function ApplicantsTab({
           onEdit={onEditApplicant}
           onRefer={onReferApplicant}
           onShowHistory={onShowHistory}
+          onDelete={onDeleteApplicant}
         />
 
         <ApplicantsPagination

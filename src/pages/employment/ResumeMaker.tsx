@@ -257,7 +257,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   // Builds the full display name shown in the search box after selecting an applicant
   function buildFullName(applicant: ApplicantData): string {
     const middle = applicant.middleName ? applicant.middleName + ' ' : '';
-    return `${applicant.firstName} ${middle}${applicant.surname}`;
+    const suffix = applicant.suffix ? ' ' + applicant.suffix : '';
+    return `${applicant.firstName} ${middle}${applicant.surname}${suffix}`;
   }
 
   function handleApplicantSelect(applicant: ApplicantData) {
@@ -457,7 +458,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                           className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 bg-white block"
                         >
                           <div className="font-medium text-sm text-gray-900">
-                            {a.firstName} {a.middleName ? a.middleName + ' ' : ''}{a.surname}
+                            {a.firstName} {a.middleName ? a.middleName + ' ' : ''}{a.surname}{a.suffix ? ' ' + a.suffix : ''}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5">{a.email || 'No email'}</div>
                         </button>
@@ -628,7 +629,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                         <div className="flex-1 flex flex-col justify-center min-h-32">
                           {selectedFields.fullName && isFieldAvailable('fullName') && (
                             <h1 className="resume-name font-bold uppercase text-brand-blue">
-                              {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}
+                              {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}{selectedApplicant.suffix && ` ${selectedApplicant.suffix}`}
                             </h1>
                           )}
                           <div className="space-y-1 text-sm text-gray-700 leading-relaxed">

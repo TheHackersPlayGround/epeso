@@ -5,6 +5,7 @@ import DatePicker from '../../components/DatePicker';
 import SearchableSelect from '../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../services/locationService';
 import ApplicantReviewModal from './ApplicantReviewModal';
+import { createDefaultApplicantFormData } from './applicantDefaults';
 
 interface ApplicantFormData {
   // Personal Information
@@ -214,84 +215,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     initialData?.hasDisability && initialData.hasDisability.length > 0 ? 'Yes' : 'No'
   );
   const [profileImage, setProfileImage] = useState<string>(initialData?.profileImage ?? '');
-  const defaultFormData: ApplicantFormData = {
-    surname: '',
-    firstName: '',
-    middleName: '',
-    suffix: '',
-    dateOfBirth: '',
-    sex: '',
-    religion: '',
-    civilStatus: '',
-    height: '',
-    houseNo: '',
-    barangay: '',
-    barangayId: null,
-    municipality: '',
-    cityId: null,
-    province: '',
-    provinceId: null,
-    hasDisability: [],
-    disabilityOther: '',
-    tin: '',
-    contactNumber: '',
-    email: '',
-    isOFW: 'No',
-    ofwCountry: '',
-    isFormerOFW: 'No',
-    formerOFWCountry: '',
-    formerOFWReturnDate: '',
-    is4PsBeneficiary: 'No',
-    householdIdNo: '',
-    employmentStatus: '',
-    employmentType: '',
-    selfEmploymentType: '',
-    selfEmploymentOther: '',
-    unemploymentReason: '',
-    unemploymentReasonOther: '',
-    monthsLookingForWork: '',
-    jobPrefEmploymentType: [],
-    jobPrefWorkLocation: [],
-    jobPreferences: [
-      { occupation: '', localCity: '', overseasCountry: '' },
-      { occupation: '', localCity: '', overseasCountry: '' },
-      { occupation: '', localCity: '', overseasCountry: '' },
-    ],
-    languages: [
-      { language: 'ENGLISH', read: false, write: false, speak: false, understand: false },
-      { language: 'FILIPINO', read: false, write: false, speak: false, understand: false },
-      { language: 'MANDARIN', read: false, write: false, speak: false, understand: false },
-    ],
-    currentlyInSchool: '',
-    elementary: { schoolName: '', schoolCity: '', schoolProvince: '', graduated: '', yearGraduated: '', levelReached: '', yearLastAttended: '' },
-    secondary: { schoolName: '', schoolCity: '', schoolProvince: '', type: '', seniorHighStrand: '', graduated: '', yearGraduated: '', levelReached: '', yearLastAttended: '' },
-    tertiary: { schoolName: '', schoolCity: '', schoolProvince: '', course: '', graduated: '', yearGraduated: '', levelReached: '', yearLastAttended: '' },
-    graduateStudies: [],
-    trainings: [],
-    eligibilities: [],
-    professionalLicenses: [],
-    workExperiences: [],
-    otherSkills: [],
-    otherSkillsSpecify: [''],
-    referredProgram: '',
-    referredProgramOther: '',
-    cdspPrograms: [],
-    livelihoodPrograms: [],
-    dileepPrograms: [],
-    projectIdNumber: '',
-    projectLocation: '',
-    projectRegion: '',
-    projectCity: '',
-    projectDetails: { type: [], programComponent: [], wayOfImplementation: [], nameOfProject: '' },
-    pagIbigNo: '',
-    philHealthNo: '',
-    sssNo: '',
-    otherProgramName: '',
-    otherProgramNo: '',
-    documentType: '',
-    documentOtherSpecify: '',
-    savedDocuments: [],
-  };
+  const defaultFormData: ApplicantFormData = createDefaultApplicantFormData();
   const [formData, setFormData] = useState<ApplicantFormData>(() => {
     const merged = { ...defaultFormData, ...initialData };
     // Guard: old saved data may have otherSkillsSpecify as a plain string
@@ -1231,9 +1155,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               
               {formData.languages.map((lang, index) => (
                 <div key={index} className="grid grid-cols-5 border-t border-gray-300">
-                  <div className="px-2 py-2 border-r border-gray-300 flex items-center">
+                  <div className="px-2 py-2 border-r border-gray-300 flex items-center gap-2">
                     {lang.language && index < 3 ? (
-                      <span className="font-medium text-sm px-2 text-gray-900">{lang.language}</span>
+                      <span className="flex-1 font-medium text-sm px-2 text-gray-900">{lang.language}</span>
                     ) : (
                       <input
                         type="text"
@@ -1244,9 +1168,23 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                           newLanguages[index] = { ...newLanguages[index], language: e.target.value.toUpperCase() };
                           setFormData({ ...formData, languages: newLanguages });
                         }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                        className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
                       />
                     )}
+                    {/* Select-all: ticks Read/Write/Speak/Understand for this row */}
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer" title="Select all abilities">
+                      <input
+                        type="checkbox"
+                        checked={lang.read && lang.write && lang.speak && lang.understand}
+                        onChange={(e) => {
+                          const v = e.target.checked;
+                          const newLanguages = [...formData.languages];
+                          newLanguages[index] = { ...newLanguages[index], read: v, write: v, speak: v, understand: v };
+                          setFormData({ ...formData, languages: newLanguages });
+                        }}
+                      />
+                      <span className="text-xs text-gray-500">All</span>
+                    </label>
                   </div>
                   <div className="px-4 py-3 border-r border-gray-300 flex justify-center">
                     <input type="checkbox" checked={lang.read} onChange={() => {
@@ -2188,6 +2126,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           <div><span className="font-semibold">Email:</span> {formData.email}</div>
           {formData.height && <div><span className="font-semibold">Height:</span> {formData.height} cm</div>}
           {formData.religion && <div><span className="font-semibold">Religion:</span> {formData.religion}</div>}
+          {formData.hasDisability.length > 0 && (
+            <div className="col-span-2">
+              <span className="font-semibold">Disability:</span>{' '}
+              {formData.hasDisability
+                .map(d => (d === 'Other' && formData.disabilityOther ? formData.disabilityOther : d))
+                .join(', ')}
+            </div>
+          )}
           {[formData.houseNo, formData.barangay, formData.municipality, formData.province].some(Boolean) && (
             <div className="col-span-2">
               <span className="font-semibold">Address:</span>{' '}

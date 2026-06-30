@@ -16,6 +16,7 @@ type FilterOption = { id: string; label: string; options: string[] }
 const STATIC_FILTERS: FilterOption[] = [
   { id: 'industry', label: 'Industry', options: ['Manufacturing', 'Information Technology', 'Agriculture', 'Retail', 'Healthcare', 'Education', 'Construction', 'Hospitality', 'Transportation', 'Financial Services', 'Other'] },
   { id: 'companySize', label: 'Company Size', options: ['Small (1-50 employees)', 'Medium (51-200 employees)', 'Large (201+ employees)'] },
+  { id: 'businessType', label: 'Business Type', options: ['Corporation', 'Partnership', 'Sole Proprietorship', 'Cooperative'] },
   { id: 'status', label: 'Status', options: ['Active', 'Inactive'] },
 ]
 
@@ -63,14 +64,19 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      return
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const menuHeight = 110
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
-    setOpenMenuId(openMenuId === id ? null : id)
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
+    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
+    setMenuPos({ top, right: window.innerWidth - rect.right })
+    setOpenMenuId(id)
   }
 
   function closeMenu() { setOpenMenuId(null) }
@@ -79,6 +85,7 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
 
   const showCompanySize = activeFilters.includes('companySize')
   const showIndustry = activeFilters.includes('industry')
+  const showBusinessType = activeFilters.includes('businessType')
   const showStatus = activeFilters.includes('status')
 
   return (
@@ -92,6 +99,7 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Contact Person</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Email</th>
               {showCompanySize && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Company Size</th>}
+              {showBusinessType && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Business Type</th>}
               {showStatus && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Status</th>}
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Actions</th>
             </tr>
@@ -107,6 +115,7 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.contactPersonName}</td>
                   <td className="px-4 py-3 text-gray-600">{employer.email}</td>
                   {showCompanySize && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.companySize}</td>}
+                  {showBusinessType && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.businessType}</td>}
                   {showStatus && (
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
@@ -136,8 +145,8 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
+            className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onView(menuEmployer); closeMenu() }}
               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
@@ -342,6 +351,7 @@ export default function EmployersTab() {
         if (filterId === 'status' && e.status !== val) return false
         if (filterId === 'industry' && e.industry !== val) return false
         if (filterId === 'companySize' && e.companySize !== val) return false
+        if (filterId === 'businessType' && e.businessType !== val) return false
       }
       return true
     })
@@ -372,8 +382,16 @@ export default function EmployersTab() {
       setEmployers(fresh)
       setSelectedEmployer(null)
       setSidebarMode(null)
+      Swal.fire({
+        icon: 'success',
+        title: 'Changes Saved!',
+        text: 'Employer information has been successfully updated.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      })
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update employer.'
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to update employer.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg })
     }
   }
@@ -381,7 +399,7 @@ export default function EmployersTab() {
   async function handleDelete(id: number) {
     const result = await Swal.fire({
       title: 'Delete Employer?',
-      text: 'Are you sure you want to delete this employer? This cannot be undone.',
+      text: 'Are you sure you want to delete this employer? This will move the employer to the recycle bin.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',
@@ -394,7 +412,8 @@ export default function EmployersTab() {
       await deleteEmployer(id)
       setEmployers(prev => prev.filter(e => e.id !== id))
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to delete employer.'
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to delete employer.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg })
     }
   }

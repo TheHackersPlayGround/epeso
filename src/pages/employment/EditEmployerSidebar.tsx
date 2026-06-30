@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, Briefcase, Plus, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Briefcase, Plus } from 'lucide-react';
+import Swal from 'sweetalert2';
 import DatePicker from '../../components/DatePicker';
 import SearchableSelect from '../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService';
@@ -39,58 +40,8 @@ interface EditEmployerSidebarProps {
 
 type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'jobOpenings' | 'registration';
 
-function SaveConfirmModal({ isOpen, onConfirm, onCancel }: { isOpen: boolean; onConfirm: () => void; onCancel: () => void }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle size={36} className="text-brand-blue" />
-          </div>
-          <h3 className="text-xl text-gray-800 mb-2">Save Changes?</h3>
-          <p className="text-gray-500 text-sm mb-6">Are you sure you want to save the changes made to this employer's information?</p>
-          <div className="flex gap-3">
-            <button onClick={onCancel}
-              className="flex-1 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium">
-              Cancel
-            </button>
-            <button onClick={onConfirm}
-              className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium">
-              Yes, Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SaveSuccessModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={36} className="text-green-500" />
-          </div>
-          <h3 className="text-xl text-gray-800 mb-2">Changes Saved!</h3>
-          <p className="text-gray-500 text-sm mb-6">Employer information has been successfully updated.</p>
-          <button onClick={onClose}
-            className="w-full py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium">
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function EditEmployerSidebar({ initialData, onSave, onClose }: EditEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState<EmployerFormData>({
     ...initialData,
     barangayId: initialData.barangayId ?? null,
@@ -111,10 +62,20 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
   const handleChange = (field: keyof EmployerFormData, value: string) =>
     setFormData(prev => ({ ...prev, [field]: value }));
 
-  const handleConfirmSave = () => {
-    setShowConfirm(false);
+  const handleSave = async () => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: 'Save Changes?',
+      text: "Are you sure you want to save the changes made to this employer's information?",
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Save',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#0077BE',
+      cancelButtonColor: '#6b7280',
+    });
+    if (!result.isConfirmed) return;
+    // The parent persists, closes this sidebar, and shows the success alert.
     onSave(formData);
-    setShowSuccess(true);
   };
 
   const renderSectionContent = () => {
@@ -176,7 +137,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.tinNumber}
                   onChange={e => handleChange('tinNumber', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
@@ -399,7 +360,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
               className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
               Cancel
             </button>
-            <button type="button" onClick={() => setShowConfirm(true)}
+            <button type="button" onClick={handleSave}
               className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium">
               Save Changes
             </button>
@@ -407,8 +368,6 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         </div>
       </div>
 
-      <SaveConfirmModal isOpen={showConfirm} onConfirm={handleConfirmSave} onCancel={() => setShowConfirm(false)} />
-      <SaveSuccessModal isOpen={showSuccess} onClose={() => { setShowSuccess(false); onClose(); }} />
     </>
   );
 }

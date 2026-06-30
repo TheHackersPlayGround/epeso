@@ -237,14 +237,19 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
+    if (openMenuId === id) {
+      setOpenMenuId(null)
+      return
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const menuHeight = 80
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
-    setOpenMenuId(openMenuId === id ? null : id)
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom
+    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
+    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
+    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
+    setMenuPos({ top, right: window.innerWidth - rect.right })
+    setOpenMenuId(id)
   }
 
   function closeMenu() { setOpenMenuId(null) }
@@ -255,7 +260,7 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
     if (!menuReferral) return
     const result = await Swal.fire({
       title: 'Remove Referral?',
-      text: `Remove referral for "${menuReferral.applicantName}"? This cannot be undone.`,
+      text: `Remove referral for "${menuReferral.applicantName}"? This will move the referral to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Remove',
@@ -336,8 +341,8 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
-            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+            style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
+            className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onUpdateStatus(menuReferral); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Update Status</button>
             <button
@@ -478,19 +483,47 @@ export default function ReferralsTab() {
     try {
       await deleteReferral(id)
       setReferrals(prev => prev.filter(r => r.id !== id))
-    } catch {
-      Swal.fire('Error', 'Failed to remove referral. Please try again.', 'error')
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to remove referral. Please try again.'
+      Swal.fire('Error', msg, 'error')
     }
   }
 
   async function handleUpdateStatus(id: number, newStatus: ReferralStatusOption) {
-    await updateReferralStatus(id, newStatus)
+    const name = referrals.find(r => r.id === id)?.applicantName ?? 'The applicant'
+
+    try {
+      await updateReferralStatus(id, newStatus)
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to update referral status. Please try again.'
+      Swal.fire('Error', msg, 'error')
+      throw err // keep the Update Status modal open so the user can retry
+    }
+
     if (newStatus === 'Hired') {
       // Hired referrals are removed from the list (they become placements)
       setReferrals(prev => prev.filter(r => r.id !== id))
     } else {
       setReferrals(prev => prev.map(r => r.id === id ? { ...r, status: newStatus as Referral['status'] } : r))
     }
+
+    // Customised confirmation per status.
+    const notes: Record<ReferralStatusOption, { title: string; text: string }> = {
+      Hired:        { title: 'Applicant Hired',  text: `${name} has been hired and moved to Placements.` },
+      'Not Hired':  { title: 'Status Updated',   text: `${name} has been marked as Not Hired.` },
+      Interviewed:  { title: 'Status Updated',   text: `${name} has been marked as Interviewed.` },
+      Pending:      { title: 'Status Updated',   text: `${name}'s referral is now set to Pending.` },
+    }
+    const note = notes[newStatus]
+    Swal.fire({
+      icon: 'success',
+      title: note.title,
+      text: note.text,
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#0077BE',
+    })
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────

@@ -334,7 +334,8 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
                 <button
                   type="button"
                   onClick={() => { onUnassign(); onClose() }}
-                  className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                  disabled={!canManage('livelihood')}
+                  className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Unassign
                 </button>
@@ -493,7 +494,8 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
           <button
             type="button"
             onClick={() => { onChangeAssignment(beneficiary); onClose() }}
-            className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors"
+            disabled={!canManage('livelihood')}
+            className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Change Assignment
           </button>
@@ -690,7 +692,7 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
             <button onClick={() => { onEdit(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             {menuBeneficiary.projectName
               ? <button onClick={() => { onViewAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
-              : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Assign Project</button>
+              : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
             }
             <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
           </div>
@@ -931,7 +933,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
           Add Profile
         </button>
 
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap">
+        <button disabled={!canManage('livelihood')} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
           <Upload size={16} />
           Import
         </button>

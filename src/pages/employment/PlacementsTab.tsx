@@ -320,7 +320,7 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
           >
             <button onClick={() => { onView(menuPlacement); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-            <button onClick={() => { onUpdateStatus(menuPlacement); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Update Status</button>
+            <button onClick={() => { onUpdateStatus(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
           </div>
         </>
       )}

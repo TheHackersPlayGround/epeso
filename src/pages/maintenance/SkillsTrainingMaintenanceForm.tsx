@@ -396,7 +396,8 @@ export default function SkillsTrainingMaintenanceForm() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
-                className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+                disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+                className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
                 }`}>
                 <div className={`p-4 rounded-2xl ${action === card.key ? 'bg-brand-blue text-white' : 'bg-gray-100'}`}>{card.icon}</div>
@@ -500,7 +501,8 @@ export default function SkillsTrainingMaintenanceForm() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
-                className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+                disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+                className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
                 }`}>
                 <div className={`p-4 rounded-2xl ${action === card.key ? 'bg-brand-blue text-white' : 'bg-gray-100'}`}>{card.icon}</div>
@@ -539,7 +541,8 @@ export default function SkillsTrainingMaintenanceForm() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
           {ACTION_CARDS.map(card => (
             <button key={card.key} onClick={() => { setAction(card.key); resetAdd(); setTrainingSubView('') }}
-              className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+              disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+              className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
               }`}>
               <div className={`p-4 rounded-2xl ${action === card.key ? 'bg-brand-blue text-white' : 'bg-gray-100'}`}>{card.icon}</div>
@@ -605,8 +608,8 @@ export default function SkillsTrainingMaintenanceForm() {
               <div>
                 <h3 className="text-white m-0">Skills Training Trainings</h3>
               </div>
-              <button onClick={() => setAction('add_training')}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
+              <button onClick={() => setAction('add_training')} disabled={!canManage('maintenance')}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
                 <Plus size={16} /> Add Training
               </button>
             </div>
@@ -615,8 +618,8 @@ export default function SkillsTrainingMaintenanceForm() {
               <div className="text-center py-16">
                 <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
                 <p className="text-gray-500">No trainings found.</p>
-                <button onClick={() => setAction('add_training')}
-                  className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                <button onClick={() => setAction('add_training')} disabled={!canManage('maintenance')}
+                  className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                   Add First Training
                 </button>
               </div>
@@ -713,13 +716,13 @@ export default function SkillsTrainingMaintenanceForm() {
                     <Users size={15} className="text-gray-500" /> View Participants
                   </button>
                   <div className="my-1 border-t border-gray-100" />
-                  <button onClick={() => { openEdit(a); setTrainingMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5">
+                  <button onClick={() => { openEdit(a); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                    className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Edit2 size={15} className="text-blue-500" /> Edit
                   </button>
                   {ns && (
-                    <button onClick={() => { setTrainingStatusConfirm({ activity: a, nextStatus: ns.next, label: ns.label }); setTrainingMenuId(null) }}
-                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 ${ns.next === 'Planned' ? 'text-brand-blue hover:bg-blue-50' : 'text-green-600 hover:bg-green-50'}`}>
+                    <button onClick={() => { setTrainingStatusConfirm({ activity: a, nextStatus: ns.next, label: ns.label }); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                      className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${ns.next === 'Planned' ? 'text-brand-blue hover:bg-blue-50' : 'text-green-600 hover:bg-green-50'}`}>
                       {ns.next === 'Ongoing'   && <PlayCircle  size={15} className="text-green-600" />}
                       {ns.next === 'Completed' && <CheckCircle size={15} className="text-green-600" />}
                       {ns.next === 'Planned'   && <RefreshCw   size={15} className="text-brand-blue" />}
@@ -727,8 +730,8 @@ export default function SkillsTrainingMaintenanceForm() {
                     </button>
                   )}
                   <div className="my-1 border-t border-gray-100" />
-                  <button onClick={() => { setTrainingDeleteConfirm(a.id); setTrainingMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5">
+                  <button onClick={() => { setTrainingDeleteConfirm(a.id); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                    className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Trash2 size={15} className="text-red-500" /> Delete
                   </button>
                 </div>
@@ -798,8 +801,8 @@ export default function SkillsTrainingMaintenanceForm() {
             <div>
               <h3 className="text-white m-0">Skills Training Batches</h3>
             </div>
-            <button onClick={() => setAction('add_batch')}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium">
+            <button onClick={() => setAction('add_batch')} disabled={!canManage('maintenance')}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
               <Plus size={15} /> Add Batch
             </button>
           </div>
@@ -808,8 +811,8 @@ export default function SkillsTrainingMaintenanceForm() {
             <div className="text-center py-16">
               <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
               <p className="text-gray-500">No batches yet.</p>
-              <button onClick={() => setAction('add_batch')}
-                className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+              <button onClick={() => setAction('add_batch')} disabled={!canManage('maintenance')}
+                className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 Add First Batch
               </button>
             </div>

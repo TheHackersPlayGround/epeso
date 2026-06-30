@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type ChangeEvent } from 'react';
 import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText, Pencil, Minus, User } from 'lucide-react';
 // html2canvas-pro supports modern CSS color functions (oklch/lab/lch) that
 // Tailwind v4 emits; the original html2canvas throws on "oklch".
@@ -6,6 +6,16 @@ import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import ResumeCheckbox from './ResumeCheckbox';
 import { getApplicantPhoto } from '../../services/applicantService';
+
+// A4 page geometry. The preview and the generated PDF both use these so the
+// on-screen layout matches the printed/exported output exactly.
+const MM_TO_PX = 96 / 25.4;                       // CSS px per millimetre at 96dpi
+const PAGE_W_MM = 210;                            // A4 width
+const PAGE_H_MM = 297;                            // A4 height
+const MARGIN_MM = 15;                             // consistent margin on every page
+const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;   // printable width
+const CONTENT_H_PX = (PAGE_H_MM - MARGIN_MM * 2) * MM_TO_PX; // printable height in px
+const BLOCK_GAP_PX = 24;                          // vertical gap between sections (gap-6)
 
 export interface ApplicantData {
   id: number;
@@ -198,7 +208,11 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     languages: false,
     footer: true,
   });
-  const resumeRef = useRef<HTMLDivElement>(null);
+  const printAreaRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Section indices grouped per A4 page (computed by measuring the content).
+  const [pages, setPages] = useState<number[][]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const resumePhotoInputRef = useRef<HTMLInputElement>(null);
   const [resumePhoto, setResumePhoto] = useState<string | null>(null);
@@ -235,6 +249,32 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
       .catch(() => { /* keep the preview URL; PDF just won't include the photo */ });
     return () => { cancelled = true; };
   }, [selectedApplicant?.id, selectedApplicant?.profileImage]);
+
+  // Re-paginate whenever the resume content changes: measure each section's
+  // natural height and greedily pack sections into A4-tall pages so a section is
+  // never split mid-line. Overflow simply continues onto the next page.
+  useLayoutEffect(() => {
+    const container = measureRef.current;
+    if (!container || !selectedApplicant) { setPages(prev => (prev.length ? [] : prev)); return; }
+    const kids = Array.from(container.children) as HTMLElement[];
+    const result: number[][] = [];
+    let current: number[] = [];
+    let used = 0;
+    kids.forEach((kid, i) => {
+      const h = kid.offsetHeight;
+      const add = current.length === 0 ? h : h + BLOCK_GAP_PX;
+      if (current.length > 0 && used + add > CONTENT_H_PX) {
+        result.push(current);
+        current = [i];
+        used = h;
+      } else {
+        current.push(i);
+        used += add;
+      }
+    });
+    if (current.length) result.push(current);
+    setPages(prev => (JSON.stringify(prev) === JSON.stringify(result) ? prev : result));
+  });
 
   function handleResumePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -327,27 +367,31 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   }
 
   async function handleDownloadPDF() {
-    if (!resumeRef.current || !selectedApplicant) return;
-    const noPrint = resumeRef.current.querySelectorAll<HTMLElement>('.resume-no-print');
+    const els = pageRefs.current.filter((el): el is HTMLDivElement => !!el);
+    if (!selectedApplicant || els.length === 0) return;
+    // Hide the on-screen-only photo controls while rasterizing each page.
+    const noPrint = printAreaRef.current?.querySelectorAll<HTMLElement>('.resume-no-print') ?? [];
     noPrint.forEach(el => { el.style.visibility = 'hidden'; });
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
-      const canvas = await html2canvas(resumeRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        imageTimeout: 15000,
-      });
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const ratio = Math.min(pdfWidth / (canvas.width * 0.264583), pdfHeight / (canvas.height * 0.264583));
-      const scaledWidth = canvas.width * 0.264583 * ratio;
-      const scaledHeight = canvas.height * 0.264583 * ratio;
-      pdf.addImage(imgData, 'PNG', (pdfWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+      // Each .resume-page is already A4-proportioned (margins live inside it),
+      // so every page maps 1:1 onto a full PDF page.
+      for (let i = 0; i < els.length; i++) {
+        const canvas = await html2canvas(els[i], {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          imageTimeout: 15000,
+        });
+        const imgData = canvas.toDataURL('image/png');
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
       pdf.save(`${selectedApplicant.firstName}_${selectedApplicant.surname}_Resume.pdf`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -387,6 +431,301 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
       />
     </div>
   );
+
+  // Each resume section is an independent "block". The blocks are measured and
+  // packed into A4 pages so the preview and PDF paginate cleanly.
+  const resumeBlocks: { key: string; node: ReactNode }[] = [];
+  if (selectedApplicant) {
+    // Header (name, contact, photo)
+    resumeBlocks.push({ key: 'header', node: (
+      <div className="pb-4 border-b-4 border-brand-blue">
+        <div className="flex gap-5 items-start">
+          {selectedFields.profilePicture && (
+            <div className="flex-shrink-0 pb-5">
+              <div className="relative">
+                <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
+                  {resumePhoto ? (
+                    <img
+                      src={resumePhoto}
+                      alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User size={64} className="text-gray-400" />
+                  )}
+                </div>
+                {resumePhoto ? (
+                  <button
+                    type="button"
+                    onClick={() => setResumePhoto(null)}
+                    title="Remove photo"
+                    className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow border-2 border-white hover:bg-red-600 transition-colors"
+                  >
+                    <Minus size={12} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => resumePhotoInputRef.current?.click()}
+                    title="Upload photo"
+                    className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-brand-blue text-white flex items-center justify-center shadow border-2 border-white hover:bg-brand-blue-dark transition-colors"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 flex flex-col justify-center min-h-32">
+            {selectedFields.fullName && isFieldAvailable('fullName') && (
+              <h1 className="resume-name font-bold uppercase text-brand-blue">
+                {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}{selectedApplicant.suffix && ` ${selectedApplicant.suffix}`}
+              </h1>
+            )}
+            <div className="space-y-1 text-sm text-gray-700 leading-relaxed">
+              {selectedFields.address && isFieldAvailable('address') && (
+                <div className="flex items-center gap-2">
+                  <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  <span>{[selectedApplicant.houseNo, selectedApplicant.barangay, selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {selectedFields.contactNumber && isFieldAvailable('contactNumber') && (
+                <div className="flex items-center gap-2">
+                  <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                  </svg>
+                  <span>{selectedApplicant.contactNumber}</span>
+                </div>
+              )}
+              {selectedFields.email && isFieldAvailable('email') && (
+                <div className="flex items-center gap-2">
+                  <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                  </svg>
+                  <span>{selectedApplicant.email}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) });
+
+    if (selectedFields.age || selectedFields.sex || selectedFields.civilStatus || selectedFields.dateOfBirth || selectedFields.placeOfBirth) {
+      resumeBlocks.push({ key: 'personal', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Personal Information</h2>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+            {selectedFields.age && isFieldAvailable('age') && (
+              <div><span className="font-semibold text-gray-800">Age:</span>{' '}<span className="text-gray-700">{calculateAge(selectedApplicant.dateOfBirth)} years old</span></div>
+            )}
+            {selectedFields.sex && isFieldAvailable('sex') && (
+              <div><span className="font-semibold text-gray-800">Sex:</span>{' '}<span className="text-gray-700">{selectedApplicant.sex}</span></div>
+            )}
+            {selectedFields.civilStatus && isFieldAvailable('civilStatus') && (
+              <div><span className="font-semibold text-gray-800">Civil Status:</span>{' '}<span className="text-gray-700">{selectedApplicant.civilStatus}</span></div>
+            )}
+            {selectedFields.dateOfBirth && isFieldAvailable('dateOfBirth') && (
+              <div><span className="font-semibold text-gray-800">Date of Birth:</span>{' '}<span className="text-gray-700">{formatDate(selectedApplicant.dateOfBirth)}</span></div>
+            )}
+            {selectedFields.placeOfBirth && isFieldAvailable('placeOfBirth') && (
+              <div><span className="font-semibold text-gray-800">Place of Birth:</span>{' '}<span className="text-gray-700">{[selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span></div>
+            )}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.elementary || selectedFields.highSchool || selectedFields.college || selectedFields.graduateStudies) {
+      resumeBlocks.push({ key: 'education', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Educational Background</h2>
+          <div className="space-y-3">
+            {selectedFields.college && isFieldAvailable('college') && selectedApplicant.tertiary?.course && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Tertiary</div>
+                <div className="font-bold text-base text-gray-900">{selectedApplicant.tertiary.course}</div>
+                {schoolNameField('tertiary')}
+                {selectedApplicant.tertiary.yearGraduated
+                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.tertiary.yearGraduated}</div>
+                  : selectedApplicant.tertiary.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.tertiary.yearLastAttended}</div>}
+              </div>
+            )}
+            {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant.graduateStudies?.map((study, idx) => (
+              <div key={idx}>
+                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Graduate Studies</div>
+                <div className="font-bold text-base text-gray-900">{study.course}</div>
+                {schoolNameField('graduate-' + idx)}
+                {study.yearGraduated
+                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {study.yearGraduated}</div>
+                  : study.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {study.yearLastAttended}</div>}
+              </div>
+            ))}
+            {selectedFields.highSchool && isFieldAvailable('highSchool') && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Secondary</div>
+                {selectedApplicant.secondary?.seniorHighStrand && (
+                  <div className="font-bold text-base text-gray-900">{selectedApplicant.secondary.seniorHighStrand}</div>
+                )}
+                {schoolNameField('secondary')}
+                {selectedApplicant.secondary?.yearGraduated
+                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.secondary.yearGraduated}</div>
+                  : selectedApplicant.secondary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.secondary.yearLastAttended}</div>}
+              </div>
+            )}
+            {selectedFields.elementary && isFieldAvailable('elementary') && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Elementary</div>
+                {schoolNameField('elementary')}
+                {selectedApplicant.elementary?.yearGraduated
+                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.elementary.yearGraduated}</div>
+                  : selectedApplicant.elementary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.elementary.yearLastAttended}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      ) });
+    }
+
+    if ((selectedFields.workExperience1 || selectedFields.workExperience2) && selectedApplicant.workExperiences?.length > 0) {
+      resumeBlocks.push({ key: 'work', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Work Experience</h2>
+          <div className="space-y-4">
+            {[0, 1].map((i) => {
+              const w = selectedApplicant.workExperiences[i];
+              const show = i === 0 ? selectedFields.workExperience1 : selectedFields.workExperience2;
+              if (!show || !w) return null;
+              return (
+                <div key={i}>
+                  <div className="font-bold text-base text-gray-900">{w.position}</div>
+                  <div className="text-sm mt-1 text-gray-700">
+                    {[w.companyName, w.companyCity].filter(Boolean).join(' — ')}
+                  </div>
+                  <div className="text-sm italic mt-1 text-gray-900">
+                    {[w.numberOfMonths && `${w.numberOfMonths} month/s`, w.status].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.skillsCompetencies && isFieldAvailable('skillsCompetencies') && selectedApplicant.otherSkills?.length > 0) {
+      resumeBlocks.push({ key: 'skills', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Skills &amp; Competencies</h2>
+          <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm text-gray-700">
+            {selectedApplicant.otherSkills.map((skill, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="text-brand-blue leading-tight">•</span>
+                <span>{skill}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.employmentStatus && isFieldAvailable('employmentStatus') && selectedApplicant.jobPreferences?.length > 0) {
+      resumeBlocks.push({ key: 'preferences', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Employment Preferences</h2>
+          <div className="space-y-3">
+            {selectedApplicant.jobPrefEmploymentType && selectedApplicant.jobPrefEmploymentType.length > 0 && (
+              <div className="text-sm text-gray-700"><span className="font-semibold">Type:</span> {selectedApplicant.jobPrefEmploymentType.join(', ')}</div>
+            )}
+            {selectedApplicant.jobPrefWorkLocation && selectedApplicant.jobPrefWorkLocation.length > 0 && (
+              <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Preferred Location:</span> {selectedApplicant.jobPrefWorkLocation.join(', ')}</div>
+            )}
+            {selectedApplicant.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
+              <div key={idx} className="mt-2">
+                <div className="font-bold text-base text-gray-900">{pref.occupation}</div>
+                {pref.localCity && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Local:</span> {pref.localCity}</div>}
+                {pref.overseasCountry && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.trainings && isFieldAvailable('trainings') && selectedApplicant.trainings?.length > 0) {
+      resumeBlocks.push({ key: 'trainings', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Trainings &amp; Certifications</h2>
+          <div className="space-y-3">
+            {selectedApplicant.trainings.map((t, idx) => (
+              <div key={idx}>
+                <div className="font-bold text-base text-gray-900">{t.course}</div>
+                <div className="text-sm mt-1 text-gray-700">{t.institution}</div>
+                <div className="text-sm mt-1 text-gray-600">{t.hoursOfTraining}{' hours • '}{t.skillsAcquired}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.eligibilities && isFieldAvailable('eligibilities') && selectedApplicant.eligibilities?.length > 0) {
+      resumeBlocks.push({ key: 'eligibilities', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Professional Eligibility</h2>
+          <div className="space-y-2">
+            {selectedApplicant.eligibilities.map((e, idx) => (
+              <div key={idx} className="text-sm text-gray-700">
+                <span className="font-semibold">{e.eligibility}</span>{' - '}{formatDate(e.dateTaken)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.languages && isFieldAvailable('languages') && selectedApplicant.languages?.length > 0) {
+      resumeBlocks.push({ key: 'languages', node: (
+        <div>
+          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Language Proficiency</h2>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {selectedApplicant.languages
+              .filter((lang) => lang.read || lang.write || lang.speak || lang.understand)
+              .map((lang, idx) => (
+                <div key={idx} className="text-gray-700">
+                  <span className="font-semibold">{lang.language}</span>{' - '}
+                  {[lang.read && 'Read', lang.write && 'Write', lang.speak && 'Speak', lang.understand && 'Understand'].filter(Boolean).join(', ')}
+                </div>
+              ))}
+          </div>
+        </div>
+      ) });
+    }
+
+    if (selectedFields.footer) {
+      resumeBlocks.push({ key: 'footer', node: (
+        <div className="pt-6 text-center border-t border-gray-300">
+          <p className="text-xs text-gray-600">Generated by PESO Tangub City {'–'} Comprehensive Profiling System</p>
+          <p className="text-xs text-gray-600">Public Employment Service Office | Tangub City, Misamis Occidental</p>
+        </div>
+      ) });
+    }
+  }
+
+  // Shared styling for a single A4 sheet (preview + PDF rasterization source).
+  const pageStyle: CSSProperties = {
+    width: `${PAGE_W_MM}mm`,
+    minHeight: `${PAGE_H_MM}mm`,
+    padding: `${MARGIN_MM}mm`,
+    boxSizing: 'border-box',
+    fontFamily: "'Times New Roman', Times, serif",
+    display: 'flex',
+    flexDirection: 'column',
+    gap: `${BLOCK_GAP_PX}px`,
+  };
 
   return (
     <>
@@ -579,282 +918,58 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                     <p className="text-sm text-gray-500">Select an applicant to preview resume</p>
                   </div>
                 ) : (
-                  <div id="resume-preview" ref={resumeRef} style={{ fontFamily: "'Times New Roman', Times, serif" }} className="w-full max-w-[210mm] min-h-[297mm] flex flex-col mx-auto shadow-xl text-gray-800 bg-white border border-gray-200">
-                    {/* Header with Photo */}
-                    <div className="pb-4 mb-5 border-b-4 border-brand-blue">
-                      <div className="flex gap-5 items-start">
-                        {selectedFields.profilePicture && (
-                          <div className="flex-shrink-0 pb-5">
-                            <div className="relative">
-                              <div className="rounded-lg overflow-hidden flex items-center justify-center w-32 h-32 bg-gray-200 border-4 border-brand-blue">
-                                {resumePhoto ? (
-                                  <img
-                                    src={resumePhoto}
-                                    alt={`Profile photo of ${selectedApplicant.firstName} ${selectedApplicant.surname}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <User size={64} className="text-gray-400" />
-                                )}
+                  <>
+                    {/* One file input shared by the header block's photo controls. */}
+                    <input
+                      ref={resumePhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden resume-no-print"
+                      onChange={handleResumePhotoChange}
+                    />
+
+                    {/* Paginated A4 sheets — the preview matches the printed / exported output. */}
+                    <div id="resume-print-area" ref={printAreaRef} className="flex flex-col items-center gap-8">
+                      {pages.map((blockIdxs, pageIdx) => (
+                        <div
+                          key={pageIdx}
+                          ref={el => { pageRefs.current[pageIdx] = el; }}
+                          className="resume-page relative bg-white shadow-xl border border-gray-200 text-gray-800"
+                          style={pageStyle}
+                        >
+                          {blockIdxs.map(i => {
+                            // `pages` can briefly reference a block index that no longer
+                            // exists (e.g. right after toggling a field off) until the
+                            // layout effect re-measures — skip those to avoid a crash.
+                            const block = resumeBlocks[i];
+                            if (!block) return null;
+                            return (
+                              <div
+                                key={block.key}
+                                style={block.key === 'footer' ? { marginTop: 'auto' } : undefined}
+                              >
+                                {block.node}
                               </div>
-                              {resumePhoto ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setResumePhoto(null)}
-                                  title="Remove photo"
-                                  className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow border-2 border-white hover:bg-red-600 transition-colors"
-                                >
-                                  <Minus size={12} />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => resumePhotoInputRef.current?.click()}
-                                  title="Upload photo"
-                                  className="resume-no-print print:hidden absolute -bottom-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-brand-blue text-white flex items-center justify-center shadow border-2 border-white hover:bg-brand-blue-dark transition-colors"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                              <input
-                                ref={resumePhotoInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden resume-no-print"
-                                onChange={handleResumePhotoChange}
-                              />
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex-1 flex flex-col justify-center min-h-32">
-                          {selectedFields.fullName && isFieldAvailable('fullName') && (
-                            <h1 className="resume-name font-bold uppercase text-brand-blue">
-                              {selectedApplicant.firstName} {selectedApplicant.middleName && `${selectedApplicant.middleName} `}{selectedApplicant.surname}{selectedApplicant.suffix && ` ${selectedApplicant.suffix}`}
-                            </h1>
-                          )}
-                          <div className="space-y-1 text-sm text-gray-700 leading-relaxed">
-                            {selectedFields.address && isFieldAvailable('address') && (
-                              <div className="flex items-center gap-2">
-                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                                </svg>
-                                <span>{[selectedApplicant.houseNo, selectedApplicant.barangay, selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span>
-                              </div>
-                            )}
-                            {selectedFields.contactNumber && isFieldAvailable('contactNumber') && (
-                              <div className="flex items-center gap-2">
-                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
-                                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                                </svg>
-                                <span>{selectedApplicant.contactNumber}</span>
-                              </div>
-                            )}
-                            {selectedFields.email && isFieldAvailable('email') && (
-                              <div className="flex items-center gap-2">
-                                <svg aria-hidden="true" className="fill-brand-blue w-4 h-4 flex-shrink-0" viewBox="0 0 20 20">
-                                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                                </svg>
-                                <span>{selectedApplicant.email}</span>
-                              </div>
-                            )}
+                            );
+                          })}
+                          <div className="resume-no-print absolute bottom-2 right-3 text-[10px] text-gray-400">
+                            Page {pageIdx + 1} of {pages.length}
                           </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
 
-                      {/* Personal Information */}
-                      {(selectedFields.age || selectedFields.sex || selectedFields.civilStatus || selectedFields.dateOfBirth || selectedFields.placeOfBirth) && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Personal Information</h2>
-                          <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                            {selectedFields.age && isFieldAvailable('age') && (
-                              <div><span className="font-semibold text-gray-800">Age:</span>{' '}<span className="text-gray-700">{calculateAge(selectedApplicant.dateOfBirth)} years old</span></div>
-                            )}
-                            {selectedFields.sex && isFieldAvailable('sex') && (
-                              <div><span className="font-semibold text-gray-800">Sex:</span>{' '}<span className="text-gray-700">{selectedApplicant.sex}</span></div>
-                            )}
-                            {selectedFields.civilStatus && isFieldAvailable('civilStatus') && (
-                              <div><span className="font-semibold text-gray-800">Civil Status:</span>{' '}<span className="text-gray-700">{selectedApplicant.civilStatus}</span></div>
-                            )}
-                            {selectedFields.dateOfBirth && isFieldAvailable('dateOfBirth') && (
-                              <div><span className="font-semibold text-gray-800">Date of Birth:</span>{' '}<span className="text-gray-700">{formatDate(selectedApplicant.dateOfBirth)}</span></div>
-                            )}
-                            {selectedFields.placeOfBirth && isFieldAvailable('placeOfBirth') && (
-                              <div><span className="font-semibold text-gray-800">Place of Birth:</span>{' '}<span className="text-gray-700">{[selectedApplicant.municipality, selectedApplicant.province].filter(Boolean).join(', ')}</span></div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Educational Background */}
-                      {(selectedFields.elementary || selectedFields.highSchool || selectedFields.college || selectedFields.graduateStudies) && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Educational Background</h2>
-                          <div className="space-y-3">
-                            {selectedFields.college && isFieldAvailable('college') && selectedApplicant.tertiary?.course && (
-                              <div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Tertiary</div>
-                                <div className="font-bold text-base text-gray-900">{selectedApplicant.tertiary.course}</div>
-                                {schoolNameField('tertiary')}
-                                {selectedApplicant.tertiary.yearGraduated
-                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.tertiary.yearGraduated}</div>
-                                  : selectedApplicant.tertiary.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.tertiary.yearLastAttended}</div>}
-                              </div>
-                            )}
-                            {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant.graduateStudies?.map((study, idx) => (
-                              <div key={idx}>
-                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Graduate Studies</div>
-                                <div className="font-bold text-base text-gray-900">{study.course}</div>
-                                {schoolNameField('graduate-' + idx)}
-                                {study.yearGraduated
-                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {study.yearGraduated}</div>
-                                  : study.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {study.yearLastAttended}</div>}
-                              </div>
-                            ))}
-                            {selectedFields.highSchool && isFieldAvailable('highSchool') && (
-                              <div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Secondary</div>
-                                {selectedApplicant.secondary?.seniorHighStrand && (
-                                  <div className="font-bold text-base text-gray-900">{selectedApplicant.secondary.seniorHighStrand}</div>
-                                )}
-                                {schoolNameField('secondary')}
-                                {selectedApplicant.secondary?.yearGraduated
-                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.secondary.yearGraduated}</div>
-                                  : selectedApplicant.secondary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.secondary.yearLastAttended}</div>}
-                              </div>
-                            )}
-                            {selectedFields.elementary && isFieldAvailable('elementary') && (
-                              <div>
-                                <div className="text-xs font-bold uppercase tracking-wide text-brand-blue">Elementary</div>
-                                {schoolNameField('elementary')}
-                                {selectedApplicant.elementary?.yearGraduated
-                                  ? <div className="text-sm italic mt-1 text-gray-900">Graduated: {selectedApplicant.elementary.yearGraduated}</div>
-                                  : selectedApplicant.elementary?.yearLastAttended && <div className="text-sm italic mt-1 text-gray-900">Last attended: {selectedApplicant.elementary.yearLastAttended}</div>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Work Experience */}
-                      {(selectedFields.workExperience1 || selectedFields.workExperience2) && selectedApplicant.workExperiences?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Work Experience</h2>
-                          <div className="space-y-4">
-                            {[0, 1].map((i) => {
-                              const w = selectedApplicant.workExperiences[i];
-                              const show = i === 0 ? selectedFields.workExperience1 : selectedFields.workExperience2;
-                              if (!show || !w) return null;
-                              return (
-                                <div key={i}>
-                                  <div className="font-bold text-base text-gray-900">{w.position}</div>
-                                  <div className="text-sm mt-1 text-gray-700">
-                                    {[w.companyName, w.companyCity].filter(Boolean).join(' — ')}
-                                  </div>
-                                  <div className="text-sm italic mt-1 text-gray-900">
-                                    {[w.numberOfMonths && `${w.numberOfMonths} month/s`, w.status].filter(Boolean).join(' · ')}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Skills */}
-                      {selectedFields.skillsCompetencies && isFieldAvailable('skillsCompetencies') && selectedApplicant.otherSkills?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Skills & Competencies</h2>
-                          {/* 3 columns, filled left-to-right then top-to-bottom */}
-                          <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm text-gray-700">
-                            {selectedApplicant.otherSkills.map((skill, i) => (
-                              <div key={i} className="flex items-start gap-2">
-                                <span className="text-brand-blue leading-tight">•</span>
-                                <span>{skill}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Employment Preferences */}
-                      {selectedFields.employmentStatus && isFieldAvailable('employmentStatus') && selectedApplicant.jobPreferences?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Employment Preferences</h2>
-                          <div className="space-y-3">
-                            {selectedApplicant.jobPrefEmploymentType && selectedApplicant.jobPrefEmploymentType.length > 0 && (
-                              <div className="text-sm text-gray-700"><span className="font-semibold">Type:</span> {selectedApplicant.jobPrefEmploymentType.join(', ')}</div>
-                            )}
-                            {selectedApplicant.jobPrefWorkLocation && selectedApplicant.jobPrefWorkLocation.length > 0 && (
-                              <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Preferred Location:</span> {selectedApplicant.jobPrefWorkLocation.join(', ')}</div>
-                            )}
-                            {selectedApplicant.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
-                              <div key={idx} className="mt-2">
-                                <div className="font-bold text-base text-gray-900">{pref.occupation}</div>
-                                {pref.localCity && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Local:</span> {pref.localCity}</div>}
-                                {pref.overseasCountry && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Trainings */}
-                      {selectedFields.trainings && isFieldAvailable('trainings') && selectedApplicant.trainings?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Trainings & Certifications</h2>
-                          <div className="space-y-3">
-                            {selectedApplicant.trainings.map((t, idx) => (
-                              <div key={idx}>
-                                <div className="font-bold text-base text-gray-900">{t.course}</div>
-                                <div className="text-sm mt-1 text-gray-700">{t.institution}</div>
-                                <div className="text-sm mt-1 text-gray-600">{t.hoursOfTraining}{' hours • '}{t.skillsAcquired}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Eligibilities */}
-                      {selectedFields.eligibilities && isFieldAvailable('eligibilities') && selectedApplicant.eligibilities?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Professional Eligibility</h2>
-                          <div className="space-y-2">
-                            {selectedApplicant.eligibilities.map((e, idx) => (
-                              <div key={idx} className="text-sm text-gray-700">
-                                <span className="font-semibold">{e.eligibility}</span>{' - '}{formatDate(e.dateTaken)}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Languages */}
-                      {selectedFields.languages && isFieldAvailable('languages') && selectedApplicant.languages?.length > 0 && (
-                        <div className="mt-6">
-                          <h2 className="resume-section-heading text-xl font-bold mb-3 uppercase tracking-wider pb-2 text-brand-blue border-b-2 border-brand-blue">Language Proficiency</h2>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {selectedApplicant.languages
-                              .filter((lang) => lang.read || lang.write || lang.speak || lang.understand)
-                              .map((lang, idx) => (
-                                <div key={idx} className="text-gray-700">
-                                  <span className="font-semibold">{lang.language}</span>{' - '}
-                                  {[lang.read && 'Read', lang.write && 'Write', lang.speak && 'Speak', lang.understand && 'Understand'].filter(Boolean).join(', ')}
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Footer — pinned to the bottom of the page */}
-                      {selectedFields.footer && (
-                        <div className="mt-auto pt-6 text-center border-t border-gray-300">
-                          <p className="text-xs text-gray-600">Generated by PESO Tangub City {'–'} Comprehensive Profiling System</p>
-                          <p className="text-xs text-gray-600">Public Employment Service Office | Tangub City, Misamis Occidental</p>
-                        </div>
-                      )}
-                  </div>
+                    {/* Hidden measuring container: natural section heights drive pagination. */}
+                    <div
+                      ref={measureRef}
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: -99999, top: 0, width: `${CONTENT_W_MM}mm`, visibility: 'hidden', fontFamily: "'Times New Roman', Times, serif" }}
+                    >
+                      {resumeBlocks.map(b => (
+                        <div key={b.key}>{b.node}</div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -865,13 +980,18 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
           @media print {
             @page { size: A4; margin: 0; }
             body * { visibility: hidden; }
-            #resume-preview, #resume-preview * { visibility: visible; }
-            #resume-preview {
-              position: absolute; left: 0; top: 0;
-              width: 210mm; margin: 0; padding: 15mm;
-              box-shadow: none !important; border: none !important;
+            #resume-print-area, #resume-print-area * { visibility: visible; }
+            #resume-print-area { position: absolute; left: 0; top: 0; gap: 0 !important; }
+            .resume-page {
+              box-shadow: none !important;
+              border: none !important;
+              margin: 0 !important;
+              break-after: page;
+              page-break-after: always;
             }
-            #resume-preview img, #resume-preview * {
+            .resume-page:last-child { break-after: auto; page-break-after: auto; }
+            .resume-no-print { display: none !important; }
+            #resume-print-area img, #resume-print-area * {
               print-color-adjust: exact;
               -webkit-print-color-adjust: exact;
             }

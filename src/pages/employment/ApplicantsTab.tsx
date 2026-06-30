@@ -277,7 +277,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
             ) : menuApplicant.referralState === 'Referred' ? (
               <button disabled className="w-full px-3 py-2 text-left text-xs text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Referred</button>
             ) : (
-              <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">Refer</button>
+              <button onClick={() => { onRefer(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Refer</button>
             )}
             <button onClick={() => { onShowHistory(menuApplicant); closeMenu(); }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Employment History</button>
             <button onClick={() => { onDelete(menuApplicant); closeMenu(); }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
@@ -559,8 +559,9 @@ function ApplicantsToolbar({
 
         <button
           onClick={onImportClick}
+          disabled={!canManage('employment')}
           aria-label="Import applicants"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />

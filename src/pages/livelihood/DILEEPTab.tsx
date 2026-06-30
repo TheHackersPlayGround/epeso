@@ -180,7 +180,8 @@ function AssignProjectModal({ beneficiary, program, onAssign, onUnassign, onClos
               <button
                 type="button"
                 onClick={() => { onUnassign(); onClose() }}
-                className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors flex-shrink-0 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50"
+                disabled={!canManage('livelihood')}
+                className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors flex-shrink-0 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Unassign
               </button>
@@ -288,8 +289,8 @@ function ViewAssignedProjectModal({ beneficiary: b, program, onChangeAssignment,
       <button
         type="button"
         onClick={onChangeAssignment}
-        disabled={!canChange}
-        className={`flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors${!canChange ? ' opacity-50 cursor-not-allowed' : ''}`}
+        disabled={!canChange || !canManage('livelihood')}
+        className={`flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors${(!canChange || !canManage('livelihood')) ? ' opacity-50 cursor-not-allowed' : ''}`}
       >
         Change Assignment
       </button>
@@ -690,7 +691,8 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
         </button>
 
         <button
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          disabled={!canManage('livelihood')}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
         >
           <Upload size={16} />
           Import
@@ -957,7 +959,7 @@ function BeneficiaryList({ program, allRecords, onPersistAll, onWizardChange }: 
               <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               {menuBeneficiary.projectName && !isCompleted
                 ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
-                : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50">Assign Project</button>
+                : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
               }
               {program === 'DILEEP (TUPAD)' && (
                 <button onClick={() => { setViewingAssignmentHistoryFor(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>

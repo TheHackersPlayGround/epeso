@@ -449,8 +449,8 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
           <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
             <button onClick={() => { setIsNewFolderModalOpen(false); setNewFolderName('') }}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
-            <button onClick={handleCreateFolder}
-              className="px-6 py-2.5 text-white rounded-lg text-sm"
+            <button onClick={handleCreateFolder} disabled={!canManage('documents')}
+              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
               Create Folder
             </button>
@@ -502,8 +502,8 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
           <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
             <button onClick={() => { setIsMoveModalOpen(false); setFileToMove(null) }}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
-            <button onClick={handleMoveFile}
-              className="px-6 py-2.5 text-white rounded-lg text-sm"
+            <button onClick={handleMoveFile} disabled={!canManage('documents')}
+              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
               Move File
             </button>

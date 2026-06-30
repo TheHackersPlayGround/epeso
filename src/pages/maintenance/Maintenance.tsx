@@ -526,7 +526,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 <button
                   key={action.key}
                   onClick={() => setGipAction(action.key)}
-                  className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+                  disabled={action.label.startsWith('Add') && !canManage('maintenance')}
+                  className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     gipAction === action.key
                       ? 'border-brand-blue bg-blue-50 text-brand-blue'
                       : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
@@ -765,7 +766,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setSelectedGipBatch(b); setGipBatchAction('edit_batch'); setGipOpenMenuId(null) }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5"
+                        disabled={!canManage('maintenance')}
+                        className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Edit2 size={15} className="text-blue-500" />
                         Edit
@@ -773,7 +775,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Planned' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Ongoing', action: 'Mark as Ongoing' }); setGipOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <PlayCircle size={15} className="text-green-600" />
                           Mark as Ongoing
@@ -782,7 +785,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Ongoing' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Completed', action: 'Mark as Completed' }); setGipOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <CheckCircle size={15} className="text-green-600" />
                           Mark as Completed
@@ -791,7 +795,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Completed' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Planned', action: 'Reopen Batch' }); setGipOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <RefreshCw size={15} style={{ color: GIP_CONFIRM_COLOR }} />
                           Reopen Batch
@@ -831,7 +836,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 <button
                   key={action.key}
                   onClick={() => setSpesAction(action.key)}
-                  className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+                  disabled={action.label.startsWith('Add') && !canManage('maintenance')}
+                  className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     spesAction === action.key
                       ? 'border-brand-blue bg-blue-50 text-brand-blue'
                       : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
@@ -1044,7 +1050,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setSelectedBatch(b); setSpesBatchAction('edit_batch'); setOpenMenuId(null) }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5"
+                        disabled={!canManage('maintenance')}
+                        className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Edit2 size={15} className="text-blue-500" />
                         Edit
@@ -1052,7 +1059,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Open' && (
                         <button
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Closed', action: 'Close Batch' }); setOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <Users size={15} className="text-gray-500" />
                           Close Batch
@@ -1061,7 +1069,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Closed' && (
                         <button
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Ongoing', action: 'Mark as Ongoing' }); setOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <PlayCircle size={15} className="text-blue-500" />
                           Mark as Ongoing
@@ -1070,7 +1079,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Ongoing' && (
                         <button
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Completed', action: 'Mark as Completed' }); setOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <CheckCircle size={15} className="text-green-600" />
                           Mark as Completed
@@ -1079,7 +1089,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Completed' && (
                         <button
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Open', action: 'Reopen Batch' }); setOpenMenuId(null) }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                          disabled={!canManage('maintenance')}
+                          className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <RefreshCw size={15} className="text-brand-blue" />
                           Reopen Batch

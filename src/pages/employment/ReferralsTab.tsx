@@ -5,6 +5,7 @@ import type { Referral } from '../../contexts/EmploymentContext'
 import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
+import { canManage } from '../../utils/permissions'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -344,10 +345,11 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
             style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
             className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
-            <button onClick={() => { onUpdateStatus(menuReferral); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Update Status</button>
+            <button onClick={() => { onUpdateStatus(menuReferral); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
             <button
               onClick={handleConfirmRemove}
-              className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50"
+              disabled={!canManage('employment')}
+              className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               Remove
             </button>

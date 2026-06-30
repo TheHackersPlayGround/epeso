@@ -362,7 +362,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex flex-col gap-2">
                   {assigningProfile.assignedTrainingId && (
-                    <button onClick={handleUnassignTraining} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors">Remove Assigned Activity</button>
+                    <button onClick={handleUnassignTraining} disabled={!canManage('skills')} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Remove Assigned Activity</button>
                   )}
                   <button onClick={closeAssignModal} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
                 </div>
@@ -408,7 +408,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       <button onClick={() => { setAssignStep(1); setSelectedTraining(null) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
                       <button
                         onClick={() => handleAssignTraining(selectedTraining.id)}
-                        className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark"
+                        disabled={!canManage('skills')}
+                        className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                       >
                         {assigningProfile.assignedTrainingId ? 'Re-assign' : 'Assign'}
                       </button>
@@ -455,7 +456,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             </div>
             <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
               <button onClick={closeImportModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-              <button onClick={handleImport} disabled={importPreview.filter(r => r.valid).length === 0} className="flex-1 py-2 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: BRAND }}>
+              <button onClick={handleImport} disabled={importPreview.filter(r => r.valid).length === 0 || !canManage('skills')} className="flex-1 py-2 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: BRAND }}>
                 Import {importPreview.filter(r => r.valid).length > 0 ? `(${importPreview.filter(r => r.valid).length})` : ''}
               </button>
             </div>
@@ -481,7 +482,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               <button onClick={() => setIsFormOpen(true)} disabled={!canManage('skills')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                 <Plus size={16} /><span>Add Profile</span>
               </button>
-              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm">
+              <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('skills')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
                 <Upload size={16} /><span>Import</span>
               </button>
               <div className="relative">
@@ -706,7 +707,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   )
                 }
                 return (
-                  <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setAssignViewOnly(false); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Training</button>
+                  <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setAssignViewOnly(false); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Training</button>
                 )
               })()}
               <div className="my-1 border-t border-gray-100" />

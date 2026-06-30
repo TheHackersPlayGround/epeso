@@ -152,6 +152,51 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
               </div>
             </div>
 
+            {/* Employment Status / Type — read-only mirror of the Add/Edit form */}
+            <div>
+              <label className={LBL}>Employment Status / Type</label>
+              <div className="grid grid-cols-2 gap-8">
+                {/* Employed */}
+                <div>
+                  <div className="mb-3 text-sm font-semibold">
+                    <RR label="Employed" checked={s('employmentStatus') === 'Employed'} />
+                  </div>
+                  <div className={`ml-6 space-y-2 ${s('employmentStatus') !== 'Employed' ? 'opacity-50' : ''}`}>
+                    <RR label="Wage Employed" checked={s('employmentType') === 'Wage Employed'} />
+                    <RR label="Self-employed (please specify)" checked={s('employmentType') === 'Self-employed'} />
+                    <input
+                      type="text"
+                      readOnly
+                      value={s('selfEmploymentType') === 'Others' ? (s('selfEmploymentOther') || 'Others') : s('selfEmploymentType')}
+                      className={`${INP} ${s('employmentType') !== 'Self-employed' ? 'bg-gray-100 opacity-50' : ''}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Unemployed */}
+                <div>
+                  <div className="mb-3 text-sm font-semibold">
+                    <RR label="Unemployed" checked={s('employmentStatus') === 'Unemployed'} />
+                  </div>
+                  <div className={`ml-6 space-y-3 ${s('employmentStatus') !== 'Unemployed' ? 'opacity-50' : ''}`}>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">How long looking for work? (months)</label>
+                      <input type="text" readOnly value={s('monthsLookingForWork')} className={INP} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Reason</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={s('unemploymentReason') === 'Others' ? (s('unemploymentReasonOther') || 'Others') : s('unemploymentReason')}
+                        className={INP}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* OFW / Former OFW — grid grid-cols-2 gap-4 */}
             <div className="grid grid-cols-2 gap-4">
               <div>

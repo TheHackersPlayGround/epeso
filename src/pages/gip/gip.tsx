@@ -417,7 +417,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   <button onClick={() => setAssignStep(1)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
                   <button
                     onClick={() => handleAssignBatch(selectedBatch)}
-                    className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark"
+                    disabled={!canManage('gip')}
+                    className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                   >
                     {assignTarget.assignedBatchId ? 'Re-assign' : 'Assign'}
                   </button>
@@ -466,11 +467,11 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
-                <button onClick={handleUnassignBatch} className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50">Unassign</button>
+                <button onClick={handleUnassignBatch} disabled={!canManage('gip')} className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Unassign</button>
                 <button
                   onClick={() => { setViewBatchTarget(null); openAssignModal(viewBatchTarget) }}
-                  disabled={!canChange}
-                  className={`flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50${!canChange ? ' opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!canChange || !canManage('gip')}
+                  className={`flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50${(!canChange || !canManage('gip')) ? ' opacity-50 cursor-not-allowed' : ''}`}
                 >Change Batch</button>
                 <button onClick={() => setViewBatchTarget(null)} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark">Close</button>
               </div>
@@ -527,7 +528,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
               <button
-                disabled={!uploadedFile}
+                disabled={!uploadedFile || !canManage('gip')}
                 onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }}
                 className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40"
               >Import</button>
@@ -549,7 +550,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
             <button onClick={() => setIsFormOpen(true)} disabled={!canManage('gip')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
               <Plus size={16} /><span>Add Applicant</span>
             </button>
-            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+            <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('gip')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
               <Upload size={16} /><span>Import</span>
             </button>
             <div className="relative">
@@ -861,7 +862,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
               ) : (
                 <button
                   onClick={() => { openAssignModal(applicant); setOpenActionMenuId(null) }}
-                  className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50"
+                  disabled={!canManage('gip')}
+                  className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Assign Batch</button>
               )}
               <div className="my-1 border-t border-gray-100" />

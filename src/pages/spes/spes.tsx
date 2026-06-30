@@ -345,7 +345,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                   <button onClick={() => setSelectedBatch(null)} className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium">Change Batch</button>
-                  <button onClick={() => setConfirmingBatch(selectedBatch)} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium">{isAssigned ? 'Re-assign' : 'Assign'}</button>
+                  <button onClick={() => setConfirmingBatch(selectedBatch)} disabled={!canManage('spes')} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">{isAssigned ? 'Re-assign' : 'Assign'}</button>
                 </div>
               </div>
             </div>
@@ -420,11 +420,11 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 )}
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                <button onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)} className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium">Unassign</button>
+                <button onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)} disabled={!canManage('spes')} className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Unassign</button>
                 <button
                   onClick={() => { close(); setAssignTarget(viewingAssignedBatchFor) }}
-                  disabled={!canChange}
-                  className={`px-4 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium${!canChange ? ' opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={!canChange || !canManage('spes')}
+                  className={`px-4 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium${(!canChange || !canManage('spes')) ? ' opacity-50 cursor-not-allowed' : ''}`}
                 >Change Batch</button>
               </div>
             </div>
@@ -552,7 +552,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       <BatchStatusBadge status={currentBatch.status} />
                     </div>
                   </div>
-                  <button onClick={() => setConfirmUnassignId(assignTarget.id)} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0">Unassign</button>
+                  <button onClick={() => setConfirmUnassignId(assignTarget.id)} disabled={!canManage('spes')} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">Unassign</button>
                 </div>
               )}
               <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
@@ -634,7 +634,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
               <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button disabled={!uploadedFile} onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40">Import</button>
+              <button disabled={!uploadedFile || !canManage('spes')} onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40">Import</button>
             </div>
           </div>
         </div>
@@ -653,7 +653,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
               <button onClick={() => setIsFormOpen(true)} disabled={!canManage('spes')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                 <Plus size={16} /><span>Add Applicant</span>
               </button>
-              <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+              <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('spes')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
                 <Upload size={16} /><span>Import</span>
               </button>
               <div className="relative">
@@ -878,7 +878,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
               {applicant.assignedBatchId && !isCompleted ? (
                 <button onClick={() => { setViewingAssignedBatchFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue font-medium hover:bg-blue-50">View Assigned Batch</button>
               ) : (
-                <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50">Assign Batch</button>
+                <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Batch</button>
               )}
               <button onClick={() => { setViewingAssignmentHistoryFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               <div className="my-1 border-t border-gray-100" />

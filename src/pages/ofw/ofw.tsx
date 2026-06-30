@@ -101,25 +101,25 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
           Edit
         </button>
         {profile.status === 'Pending' && (
-          <button onClick={() => { onChangeStatus('Ongoing'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+          <button onClick={() => { onChangeStatus('Ongoing'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
             <PlayCircle className="w-4 h-4 text-blue-500" />
             Start Processing
           </button>
         )}
         {profile.status === 'Pending' && (
-          <button onClick={() => { onChangeStatus('Rejected'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+          <button onClick={() => { onChangeStatus('Rejected'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
             <XCircle className="w-4 h-4 text-red-500" />
             Reject
           </button>
         )}
         {profile.status === 'Ongoing' && (
-          <button onClick={() => { onChangeStatus('Approved'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+          <button onClick={() => { onChangeStatus('Approved'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
             <CheckCircle className="w-4 h-4 text-blue-500" />
             Mark as Approved
           </button>
         )}
         {profile.status === 'Approved' && (
-          <button onClick={() => { onChangeStatus('Completed'); onClose() }} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2">
+          <button onClick={() => { onChangeStatus('Completed'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
             <CheckCircle className="w-4 h-4 text-green-500" />
             Mark as Completed
           </button>
@@ -444,7 +444,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
             </button>
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
+              disabled={!canManage('ofw')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
             >
               <Upload size={16} /><span>Import</span>
             </button>
@@ -814,7 +815,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                 Cancel
               </button>
               <button
-                disabled={!uploadedFile}
+                disabled={!uploadedFile || !canManage('ofw')}
                 onClick={handleImport}
                 className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40 transition-colors"
               >

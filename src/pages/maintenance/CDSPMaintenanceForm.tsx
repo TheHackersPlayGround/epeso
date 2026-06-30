@@ -312,7 +312,8 @@ export default function CDSPMaintenanceForm() {
             <button
               key={card.key}
               onClick={() => setAction(card.key)}
-              className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all ${
+              disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+              className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
                   : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
@@ -576,7 +577,8 @@ export default function CDSPMaintenanceForm() {
           </div>
           <button
             onClick={() => { resetForm(); setAction('add_activity') }}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+            disabled={!canManage('maintenance')}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             <Plus size={15} /> Add Activity
           </button>
@@ -610,7 +612,8 @@ export default function CDSPMaintenanceForm() {
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { fillFormFromActivity(a); setEditingId(a.id); setAction('edit_activity'); setOpenMenuId(null) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                  disabled={!canManage('maintenance')}
+                  className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Edit2 size={14} className="text-blue-500" />
                   Edit
@@ -618,7 +621,8 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Planned' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Ongoing', label: 'Mark as Ongoing' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                    disabled={!canManage('maintenance')}
+                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <PlayCircle size={14} className="text-blue-500" />
                     Mark as Ongoing
@@ -627,7 +631,8 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Ongoing' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Completed', label: 'Mark as Completed' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5"
+                    disabled={!canManage('maintenance')}
+                    className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <CheckCircle size={14} className="text-green-600" />
                     Mark as Completed
@@ -636,7 +641,8 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Completed' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Planned', label: 'Reopen Activity' }); setOpenMenuId(null) }}
-                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5"
+                    disabled={!canManage('maintenance')}
+                    className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <RefreshCw size={14} className="text-blue-500" />
                     Reopen Activity
@@ -645,7 +651,8 @@ export default function CDSPMaintenanceForm() {
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { setDeleteConfirm(a.id); setOpenMenuId(null) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
+                  disabled={!canManage('maintenance')}
+                  className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Trash2 size={14} className="text-red-500" />
                   Delete
@@ -662,7 +669,8 @@ export default function CDSPMaintenanceForm() {
             <p className="text-gray-500 mb-4">No CDSP activities found.</p>
             <button
               onClick={() => { resetForm(); setAction('add_activity') }}
-              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm"
+              disabled={!canManage('maintenance')}
+              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add First Activity
             </button>
@@ -908,7 +916,8 @@ export default function CDSPMaintenanceForm() {
         </div>
         <button
           onClick={() => setAction('add_service')}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium"
+          disabled={!canManage('maintenance')}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
         >
           <Plus size={15} /> Add Service
         </button>
@@ -918,7 +927,7 @@ export default function CDSPMaintenanceForm() {
         <div className="py-16 text-center">
           <Tag size={40} className="mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500 text-sm">No services defined yet.</p>
-          <button onClick={() => setAction('add_service')} className="mt-4 px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm">
+          <button onClick={() => setAction('add_service')} disabled={!canManage('maintenance')} className="mt-4 px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
             Add First Service
           </button>
         </div>
@@ -950,7 +959,8 @@ export default function CDSPMaintenanceForm() {
                   <td className="px-6 py-4">
                     <button
                       onClick={() => setServiceDeleteConfirm(svc)}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={!canManage('maintenance')}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       title="Remove service"
                     >
                       <Trash2 size={15} />

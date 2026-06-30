@@ -194,16 +194,15 @@ button, a, [role="button"] {
 
 /* ============================================================
    RESUME PREVIEW
-   Scoped to #resume-preview so these fonts never leak into
-   the rest of the app. Georgia for body copy, Arial for
-   headings — matches a classic formal resume layout.
+   Scoped to .resume-page so these fonts never leak into
+   the rest of the app, and so the unlayered global h1/h2
+   sizes/colors don't bleed into the paginated resume sheets.
    ============================================================ */
-#resume-preview {
+.resume-page {
   font-family: 'Times New Roman', Times, serif;
-  padding: 48px 60px;
 }
 
-#resume-preview .resume-name {
+.resume-page .resume-name {
   font-family: 'Times New Roman', Times, serif;
   font-weight: bold;
   font-size: 26px;
@@ -213,8 +212,9 @@ button, a, [role="button"] {
   color: #0077BE;
 }
 
-#resume-preview .resume-section-heading {
+.resume-page .resume-section-heading {
   font-family: 'Times New Roman', Times, serif;
+  font-size: 24px;
   color: #0077BE;
 }
 

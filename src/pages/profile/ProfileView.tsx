@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
+import Swal from 'sweetalert2'
 import { ArrowLeft, LogOut, User, Pencil, Minus, Check, X } from 'lucide-react'
+import { updateUser } from '../../services/userService'
 
 interface ProfileUser {
   id: number
@@ -16,6 +18,7 @@ interface ProfileUser {
 interface ProfileViewProps {
   onBack: () => void
   onLogout: () => void
+  onNameChange?: (firstName: string) => void
 }
 
 const DEFAULT_USER: ProfileUser = {
@@ -116,7 +119,7 @@ function EditField({
   )
 }
 
-export default function ProfileView({ onBack, onLogout }: ProfileViewProps) {
+export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileViewProps) {
   const [user, setUser] = useState<ProfileUser>(getCurrentUser)
   const isAdmin = user.role === 'Administrator'
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
@@ -155,10 +158,23 @@ export default function ProfileView({ onBack, onLogout }: ProfileViewProps) {
     setIsEditing(true)
   }
 
-  function saveEdit() {
-    setUser(draft)
-    try { localStorage.setItem('peso_current_user', JSON.stringify(draft)) } catch { /* quota */ }
-    setIsEditing(false)
+  async function saveEdit() {
+    try {
+      await updateUser(draft.id, {
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        username: draft.username,
+        role: draft.role,
+        status: draft.status,
+        permissions: draft.permissions ?? [],
+      })
+      setUser(draft)
+      try { localStorage.setItem('peso_current_user', JSON.stringify(draft)) } catch { /* quota */ }
+      onNameChange?.(draft.firstName)
+      setIsEditing(false)
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not update your profile. Please try again.' })
+    }
   }
 
   function cancelEdit() {

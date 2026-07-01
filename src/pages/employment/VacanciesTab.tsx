@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { Search, Plus, ChevronDown, X, MoreHorizontal, Download } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
 import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
@@ -28,10 +29,15 @@ type VacanciesSearchBarProps = {
   searchQuery: string
   activeFilters: string[]
   isFilterOpen: boolean
+  isExportOpen: boolean
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
+  onToggleExport: () => void
+  onCloseExport: () => void
+  onExportExcel: () => void
+  onExportCsv: () => void
 }
 
 function VacanciesSearchBar({
@@ -39,10 +45,15 @@ function VacanciesSearchBar({
   searchQuery,
   activeFilters,
   isFilterOpen,
+  isExportOpen,
   onSearchChange,
   onToggleFilter,
   onCloseFilter,
   onAddFilter,
+  onToggleExport,
+  onCloseExport,
+  onExportExcel,
+  onExportCsv,
 }: VacanciesSearchBarProps) {
   const unselected = AVAILABLE_FILTERS.filter((f) => !activeFilters.includes(f.id))
 
@@ -95,6 +106,36 @@ function VacanciesSearchBar({
                   </button>
                 ))
               )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="relative">
+        <button
+          onClick={onToggleExport}
+          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm"
+        >
+          <Download size={16} />
+          Export
+          <ChevronDown size={14} className="text-white" />
+        </button>
+        {isExportOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={onCloseExport} />
+            <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+              <button
+                onClick={() => { onExportExcel(); onCloseExport() }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
+              >
+                Export as Excel
+              </button>
+              <button
+                onClick={() => { onExportCsv(); onCloseExport() }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Export as CSV
+              </button>
             </div>
           </>
         )}
@@ -431,7 +472,7 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
 
         <div className="px-6 py-4 flex flex-col gap-4 overflow-y-auto">
           <p className="text-sm text-gray-600">
-            Showing applicants who might be a good match for this vacancy. You can refer them directly from here.
+            Select an applicant below to refer them to this vacancy.
           </p>
 
           {loadingApplicants ? (
@@ -495,7 +536,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
   const [vacanciesCount, setVacanciesCount] = useState(String(vacancy.vacanciesCount))
   const [jobType, setJobType] = useState(vacancy.jobType)
-  const [salaryRange, setSalaryRange] = useState(vacancy.salaryRange)
+  const [salaryRange, setSalaryRange] = useState(vacancy.salaryRange.replace(/^₱\s*/, ''))
   const [description, setDescription] = useState(vacancy.description)
   const [requirements, setRequirements] = useState(vacancy.requirements)
 
@@ -503,7 +544,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
     e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
 
-  const isValid = jobTitle.trim() && employerId !== null && vacanciesCount
+  const isValid = jobTitle.trim() && employerId !== null && vacanciesCount && salaryRange.trim()
 
   function handleSave() {
     if (!isValid) return
@@ -514,7 +555,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
       employerId: employerId ?? undefined,
       vacanciesCount: parseInt(vacanciesCount) || 1,
       jobType,
-      salaryRange: salaryRange.trim(),
+      salaryRange: salaryRange.trim() ? `₱${salaryRange.trim()}` : '',
       description: description.trim(),
       requirements: requirements.trim(),
     })
@@ -538,7 +579,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
                 type="text"
                 value={jobTitle}
                 onChange={e => setJobTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
               />
             </div>
             <div className="relative">
@@ -547,7 +588,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm flex items-center justify-between cursor-pointer focus-within:ring-2 focus-within:ring-brand-blue"
                 onClick={() => setShowEmployerDropdown(p => !p)}
               >
-                <span className={employer ? 'text-gray-900' : 'text-gray-400'}>{employer || 'Search employer...'}</span>
+                <span className={employer ? 'text-gray-900' : 'text-gray-400'}>{employer || 'Select employer'}</span>
                 <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
               </div>
               {showEmployerDropdown && (
@@ -588,7 +629,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
                 min={1}
                 value={vacanciesCount}
                 onChange={e => setVacanciesCount(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
               />
             </div>
             <div>
@@ -607,13 +648,16 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
 
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={salaryRange}
-              onChange={e => setSalaryRange(e.target.value)}
-              placeholder="e.g. ₱25,000 - ₱35,000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400"
-            />
+            <div className="flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
+              <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+              <input
+                type="text"
+                value={salaryRange}
+                onChange={e => setSalaryRange(e.target.value)}
+                placeholder="25,000 - 35,000"
+                className="flex-1 px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+              />
+            </div>
           </div>
 
           <div>
@@ -622,7 +666,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y"
             />
           </div>
 
@@ -632,7 +676,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
               value={requirements}
               onChange={e => setRequirements(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none resize-y"
             />
           </div>
         </div>
@@ -699,7 +743,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
       vacanciesCount: parseInt(vacanciesCount) || 1,
       industry: '',
       jobType,
-      salaryRange: salaryRange.trim(),
+      salaryRange: salaryRange.trim() ? `₱${salaryRange.trim()}` : '',
       description: description.trim(),
       requirements: requirements.trim(),
       status: 'Open',
@@ -737,7 +781,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
                 onClick={() => setShowEmployerDropdown(p => !p)}
               >
                 <span className={employer ? 'text-gray-900' : 'text-gray-400'}>
-                  {employer || 'Search employer...'}
+                  {employer || 'Select employer'}
                 </span>
                 <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
               </div>
@@ -800,13 +844,16 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
 
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={salaryRange}
-              onChange={e => setSalaryRange(e.target.value)}
-              placeholder="e.g. ₱25,000 - ₱35,000"
-              className={inputCls(!salaryRange.trim())}
-            />
+            <div className={`flex items-center border rounded-lg focus-within:ring-2 focus-within:border-transparent ${fieldErr(!salaryRange.trim()) ? 'border-red-500 ring-2 ring-red-200 focus-within:ring-red-300' : 'border-gray-300 focus-within:ring-brand-blue'}`}>
+              <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+              <input
+                type="text"
+                value={salaryRange}
+                onChange={e => setSalaryRange(e.target.value)}
+                placeholder="25,000 - 35,000"
+                className="flex-1 px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+              />
+            </div>
             <ErrMsg show={fieldErr(!salaryRange.trim())} />
           </div>
 
@@ -862,6 +909,7 @@ export default function VacanciesTab() {
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isExportOpen, setIsExportOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([listVacancies(), listEmployers()])
@@ -893,6 +941,34 @@ export default function VacanciesTab() {
     } catch {
       Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update vacancy status.' })
     }
+  }
+
+  function buildExportRows() {
+    return filtered.map(v => ({
+      'Job Title': v.jobTitle,
+      'Employer': v.employer,
+      'Vacancies Count': v.vacanciesCount,
+      'Industry': v.industry,
+      'Job Type': v.jobType,
+      'Salary Range': v.salaryRange,
+      'Status': v.status,
+      'Description': v.description,
+      'Requirements': v.requirements,
+    }))
+  }
+
+  function handleExportExcel() {
+    const ws = XLSX.utils.json_to_sheet(buildExportRows())
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
+    XLSX.writeFile(wb, 'vacancies.xlsx')
+  }
+
+  function handleExportCsv() {
+    const ws = XLSX.utils.json_to_sheet(buildExportRows())
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
+    XLSX.writeFile(wb, 'vacancies.csv')
   }
 
   async function handleAddVacancy(data: Omit<Vacancy, 'id'>) {
@@ -963,10 +1039,15 @@ export default function VacanciesTab() {
             searchQuery={searchQuery}
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
+            isExportOpen={isExportOpen}
             onSearchChange={(v) => setSearchQuery(v)}
             onToggleFilter={() => setIsFilterOpen((o) => !o)}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
+            onToggleExport={() => setIsExportOpen((o) => !o)}
+            onCloseExport={() => setIsExportOpen(false)}
+            onExportExcel={handleExportExcel}
+            onExportCsv={handleExportCsv}
           />
 
           {activeFilters.length > 0 && (

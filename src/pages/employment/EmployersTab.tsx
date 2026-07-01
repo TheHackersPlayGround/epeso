@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import type { Employer } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
 import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '../../services/employerService'
+import { downloadImportTemplate, importEmployers, type ImportResult } from './employerImport'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
@@ -317,6 +319,141 @@ function EmployersToolbar({ onAdd, onImport, isExportOpen, onToggleExport, onClo
   )
 }
 
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No employer rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} employer{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importEmployers(file, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx or .csv.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Import Employers</h3>
+          <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+        </div>
+
+        <div className="overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <label className={`block border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 text-gray-400 hover:border-brand-blue'}`}>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+                <p className="text-3xl mb-2">📂</p>
+                {file ? (
+                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-gray-600">Click to upload or drag & drop</p>
+                    <p className="text-xs mt-1">Excel (.xlsx) or CSV files</p>
+                  </>
+                )}
+              </label>
+
+              <p className="text-xs text-gray-400 mt-3 text-center">
+                Download the{' '}
+                <button type="button" onClick={() => { void downloadImportTemplate() }} className="text-brand-blue cursor-pointer hover:underline">
+                  template file
+                </button>{' '}
+                to ensure correct column format.
+              </p>
+
+              {error && <p className="text-red-500 text-sm mt-3 text-center">{error}</p>}
+
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 mt-3 text-center">
+                  Importing {progress.done} of {progress.total}…
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── EmployersTab ──────────────────────────────────────────────────────────────
 
 export default function EmployersTab() {
@@ -331,6 +468,7 @@ export default function EmployersTab() {
   const [selectedEmployer, setSelectedEmployer] = useState<Employer | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [sidebarMode, setSidebarMode] = useState<'view' | 'edit' | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   const availableFilters = STATIC_FILTERS
 
@@ -468,17 +606,70 @@ export default function EmployersTab() {
     )
   }
 
+  function handleExportExcel() {
+    const rows = filtered.map(e => ({
+      'Company Name': e.companyName,
+      'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
+      'Company Size': e.companySize,
+      'Business Type': e.businessType,
+      'Years in Operation': e.yearsInOperation,
+      'TIN Number': e.tinNumber,
+      'Contact Person': e.contactPersonName,
+      'Position': e.position,
+      'Contact Number': e.contactNumber,
+      'Email': e.email,
+      'Address': [e.buildingNo, e.street, e.barangay, e.city, e.province, e.region].filter(Boolean).join(', '),
+      'Status': e.status,
+      'Date Registered': e.dateRegistered,
+      'Remarks': e.remarks,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Employers')
+    XLSX.writeFile(wb, 'employers.xlsx')
+    setIsExportOpen(false)
+  }
+
+  function handleExportCsv() {
+    const rows = filtered.map(e => ({
+      'Company Name': e.companyName,
+      'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
+      'Company Size': e.companySize,
+      'Business Type': e.businessType,
+      'Years in Operation': e.yearsInOperation,
+      'TIN Number': e.tinNumber,
+      'Contact Person': e.contactPersonName,
+      'Position': e.position,
+      'Contact Number': e.contactNumber,
+      'Email': e.email,
+      'Address': [e.buildingNo, e.street, e.barangay, e.city, e.province, e.region].filter(Boolean).join(', '),
+      'Status': e.status,
+      'Date Registered': e.dateRegistered,
+      'Remarks': e.remarks,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const csv = XLSX.utils.sheet_to_csv(ws)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'employers.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+    setIsExportOpen(false)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="bg-white rounded-xl shadow-md p-3">
         <EmployersToolbar
           onAdd={() => setShowAdd(true)}
-          onImport={() => {}}
+          onImport={() => setIsImportModalOpen(true)}
           isExportOpen={isExportOpen}
           onToggleExport={() => setIsExportOpen(p => !p)}
           onCloseExport={() => setIsExportOpen(false)}
-          onExportExcel={() => { setIsExportOpen(false) }}
-          onExportCsv={() => { setIsExportOpen(false) }}
+          onExportExcel={handleExportExcel}
+          onExportCsv={handleExportCsv}
         />
       </div>
 
@@ -524,6 +715,15 @@ export default function EmployersTab() {
           itemLabel="employer"
         />
       </div>
+
+      {isImportModalOpen && (
+        <EmployerImportModal
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={() => {
+            listEmployers().then(setEmployers).catch(() => {})
+          }}
+        />
+      )}
     </div>
   )
 }

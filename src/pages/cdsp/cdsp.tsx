@@ -8,10 +8,9 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useCDSP } from '../../contexts/CDSPContext'
+import type { CDSPApplicant, CdspActivity } from '../../contexts/CDSPContext'
 import { canManage } from '../../utils/permissions'
-import type { CDSPApplicant } from '../../contexts/CDSPContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
+import * as cdspApiService from '../../services/cdspService'
 import CDSPProfileForm, {
   ViewApplicantPanel, emptyForm, CDSP_SEED_SERVICES,
   getEffectiveStatus, StatusBadge, CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS,
@@ -70,10 +69,8 @@ function ConfirmModal({
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
-  const { applicants, setApplicants } = useCDSP()
-  const { activities } = useProgramActivities()
-  const cdspActivities = activities.filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
-  const cdspServices = Array.from(new Set(cdspActivities.map(a => a.service)))
+  const { applicants, activities: cdspActivities, services: svcList, refreshProfiles } = useCDSP()
+  const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -123,7 +120,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
-  const [selectedActivity, setSelectedActivity] = useState<ProgramActivity | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<CdspActivity | null>(null)
   const [viewingAssignedFor, setViewingAssignedFor] = useState<CDSPApplicant | null>(null)
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<CDSPApplicant | null>(null)
 
@@ -169,70 +166,69 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, sorted.length)
 
-  const handleAddSave = (data: Omit<CDSPApplicant, 'id'>) => {
-    setApplicants((prev) => [...prev, { ...data, id: Date.now() }])
-    setIsFormOpen(false)
-    setSuccessModal({ open: true, message: 'Applicant profile has been added successfully.' })
+  const handleAddSave = async (data: Omit<CDSPApplicant, 'id'>) => {
+    try {
+      await cdspApiService.createProfile(data as unknown as Record<string, unknown>)
+      await refreshProfiles()
+      setIsFormOpen(false)
+      setSuccessModal({ open: true, message: 'Applicant profile has been added successfully.' })
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save profile.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
-  const handleEditSave = (data: Omit<CDSPApplicant, 'id'>) => {
+  const handleEditSave = async (data: Omit<CDSPApplicant, 'id'>) => {
     if (!editingApplicant) return
-    setApplicants((prev) => prev.map((a) => (a.id === editingApplicant.id ? { ...data, id: a.id } : a)))
-    setEditingApplicant(null)
-    setSuccessModal({ open: true, message: 'Applicant profile has been updated successfully.' })
+    try {
+      await cdspApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
+      await refreshProfiles()
+      setEditingApplicant(null)
+      setSuccessModal({ open: true, message: 'Applicant profile has been updated successfully.' })
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to update profile.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
-  const handleDelete = (id: number) => {
-    setApplicants((prev) => prev.filter((a) => a.id !== id))
-    setDeleteConfirm({ open: false, id: null })
-    setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
+  const handleDelete = async (id: number) => {
+    try {
+      await cdspApiService.deleteProfile(id)
+      await refreshProfiles()
+      setDeleteConfirm({ open: false, id: null })
+      setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete profile.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
-  const handleAssign = (activity: ProgramActivity) => {
-    if (!assignTarget) return
-    const today = new Date().toISOString().split('T')[0]
-    setApplicants((prev) => prev.map((a) => {
-      if (a.id !== assignTarget.id) return a
-      const history = [...(a.assignmentHistory ?? [])]
-      // Mark previous assignment completed if its activity was completed
-      if (a.assignedActivity) {
-        const prevIdx = history.findIndex(h => h.activityTitle === a.assignedActivity)
-        if (prevIdx >= 0 && !history[prevIdx].completedDate) {
-          const prevAct = cdspActivities.find(x => x.title === a.assignedActivity)
-          if (prevAct?.status === 'Completed') {
-            history[prevIdx] = { ...history[prevIdx], completedDate: today }
-          }
-        }
-      }
-      // Add new assignment to history if not already present
-      if (!history.some(h => h.activityTitle === activity.title)) {
-        history.push({ activityTitle: activity.title, assignedDate: today })
-      }
-      return { ...a, assignedActivity: activity.title, status: 'Active' as const, assignmentHistory: history }
-    }))
-    setAssignTarget(null)
-    setSelectedActivity(null)
-    Swal.fire({
-      icon: 'success',
-      title: 'Success',
-      text: `Assigned to "${activity.title}" successfully.`,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+  const handleAssign = async (activity: CdspActivity) => {
+    if (!assignTarget?.beneficiaryServiceId) return
+    try {
+      await cdspApiService.addParticipant({ activityId: activity.id, beneficiaryServiceId: assignTarget.beneficiaryServiceId })
+      await refreshProfiles()
+      setAssignTarget(null)
+      setSelectedActivity(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${activity.title}" successfully.`, confirmButtonText: 'OK', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to assign activity.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
-  const handleUnassign = (targetId?: number) => {
-    const id = targetId ?? assignTarget?.id
-    if (!id) return
-    setApplicants((prev) => prev.map((a) =>
-      a.id === id ? { ...a, assignedActivity: '', status: 'Inactive' as const } : a
-    ))
-    setAssignTarget(null)
-    setSelectedActivity(null)
-    setViewingAssignedFor(null)
-    Swal.fire({
-      icon: 'success',
-      title: 'Removed',
-      text: 'Assigned activity has been removed.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+  const handleUnassign = async (targetId?: number) => {
+    const applicant = targetId
+      ? applicants.find(a => a.id === targetId)
+      : assignTarget
+    if (!applicant?.beneficiaryServiceId || !applicant?.assignedActivityId) return
+    try {
+      await cdspApiService.removeParticipant({ activityId: applicant.assignedActivityId, beneficiaryServiceId: applicant.beneficiaryServiceId })
+      await refreshProfiles()
+      setAssignTarget(null)
+      setSelectedActivity(null)
+      setViewingAssignedFor(null)
+      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned activity has been removed.', confirmButtonText: 'OK', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to remove assignment.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
 
   const exportRows = (rows: CDSPApplicant[]) => rows.map((a) => ({
@@ -275,9 +271,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       'City / Municipality': 'Tangub City', 'Province': 'Misamis Occidental', 'Region': 'Region X – Northern Mindanao',
       'Classification': 'Fresh Graduate', 'Highest Education': 'College Graduate', 'Course': 'BS IT',
       'Employment Status': 'Unemployed', 'Occupation': '',
-      'Service Availed': 'Career Coaching', 'Assigned Activity': 'Career Coaching Batch 1 – March 2026',
+      'Service Availed': 'Career Coaching', 'Assigned Activity': '',
       'Career Goal': 'Software Developer', 'Target Job': '',
-      'Counselor': 'Engr. Lito Reyes', 'Status': 'Active', 'Remarks': '',
+      'Counselor': '', 'Status': 'Active', 'Remarks': '',
       'Date Received': '2026-03-10', 'Received By': 'Admin',
     }])
     const wb = XLSX.utils.book_new()
@@ -308,16 +304,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     reader.readAsBinaryString(file)
   }
   const handleImport = () => {
-    const valid = importPreview.filter((r) => r.valid)
-    setApplicants((prev) => [...prev, ...valid.map((row) => ({
-      ...emptyForm,
-      id: Date.now() + Math.random(),
-      lastName: row.lastName, firstName: row.firstName,
-      serviceAvailed: cdspServices.includes(row.service) ? row.service : '',
-      status: (['Active', 'Inactive'].includes(row.status) ? row.status : 'Active') as CDSPApplicant['status'],
-    }))])
-    setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([])
-    alert(`Successfully imported ${valid.length} applicant(s)!`)
+    Swal.fire({ icon: 'info', title: 'Import Not Available', text: 'Bulk import requires barangay selection which cannot be resolved from a file. Please add applicants individually.', confirmButtonColor: '#0077BE' })
+    setIsImportModalOpen(false)
+    setUploadedFile(null)
+    setImportPreview([])
   }
 
   // ─── Full-page sub-views ────────────────────────────────────────────────────
@@ -350,7 +340,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
       {/* View Assigned Activity Modal */}
       {viewingAssignedFor && (() => {
-        const activity = cdspActivities.find(a => a.title === viewingAssignedFor.assignedActivity)
+        const activity = cdspActivities.find(a => a.id === viewingAssignedFor.assignedActivityId)
         const close = () => setViewingAssignedFor(null)
         const statusBadge = (s: string) =>
           s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
@@ -388,11 +378,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <div className="mt-2">
                       <Row label="Service" value={activity.service} />
                       <Row label="Date" value={activity.date} />
-                      <Row label="Start Date" value={activity.startDate} />
-                      <Row label="End Date" value={activity.endDate} />
                       <Row label="Location / Venue" value={activity.location} />
                       <Row label="Facilitator" value={activity.facilitator} />
-                      <Row label="Participants" value={activity.participants} />
+                      <Row label="Participants" value={activity.participants ?? undefined} />
                       <Row label="Counselor" value={activity.counselor} />
                       <Row label="Session Duration" value={activity.sessionDuration} />
                     </div>
@@ -444,9 +432,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
           s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
           'bg-amber-100 text-amber-700 border border-amber-200'
         const visibleHistory = (a.assignmentHistory ?? []).filter(entry => {
-          const act = cdspActivities.find(x => x.title === entry.activityTitle)
+          const act = cdspActivities.find(x => x.id === entry.activityId)
           const entryStatus = act?.status ?? 'Planned'
-          const isCurrent = a.assignedActivity === entry.activityTitle
+          const isCurrent = a.assignedActivityId === entry.activityId
           return entryStatus === 'Completed' || isCurrent
         })
         return (
@@ -471,8 +459,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 ) : (
                   <div className="space-y-3">
                     {[...visibleHistory].reverse().map((entry, i) => {
-                      const act = cdspActivities.find(x => x.title === entry.activityTitle)
-                      const isCurrent = a.assignedActivity === entry.activityTitle
+                      const act = cdspActivities.find(x => x.id === entry.activityId)
+                      const isCurrent = a.assignedActivityId === entry.activityId
                       const entryStatus = act?.status ?? 'Planned'
                       return (
                         <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -503,8 +491,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
       {/* Assign Activity Modal — Step 1: Select */}
       {assignTarget && !selectedActivity && (() => {
-        const currentActivity = assignTarget.assignedActivity
-          ? cdspActivities.find(a => a.title === assignTarget.assignedActivity) ?? null
+        const currentActivity = assignTarget.assignedActivityId
+          ? cdspActivities.find(a => a.id === assignTarget.assignedActivityId) ?? null
           : null
         const available = cdspActivities.filter(a =>
           a.status === 'Planned' &&
@@ -571,7 +559,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     </p>
                   </div>
                 ) : available.map(activity => {
-                  const isCurrent = assignTarget.assignedActivity === activity.title
+                  const isCurrent = assignTarget.assignedActivityId === activity.id
                   return (
                     <button
                       key={activity.id}
@@ -586,9 +574,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                             {activity.date && <><span>·</span><span>{activity.date}</span></>}
                             {activity.location && <><span>·</span><span>{activity.location}</span></>}
                           </div>
-                          {(activity.startDate || activity.endDate) && (
-                            <p className="text-xs text-gray-400 mt-0.5">{activity.startDate} – {activity.endDate}</p>
-                          )}
                         </div>
                         <span className="text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 font-medium bg-yellow-100 text-yellow-700">{activity.status}</span>
                       </div>
@@ -607,7 +592,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
       {/* Assign Activity Modal — Step 2: Confirm */}
       {assignTarget && selectedActivity && (() => {
-        const isAssigned = assignTarget.assignedActivity === selectedActivity.title
+        const isAssigned = assignTarget.assignedActivityId === selectedActivity.id
         const statusBadge = (s: string) =>
           s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
           s === 'Completed' ? 'bg-blue-100 text-blue-700'  :
@@ -653,11 +638,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 <div>
                   <Row label="Service" value={selectedActivity.service} />
                   <Row label="Date" value={selectedActivity.date} />
-                  <Row label="Start Date" value={selectedActivity.startDate} />
-                  <Row label="End Date" value={selectedActivity.endDate} />
                   <Row label="Location / Venue" value={selectedActivity.location} />
                   <Row label="Facilitator" value={selectedActivity.facilitator} />
-                  <Row label="Participants" value={selectedActivity.participants} />
+                  <Row label="Participants" value={selectedActivity.participants ?? undefined} />
                   <Row label="Counselor" value={selectedActivity.counselor} />
                   <Row label="Session Duration" value={selectedActivity.sessionDuration} />
                 </div>
@@ -753,6 +736,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         </div>
                       ))}
                     </div>
+                    <p className="text-xs text-amber-600 mt-2">Note: Bulk import will be processed individually. Address fields must be set after import.</p>
                   </div>
                 )}
               </div>
@@ -890,7 +874,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                       </td>
                       <td className="px-4 py-3">
                         {applicant.assignedActivity ? (() => {
-                          const act = cdspActivities.find(a => a.title === applicant.assignedActivity)
+                          const act = cdspActivities.find(a => a.id === applicant.assignedActivityId)
                           return (
                             <div className="flex flex-col gap-0.5">
                               <span className="text-sm text-gray-800 line-clamp-1">{applicant.assignedActivity}</span>
@@ -954,8 +938,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find((a) => a.id === openActionMenuId)
         if (!applicant) return null
-        const assignedAct = applicant.assignedActivity
-          ? cdspActivities.find(a => a.title === applicant.assignedActivity)
+        const assignedAct = applicant.assignedActivityId
+          ? cdspActivities.find(a => a.id === applicant.assignedActivityId)
           : null
         const isCompleted = assignedAct?.status === 'Completed'
         return (

@@ -1,15 +1,15 @@
-﻿import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight,
+  Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { useCDSP } from '../../contexts/CDSPContext'
+import type { CdspActivity } from '../../contexts/CDSPContext'
+import * as cdspService from '../../services/cdspService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -27,8 +27,8 @@ type Action =
   | 'view_activity'
   | 'view_activities'
   | 'view_participants'
-  | 'add_service'
   | 'view_services'
+  | 'add_service'
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -93,6 +93,21 @@ function ConfirmModal({ open, title, message, confirmLabel = 'Confirm', destruct
   )
 }
 
+// ─── Participant record ───────────────────────────────────────────────────────
+
+interface ParticipantRecord {
+  id: number
+  beneficiaryServiceId: number
+  lastName: string
+  firstName: string
+  middleName: string
+  contactNumber: string
+  serviceAvailed: string
+  classification: string[]
+  status: string
+  attended: boolean
+}
+
 // ─── Blank form data ──────────────────────────────────────────────────────────
 
 const blankForm = {
@@ -104,26 +119,19 @@ const blankForm = {
   counselor: '',
   sessionDuration: '',
   participants: '',
-  startDate: '',
-  endDate: '',
   status: 'Planned' as ActivityStatus,
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CDSPMaintenanceForm() {
-  const { activities, setActivities } = useProgramActivities()
-  const { applicants: cdspApplicants, setApplicants } = useCDSP()
+  const { activities: cdspActivities, services: apiServices, refreshActivities, refreshServices } = useCDSP()
+  const services = apiServices.length > 0 ? apiServices.map(s => s.name) : DEFAULT_SERVICES
 
   // Navigation
   const [action, setAction] = useState<Action>('')
-  const [selectedActivity, setSelectedActivity] = useState<ProgramActivity | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<CdspActivity | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
-
-  // Services list (user-editable)
-  const [services, setServices] = useState<string[]>(DEFAULT_SERVICES)
-  const [newServiceName, setNewServiceName] = useState('')
-  const [serviceDeleteConfirm, setServiceDeleteConfirm] = useState<string | null>(null)
 
   // Activity form
   const [selectedService, setSelectedService] = useState('')
@@ -137,28 +145,43 @@ export default function CDSPMaintenanceForm() {
   const [perPage, setPerPage] = useState(10)
   const [participantPage, setParticipantPage] = useState(1)
   const [participantPerPage, setParticipantPerPage] = useState(10)
-  const [servicePage, setServicePage] = useState(1)
-  const [servicePerPage, setServicePerPage] = useState(10)
+
+  // Participants state
+  const [activityParticipants, setActivityParticipants] = useState<ParticipantRecord[]>([])
+  const [loadingParticipants, setLoadingParticipants] = useState(false)
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
+  // Service form + pagination
+  const [serviceForm, setServiceForm] = useState({ name: '' })
+  const [deleteServiceConfirm, setDeleteServiceConfirm] = useState<number | null>(null)
+  const [servicePage, setServicePage] = useState(1)
+  const [servicePerPage, setServicePerPage] = useState(10)
+
   // Confirm modals
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [statusConfirm, setStatusConfirm] = useState<{
-    activity: ProgramActivity
+    activity: CdspActivity
     nextStatus: ActivityStatus
     label: string
   } | null>(null)
 
-  const newServiceRef = useRef<HTMLInputElement>(null)
+  // Load participants when viewing
+  useEffect(() => {
+    if (action === 'view_participants' && selectedActivity) {
+      setLoadingParticipants(true)
+      cdspService.listActivityParticipants(selectedActivity.id)
+        .then(res => setActivityParticipants(res.data ?? []))
+        .catch(() => setActivityParticipants([]))
+        .finally(() => setLoadingParticipants(false))
+    } else {
+      setActivityParticipants([])
+    }
+  }, [action, selectedActivity])
 
   // ── Derived data ─────────────────────────────────────────────────────────
-
-  const cdspActivities = activities.filter(
-    a => a.program === 'CDSP' || DEFAULT_SERVICES.includes(a.service)
-  )
 
   const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
   const filteredActivities = cdspActivities.filter(a => {
@@ -174,11 +197,6 @@ export default function CDSPMaintenanceForm() {
   const paginatedActivities = filteredActivities.slice((safePage - 1) * perPage, safePage * perPage)
   const recordStart = filteredActivities.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredActivities.length)
-  const sTotalPages = Math.max(1, Math.ceil(services.length / servicePerPage))
-  const sSafePage = Math.min(servicePage, sTotalPages)
-  const paginatedServices = services.slice((sSafePage - 1) * servicePerPage, sSafePage * servicePerPage)
-  const sRecordStart = services.length === 0 ? 0 : (sSafePage - 1) * servicePerPage + 1
-  const sRecordEnd = Math.min(sSafePage * servicePerPage, services.length)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -202,7 +220,7 @@ export default function CDSPMaintenanceForm() {
     setSearchQuery('')
   }
 
-  const fillFormFromActivity = (a: ProgramActivity) => {
+  const fillFormFromActivity = (a: CdspActivity) => {
     setSelectedService(a.service)
     setFormData({
       title:           a.title,
@@ -213,93 +231,105 @@ export default function CDSPMaintenanceForm() {
       counselor:       a.counselor       ?? '',
       sessionDuration: a.sessionDuration ?? '',
       participants:    a.participants != null ? String(a.participants) : '',
-      startDate:       a.startDate       ?? '',
-      endDate:         a.endDate         ?? '',
       status:          a.status,
     })
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedService) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a service type.', confirmButtonColor: '#0077BE' }); return }
     if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity title.', confirmButtonColor: '#0077BE' }); return }
+    if (!formData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity date.', confirmButtonColor: '#0077BE' }); return }
 
-    const payload: ProgramActivity = {
-      id:              editingId ?? Date.now(),
-      program:         'CDSP',
-      service:         selectedService,
+    const payload = {
+      serviceName:     selectedService,
       title:           formData.title.trim(),
-      description:     formData.description.trim()  || undefined,
+      description:     formData.description.trim() || '',
       date:            formData.date,
       location:        formData.location,
-      facilitator:     formData.facilitator          || undefined,
-      counselor:       formData.counselor            || undefined,
-      sessionDuration: formData.sessionDuration      || undefined,
-      participants:    parseInt(formData.participants) || undefined,
-      startDate:       formData.startDate            || undefined,
-      endDate:         formData.endDate              || undefined,
+      facilitator:     formData.facilitator || '',
+      counselor:       formData.counselor || '',
+      sessionDuration: formData.sessionDuration || '',
+      participants:    formData.participants ? parseInt(formData.participants) : null,
       status:          formData.status,
     }
 
-    if (editingId !== null) {
-      setActivities(prev => prev.map(a => a.id === editingId ? payload : a))
-      Swal.fire({ icon: 'success', title: 'Activity Updated', text: 'The activity has been updated.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-    } else {
-      setActivities(prev => [...prev, payload])
-      Swal.fire({ icon: 'success', title: 'Activity Added', text: 'New CDSP activity has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+    try {
+      if (editingId !== null) {
+        await cdspService.updateActivity(editingId, payload)
+        Swal.fire({ icon: 'success', title: 'Activity Updated', text: 'The activity has been updated.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      } else {
+        await cdspService.createActivity(payload)
+        Swal.fire({ icon: 'success', title: 'Activity Added', text: 'New CDSP activity has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      }
+      await refreshActivities()
+      goToList()
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save activity.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
     }
-
-    goToList()
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteConfirm === null) return
-    setActivities(prev => prev.filter(a => a.id !== deleteConfirm))
-    setDeleteConfirm(null)
+    try {
+      await cdspService.deleteActivity(deleteConfirm)
+      await refreshActivities()
+      setDeleteConfirm(null)
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete activity.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleStatusChange = () => {
+  const handleStatusChange = async () => {
     if (!statusConfirm) return
-    const { activity, nextStatus } = statusConfirm
-    setActivities(prev =>
-      prev.map(a => a.id === activity.id ? { ...a, status: nextStatus } : a)
-    )
-    if (nextStatus === 'Completed') {
-      setApplicants(prev =>
-        prev.map(a => a.assignedActivity === activity.title ? { ...a, status: 'Inactive' as const } : a)
-      )
+    const { activity, nextStatus, label } = statusConfirm
+    try {
+      await cdspService.updateActivityStatus(activity.id, nextStatus)
+      await refreshActivities()
+      Swal.fire({ icon: 'success', title: 'Status Updated', text: `Activity is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setStatusConfirm(null)
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? `Failed to ${label.toLowerCase()}.`
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
     }
-    Swal.fire({ icon: 'success', title: 'Status Updated', text: `Activity is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-    setStatusConfirm(null)
   }
 
-  const handleAddService = () => {
-    const name = newServiceName.trim()
-    if (!name) return
-    if (services.includes(name)) {
-      Swal.fire({ icon: 'warning', title: 'Duplicate', text: 'This service already exists.', confirmButtonColor: '#0077BE' })
-      return
+  const handleSaveService = async () => {
+    const name = serviceForm.name.trim()
+    if (!name) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a service name.', confirmButtonColor: '#0077BE' }); return }
+    try {
+      await cdspService.createService({ serviceName: name })
+      await refreshServices()
+      setServiceForm({ name: '' })
+      Swal.fire({ icon: 'success', title: 'Service Added', text: `"${name}" has been added.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message ?? 'Failed to create service.'
+      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
     }
-    setServices(prev => [...prev, name])
-    setNewServiceName('')
-    newServiceRef.current?.focus()
   }
 
-  const handleDeleteService = () => {
-    if (!serviceDeleteConfirm) return
-    setServices(prev => prev.filter(s => s !== serviceDeleteConfirm))
-    setServiceDeleteConfirm(null)
+  const handleDeleteService = async (id: number) => {
+    try {
+      await cdspService.deleteService(id)
+      await refreshServices()
+      setDeleteServiceConfirm(null)
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message ?? 'Failed to delete service.'
+      Swal.fire({ icon: 'error', title: 'Cannot Delete', text: msg, confirmButtonColor: '#0077BE' })
+    }
   }
 
   // ── Render: landing ───────────────────────────────────────────────────────
 
   const renderLanding = () => {
-    const cards: { key: Action; icon: React.ReactNode; label: string; desc: string }[] = [
-      { key: 'add_activity',   icon: <PlusCircle  size={32} />, label: 'Add Activity',    desc: 'Create a new CDSP activity' },
-      { key: 'add_service',    icon: <Tag         size={32} />, label: 'Add Service',     desc: 'Add a new service type' },
-      { key: 'view_activities',icon: <FolderOpen  size={32} />, label: 'View Activities', desc: 'Browse all CDSP activities' },
-      { key: 'view_services',  icon: <ClipboardList size={32}/>, label: 'View Services',  desc: 'Manage service types' },
+    const cards: { key: Action; icon: React.ReactNode; label: string; desc: string; editorOnly?: boolean }[] = [
+      { key: 'add_activity',    icon: <PlusCircle    size={32} />, label: 'Add Activity',    desc: 'Create a new CDSP activity',   editorOnly: true },
+      { key: 'add_service',     icon: <Tag           size={32} />, label: 'Add Service',     desc: 'Register a new CDSP service',  editorOnly: true },
+      { key: 'view_activities', icon: <FolderOpen    size={32} />, label: 'View Activities', desc: 'Browse all CDSP activities' },
+      { key: 'view_services',   icon: <ClipboardList size={32} />, label: 'View Services',   desc: 'View CDSP service types' },
     ]
 
     return (
@@ -311,8 +341,8 @@ export default function CDSPMaintenanceForm() {
           {cards.map(card => (
             <button
               key={card.key}
-              onClick={() => setAction(card.key)}
-              disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+              onClick={() => { if (card.key === 'add_service') setServiceForm({ name: '' }); setAction(card.key) }}
+              disabled={card.editorOnly && !canManage('maintenance')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -343,7 +373,6 @@ export default function CDSPMaintenanceForm() {
 
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        {/* Header */}
         <div className="bg-brand-blue px-6 py-4">
           <div className="flex items-center gap-3">
             {(mode === 'edit' || mode === 'view') && (
@@ -359,7 +388,6 @@ export default function CDSPMaintenanceForm() {
         </div>
 
         <div className="p-6">
-          {/* Service selector */}
           <div className="mb-6">
             <label className={labelCls}>
               Service Type <span className="text-red-500">*</span>
@@ -381,10 +409,8 @@ export default function CDSPMaintenanceForm() {
             )}
           </div>
 
-          {/* Activity fields — only shown once a service is selected */}
           {(selectedService || mode !== 'add') && (
             <div className="border-t pt-6 space-y-5">
-              {/* Title + Description */}
               <div>
                 <label className={labelCls}>Activity Title <span className="text-red-500">*</span></label>
                 <input
@@ -408,10 +434,9 @@ export default function CDSPMaintenanceForm() {
                 />
               </div>
 
-              {/* Date + Location */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Date</label>
+                  <label className={labelCls}>Date <span className="text-red-500">*</span></label>
                   <DatePicker className={inputCls} value={formData.date} readOnly={isView}
                     onChange={value => setFormData(p => ({ ...p, date: value }))} />
                 </div>
@@ -423,7 +448,6 @@ export default function CDSPMaintenanceForm() {
                 </div>
               </div>
 
-              {/* Facilitator + Participants */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Person In Charge / Facilitator</label>
@@ -439,7 +463,6 @@ export default function CDSPMaintenanceForm() {
                 </div>
               </div>
 
-              {/* Status */}
               <div>
                 <label className={labelCls}>Status</label>
                 <div className="flex gap-6 mt-1">
@@ -463,13 +486,10 @@ export default function CDSPMaintenanceForm() {
                 </div>
               </div>
 
-              {/* Section divider: Counseling info */}
               <div className="border-t pt-5 mt-1">
                 <p className="text-xs font-semibold text-brand-blue uppercase tracking-wider mb-4">
                   Additional Counseling / Session Information
                 </p>
-
-                {/* Counselor + Session Duration */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className={labelCls}>Counselor / Career Advisor</label>
@@ -484,23 +504,8 @@ export default function CDSPMaintenanceForm() {
                       className={inputCls} placeholder="e.g. 3 sessions, 1 hour each" />
                   </div>
                 </div>
-
-                {/* Start + End dates */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Start Date</label>
-                    <DatePicker className={inputCls} value={formData.startDate} readOnly={isView}
-                      onChange={value => setFormData(p => ({ ...p, startDate: value }))} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>End Date</label>
-                    <DatePicker className={inputCls} value={formData.endDate} readOnly={isView}
-                      onChange={value => setFormData(p => ({ ...p, endDate: value }))} />
-                  </div>
-                </div>
               </div>
 
-              {/* Buttons */}
               <div className="flex justify-end gap-3 border-t pt-4 mt-2">
                 <button
                   type="button"
@@ -534,7 +539,6 @@ export default function CDSPMaintenanceForm() {
 
   const renderViewActivities = () => (
     <>
-      {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-5 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <select
@@ -568,9 +572,7 @@ export default function CDSPMaintenanceForm() {
         </div>
       </div>
 
-      {/* Table card */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        {/* Table header */}
         <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-white m-0">CDSP Activities</h3>
@@ -584,7 +586,6 @@ export default function CDSPMaintenanceForm() {
           </button>
         </div>
 
-        {/* Ellipsis menu portal */}
         {openMenuId !== null && menuPos !== null && (() => {
           const a = cdspActivities.find(x => x.id === openMenuId)
           if (!a) return null
@@ -662,7 +663,6 @@ export default function CDSPMaintenanceForm() {
           )
         })()}
 
-        {/* Empty state */}
         {filteredActivities.length === 0 ? (
           <div className="py-16 text-center">
             <FolderOpen size={48} className="mx-auto mb-4 text-gray-300" />
@@ -757,12 +757,11 @@ export default function CDSPMaintenanceForm() {
 
   const renderViewParticipants = () => {
     if (!selectedActivity) return null
-    const participants = cdspApplicants.filter(a => a.assignedActivity === selectedActivity.title)
-    const ptotal = Math.max(1, Math.ceil(participants.length / participantPerPage))
+    const ptotal = Math.max(1, Math.ceil(activityParticipants.length / participantPerPage))
     const psafe = Math.min(participantPage, ptotal)
-    const paginatedPts = participants.slice((psafe - 1) * participantPerPage, psafe * participantPerPage)
-    const pStart = participants.length === 0 ? 0 : (psafe - 1) * participantPerPage + 1
-    const pEnd = Math.min(psafe * participantPerPage, participants.length)
+    const paginatedPts = activityParticipants.slice((psafe - 1) * participantPerPage, psafe * participantPerPage)
+    const pStart = activityParticipants.length === 0 ? 0 : (psafe - 1) * participantPerPage + 1
+    const pEnd = Math.min(psafe * participantPerPage, activityParticipants.length)
     const STATUS_COLORS_APPLICANT: Record<string, string> = {
       Active:    'bg-blue-100 text-blue-700',
       Inactive:  'bg-gray-100 text-gray-500',
@@ -782,18 +781,21 @@ export default function CDSPMaintenanceForm() {
           </button>
         </div>
 
-        {/* Header */}
         <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-white text-base font-semibold m-0">{selectedActivity.title}</h3>
             <p className="text-white/80 text-sm mt-0.5">
-              {participants.length} participant{participants.length !== 1 ? 's' : ''} found
+              {loadingParticipants ? 'Loading…' : `${activityParticipants.length} participant${activityParticipants.length !== 1 ? 's' : ''} found`}
             </p>
           </div>
           <StatusBadge status={selectedActivity.status} />
         </div>
 
-        {participants.length === 0 ? (
+        {loadingParticipants ? (
+          <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
+            <p className="text-gray-400 text-sm">Loading participants…</p>
+          </div>
+        ) : activityParticipants.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
             <Users size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-gray-500 text-sm">No participants assigned to this activity yet.</p>
@@ -812,22 +814,22 @@ export default function CDSPMaintenanceForm() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedPts.map((a, i) => (
-                  <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                {paginatedPts.map((p, i) => (
+                  <tr key={p.beneficiaryServiceId} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                     <td className="px-4 py-3 font-medium text-gray-800">
-                      {a.lastName}, {a.firstName} {a.middleName}
+                      {p.lastName}, {p.firstName} {p.middleName}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{a.serviceAvailed || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{p.serviceAvailed || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">
-                      {a.classification.slice(0, 2).join(', ')}
-                      {a.classification.length > 2 && (
-                        <span className="text-gray-400"> +{a.classification.length - 2}</span>
+                      {(p.classification ?? []).slice(0, 2).join(', ')}
+                      {(p.classification ?? []).length > 2 && (
+                        <span className="text-gray-400"> +{p.classification.length - 2}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{a.contactNumber || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{p.contactNumber || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS_APPLICANT[a.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {a.status}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS_APPLICANT[p.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {p.status}
                       </span>
                     </td>
                   </tr>
@@ -842,7 +844,7 @@ export default function CDSPMaintenanceForm() {
                 </select>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{pStart}–{pEnd} of {participants.length} records</span>
+                <span className="text-sm text-gray-500">{pStart}–{pEnd} of {activityParticipants.length} records</span>
                 <div className="flex gap-1">
                   <button onClick={() => setParticipantPage(p => Math.max(1, p - 1))} disabled={psafe === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
                   <button onClick={() => setParticipantPage(p => Math.min(ptotal, p + 1))} disabled={psafe === ptotal} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
@@ -861,42 +863,40 @@ export default function CDSPMaintenanceForm() {
     <div className="bg-white rounded-xl shadow-md overflow-hidden">
       <div className="bg-brand-blue px-6 py-4">
         <h3 className="text-white m-0">Add New Service</h3>
-        <p className="text-white/70 text-sm">CDSP Program</p>
+        <p className="text-white/70 text-sm mt-0.5">CDSP Program</p>
       </div>
       <div className="p-6">
-        <p className="text-gray-600 text-sm mb-6">
+        <p className="text-sm text-gray-600 mb-1">
           Add a new service type to the CDSP program. This service will be available when creating new activities.
         </p>
-        <div className="max-w-lg">
-          <label className={labelCls}>Service Name <span className="text-red-500">*</span></label>
-          <div className="flex gap-3">
-            <input
-              ref={newServiceRef}
-              type="text"
-              value={newServiceName}
-              onChange={e => setNewServiceName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddService()}
-              placeholder="e.g. Career Workshop, Job Matching..."
-              className={inputCls + ' flex-1'}
-            />
-            <button
-              onClick={handleAddService}
-              disabled={!canManage('maintenance')}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
-            >
-              <Plus size={16} /> Add Service
-            </button>
-          </div>
-          <p className="text-gray-400 text-xs mt-1.5">Press Enter or click "Add Service" to save.</p>
+        <label className="block text-sm font-semibold text-gray-900 mb-2">
+          Service Name <span className="text-red-500">*</span>
+        </label>
+        <div className="flex gap-3 items-center">
+          <input
+            type="text"
+            value={serviceForm.name}
+            onChange={e => setServiceForm({ name: e.target.value })}
+            onKeyDown={e => { if (e.key === 'Enter') handleSaveService() }}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-400"
+            placeholder="e.g. Career Workshop, Job Matching..."
+          />
+          <button
+            onClick={handleSaveService}
+            className="flex items-center gap-2 px-5 py-2.5 bg-brand-blue text-white rounded-full hover:bg-brand-blue-dark transition-colors text-sm font-medium whitespace-nowrap"
+          >
+            <Plus size={15} /> Add Service
+          </button>
         </div>
+        <p className="text-xs text-gray-400 mt-1.5">Press Enter or click "Add Service" to save.</p>
 
-        {services.length > 0 && (
-          <div className="mt-8">
-            <h4 className="text-gray-700 text-sm font-semibold mb-3">Current Services in CDSP</h4>
+        {apiServices.length > 0 && (
+          <div className="mt-6">
+            <p className="text-sm font-bold text-gray-900 mb-3">Current Services in CDSP</p>
             <div className="flex flex-wrap gap-2">
-              {services.map(s => (
-                <span key={s} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-brand-blue border border-blue-200 rounded-lg text-sm">
-                  {s}
+              {apiServices.map(svc => (
+                <span key={svc.id} className="px-4 py-1.5 border border-brand-blue text-brand-blue rounded-full text-sm">
+                  {svc.name}
                 </span>
               ))}
             </div>
@@ -908,98 +908,111 @@ export default function CDSPMaintenanceForm() {
 
   // ── Render: view services ─────────────────────────────────────────────────
 
-  const renderViewServices = () => (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-white m-0">CDSP Services</h3>
-        </div>
-        <button
-          onClick={() => setAction('add_service')}
-          disabled={!canManage('maintenance')}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-        >
-          <Plus size={15} /> Add Service
-        </button>
-      </div>
+  const renderViewServices = () => {
+    const svcTotal = Math.max(1, Math.ceil(apiServices.length / servicePerPage))
+    const svcSafe  = Math.min(servicePage, svcTotal)
+    const svcSlice = apiServices.slice((svcSafe - 1) * servicePerPage, svcSafe * servicePerPage)
+    const svcStart = apiServices.length === 0 ? 0 : (svcSafe - 1) * servicePerPage + 1
+    const svcEnd   = Math.min(svcSafe * servicePerPage, apiServices.length)
 
-      {services.length === 0 ? (
-        <div className="py-16 text-center">
-          <Tag size={40} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-500 text-sm">No services defined yet.</p>
-          <button onClick={() => setAction('add_service')} disabled={!canManage('maintenance')} className="mt-4 px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            Add First Service
-          </button>
+    return (
+      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
+          <h3 className="text-white m-0">CDSP Services</h3>
+          {canManage('maintenance') && (
+            <button
+              onClick={() => { setServiceForm({ name: '' }); setAction('add_service') }}
+              className="flex items-center gap-2 px-5 py-2 bg-white text-brand-blue rounded-full hover:bg-blue-50 transition-colors text-sm font-medium"
+            >
+              <Plus size={15} /> Add Service
+            </button>
+          )}
         </div>
-      ) : (
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service Name</th>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Projects Count</th>
-              <th className="px-6 py-4 text-right text-sm text-gray-700 font-semibold w-20">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedServices.map(svc => {
-              const count = cdspActivities.filter(a => a.service === svc).length
-              return (
-                <tr key={svc} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm font-medium text-gray-800">{svc}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {count} project{count !== 1 ? 's' : ''}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => setServiceDeleteConfirm(svc)}
-                      disabled={!canManage('maintenance')}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      title="Remove service"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
+
+        <ConfirmModal
+          open={deleteServiceConfirm !== null}
+          title="Delete Service"
+          message={`Are you sure you want to delete this service?\nActivities linked to it must be removed first.`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => deleteServiceConfirm !== null && handleDeleteService(deleteServiceConfirm)}
+          onCancel={() => setDeleteServiceConfirm(null)}
+        />
+
+        {apiServices.length === 0 ? (
+          <div className="py-16 text-center">
+            <Tag size={40} className="mx-auto mb-3 text-gray-300" />
+            <p className="text-gray-500 text-sm">No services loaded yet.</p>
+          </div>
+        ) : (
+          <>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Service Name</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-800">Projects Count</th>
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-gray-800">Actions</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
-      {services.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Rows per page:</span>
-            <select value={servicePerPage} onChange={e => { setServicePerPage(Number(e.target.value)); setServicePage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
-              {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{sRecordStart}–{sRecordEnd} of {services.length} records</span>
-            <div className="flex gap-1">
-              <button onClick={() => setServicePage(p => Math.max(1, p - 1))} disabled={sSafePage === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
-              <button onClick={() => setServicePage(p => Math.min(sTotalPages, p + 1))} disabled={sSafePage === sTotalPages} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+              </thead>
+              <tbody>
+                {svcSlice.map(svc => {
+                  const count = cdspActivities.filter(a => a.service === svc.name).length
+                  return (
+                    <tr key={svc.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-brand-blue flex-shrink-0" />
+                          <span className="text-sm text-gray-800">{svc.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-600">
+                          {count} {count === 1 ? 'project' : 'projects'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => setDeleteServiceConfirm(svc.id)}
+                          title="Delete service"
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                Rows per page:
+                <select
+                  value={servicePerPage}
+                  onChange={e => { setServicePerPage(Number(e.target.value)); setServicePage(1) }}
+                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+                >
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <span>{svcStart}–{svcEnd} of {apiServices.length} records</span>
+                <button onClick={() => setServicePage(p => Math.max(1, p - 1))} disabled={svcSafe === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
+                <button onClick={() => setServicePage(p => Math.min(svcTotal, p + 1))} disabled={svcSafe === svcTotal} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+          </>
+        )}
+      </div>
+    )
+  }
 
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
     <div className="pb-8">
-      {/* Action cards — always visible unless viewing participants or activity detail/edit */}
       {action !== 'view_participants' && action !== 'view_activity' && action !== 'edit_activity' && renderLanding()}
 
-      {/* Content area */}
       {action === '' && (
         <div className="bg-white rounded-xl shadow-md py-20 text-center">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1017,10 +1030,9 @@ export default function CDSPMaintenanceForm() {
       {action === 'view_activity'   && renderActivityForm('view')}
       {action === 'view_activities' && renderViewActivities()}
       {action === 'view_participants' && renderViewParticipants()}
-      {action === 'add_service'     && renderAddService()}
       {action === 'view_services'   && renderViewServices()}
+      {action === 'add_service'     && renderAddService()}
 
-      {/* Delete activity modal */}
       <ConfirmModal
         open={deleteConfirm !== null}
         title="Delete Activity"
@@ -1031,18 +1043,6 @@ export default function CDSPMaintenanceForm() {
         onCancel={() => setDeleteConfirm(null)}
       />
 
-      {/* Delete service modal */}
-      <ConfirmModal
-        open={serviceDeleteConfirm !== null}
-        title="Remove Service"
-        message={`Remove "${serviceDeleteConfirm}" from CDSP?\nExisting activities with this service will not be affected.`}
-        confirmLabel="Remove"
-        destructive
-        onConfirm={handleDeleteService}
-        onCancel={() => setServiceDeleteConfirm(null)}
-      />
-
-      {/* Status change modal */}
       {statusConfirm !== null && (() => {
         const { activity, nextStatus, label } = statusConfirm
         const steps: ActivityStatus[] = ['Planned', 'Ongoing', 'Completed']
@@ -1062,7 +1062,6 @@ export default function CDSPMaintenanceForm() {
                 <h3 className="text-gray-800 m-0 text-lg">{label}</h3>
               </div>
 
-              {/* Progress indicator */}
               <div className="flex items-center gap-2 mb-5 bg-gray-50 rounded-xl px-4 py-3">
                 {steps.map((s, i) => {
                   const isCur  = s === activity.status
@@ -1113,4 +1112,3 @@ export default function CDSPMaintenanceForm() {
     </div>
   )
 }
-

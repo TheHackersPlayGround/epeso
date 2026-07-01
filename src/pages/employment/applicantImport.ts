@@ -55,7 +55,9 @@ type TemplateColumn = {
 
 type TemplateSection = {
   label: string;
-  fillArgb: string; // section-label row fill
+  fillArgb: string;
+  requiredArgb: string;
+  optionalArgb: string;
   columns: TemplateColumn[];
 };
 
@@ -63,7 +65,9 @@ type TemplateSection = {
 // the address triple, disability, employment status/type, OFW and 4Ps blocks.
 const SECTION_PERSONAL: TemplateSection = {
   label: "I. PERSONAL INFORMATION",
-  fillArgb: "FF0077BE",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
   columns: [
     { header: "Surname", width: 18, example: "Dela Cruz", required: true },
     { header: "First Name", width: 18, example: "Juan", required: true },
@@ -113,7 +117,9 @@ const EMPLOYMENT_TYPE_PREF_OPTIONS = ["Part-time", "Full-time", "Part-time, Full
 
 const SECTION_JOBPREF: TemplateSection = {
   label: "II. JOB PREFERENCE",
-  fillArgb: "FF0065A5",
+  fillArgb: "FFF1C40F",
+  requiredArgb: "FFF5D478",
+  optionalArgb: "FFFDF1C1",
   columns: [
     { header: "Employment Type Preference", width: 24, example: "Full-time", options: EMPLOYMENT_TYPE_PREF_OPTIONS },
     ...Array.from({ length: JOB_PREF_ROWS }, (_, i): TemplateColumn[] => [
@@ -133,7 +139,9 @@ const DEFAULT_LANGUAGES = ["ENGLISH", "FILIPINO", "MANDARIN"];
 
 const SECTION_LANGUAGE: TemplateSection = {
   label: "III. LANGUAGE / DIALECT PROFICIENCY",
-  fillArgb: "FF0077BE",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
   columns: Array.from({ length: LANGUAGE_ROWS }, (_, i): TemplateColumn[] => [
     { header: `Language ${i + 1}`, width: 16, example: DEFAULT_LANGUAGES[i] ?? "" },
     { header: `Language ${i + 1} - Read`, width: 13, example: i === 0 ? "Yes" : "", options: YES_NO_OPTIONS },
@@ -152,7 +160,9 @@ const GRADUATE_STUDY_ROWS = 1;
 
 const SECTION_EDUCATION: TemplateSection = {
   label: "IV. EDUCATIONAL BACKGROUND",
-  fillArgb: "FF0065A5",
+  fillArgb: "FFF1C40F",
+  requiredArgb: "FFF5D478",
+  optionalArgb: "FFFDF1C1",
   columns: [
     { header: "Currently In School?", width: 16, example: "No", options: YES_NO_OPTIONS },
     { header: "Elementary - Graduated?", width: 18, example: "Yes", options: YES_NO_OPTIONS },
@@ -187,7 +197,9 @@ const TRAINING_ROWS = 1;
 
 const SECTION_TRAINING: TemplateSection = {
   label: "V. TECHNICAL/VOCATIONAL AND OTHER TRAINING",
-  fillArgb: "FF0077BE",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
   columns: Array.from({ length: TRAINING_ROWS }, (_, i): TemplateColumn[] => [
     { header: `Training ${i + 1} - Course`, width: 26, example: i === 0 ? "Bread and Pastry Production NC II" : "" },
     { header: `Training ${i + 1} - Hours`, width: 14, example: i === 0 ? "120" : "" },
@@ -205,7 +217,9 @@ const LICENSE_ROWS = 3;
 
 const SECTION_ELIGIBILITY: TemplateSection = {
   label: "VI. ELIGIBILITY / PROFESSIONAL LICENSE",
-  fillArgb: "FF0065A5",
+  fillArgb: "FFF1C40F",
+  requiredArgb: "FFF5D478",
+  optionalArgb: "FFFDF1C1",
   columns: [
     ...Array.from({ length: ELIGIBILITY_ROWS }, (_, i): TemplateColumn[] => [
       { header: `Eligibility ${i + 1} - Name`, width: 28, example: i === 0 ? "Career Service Professional" : "" },
@@ -225,7 +239,9 @@ const WORK_EXPERIENCE_ROWS = 3;
 
 const SECTION_WORKEXP: TemplateSection = {
   label: "VII. WORK EXPERIENCE",
-  fillArgb: "FF0065A5",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
   columns: Array.from({ length: WORK_EXPERIENCE_ROWS }, (_, i): TemplateColumn[] => [
     { header: `Work Experience ${i + 1} - Company Name`, width: 24, example: i === 0 ? "ABC Construction Inc." : "" },
     { header: `Work Experience ${i + 1} - Company City`, width: 28, example: i === 0 ? "Tangub City, Misamis Occidental" : "" },
@@ -249,7 +265,9 @@ const PREDEFINED_SKILLS = [
 
 const SECTION_OTHERSKILLS: TemplateSection = {
   label: "VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE",
-  fillArgb: "FF0077BE",
+  fillArgb: "FFF1C40F",
+  requiredArgb: "FFF5D478",
+  optionalArgb: "FFFDF1C1",
   columns: [
     { header: "Other Skills (comma-separated)", width: 48, example: "CARPENTRY WORK, DRIVER, Welding" },
   ],
@@ -261,7 +279,9 @@ const REFERRED_PROGRAM_OPTIONS = ["SPES", "GIP", "DILEEP", "TESDA Training", "TU
 
 const SECTION_REFERRED: TemplateSection = {
   label: "IX. REFERRED PROGRAM",
-  fillArgb: "FF0065A5",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
   columns: [
     { header: "Referred Program", width: 20, example: "", options: REFERRED_PROGRAM_OPTIONS },
     { header: "Referred Program (Other)", width: 24, example: "" },
@@ -312,7 +332,7 @@ export async function downloadImportTemplate(): Promise<void> {
     for (let c = startCol; c <= endCol; c++) {
       const cell = ws.getCell(1, c);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: section.fillArgb } };
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
+      cell.font = { bold: true, color: { argb: "FF1A1A1A" }, size: 12 };
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = border;
     }
@@ -322,15 +342,19 @@ export async function downloadImportTemplate(): Promise<void> {
   }
   ws.getRow(1).height = 26;
 
-  // Row 2: individual field headers (required columns darker + "*").
-  TEMPLATE_COLUMNS.forEach((col, idx) => {
-    const cell = ws.getCell(2, idx + 1);
-    cell.value = col.required ? `${col.header} *` : col.header;
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col.required ? "FF0065A5" : "FF4AA3DF" } };
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = border;
-  });
+  // Row 2: field headers colored per section (blue shades / yellow shades), black text
+  let colIdx2 = 0;
+  for (const section of TEMPLATE_SECTIONS) {
+    for (const col of section.columns) {
+      const cell = ws.getCell(2, colIdx2 + 1);
+      cell.value = col.required ? `${col.header} *` : col.header;
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col.required ? section.requiredArgb : section.optionalArgb } };
+      cell.font = { bold: true, color: { argb: "FF1A1A1A" }, size: 11 };
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+      cell.border = border;
+      colIdx2++;
+    }
+  }
   ws.getRow(2).height = 32;
 
   // Row 3: one greyed, italic example row.

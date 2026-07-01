@@ -1,38 +1,39 @@
 import { useState } from 'react'
 import { X, Users, FileText, Upload } from 'lucide-react'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
+import { useCDSP } from '../../contexts/CDSPContext'
 import type { CDSPApplicant } from '../../contexts/CDSPContext'
-import AddressFields from '../../components/AddressFields'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const CLASSIFICATION_OPTIONS = [
   'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
-  'Out of School Youth (OSY)', 'Person with Disability (PWD)', 'Solo Parent',
-  'Women', 'Senior Citizen', 'Returning OFW', 'Other',
+  'Out of School Youth', 'Person with Disability', 'Solo Parent',
+  'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]
 
 const EDUCATION_OPTIONS = [
   'Elementary Level', 'Elementary Graduate', 'High School Level', 'High School Graduate',
   'Senior High School Level', 'Senior High School Graduate', 'Vocational / Technical',
-  'College Level', 'College Level (2nd Year)', 'College Level (3rd Year)',
-  'College Level (4th Year)', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral',
+  'College Level', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral Level', 'Doctoral Graduate',
 ]
 
 const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Underemployed', 'Unemployed', 'Self-Employed', 'Student', 'Retired']
 
-export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
+export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
 
 export const CDSP_SEED_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
 
 export const emptyForm: Omit<CDSPApplicant, 'id'> = {
+  beneficiaryServiceId: 0, serviceId: 0, assignedActivityId: null, barangayId: 0,
   lastName: '', firstName: '', middleName: '',
   sex: '', birthdate: '', age: 0, civilStatus: '',
   contactNumber: '', email: '',
   streetPurok: '', barangay: '', cityMunicipality: '', province: '', region: '',
   classification: [], classificationOther: '',
-  highestEducation: '', schoolName: '', course: '', yearGraduated: '',
+  highestEducation: '', schoolName: '', course: '', strand: '', yearLevel: '', yearGraduated: '',
   employmentStatus: '', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
   serviceAvailed: '', assignedActivity: '', assignmentHistory: [],
   careerGoal: '', coachingType: '', careerAssessmentResult: '',
@@ -142,9 +143,8 @@ function DocAttachSection({
 // ─── View Applicant Panel ─────────────────────────────────────────────────────
 
 export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; onClose: () => void }) {
-  const { activities } = useProgramActivities()
-  const cdspActivities = activities.filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
-  const cdspServices = Array.from(new Set(cdspActivities.map(a => a.service)))
+  const { activities: cdspActivities, services: svcList } = useCDSP()
+  const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const fullName = `${applicant.lastName}, ${applicant.firstName}${applicant.middleName ? ' ' + applicant.middleName : ''}`.trim()
 
@@ -282,15 +282,13 @@ export default function CDSPProfileForm({
   initialData?: Omit<CDSPApplicant, 'id'>
   mode?: 'add' | 'edit'
 }) {
-  const { activities } = useProgramActivities()
-  const cdspServices = Array.from(new Set(
-    activities
-      .filter(a => a.program === 'CDSP' || CDSP_SEED_SERVICES.includes(a.service))
-      .map(a => a.service)
-  ))
+  const { services: svcList } = useCDSP()
+  const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const [formData, setFormData] = useState<Omit<CDSPApplicant, 'id'>>(initialData ?? emptyForm)
   const set = (updates: Partial<Omit<CDSPApplicant, 'id'>>) => setFormData((prev) => ({ ...prev, ...updates }))
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
 
   const toggleArr = (field: 'classification' | 'industriesOfInterest' | 'preEmploymentRequirements', value: string) => {
     const arr = formData[field] as string[]
@@ -308,7 +306,7 @@ export default function CDSPProfileForm({
     onSave(formData)
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
   const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
   const sel = `${inp} bg-white`
 
@@ -345,15 +343,15 @@ export default function CDSPProfileForm({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.lastName} onChange={(e) => set({ lastName: e.target.value })} placeholder="Dela Cruz" />
+              <input className={inp} value={formData.lastName} onChange={(e) => set({ lastName: e.target.value })} placeholder="Enter surname" />
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.firstName} onChange={(e) => set({ firstName: e.target.value })} placeholder="Juan" />
+              <input className={inp} value={formData.firstName} onChange={(e) => set({ firstName: e.target.value })} placeholder="Enter first name" />
             </div>
             <div>
               <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input className={inp} value={formData.middleName} onChange={(e) => set({ middleName: e.target.value })} placeholder="M." />
+              <input className={inp} value={formData.middleName} onChange={(e) => set({ middleName: e.target.value })} placeholder="Enter middle name" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 mb-4">
@@ -371,7 +369,7 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={(e) => set({ age: parseInt(e.target.value) || 0 })} placeholder="0" min={0} />
+              <input type="number" className={inp} value={formData.age || ''} onChange={(e) => set({ age: parseInt(e.target.value) || 0 })} placeholder="Enter age" min={0} />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -384,21 +382,59 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={(e) => set({ contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
+              <input className={inp} value={formData.contactNumber} onChange={(e) => set({ contactNumber: e.target.value })} placeholder="Enter contact number" />
             </div>
             <div>
               <label className={lbl}>Email <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input type="email" className={inp} value={formData.email} onChange={(e) => set({ email: e.target.value })} placeholder="example@email.com" />
+              <input type="email" className={inp} value={formData.email} onChange={(e) => set({ email: e.target.value })} placeholder="Enter email address" />
             </div>
           </div>
 
           <SectionDivider numeral="II" title="Address" />
-          <AddressFields
-            value={{ region: formData.region, province: formData.province, cityMunicipality: formData.cityMunicipality, barangay: formData.barangay, streetPurok: formData.streetPurok }}
-            onChange={(addr) => set(addr)}
-            inputClass={inp}
-            labelClass={lbl}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Province</label>
+              <SearchableSelect
+                value={formData.province}
+                placeholder="Search province..."
+                fetchOptions={(s) => searchProvinces(s)}
+                onSelect={(opt) => {
+                  setProvinceId(opt.id)
+                  setCityId(null)
+                  set({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div>
+              <label className={lbl}>City / Municipality</label>
+              <SearchableSelect
+                value={formData.cityMunicipality}
+                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                disabled={!provinceId}
+                refetchKey={provinceId ?? ''}
+                fetchOptions={(s) => searchCities(provinceId ?? 0, s)}
+                onSelect={(opt) => {
+                  setCityId(opt.id)
+                  set({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div>
+              <label className={lbl}>Barangay</label>
+              <SearchableSelect
+                value={formData.barangay}
+                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                disabled={!cityId}
+                refetchKey={cityId ?? ''}
+                fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
+                onSelect={(opt) => set({ barangay: opt.name, barangayId: opt.id })}
+              />
+            </div>
+            <div>
+              <label className={lbl}>Street / Purok #</label>
+              <input className={inp} value={formData.streetPurok} onChange={(e) => set({ streetPurok: e.target.value })} placeholder="Enter street or purok" />
+            </div>
+          </div>
 
           <SectionDivider numeral="III" title="Classification" />
           <div className="grid grid-cols-2 gap-3">
@@ -410,28 +446,55 @@ export default function CDSPProfileForm({
           {formData.classification.includes('Other') && (
             <div className="mt-3">
               <label className={lbl}>Please specify</label>
-              <input className={inp} value={formData.classificationOther} onChange={(e) => set({ classificationOther: e.target.value })} placeholder="Specify classification" />
+              <input className={inp} value={formData.classificationOther} onChange={(e) => set({ classificationOther: e.target.value })} placeholder="Enter classification" />
             </div>
           )}
 
           <SectionDivider numeral="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className={lbl}>Highest Educational Attainment</label>
-              <select className={sel} value={formData.highestEducation} onChange={(e) => set({ highestEducation: e.target.value })}>
-                <option value="">Select</option>
-                {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Course / Program</label>
-              <input className={inp} value={formData.course} onChange={(e) => set({ course: e.target.value })} placeholder="e.g. BS Information Technology" />
-            </div>
-            <div>
-              <label className={lbl}>Year Graduated</label>
-              <input className={inp} value={formData.yearGraduated} onChange={(e) => set({ yearGraduated: e.target.value })} placeholder="e.g. 2024" />
-            </div>
-          </div>
+          {(() => {
+            const edu = formData.highestEducation
+            const isSHS             = edu === 'Senior High School Level' || edu === 'Senior High School Graduate'
+            const isLevel           = edu.endsWith('Level')
+            const showYearLevel     = isLevel && edu !== 'Doctoral Level' && edu !== "Master's Level"
+            const showStrand        = isSHS
+            const showCourse        = ['College Level','College Graduate',"Master's Level","Master's Graduate",'Doctoral Level','Doctoral Graduate'].includes(edu)
+            const showYearGraduated = edu.toLowerCase().includes('graduate') || edu === 'Vocational / Technical'
+            return (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className={lbl}>Highest Educational Attainment</label>
+                  <select className={sel} value={edu} onChange={(e) => set({ highestEducation: e.target.value, course: '', strand: '', yearLevel: '', yearGraduated: '' })}>
+                    <option value="">Select</option>
+                    {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                {showYearLevel && (
+                  <div>
+                    <label className={lbl}>Year Level</label>
+                    <input className={inp} value={formData.yearLevel} onChange={(e) => set({ yearLevel: e.target.value })} placeholder="e.g. Grade 1, 1st Year" />
+                  </div>
+                )}
+                {showStrand && (
+                  <div>
+                    <label className={lbl}>Strand</label>
+                    <input className={inp} value={formData.strand} onChange={(e) => set({ strand: e.target.value })} placeholder="Enter strand" />
+                  </div>
+                )}
+                {showCourse && (
+                  <div>
+                    <label className={lbl}>Course / Program</label>
+                    <input className={inp} value={formData.course} onChange={(e) => set({ course: e.target.value })} placeholder="Enter course or program" />
+                  </div>
+                )}
+                {showYearGraduated && (
+                  <div>
+                    <label className={lbl}>Year Graduated</label>
+                    <input className={inp} value={formData.yearGraduated} onChange={(e) => set({ yearGraduated: e.target.value })} placeholder="Enter year graduated" />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <SectionDivider numeral="V" title="Employment Status" />
           <div className="grid grid-cols-2 gap-4">
@@ -444,7 +507,7 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Current Occupation</label>
-              <input className={inp} value={formData.currentOccupation} onChange={(e) => set({ currentOccupation: e.target.value })} placeholder="e.g. Sales Associate" />
+              <input className={inp} value={formData.currentOccupation} onChange={(e) => set({ currentOccupation: e.target.value })} placeholder="Enter current occupation" />
             </div>
           </div>
 
@@ -472,11 +535,11 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Received By</label>
-              <input className={inp} value={formData.receivedBy} onChange={(e) => set({ receivedBy: e.target.value })} placeholder="Staff name" />
+              <input className={inp} value={formData.receivedBy} onChange={(e) => set({ receivedBy: e.target.value })} placeholder="Enter staff name" />
             </div>
             <div>
               <label className={lbl}>Remarks</label>
-              <input className={inp} value={formData.remarks} onChange={(e) => set({ remarks: e.target.value })} placeholder="Optional" />
+              <input className={inp} value={formData.remarks} onChange={(e) => set({ remarks: e.target.value })} placeholder="Enter remarks" />
             </div>
           </div>
           <div className="mt-6">

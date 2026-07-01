@@ -1,14 +1,18 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import * as cdspService from '../services/cdspService'
 
 export interface CDSPAssignment {
+  activityId: number
   activityTitle: string
   assignedDate: string
-  completedDate?: string
+  completedDate?: string | null
 }
 
 export interface CDSPApplicant {
   id: number
+  beneficiaryServiceId: number
+  serviceId: number
   lastName: string
   firstName: string
   middleName: string
@@ -20,6 +24,7 @@ export interface CDSPApplicant {
   email: string
   streetPurok: string
   barangay: string
+  barangayId: number
   cityMunicipality: string
   province: string
   region: string
@@ -28,6 +33,7 @@ export interface CDSPApplicant {
   highestEducation: string
   schoolName: string
   course: string
+  strand: string
   yearGraduated: string
   employmentStatus: string
   currentOccupation: string
@@ -36,6 +42,7 @@ export interface CDSPApplicant {
   monthlyIncome: string
   serviceAvailed: string
   assignedActivity: string
+  assignedActivityId: number | null
   assignmentHistory: CDSPAssignment[]
   careerGoal: string
   coachingType: string
@@ -57,139 +64,92 @@ export interface CDSPApplicant {
   attachedDocuments: { name: string; file: File; url: string }[]
 }
 
-const SEED: CDSPApplicant[] = [
-  {
-    id: 1, lastName: 'Dela Cruz', firstName: 'Juan', middleName: 'M.',
-    sex: 'Male', birthdate: '2003-05-14', age: 23, civilStatus: 'Single',
-    contactNumber: '09171234567', email: 'juan@gmail.com',
-    streetPurok: 'Purok 3', barangay: 'Poblacion', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Fresh Graduate'], classificationOther: '',
-    highestEducation: 'College Graduate', schoolName: 'Tangub City College', course: 'BS Information Technology', yearGraduated: '2024',
-    employmentStatus: 'Unemployed', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-    serviceAvailed: 'Career Coaching', assignedActivity: 'Career Coaching Batch 1 – March 2026',
-    careerGoal: 'Software Developer', coachingType: 'Career Path Planning', careerAssessmentResult: '',
-    targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-    school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-10', receivedBy: 'Admin', counselorName: 'Engr. Lito Reyes',
-    status: 'Active', remarks: '', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'Career Coaching Batch 1 – March 2026', assignedDate: '2026-03-10' },
-    ],
-  },
-  {
-    id: 2, lastName: 'Reyes', firstName: 'Ana', middleName: 'D.',
-    sex: 'Female', birthdate: '2004-02-20', age: 22, civilStatus: 'Single',
-    contactNumber: '09181234567', email: '',
-    streetPurok: '', barangay: 'Sta. Cruz', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Student'], classificationOther: '',
-    highestEducation: 'College Level (4th Year)', schoolName: '', course: 'BS Education', yearGraduated: '',
-    employmentStatus: 'Student', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-    serviceAvailed: 'Labor Employment for Graduating Students', assignedActivity: 'LEGS Orientation – March 2026',
-    careerGoal: '', coachingType: '', careerAssessmentResult: '',
-    targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-    school: 'Tangub City College', courseProgram: 'BS Education', yearLevel: '4th Year', expectedGraduation: '2026-06',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-12', receivedBy: 'Admin', counselorName: 'Ms. Santos',
-    status: 'Active', remarks: '', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'LEGS Orientation – March 2026', assignedDate: '2026-03-12' },
-    ],
-  },
-  {
-    id: 3, lastName: 'Garcia', firstName: 'Pedro', middleName: 'S.',
-    sex: 'Male', birthdate: '1999-07-08', age: 27, civilStatus: 'Married',
-    contactNumber: '09191234567', email: '',
-    streetPurok: '', barangay: 'Maloro', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Underemployed'], classificationOther: '',
-    highestEducation: 'College Graduate', schoolName: '', course: 'BS Commerce', yearGraduated: '2020',
-    employmentStatus: 'Underemployed', currentOccupation: 'Part-time Sales', employerName: '', employmentType: 'Part-Time', monthlyIncome: '',
-    serviceAvailed: 'Pre-Employment Coaching', assignedActivity: 'Pre-Employment Coaching – April 2026',
-    careerGoal: '', coachingType: '', careerAssessmentResult: '',
-    targetJob: 'Marketing Officer', industriesOfInterest: ['Retail & Commerce'], preEmploymentRequirements: [],
-    school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-15', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
-    status: 'Inactive', remarks: '', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-03-15', completedDate: '2026-04-19' },
-    ],
-  },
-  {
-    id: 4, lastName: 'Santos', firstName: 'Maria', middleName: 'L.',
-    sex: 'Female', birthdate: '2001-09-03', age: 25, civilStatus: 'Single',
-    contactNumber: '09201234567', email: '',
-    streetPurok: '', barangay: 'Panalsalan', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Fresh Graduate', 'Women'], classificationOther: '',
-    highestEducation: 'College Graduate', schoolName: '', course: 'BS Nursing', yearGraduated: '2025',
-    employmentStatus: 'Unemployed', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-    serviceAvailed: 'Career Coaching', assignedActivity: 'Career Coaching Batch 1 – March 2026',
-    careerGoal: 'Registered Nurse', coachingType: 'Career Path Planning', careerAssessmentResult: '',
-    targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-    school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-18', receivedBy: 'Admin', counselorName: 'Engr. Lito Reyes',
-    status: 'Active', remarks: '', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'Career Coaching Batch 1 – March 2026', assignedDate: '2026-03-18' },
-    ],
-  },
-  {
-    id: 5, lastName: 'Torres', firstName: 'Miguel', middleName: 'A.',
-    sex: 'Male', birthdate: '2005-04-11', age: 21, civilStatus: 'Single',
-    contactNumber: '09211234567', email: '',
-    streetPurok: '', barangay: 'Bongbong', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Student'], classificationOther: '',
-    highestEducation: 'College Level (3rd Year)', schoolName: '', course: 'BS Civil Engineering', yearGraduated: '',
-    employmentStatus: 'Student', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-    serviceAvailed: 'Labor Employment for Graduating Students', assignedActivity: 'LEGS Orientation – April 2026',
-    careerGoal: '', coachingType: '', careerAssessmentResult: '',
-    targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-    school: 'Western Mindanao State University', courseProgram: 'BS Civil Engineering', yearLevel: '3rd Year', expectedGraduation: '2027-03',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-20', receivedBy: 'Admin', counselorName: 'Ms. Santos',
-    status: 'Active', remarks: '', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'LEGS Orientation – April 2026', assignedDate: '2026-03-20' },
-    ],
-  },
-  {
-    id: 6, lastName: 'Mendoza', firstName: 'Liza', middleName: 'B.',
-    sex: 'Female', birthdate: '1995-11-25', age: 31, civilStatus: 'Married',
-    contactNumber: '09221234567', email: '',
-    streetPurok: '', barangay: 'Caniangan', cityMunicipality: 'Tangub City',
-    province: 'Misamis Occidental', region: 'Region X – Northern Mindanao',
-    classification: ['Unemployed', 'Women', 'Solo Parent'], classificationOther: '',
-    highestEducation: 'College Graduate', schoolName: '', course: 'BS Education', yearGraduated: '2015',
-    employmentStatus: 'Unemployed', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
-    serviceAvailed: 'Pre-Employment Coaching', assignedActivity: 'Pre-Employment Coaching – April 2026',
-    careerGoal: '', coachingType: '', careerAssessmentResult: '',
-    targetJob: 'Teacher', industriesOfInterest: ['Education'], preEmploymentRequirements: [],
-    school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
-    applicantSignature: '', dateSignature: '',
-    dateApplicationReceived: '2026-03-22', receivedBy: 'Admin', counselorName: 'Mr. Cruz',
-    status: 'Inactive', remarks: 'Referred to DepEd Tangub', attachedDocuments: [],
-    assignmentHistory: [
-      { activityTitle: 'Pre-Employment Coaching – April 2026', assignedDate: '2026-03-22', completedDate: '2026-04-19' },
-    ],
-  },
-]
+export interface CdspActivity {
+  id: number
+  serviceId: number
+  service: string
+  program: string
+  title: string
+  description: string
+  date: string
+  location: string
+  facilitator: string
+  participants: number | null
+  status: 'Planned' | 'Ongoing' | 'Completed'
+  counselor: string
+  sessionDuration: string
+}
+
+export interface CdspService {
+  id: number
+  code: string
+  name: string
+}
 
 interface CDSPContextValue {
   applicants: CDSPApplicant[]
-  setApplicants: React.Dispatch<React.SetStateAction<CDSPApplicant[]>>
+  activities: CdspActivity[]
+  services: CdspService[]
+  loading: boolean
+  loadingActivities: boolean
+  refreshProfiles: () => Promise<void>
+  refreshActivities: () => Promise<void>
+  refreshServices: () => Promise<void>
 }
 
 const CDSPContext = createContext<CDSPContextValue | null>(null)
 
 export function CDSPProvider({ children }: { children: ReactNode }) {
-  const [applicants, setApplicants] = useState<CDSPApplicant[]>(SEED)
-  return <CDSPContext.Provider value={{ applicants, setApplicants }}>{children}</CDSPContext.Provider>
+  const [applicants, setApplicants] = useState<CDSPApplicant[]>([])
+  const [activities, setActivities] = useState<CdspActivity[]>([])
+  const [services, setServices] = useState<CdspService[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingActivities, setLoadingActivities] = useState(true)
+
+  const refreshProfiles = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await cdspService.listProfiles()
+      setApplicants(res.data ?? [])
+    } catch {
+      // silent — show empty list rather than crashing
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const refreshActivities = useCallback(async () => {
+    setLoadingActivities(true)
+    try {
+      const res = await cdspService.listActivities()
+      setActivities(res.data ?? [])
+    } catch {
+      // silent
+    } finally {
+      setLoadingActivities(false)
+    }
+  }, [])
+
+  const refreshServices = useCallback(async () => {
+    try {
+      const res = await cdspService.listCdspServices()
+      setServices(res.data ?? [])
+    } catch {
+      // silent
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshProfiles()
+    refreshActivities()
+    refreshServices()
+  }, [refreshProfiles, refreshActivities, refreshServices])
+
+  return (
+    <CDSPContext.Provider value={{ applicants, activities, services, loading, loadingActivities, refreshProfiles, refreshActivities, refreshServices }}>
+      {children}
+    </CDSPContext.Provider>
+  )
 }
 
 export function useCDSP() {

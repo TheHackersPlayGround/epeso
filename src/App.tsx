@@ -66,6 +66,8 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     catch { return 'User' }
   }
 
+  const [navUsername, setNavUsername] = useState(getCurrentUsername)
+
   const navbar = (
     <Navbar
       activeTab={activeTab}
@@ -76,7 +78,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       }}
       onLogout={onLogout}
       onProfileClick={() => setCurrentPage('profile')}
-      username={getCurrentUsername()}
+      username={navUsername}
     />
   )
 
@@ -239,6 +241,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
           <ProfileView
             onBack={() => setCurrentPage('dashboard')}
             onLogout={onLogout}
+            onNameChange={(firstName) => setNavUsername(firstName)}
           />
         </div>
       </div>

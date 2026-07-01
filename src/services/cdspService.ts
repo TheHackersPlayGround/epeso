@@ -45,6 +45,10 @@ export function removeParticipant(data: { activityId: number; beneficiaryService
   return axiosClient.post(ENDPOINTS.cdsp.removeParticipant, data).then(r => r.data)
 }
 
+export function updateAttendance(data: { activityId: number; beneficiaryServiceId: number; attended: boolean }) {
+  return axiosClient.post(ENDPOINTS.cdsp.updateAttendance, data).then(r => r.data)
+}
+
 export function listProfiles() {
   return axiosClient.get(ENDPOINTS.cdsp.listProfiles).then(r => r.data)
 }

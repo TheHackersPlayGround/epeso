@@ -65,6 +65,7 @@ export const ENDPOINTS = {
     listActivityParticipants: '/cdsp/listActivityParticipants',
     addParticipant:           '/cdsp/addParticipant',
     removeParticipant:        '/cdsp/removeParticipant',
+    updateAttendance:         '/cdsp/updateAttendance',
     listProfiles:             '/cdsp/listProfiles',
     getProfile:               '/cdsp/getProfile',
     createProfile:            '/cdsp/createProfile',

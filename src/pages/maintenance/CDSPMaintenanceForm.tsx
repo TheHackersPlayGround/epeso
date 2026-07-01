@@ -105,7 +105,7 @@ interface ParticipantRecord {
   serviceAvailed: string
   classification: string[]
   status: string
-  attended: boolean
+  attended: boolean | null
 }
 
 // ─── Blank form data ──────────────────────────────────────────────────────────
@@ -180,6 +180,17 @@ export default function CDSPMaintenanceForm() {
       setActivityParticipants([])
     }
   }, [action, selectedActivity])
+
+  const handleAttendance = async (beneficiaryServiceId: number, activityId: number, value: boolean) => {
+    try {
+      await cdspService.updateAttendance({ activityId, beneficiaryServiceId, attended: value })
+      setActivityParticipants(prev => prev.map(p =>
+        p.beneficiaryServiceId === beneficiaryServiceId ? { ...p, attended: value } : p
+      ))
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update attendance.', confirmButtonColor: '#0077BE' })
+    }
+  }
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
@@ -286,6 +297,28 @@ export default function CDSPMaintenanceForm() {
   const handleStatusChange = async () => {
     if (!statusConfirm) return
     const { activity, nextStatus, label } = statusConfirm
+
+    if (nextStatus === 'Completed') {
+      try {
+        const res = await cdspService.listActivityParticipants(activity.id)
+        const participants: ParticipantRecord[] = res.data ?? []
+        const unmarked = participants.filter(p => p.attended === null).length
+        if (unmarked > 0) {
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Attendance Incomplete',
+            html: `<b>${unmarked} participant${unmarked !== 1 ? 's have' : ' has'}</b> not been marked present or absent yet.<br><br>Please mark attendance for all participants before completing this activity.`,
+            confirmButtonText: 'Go to Attendance',
+            confirmButtonColor: '#0077BE',
+          })
+          setStatusConfirm(null)
+          setSelectedActivity(activity)
+          setAction('view_participants')
+          return
+        }
+      } catch { /* proceed if participants can't be fetched */ }
+    }
+
     try {
       await cdspService.updateActivityStatus(activity.id, nextStatus)
       await refreshActivities()
@@ -811,6 +844,7 @@ export default function CDSPMaintenanceForm() {
                   <th className="px-4 py-3 text-left text-white font-semibold">Classification</th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Contact</th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Status</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Attendance</th>
                 </tr>
               </thead>
               <tbody>
@@ -831,6 +865,26 @@ export default function CDSPMaintenanceForm() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS_APPLICANT[p.status] ?? 'bg-gray-100 text-gray-500'}`}>
                         {p.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {selectedActivity.status === 'Planned' ? (
+                        <span className="text-gray-400 text-sm">—</span>
+                      ) : selectedActivity.status === 'Completed' ? (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.attended === true ? 'bg-green-100 text-green-700' : p.attended === false ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                          {p.attended === true ? 'Present' : p.attended === false ? 'Absent' : '—'}
+                        </span>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => handleAttendance(p.beneficiaryServiceId, selectedActivity.id, true)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${p.attended === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'}`}
+                          >Present</button>
+                          <button
+                            onClick={() => handleAttendance(p.beneficiaryServiceId, selectedActivity.id, false)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${p.attended === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-700'}`}
+                          >Absent</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

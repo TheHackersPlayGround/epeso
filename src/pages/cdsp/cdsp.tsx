@@ -117,7 +117,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; service: string; status: string; valid: boolean }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
-  const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<CdspActivity | null>(null)
@@ -171,7 +170,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.createProfile(data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setIsFormOpen(false)
-      setSuccessModal({ open: true, message: 'Applicant profile has been added successfully.' })
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been added successfully.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save profile.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
@@ -183,7 +182,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setEditingApplicant(null)
-      setSuccessModal({ open: true, message: 'Applicant profile has been updated successfully.' })
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been updated successfully.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to update profile.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
@@ -194,7 +193,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.deleteProfile(id)
       await refreshProfiles()
       setDeleteConfirm({ open: false, id: null })
-      setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been deleted.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete profile.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
@@ -331,12 +330,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
         onCancel={() => setDeleteConfirm({ open: false, id: null })}
       />
-      <ConfirmModal
-        isOpen={successModal.open} type="success"
-        title="Success" message={successModal.message}
-        onConfirm={() => setSuccessModal({ open: false, message: '' })}
-        onCancel={() => setSuccessModal({ open: false, message: '' })}
-      />
 
       {/* View Assigned Activity Modal */}
       {viewingAssignedFor && (() => {
@@ -467,8 +460,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.activityTitle}</p>
                             <p className="text-xs text-gray-400 mt-1">Date Assigned: {fmtDate(entry.assignedDate)}</p>
-                            {entry.completedDate && entryStatus === 'Completed' && (
-                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {fmtDate(entry.completedDate)}</p>
+                            {entryStatus === 'Completed' && (
+                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {fmtDate(entry.completedDate ?? act?.date ?? '')}</p>
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">

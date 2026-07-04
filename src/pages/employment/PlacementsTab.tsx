@@ -6,7 +6,7 @@ import type { Placement } from '../../contexts/EmploymentContext'
 import { listPlacements, updatePlacement, updatePlacementStatus } from '../../services/placementService'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
-import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 

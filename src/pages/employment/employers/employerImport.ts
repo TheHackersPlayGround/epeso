@@ -15,8 +15,8 @@ import {
   searchCities,
   searchBarangaysByCity,
   type LocationOption,
-} from "../../services/locationService";
-import { createEmployer } from "../../services/employerService";
+} from "../../../services/locationService";
+import { createEmployer } from "../../../services/employerService";
 
 // ─── Shared result type ───────────────────────────────────────────────────────
 

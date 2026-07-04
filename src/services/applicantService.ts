@@ -6,7 +6,7 @@
 import axiosClient from './axiosClient'
 import { ENDPOINTS } from '../config/api'
 import type { Applicant } from '../contexts/EmploymentContext'
-import type { ApplicantFormData } from '../pages/employment/AddApplicantSidebar'
+import type { ApplicantFormData } from '../pages/employment/applicants/AddApplicantSidebar'
 
 // GET /api/employment/listApplicants
 export async function listApplicants(): Promise<Applicant[]> {

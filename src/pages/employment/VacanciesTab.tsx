@@ -8,7 +8,7 @@ import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from
 import { listEmployers } from '../../services/employerService'
 import { listApplicants } from '../../services/applicantService'
 import { createReferral } from '../../services/referralService'
-import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
 

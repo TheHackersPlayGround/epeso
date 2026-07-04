@@ -30,7 +30,7 @@ const REQUEST_TYPES = [
 
 const ELPOR_FORMS = ['ELPOR Form A', 'ELPOR Form A2', 'ELPOR Form B', 'ELPOR Form B1', 'ELPOR Form C']
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
 const sublbl = 'block text-xs uppercase tracking-wide text-gray-600 font-semibold mb-1'
 
 function AttachIcon() {
@@ -62,6 +62,10 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
   const [desiredPosition, setDesiredPosition] = useState('')
   const [typeOfSkill, setTypeOfSkill] = useState('')
   const [agencies, setAgencies] = useState<string[]>([])
+
+  // "please specify" free-text sub-panel state
+  const [inquirySpecify, setInquirySpecify] = useState('')
+  const [otherProgramSpecify, setOtherProgramSpecify] = useState('')
 
   // OWWA Welfare Case attachment state
   const owwaInputRef = useRef<HTMLInputElement>(null)
@@ -144,6 +148,8 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
       desiredPosition: desiredPosition || undefined,
       typeOfSkill: typeOfSkill || undefined,
       agencies: agencies.filter(a => a.trim()).length ? agencies.filter(a => a.trim()) : undefined,
+      inquirySpecify: inquirySpecify || undefined,
+      otherProgramSpecify: otherProgramSpecify || undefined,
       owwaWelfareFile: owwaAttachment ? { name: 'OFW Welfare Case Form', fileName: owwaAttachment.fileName, fileData: owwaAttachment.fileData } : undefined,
       elporFiles: Object.keys(elporAttachments).length
         ? Object.fromEntries(Object.entries(elporAttachments).map(([k, v]) => [k, { name: k, fileName: v.fileName, fileData: v.fileData }]))
@@ -345,6 +351,22 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
                           </button>
                           {owwaAttachment && <span className="text-xs text-gray-500 truncate max-w-xs">{owwaAttachment.fileName}</span>}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Inquiry (pls specify) sub-panel */}
+                    {type === 'inquiry (pls specify)' && form.typeOfRequest.includes('inquiry (pls specify)') && (
+                      <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
+                        <label className={lbl}>Please Specify</label>
+                        <input className={inp} placeholder="Specify inquiry" value={inquirySpecify} onChange={e => setInquirySpecify(e.target.value)} />
+                      </div>
+                    )}
+
+                    {/* Other DOLE program (please specify) sub-panel */}
+                    {type === 'other DOLE program (please specify)' && form.typeOfRequest.includes('other DOLE program (please specify)') && (
+                      <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
+                        <label className={lbl}>Please Specify</label>
+                        <input className={inp} placeholder="Specify DOLE program" value={otherProgramSpecify} onChange={e => setOtherProgramSpecify(e.target.value)} />
                       </div>
                     )}
 

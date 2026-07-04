@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import type { Referral } from '../../contexts/EmploymentContext'
 import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
-import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
+import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { canManage } from '../../utils/permissions'
 
 // ── Filter config ─────────────────────────────────────────────────────────────

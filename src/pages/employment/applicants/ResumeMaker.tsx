@@ -5,7 +5,7 @@ import { ArrowLeft, Search, ChevronDown, Printer, Download, FileText, Pencil, Mi
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import ResumeCheckbox from './ResumeCheckbox';
-import { getApplicantPhoto } from '../../services/applicantService';
+import { getApplicantPhoto } from '../../../services/applicantService';
 
 // A4 page geometry. The preview and the generated PDF both use these so the
 // on-screen layout matches the printed/exported output exactly.

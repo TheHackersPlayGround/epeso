@@ -20,8 +20,8 @@ import {
   searchBarangaysByCity,
   searchAllCities,
   type LocationOption,
-} from "../../services/locationService";
-import { createApplicant } from "../../services/applicantService";
+} from "../../../services/locationService";
+import { createApplicant } from "../../../services/applicantService";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import { createDefaultApplicantFormData } from "./applicantDefaults";
 

@@ -41,7 +41,7 @@ const STATUS_COLORS: Record<OFWProfile['status'], string> = {
   Rejected: 'bg-red-100 text-red-700',
 }
 
-const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
+const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
 const lbl = 'block text-xs uppercase tracking-wide text-gray-600 font-semibold mb-1'
 
 function Field({ label, value }: { label: string; value?: string }) {
@@ -109,6 +109,10 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
   const [typeOfSkill, setTypeOfSkill] = useState(profile.typeOfSkill ?? '')
   const [agencies, setAgencies] = useState<string[]>(profile.agencies ?? [])
 
+  // Edit mode: "please specify" free-text sub-panels
+  const [inquirySpecify, setInquirySpecify] = useState(profile.inquirySpecify ?? '')
+  const [otherProgramSpecify, setOtherProgramSpecify] = useState(profile.otherProgramSpecify ?? '')
+
   // Edit mode: OWWA welfare case
   const owwaInputRef = useRef<HTMLInputElement>(null)
   const [owwaAttachment, setOwwaAttachment] = useState<OFWAttachment | null>(profile.owwaWelfareFile ?? null)
@@ -171,6 +175,8 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
       desiredPosition: desiredPosition || undefined,
       typeOfSkill: typeOfSkill || undefined,
       agencies: agencies.filter(a => a.trim()).length ? agencies.filter(a => a.trim()) : undefined,
+      inquirySpecify: inquirySpecify || undefined,
+      otherProgramSpecify: otherProgramSpecify || undefined,
       owwaWelfareFile: owwaAttachment ?? undefined,
       elporFiles: Object.keys(elporAttachments).length ? elporAttachments : undefined,
       attachedDocuments: attachedDocuments.map(({ name, fileName, fileData }) => ({ name, fileName, fileData })),
@@ -181,6 +187,8 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
   const hasEmploymentReferral = profile.typeOfRequest.includes('employment referral')
   const hasOwwa = profile.typeOfRequest.includes('OWWA Welfare Case')
   const hasLivelihood = profile.typeOfRequest.includes('livelihood')
+  const hasInquiry = profile.typeOfRequest.includes('inquiry (pls specify)')
+  const hasOtherProgram = profile.typeOfRequest.includes('other DOLE program (please specify)')
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
@@ -296,6 +304,20 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                     ) : (
                       <p className="text-sm text-gray-400 italic">No file attached</p>
                     )}
+                  </div>
+                )}
+
+                {/* Inquiry (pls specify) sub-panel */}
+                {hasInquiry && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
+                    <Field label="Please Specify (Inquiry)" value={profile.inquirySpecify} />
+                  </div>
+                )}
+
+                {/* Other DOLE program (please specify) sub-panel */}
+                {hasOtherProgram && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
+                    <Field label="Please Specify (Other DOLE Program)" value={profile.otherProgramSpecify} />
                   </div>
                 )}
 
@@ -489,6 +511,22 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                               <AttachIcon />{owwaAttachment ? 'Replace File' : 'Attach File'}
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Inquiry (pls specify) sub-panel */}
+                      {type === 'inquiry (pls specify)' && form.typeOfRequest.includes('inquiry (pls specify)') && (
+                        <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
+                          <label className={lbl}>Please Specify</label>
+                          <input className={inp} placeholder="Specify inquiry" value={inquirySpecify} onChange={e => setInquirySpecify(e.target.value)} />
+                        </div>
+                      )}
+
+                      {/* Other DOLE program (please specify) sub-panel */}
+                      {type === 'other DOLE program (please specify)' && form.typeOfRequest.includes('other DOLE program (please specify)') && (
+                        <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
+                          <label className={lbl}>Please Specify</label>
+                          <input className={inp} placeholder="Specify DOLE program" value={otherProgramSpecify} onChange={e => setOtherProgramSpecify(e.target.value)} />
                         </div>
                       )}
 

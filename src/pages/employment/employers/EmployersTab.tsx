@@ -2,14 +2,14 @@ import { useState, useMemo, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import type { Employer } from '../../contexts/EmploymentContext'
-import { canManage } from '../../utils/permissions'
-import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '../../services/employerService'
+import type { Employer } from '../../../contexts/EmploymentContext'
+import { canManage } from '../../../utils/permissions'
+import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '../../../services/employerService'
 import { downloadImportTemplate, importEmployers, type ImportResult } from './employerImport'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
-import TablePagination, { EF_ITEMS_PER_PAGE } from './TablePagination'
+import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 

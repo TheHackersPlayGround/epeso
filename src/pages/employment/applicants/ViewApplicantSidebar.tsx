@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Eye, FileText } from 'lucide-react';
-import type { Applicant } from '../../contexts/EmploymentContext';
+import type { Applicant } from '../../../contexts/EmploymentContext';
 
 type Section =
   | 'personalInfo' | 'jobPreference' | 'language' | 'education'

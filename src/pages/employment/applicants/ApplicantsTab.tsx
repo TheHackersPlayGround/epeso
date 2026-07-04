@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
-import { canManage } from "../../utils/permissions";
-import type { Applicant } from "../../contexts/EmploymentContext";
+import { canManage } from "../../../utils/permissions";
+import type { Applicant } from "../../../contexts/EmploymentContext";
 export type { Applicant };
 
 export type FilterOption = {

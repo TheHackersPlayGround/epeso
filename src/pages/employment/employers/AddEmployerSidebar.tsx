@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { X, Briefcase, Plus } from 'lucide-react';
 import Swal from 'sweetalert2';
-import DatePicker from '../../components/DatePicker';
-import SearchableSelect from '../../components/SearchableSelect';
-import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService';
+import { X, Briefcase } from 'lucide-react';
+import DatePicker from '../../../components/DatePicker';
+import SearchableSelect from '../../../components/SearchableSelect';
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../services/locationService';
+import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 
 interface EmployerFormData {
   companyName: string;
@@ -32,51 +33,185 @@ interface EmployerFormData {
   remarks: string;
 }
 
-interface EditEmployerSidebarProps {
-  initialData: Omit<EmployerFormData, 'barangayId' | 'cityId' | 'provinceId'> & { barangayId?: number | null; cityId?: number | null; provinceId?: number | null };
-  onSave: (data: EmployerFormData) => void;
+interface AddEmployerSidebarProps {
+  onSave: (data: EmployerFormData) => void | Promise<void>;
   onClose: () => void;
 }
 
-type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'jobOpenings' | 'registration';
+type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'registration';
 
-export default function EditEmployerSidebar({ initialData, onSave, onClose }: EditEmployerSidebarProps) {
+export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [formData, setFormData] = useState<EmployerFormData>({
-    ...initialData,
-    barangayId: initialData.barangayId ?? null,
-    cityId: initialData.cityId ?? null,
-    provinceId: initialData.provinceId ?? null,
+    companyName: '',
+    industry: '',
+    industryOther: '',
+    companySize: '',
+    businessType: '',
+    yearsInOperation: '',
+    tinNumber: '',
+    contactPersonName: '',
+    position: '',
+    contactNumber: '',
+    email: '',
+    buildingNo: '',
+    street: '',
+    barangay: '',
+    barangayId: null,
+    city: '',
+    cityId: null,
+    province: '',
+    provinceId: null,
+    region: '',
+    jobOpenings: [{ jobName: '', slots: '' }],
+    status: 'Active',
+    dateRegistered: new Date().toISOString().split('T')[0],
+    remarks: '',
   });
 
   const sections = [
     { id: 'companyInfo' as Section, label: 'Company information' },
     { id: 'contactPerson' as Section, label: 'Contact person' },
     { id: 'companyAddress' as Section, label: 'Company address' },
-    { id: 'jobOpenings' as Section, label: 'Job openings' },
     { id: 'registration' as Section, label: 'Registration details' },
   ];
 
-  const totalJobOpenings = formData.jobOpenings.reduce((sum, j) => sum + (parseInt(j.slots) || 0), 0);
-
-  const handleChange = (field: keyof EmployerFormData, value: string) =>
-    setFormData(prev => ({ ...prev, [field]: value }));
-
-  const handleSave = async () => {
-    const result = await Swal.fire({
-      icon: 'question',
-      title: 'Save Changes?',
-      text: "Are you sure you want to save the changes made to this employer's information?",
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Save',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#0077BE',
-      cancelButtonColor: '#6b7280',
-    });
-    if (!result.isConfirmed) return;
-    // The parent persists, closes this sidebar, and shows the success alert.
-    onSave(formData);
+  const handleChange = (field: keyof EmployerFormData, value: string) => {
+    setFormData({ ...formData, [field]: value });
   };
+
+  const handleConfirmSave = async () => {
+    setShowConfirmation(false);
+    try {
+      // onSave persists to the backend; await so success only shows on success.
+      await onSave(formData);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Employer has been successfully added to the system.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      });
+      onClose();
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the employer. Please try again.' });
+    }
+  };
+
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+
+  const REQUIRED: Partial<Record<keyof EmployerFormData, string>> = {
+    companyName: 'companyInfo',
+    tinNumber: 'companyInfo',
+    contactPersonName: 'contactPerson',
+    contactNumber: 'contactPerson',
+    street: 'companyAddress',
+    province: 'companyAddress',
+    city: 'companyAddress',
+    barangay: 'companyAddress',
+  };
+
+  function fieldError(key: keyof EmployerFormData) {
+    return showFieldErrors && !String(formData[key] ?? '').trim();
+  }
+
+  function inputCls(key: keyof EmployerFormData) {
+    return `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors ${
+      fieldError(key)
+        ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300'
+        : 'border-gray-300 focus:ring-brand-blue'
+    }`;
+  }
+
+  function ErrMsg({ k }: { k: keyof EmployerFormData }) {
+    return fieldError(k) ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null;
+  }
+
+  function sectionRequiredKeys(section: Section): (keyof EmployerFormData)[] {
+    return (Object.entries(REQUIRED) as [keyof EmployerFormData, string][])
+      .filter(([, s]) => s === section)
+      .map(([k]) => k);
+  }
+
+  function hasSectionErrors(section: Section) {
+    return sectionRequiredKeys(section).some(k => !String(formData[k] ?? '').trim());
+  }
+
+  function hasAllErrors() {
+    return (Object.keys(REQUIRED) as (keyof EmployerFormData)[]).some(k => !String(formData[k] ?? '').trim());
+  }
+
+  function firstFailingSection(): Section {
+    const entry = (Object.entries(REQUIRED) as [keyof EmployerFormData, string][])
+      .find(([k]) => !String(formData[k] ?? '').trim());
+    return (entry?.[1] ?? 'companyInfo') as Section;
+  }
+
+  const handleNext = () => {
+    const currentIndex = sections.findIndex(s => s.id === activeSection);
+    const isLast = currentIndex === sections.length - 1;
+    if (isLast) {
+      if (hasAllErrors()) {
+        setShowFieldErrors(true);
+        setActiveSection(firstFailingSection());
+        return;
+      }
+      setShowConfirmation(true);
+    } else {
+      if (hasSectionErrors(activeSection)) {
+        setShowFieldErrors(true);
+        return;
+      }
+      setActiveSection(sections[currentIndex + 1].id);
+    }
+  };
+
+  const isLastSection = () => {
+    const currentIndex = sections.findIndex(s => s.id === activeSection);
+    return currentIndex === sections.length - 1;
+  };
+
+  const renderSummary = () => (
+    <div className="space-y-6">
+      <div>
+        <h4 className="text-sm font-bold mb-3 bg-brand-blue text-white px-3 py-2 uppercase">Company Information</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div><span className="font-semibold">Company Name:</span> {formData.companyName}</div>
+          <div><span className="font-semibold">Industry:</span> {formData.industry === 'Other' ? `Other - ${formData.industryOther}` : formData.industry}</div>
+          <div><span className="font-semibold">Company Size:</span> {formData.companySize}</div>
+          <div><span className="font-semibold">Business Type:</span> {formData.businessType}</div>
+          <div><span className="font-semibold">Years in Operation:</span> {formData.yearsInOperation}</div>
+          <div><span className="font-semibold">TIN Number:</span> {formData.tinNumber}</div>
+        </div>
+      </div>
+      <div>
+        <h4 className="text-sm font-bold mb-3 bg-brand-blue text-white px-3 py-2 uppercase">Contact Person</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div><span className="font-semibold">Name:</span> {formData.contactPersonName}</div>
+          <div><span className="font-semibold">Position:</span> {formData.position}</div>
+          <div><span className="font-semibold">Contact Number:</span> {formData.contactNumber}</div>
+          <div><span className="font-semibold">Email:</span> {formData.email}</div>
+        </div>
+      </div>
+      <div>
+        <h4 className="text-sm font-bold mb-3 bg-brand-blue text-white px-3 py-2 uppercase">Company Address</h4>
+        <div className="text-sm">
+          <p>{formData.buildingNo} {formData.street}, {formData.barangay}, {formData.city}, {formData.province}, {formData.region}</p>
+        </div>
+      </div>
+      <div>
+        <h4 className="text-sm font-bold mb-3 bg-brand-blue text-white px-3 py-2 uppercase">Registration Details</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div><span className="font-semibold">Status:</span> {formData.status}</div>
+          <div><span className="font-semibold">Date Registered:</span> {formData.dateRegistered}</div>
+          {formData.remarks && (
+            <div className="col-span-2"><span className="font-semibold">Remarks:</span> {formData.remarks}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -86,10 +221,12 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY INFORMATION</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Name</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.companyName}
                   onChange={e => handleChange('companyName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  placeholder="e.g., ABC Corporation"
+                  className={inputCls('companyName')} />
+                <ErrMsg k="companyName" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Industry</label>
@@ -105,6 +242,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                     <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Please specify industry</label>
                     <input type="text" value={formData.industryOther}
                       onChange={e => handleChange('industryOther', e.target.value)}
+                      placeholder="e.g., Mining, Logistics..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
                   </>
                 )}
@@ -134,13 +272,16 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Years in Operation</label>
                 <input type="text" value={formData.yearsInOperation}
                   onChange={e => handleChange('yearsInOperation', e.target.value)}
+                  placeholder="e.g., 5"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div className="col-span-2">
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.tinNumber}
                   onChange={e => handleChange('tinNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  placeholder="e.g., 123-456-789-000"
+                  className={inputCls('tinNumber')} />
+                <ErrMsg k="tinNumber" />
               </div>
             </div>
           </div>
@@ -152,27 +293,33 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">CONTACT PERSON</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Full Name</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Full Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.contactPersonName}
                   onChange={e => handleChange('contactPersonName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  placeholder="e.g., Maria Santos"
+                  className={inputCls('contactPersonName')} />
+                <ErrMsg k="contactPersonName" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Position</label>
                 <input type="text" value={formData.position}
                   onChange={e => handleChange('position', e.target.value)}
+                  placeholder="e.g., HR Manager"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <input type="tel" value={formData.contactNumber}
                   onChange={e => handleChange('contactNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  placeholder="e.g., 09123456789"
+                  className={inputCls('contactNumber')} />
+                <ErrMsg k="contactNumber" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Email Address</label>
                 <input type="email" value={formData.email}
                   onChange={e => handleChange('email', e.target.value)}
+                  placeholder="e.g., hr@company.com"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
             </div>
@@ -191,14 +338,15 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.street}
                   onChange={e => handleChange('street', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
+                  className={inputCls('street')} />
+                <ErrMsg k="street" />
               </div>
               {/* Cascade: Province -> City/Municipality -> Barangay */}
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.province}
                   placeholder="Search province…"
@@ -207,9 +355,10 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                     setFormData(prev => ({ ...prev, province: opt.name, provinceId: opt.id, city: '', cityId: null, barangay: '', barangayId: null }))
                   }
                 />
+                <ErrMsg k="province" />
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.city}
                   placeholder={formData.provinceId ? 'Search city/municipality…' : 'Select province first'}
@@ -220,9 +369,10 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                     setFormData(prev => ({ ...prev, city: opt.name, cityId: opt.id, barangay: '', barangayId: null }))
                   }
                 />
+                <ErrMsg k="city" />
               </div>
               <div className="col-span-2">
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay</label>
+                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.barangay}
                   placeholder={formData.cityId ? 'Search barangay…' : 'Select city first'}
@@ -231,58 +381,8 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                   fetchOptions={s => searchBarangaysByCity(formData.cityId ?? 0, s)}
                   onSelect={opt => setFormData(prev => ({ ...prev, barangay: opt.name, barangayId: opt.id }))}
                 />
+                <ErrMsg k="barangay" />
               </div>
-            </div>
-          </div>
-        );
-
-      case 'jobOpenings':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">JOB OPENINGS</h3>
-            <div>
-              <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase font-semibold">
-                Number of Job Openings: {totalJobOpenings}
-              </label>
-              <p className="text-xs text-gray-500 mb-3">Automatically calculated from total available slots.</p>
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-3 text-sm font-semibold">Positions Available</label>
-              <div className="border border-gray-300 rounded overflow-hidden">
-                <div className="grid grid-cols-2 bg-gray-200 border-b border-gray-300">
-                  <div className="px-4 py-2 font-bold text-xs">NAME OF JOB</div>
-                  <div className="px-4 py-2 font-bold text-xs border-l border-gray-300">NUMBER OF AVAILABLE SLOTS</div>
-                </div>
-                {formData.jobOpenings.map((job, idx) => (
-                  <div key={idx} className="grid grid-cols-2 border-b border-gray-300 last:border-b-0">
-                    <div className="p-2">
-                      <input type="text" value={job.jobName}
-                        onChange={e => {
-                          const jobs = [...formData.jobOpenings];
-                          jobs[idx] = { ...jobs[idx], jobName: e.target.value };
-                          setFormData(prev => ({ ...prev, jobOpenings: jobs }));
-                        }}
-                        placeholder="e.g., Customer Service Representative"
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm" />
-                    </div>
-                    <div className="p-2 border-l border-gray-300">
-                      <input type="number" value={job.slots}
-                        onChange={e => {
-                          const jobs = [...formData.jobOpenings];
-                          jobs[idx] = { ...jobs[idx], slots: e.target.value };
-                          setFormData(prev => ({ ...prev, jobOpenings: jobs }));
-                        }}
-                        placeholder="e.g., 5"
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button type="button"
-                onClick={() => setFormData(prev => ({ ...prev, jobOpenings: [...prev.jobOpenings, { jobName: '', slots: '' }] }))}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark transition-colors text-sm mt-3">
-                <Plus size={16} /> Add Row
-              </button>
             </div>
           </div>
         );
@@ -294,8 +394,9 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Status</label>
-                <select value={formData.status} onChange={e => handleChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500">
+                {/* New employers always start Active; the status can be changed later via Edit. */}
+                <select value={formData.status} disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none">
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
@@ -310,6 +411,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Remarks</label>
                 <textarea value={formData.remarks} rows={3}
                   onChange={e => handleChange('remarks', e.target.value)}
+                  placeholder="Additional notes or remarks"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
             </div>
@@ -341,10 +443,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
           <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <Briefcase size={20} className="text-brand-blue" />
-              <div>
-                <h3 className="text-gray-800 m-0 text-base font-medium">Edit Employer</h3>
-                <p className="text-gray-500 text-xs mt-0.5">{initialData.companyName}</p>
-              </div>
+              <h3 className="text-gray-800 m-0 text-base font-medium">Add new employer</h3>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={24} className="text-gray-600" />
@@ -358,15 +457,24 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
           <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
             <button type="button" onClick={onClose}
               className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-              Cancel
+              Back to Employers List
             </button>
-            <button type="button" onClick={handleSave}
-              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium">
-              Save Changes
+            <button type="button" onClick={handleNext}
+              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors">
+              {isLastSection() ? 'Submit' : 'Next'}
             </button>
           </div>
         </div>
       </div>
+
+      <ApplicantReviewModal
+        isOpen={showConfirmation}
+        title="Confirm Employer Details"
+        message="Please review the information before saving. Are all details correct?"
+        summaryContent={renderSummary()}
+        onBackToEdit={() => setShowConfirmation(false)}
+        onConfirm={handleConfirmSave}
+      />
 
     </>
   );

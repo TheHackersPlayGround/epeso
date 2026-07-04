@@ -26,6 +26,9 @@ export interface OFWProfile {
   desiredPosition?: string
   typeOfSkill?: string
   agencies?: string[]
+  // "please specify" free-text sub-panels
+  inquirySpecify?: string
+  otherProgramSpecify?: string
   // OWWA Welfare Case attachment
   owwaWelfareFile?: OFWAttachment
   // Livelihood ELPOR form attachments

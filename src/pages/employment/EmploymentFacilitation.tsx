@@ -1,23 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
-import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicantImport";
-import type { Applicant } from "./ApplicantsTab";
-import { ITEMS_PER_PAGE } from "./ApplicantsTab";
+import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
+import type { Applicant } from "./applicants/ApplicantsTab";
+import { ITEMS_PER_PAGE } from "./applicants/ApplicantsTab";
 import Swal from "sweetalert2";
 import { listApplicants, createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { listVacancies } from "../../services/vacancyService";
 import { createReferral } from "../../services/referralService";
-import ApplicantsTab from "./ApplicantsTab";
+import ApplicantsTab from "./applicants/ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
 import PlacementsTab from "./PlacementsTab";
-import EmployersTab from "./EmployersTab";
-import AddApplicantSidebar from "./AddApplicantSidebar";
-import type { ApplicantFormData } from "./AddApplicantSidebar";
-import ResumeMaker, { type ApplicantData } from "./ResumeMaker";
-import ViewApplicantSidebar from "./ViewApplicantSidebar";
-import EmploymentHistoryPanel from "./EmploymentHistoryPanel";
+import EmployersTab from "./employers/EmployersTab";
+import AddApplicantSidebar from "./applicants/AddApplicantSidebar";
+import type { ApplicantFormData } from "./applicants/AddApplicantSidebar";
+import ResumeMaker, { type ApplicantData } from "./applicants/ResumeMaker";
+import ViewApplicantSidebar from "./applicants/ViewApplicantSidebar";
+import EmploymentHistoryPanel from "./applicants/EmploymentHistoryPanel";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 

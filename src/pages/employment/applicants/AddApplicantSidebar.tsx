@@ -1,10 +1,10 @@
 ﻿import { useState } from 'react';
 import Swal from 'sweetalert2';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
-import DatePicker from '../../components/DatePicker';
-import SearchableSelect from '../../components/SearchableSelect';
-import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../services/locationService';
-import ApplicantReviewModal from './ApplicantReviewModal';
+import DatePicker from '../../../components/DatePicker';
+import SearchableSelect from '../../../components/SearchableSelect';
+import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../../services/locationService';
+import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 import { createDefaultApplicantFormData } from './applicantDefaults';
 
 interface ApplicantFormData {

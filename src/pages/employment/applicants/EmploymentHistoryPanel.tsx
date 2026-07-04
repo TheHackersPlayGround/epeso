@@ -5,12 +5,12 @@
 
 import { useEffect, useState } from 'react'
 import { X, ArrowRight } from 'lucide-react'
-import type { Applicant } from '../../contexts/EmploymentContext'
+import type { Applicant } from '../../../contexts/EmploymentContext'
 import {
   getApplicantHistory,
   type EmploymentHistory,
   type EmploymentHistoryEntry,
-} from '../../services/applicantService'
+} from '../../../services/applicantService'
 
 const PILL = 'px-2.5 py-0.5 rounded-full text-xs font-medium'
 

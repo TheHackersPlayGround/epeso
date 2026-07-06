@@ -15,6 +15,127 @@ import CDSPProfileForm, {
   ViewApplicantPanel, emptyForm, CDSP_SEED_SERVICES,
   getEffectiveStatus, StatusBadge, CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS,
 } from './CDSPProfileForm'
+import { downloadImportTemplate, importCdspApplicants, type ImportResult } from './cdspImport'
+
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+function CDSPImportModal({ services, onClose, onImported }: { services: string[]; onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importCdspApplicants(file, services, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import CDSP Applicants</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <button onClick={() => { void downloadImportTemplate(services) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface CDSPViewProps {
   onBack: () => void
@@ -113,9 +234,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [assignTarget, setAssignTarget] = useState<CDSPApplicant | null>(null)
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [importFileType, setImportFileType] = useState<'excel' | 'csv'>('excel')
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; service: string; status: string; valid: boolean }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
@@ -261,54 +379,6 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     link.click()
     setIsExportDropdownOpen(false)
   }
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([{
-      'Last Name': 'Dela Cruz', 'First Name': 'Juan', 'Middle Name': 'M.',
-      'Sex': 'Male', 'Birthdate': '2002-05-14', 'Age': 23, 'Civil Status': 'Single',
-      'Contact Number': '09171234567', 'Email': 'juan@gmail.com',
-      'Street / Purok #': 'Purok 3', 'Barangay': 'Poblacion',
-      'City / Municipality': 'Tangub City', 'Province': 'Misamis Occidental', 'Region': 'Region X – Northern Mindanao',
-      'Classification': 'Fresh Graduate', 'Highest Education': 'College Graduate', 'Course': 'BS IT',
-      'Employment Status': 'Unemployed', 'Occupation': '',
-      'Service Availed': 'Career Coaching', 'Assigned Activity': '',
-      'Career Goal': 'Software Developer', 'Target Job': '',
-      'Counselor': '', 'Status': 'Active', 'Remarks': '',
-      'Date Received': '2026-03-10', 'Received By': 'Admin',
-    }])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'CDSP Template')
-    if (importFileType === 'excel') {
-      XLSX.writeFile(wb, 'CDSP_Applicants_Template.xlsx')
-    } else {
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(new Blob([XLSX.utils.sheet_to_csv(ws)], { type: 'text/csv;charset=utf-8;' }))
-      link.download = 'CDSP_Applicants_Template.csv'
-      link.click()
-    }
-  }
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const wb = XLSX.read(e.target?.result, { type: 'binary' })
-        const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
-        setImportPreview(rows.map((r) => ({
-          lastName: r['Last Name'] || '', firstName: r['First Name'] || '',
-          service: r['Service Availed'] || '', status: r['Status'] || '',
-          valid: !!(r['Last Name'] && r['First Name']),
-        })))
-      } catch { alert('Error reading file. Please use the template format.') }
-    }
-    reader.readAsBinaryString(file)
-  }
-  const handleImport = () => {
-    Swal.fire({ icon: 'info', title: 'Import Not Available', text: 'Bulk import requires barangay selection which cannot be resolved from a file. Please add applicants individually.', confirmButtonColor: '#0077BE' })
-    setIsImportModalOpen(false)
-    setUploadedFile(null)
-    setImportPreview([])
-  }
-
   // ─── Full-page sub-views ────────────────────────────────────────────────────
 
   if (isFormOpen) return <CDSPProfileForm onClose={() => setIsFormOpen(false)} onSave={handleAddSave} mode="add" />
@@ -346,7 +416,11 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <span className="text-sm text-gray-800 font-medium">{value}</span>
             </div>
           ) : null
-        const canChange = !activity || activity.status === 'Completed'
+        // Once an activity is Completed, unassigning would hard-delete the
+        // cdsp_activity_participants row — the only place date_assigned/completed_at
+        // for that history entry live — so changing/unassigning is only offered
+        // beforehand (Planned/Ongoing), preserving the completion record.
+        const canChange = !activity || activity.status !== 'Completed'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
@@ -537,7 +611,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         cancelButtonColor: '#6b7280',
                       }).then(r => { if (r.isConfirmed) handleUnassign(assignTarget.id) })
                     }}
-                    disabled={!canManage('cdsp')}
+                    disabled={!canManage('cdsp') || currentActivity.status === 'Completed'}
+                    title={currentActivity.status === 'Completed' ? 'This activity is already completed — unassigning would erase its completion record.' : undefined}
                     className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >Unassign</button>
                 </div>
@@ -553,11 +628,18 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   </div>
                 ) : available.map(activity => {
                   const isCurrent = assignTarget.assignedActivityId === activity.id
+                  const isFull = !isCurrent && activity.participants !== null && activity.assignedCount >= activity.participants
                   return (
                     <button
                       key={activity.id}
-                      onClick={() => setSelectedActivity(activity)}
-                      className={`w-full px-4 py-3.5 text-left rounded-xl border transition-all hover:border-blue-300 hover:bg-blue-50 ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`}
+                      onClick={() => { if (!isFull) setSelectedActivity(activity) }}
+                      disabled={isFull}
+                      title={isFull ? 'This activity is already at full capacity.' : undefined}
+                      className={`w-full px-4 py-3.5 text-left rounded-xl border transition-all ${
+                        isFull
+                          ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                          : `hover:border-blue-300 hover:bg-blue-50 ${isCurrent ? 'border-brand-blue bg-blue-50' : 'border-gray-200'}`
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -566,9 +648,15 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                             {activity.service && <span>{activity.service}</span>}
                             {activity.date && <><span>·</span><span>{activity.date}</span></>}
                             {activity.location && <><span>·</span><span>{activity.location}</span></>}
+                            {activity.participants !== null && (
+                              <><span>·</span><span className={isFull ? 'text-red-500 font-semibold' : ''}>{activity.assignedCount}/{activity.participants} slots</span></>
+                            )}
                           </div>
                         </div>
-                        <span className="text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 font-medium bg-yellow-100 text-yellow-700">{activity.status}</span>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className="text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium bg-yellow-100 text-yellow-700">{activity.status}</span>
+                          {isFull && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-600">Full</span>}
+                        </div>
                       </div>
                     </button>
                   )
@@ -699,48 +787,11 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
         {/* Import Modal */}
         {isImportModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                <p className="text-gray-800 font-semibold">Import CDSP Applicants</p>
-                <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex gap-3">
-                  <button onClick={() => setImportFileType('excel')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'excel' ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>Excel (.xlsx)</button>
-                  <button onClick={() => setImportFileType('csv')} className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${importFileType === 'csv' ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>CSV (.csv)</button>
-                </div>
-                <button onClick={downloadTemplate} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
-                <label className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors">
-                  <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">{uploadedFile ? uploadedFile.name : 'Click to upload or drag and drop'}</p>
-                  <p className="text-xs text-gray-400 mt-1">{importFileType === 'excel' ? '.xlsx' : '.csv'} files only</p>
-                  <input type="file" accept={importFileType === 'excel' ? '.xlsx,.xls' : '.csv'} className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
-                </label>
-                {importPreview.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">Preview ({importPreview.length} records found):</p>
-                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                      {importPreview.slice(0, 10).map((row, i) => (
-                        <div key={i} className={`px-3 py-2 flex items-center justify-between text-xs ${row.valid ? '' : 'bg-red-50'}`}>
-                          <span className="text-gray-700">{row.firstName} {row.lastName}</span>
-                          <span className="text-gray-500">{row.service || '—'}</span>
-                          {!row.valid && <span className="text-red-500 ml-2">Invalid</span>}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-amber-600 mt-2">Note: Bulk import will be processed individually. Address fields must be set after import.</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
-                <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-                <button onClick={handleImport} disabled={importPreview.filter((r) => r.valid).length === 0 || !canManage('cdsp')} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                  Import {importPreview.filter((r) => r.valid).length > 0 ? `(${importPreview.filter((r) => r.valid).length})` : ''}
-                </button>
-              </div>
-            </div>
-          </div>
+          <CDSPImportModal
+            services={cdspServices}
+            onClose={() => setIsImportModalOpen(false)}
+            onImported={refreshProfiles}
+          />
         )}
 
         {/* Search & Filter + Table */}
@@ -754,7 +805,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 placeholder="Search by name, barangay, or assigned activity..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
               />
             </div>
             <div className="relative">

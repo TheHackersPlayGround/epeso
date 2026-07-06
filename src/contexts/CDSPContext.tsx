@@ -75,6 +75,7 @@ export interface CdspActivity {
   location: string
   facilitator: string
   participants: number | null
+  assignedCount: number
   status: 'Planned' | 'Ongoing' | 'Completed'
   counselor: string
   sessionDuration: string

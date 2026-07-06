@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { X, Users, FileText, Upload } from 'lucide-react'
 import { useCDSP } from '../../contexts/CDSPContext'
 import type { CDSPApplicant } from '../../contexts/CDSPContext'
@@ -14,13 +14,15 @@ export const CLASSIFICATION_OPTIONS = [
   'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]
 
-const EDUCATION_OPTIONS = [
+export const EDUCATION_OPTIONS = [
   'Elementary Level', 'Elementary Graduate', 'High School Level', 'High School Graduate',
   'Senior High School Level', 'Senior High School Graduate', 'Vocational / Technical',
   'College Level', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral Level', 'Doctoral Graduate',
 ]
 
-const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Underemployed', 'Unemployed', 'Self-Employed']
+export const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Underemployed', 'Unemployed', 'Self-Employed']
+
+export const SEX_OPTIONS = ['Male', 'Female']
 
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
 
@@ -300,8 +302,26 @@ export default function CDSPProfileForm({
     set({ birthdate: date, age })
   }
 
+  const [showFieldErrors, setShowFieldErrors] = useState(false)
+  const eduError = showFieldErrors && !formData.highestEducation
+  const empStatusError = showFieldErrors && !formData.employmentStatus
+  const eduFieldRef = useRef<HTMLSelectElement>(null)
+  const empStatusFieldRef = useRef<HTMLSelectElement>(null)
+
   const handleSave = () => {
     if (!formData.lastName || !formData.firstName) { alert('Please fill in Last Name and First Name.'); return }
+    if (!formData.highestEducation) {
+      setShowFieldErrors(true)
+      eduFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      eduFieldRef.current?.focus()
+      return
+    }
+    if (!formData.employmentStatus) {
+      setShowFieldErrors(true)
+      empStatusFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      empStatusFieldRef.current?.focus()
+      return
+    }
     if (!formData.serviceAvailed) { alert('Please select a CDSP Service Availed (Section VI).'); return }
     onSave(formData)
   }
@@ -462,11 +482,19 @@ export default function CDSPProfileForm({
             return (
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className={lbl}>Highest Educational Attainment</label>
-                  <select className={sel} value={edu} onChange={(e) => set({ highestEducation: e.target.value, course: '', strand: '', yearLevel: '', yearGraduated: '' })}>
+                  <label className={lbl}>Highest Educational Attainment <span className="text-red-500">*</span></label>
+                  <select
+                    ref={eduFieldRef}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white ${
+                      eduError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300' : 'border-gray-300 focus:ring-brand-blue'
+                    }`}
+                    value={edu}
+                    onChange={(e) => { set({ highestEducation: e.target.value, course: '', strand: '', yearLevel: '', yearGraduated: '' }); setShowFieldErrors(false) }}
+                  >
                     <option value="">Select</option>
                     {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
+                  {eduError && <p className="text-red-500 text-xs mt-1">This field is required.</p>}
                 </div>
                 {showYearLevel && (
                   <div>
@@ -499,11 +527,19 @@ export default function CDSPProfileForm({
           <SectionDivider numeral="V" title="Employment Status" />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>Employment Status</label>
-              <select className={sel} value={formData.employmentStatus} onChange={(e) => set({ employmentStatus: e.target.value })}>
+              <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
+              <select
+                ref={empStatusFieldRef}
+                className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white ${
+                  empStatusError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300' : 'border-gray-300 focus:ring-brand-blue'
+                }`}
+                value={formData.employmentStatus}
+                onChange={(e) => { set({ employmentStatus: e.target.value }); setShowFieldErrors(false) }}
+              >
                 <option value="">Select</option>
                 {EMPLOYMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+              {empStatusError && <p className="text-red-500 text-xs mt-1">This field is required.</p>}
             </div>
             <div>
               <label className={lbl}>Current Occupation</label>

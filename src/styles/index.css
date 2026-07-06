@@ -104,6 +104,20 @@ h2 {
   color: var(--text-h);
 }
 
+/* Typed input text should read as near-black, not the lighter body-text gray
+   (--text). Placeholder hints keep their own explicit gray (Tailwind's
+   placeholder:text-* utilities), which take precedence since they're more
+   specific than this element selector.
+   Hardcoded (not var(--text-h)): these admin screens are a fixed light theme
+   (bg-white cards throughout, no dark-mode support), but --text-h flips to a
+   near-white #f3f4f6 under prefers-color-scheme: dark, which made every input's
+   text nearly invisible on OS dark mode. */
+input,
+textarea,
+select {
+  color: #111827;
+}
+
 h1 {
   font-size: 56px;
   letter-spacing: -1.68px;

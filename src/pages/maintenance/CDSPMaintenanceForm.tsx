@@ -125,7 +125,7 @@ const blankForm = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CDSPMaintenanceForm() {
-  const { activities: cdspActivities, services: apiServices, refreshActivities, refreshServices } = useCDSP()
+  const { activities: cdspActivities, services: apiServices, refreshActivities, refreshServices, refreshProfiles } = useCDSP()
   const services = apiServices.length > 0 ? apiServices.map(s => s.name) : DEFAULT_SERVICES
 
   // Navigation
@@ -275,6 +275,7 @@ export default function CDSPMaintenanceForm() {
         Swal.fire({ icon: 'success', title: 'Activity Added', text: 'New CDSP activity has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
       }
       await refreshActivities()
+      await refreshProfiles()
       goToList()
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save activity.'
@@ -287,6 +288,7 @@ export default function CDSPMaintenanceForm() {
     try {
       await cdspService.deleteActivity(deleteConfirm)
       await refreshActivities()
+      await refreshProfiles()
       setDeleteConfirm(null)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete activity.'
@@ -322,6 +324,7 @@ export default function CDSPMaintenanceForm() {
     try {
       await cdspService.updateActivityStatus(activity.id, nextStatus)
       await refreshActivities()
+      await refreshProfiles()
       Swal.fire({ icon: 'success', title: 'Status Updated', text: `Activity is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
       setStatusConfirm(null)
     } catch (e: unknown) {
@@ -739,7 +742,11 @@ export default function CDSPMaintenanceForm() {
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 text-center">
-                      {a.participants ?? '—'}
+                      {a.participants !== null ? (
+                        <span className={a.assignedCount >= a.participants ? 'text-red-500 font-semibold' : ''}>
+                          {a.assignedCount}/{a.participants}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={a.status} />
@@ -932,7 +939,7 @@ export default function CDSPMaintenanceForm() {
             value={serviceForm.name}
             onChange={e => setServiceForm({ name: e.target.value })}
             onKeyDown={e => { if (e.key === 'Enter') handleSaveService() }}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-400"
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-400"
             placeholder="e.g. Career Workshop, Job Matching..."
           />
           <button

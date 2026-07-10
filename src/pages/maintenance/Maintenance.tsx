@@ -11,6 +11,8 @@ import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch } from '../../contexts/SPESContext'
 import { useGIP } from '../../contexts/GIPContext'
 import type { GIPBatch } from '../../contexts/GIPContext'
+import * as gipApiService from '../../services/gipService'
+import * as spesApiService from '../../services/spesService'
 import SPESMaintenanceForm from './SPESMaintenanceForm'
 import SkillsTrainingMaintenanceForm from './SkillsTrainingMaintenanceForm'
 import CDSPMaintenanceForm from './CDSPMaintenanceForm'
@@ -67,8 +69,8 @@ const TABS: { key: MaintenanceTab; label: string }[] = [
 // ─── Main component ───────────────────────────────────────────────────────────
 
 function MaintenanceInner({ onBack }: MaintenanceProps) {
-  const { spesBatches, setSpesBatches, updateSpesBatch, applicants: spesApplicants, setApplicants } = useSPES()
-  const { gipBatches, setGipBatches, updateGipBatch, applicants: gipApplicants, setApplicants: setGipApplicants } = useGIP()
+  const { spesBatches, applicants: spesApplicants, refreshProfiles: refreshSpesProfiles, refreshBatches: refreshSpesBatches } = useSPES()
+  const { gipBatches, applicants: gipApplicants, refreshProfiles: refreshGipProfiles, refreshBatches: refreshGipBatches } = useGIP()
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('CDSP')
 
   // ── SPES state ─────────────────────────────────────────────────────────────
@@ -125,93 +127,122 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
   // ── SPES handlers ──────────────────────────────────────────────────────────
 
-  const handleAddBatch = (data: Omit<SPESBatch, 'id'>, isDraft?: boolean) => {
-    setSpesBatches(prev => [...prev, { ...data, id: Date.now(), isDraft: isDraft ?? false }])
-    setSpesAction('')
-    Swal.fire({
-      icon: 'success',
-      title: isDraft ? 'Draft Saved' : 'Batch Added',
-      text: isDraft ? 'Draft saved successfully.' : 'New SPES batch has been added successfully.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+  const handleAddBatch = async (data: Omit<SPESBatch, 'id'>, isDraft?: boolean) => {
+    try {
+      await spesApiService.createBatch(data as unknown as Record<string, unknown>)
+      await refreshSpesBatches()
+      setSpesAction('')
+      Swal.fire({
+        icon: 'success',
+        title: isDraft ? 'Draft Saved' : 'Batch Added',
+        text: isDraft ? 'Draft saved successfully.' : 'New SPES batch has been added successfully.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleUpdateBatch = (updated: SPESBatch) => {
-    updateSpesBatch(updated)
-    setSpesBatchAction('')
-    setSelectedBatch(null)
-    Swal.fire({
-      icon: 'success',
-      title: 'Batch Updated',
-      text: 'Batch details have been saved successfully.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+  const handleUpdateBatch = async (updated: SPESBatch) => {
+    try {
+      await spesApiService.updateBatch(updated.id, updated as unknown as Record<string, unknown>)
+      await refreshSpesBatches()
+      await refreshSpesProfiles()
+      setSpesBatchAction('')
+      setSelectedBatch(null)
+      Swal.fire({
+        icon: 'success',
+        title: 'Batch Updated',
+        text: 'Batch details have been saved successfully.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirm === null) return
     const batchId = deleteConfirm
-    setApplicants(prev => prev.map(a => {
-      if (a.assignedBatchId !== batchId) return a
-      return { ...a, assignedBatchId: null, status: 'Inactive' as const }
-    }))
-    setSpesBatches(prev => prev.filter(b => b.id !== batchId))
-    setDeleteConfirm(null)
+    try {
+      await spesApiService.deleteBatch(batchId)
+      await refreshSpesBatches()
+      setDeleteConfirm(null)
+      Swal.fire({
+        icon: 'success',
+        title: 'Batch Deleted',
+        text: 'SPES batch has been deleted.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#0077BE',
+      })
+    } catch (e: unknown) {
+      setDeleteConfirm(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   // ── GIP handlers ───────────────────────────────────────────────────────────
 
-  const handleAddGipBatch = (data: Omit<GIPBatch, 'id'>, isDraft?: boolean) => {
-    setGipBatches(prev => [...prev, { ...data, id: Date.now(), isDraft: isDraft ?? false }])
-    setGipAction('')
-    Swal.fire({
-      icon: 'success',
-      title: isDraft ? 'Draft Saved' : 'Batch Added',
-      text: isDraft ? 'Draft saved successfully.' : 'New GIP batch has been added successfully.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: GIP_CONFIRM_COLOR,
-    })
+  const apiErrMsg = (e: unknown, fallback: string) =>
+    (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
+    ?? (e as { message?: string })?.message ?? fallback
+
+  const handleAddGipBatch = async (data: Omit<GIPBatch, 'id'>, isDraft?: boolean) => {
+    try {
+      await gipApiService.createBatch(data as unknown as Record<string, unknown>)
+      await refreshGipBatches()
+      setGipAction('')
+      Swal.fire({
+        icon: 'success',
+        title: isDraft ? 'Draft Saved' : 'Batch Added',
+        text: isDraft ? 'Draft saved successfully.' : 'New GIP batch has been added successfully.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: GIP_CONFIRM_COLOR,
+      })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+    }
   }
 
-  const handleUpdateGipBatch = (updated: GIPBatch) => {
-    updateGipBatch(updated)
-    setGipBatchAction('')
-    setSelectedGipBatch(null)
-    Swal.fire({
-      icon: 'success',
-      title: 'Batch Updated',
-      text: 'Batch details have been saved successfully.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: GIP_CONFIRM_COLOR,
-    })
+  const handleUpdateGipBatch = async (updated: GIPBatch) => {
+    try {
+      await gipApiService.updateBatch(updated.id, updated as unknown as Record<string, unknown>)
+      await refreshGipBatches()
+      await refreshGipProfiles()
+      setGipBatchAction('')
+      setSelectedGipBatch(null)
+      Swal.fire({
+        icon: 'success',
+        title: 'Batch Updated',
+        text: 'Batch details have been saved successfully.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: GIP_CONFIRM_COLOR,
+      })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+    }
   }
 
-  const confirmGipDelete = () => {
+  const confirmGipDelete = async () => {
     if (gipDeleteConfirm === null) return
     const batchId = gipDeleteConfirm
-    setGipApplicants(prev => prev.map(a => {
-      if (a.assignedBatchId !== batchId) return a
-      const today = new Date().toISOString().split('T')[0]
-      return {
-        ...a,
-        assignedBatchId: null,
-        status: 'Inactive' as const,
-        assignmentHistory: a.assignmentHistory.map(h =>
-          h.batchId === batchId && !h.completedDate ? { ...h, completedDate: today } : h
-        ),
-      }
-    }))
-    setGipBatches(prev => prev.filter(b => b.id !== batchId))
-    setGipDeleteConfirm(null)
-    Swal.fire({
-      icon: 'success',
-      title: 'Batch Deleted',
-      text: 'GIP batch has been deleted.',
-      confirmButtonText: 'OK',
-      confirmButtonColor: GIP_CONFIRM_COLOR,
-    })
+    try {
+      await gipApiService.deleteBatch(batchId)
+      await refreshGipBatches()
+      setGipDeleteConfirm(null)
+      Swal.fire({
+        icon: 'success',
+        title: 'Batch Deleted',
+        text: 'GIP batch has been deleted.',
+        confirmButtonText: 'OK',
+        confirmButtonColor: GIP_CONFIRM_COLOR,
+      })
+    } catch (e: unknown) {
+      setGipDeleteConfirm(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+    }
   }
 
   // ── GIP filtered batches ────────────────────────────────────────────────────
@@ -427,7 +458,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               <tbody>
                 {paginatedGipPts.map((a, i) => (
                   <tr key={a.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    <td className="px-4 py-3 font-medium text-gray-800">{a.lastName}, {a.firstName} {a.middleName}</td>
+                    <td className="px-4 py-3 font-medium text-gray-800">{a.lastName}, {a.firstName}{a.middleName ? ` ${a.middleName.charAt(0)}.` : ''}</td>
                     <td className="px-4 py-3 text-gray-600">{a.sex || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{a.contactNumber || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{a.email || '—'}</td>
@@ -526,7 +557,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 <button
                   key={action.key}
                   onClick={() => setGipAction(action.key)}
-                  disabled={action.label.startsWith('Add') && !canManage('maintenance')}
+                  disabled={action.label.startsWith('Add') && !canManage('gip')}
                   className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     gipAction === action.key
                       ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -608,7 +639,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   </div>
                   <button
                     onClick={() => setGipAction('add_batch')}
-                    disabled={!canManage('maintenance')}
+                    disabled={!canManage('gip')}
                     className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                   >
                     <Plus size={16} /> Add Batch
@@ -621,7 +652,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <p className="text-gray-500">No GIP batches found.</p>
                     <button
                       onClick={() => setGipAction('add_batch')}
-                      disabled={!canManage('maintenance')}
+                      disabled={!canManage('gip')}
                       className="mt-4 px-6 py-2 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: GIP_CONFIRM_COLOR }}
                     >
@@ -668,7 +699,13 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                   <p className="text-xs text-gray-400 line-clamp-1">{b.deploymentLocation}</p>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-gray-600 text-center">{b.slots || '—'}</td>
+                              <td className="px-6 py-4 text-gray-600 text-center">
+                                {b.slots ? (
+                                  <span className={b.assignedCount >= parseInt(b.slots, 10) ? 'text-red-500 font-semibold' : ''}>
+                                    {b.assignedCount}/{b.slots}
+                                  </span>
+                                ) : '—'}
+                              </td>
                               <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
                                 {b.startDate && b.endDate ? `${b.startDate} – ${b.endDate}` : '—'}
                               </td>
@@ -766,7 +803,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setSelectedGipBatch(b); setGipBatchAction('edit_batch'); setGipOpenMenuId(null) }}
-                        disabled={!canManage('maintenance')}
+                        disabled={!canManage('gip')}
                         className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Edit2 size={15} className="text-blue-500" />
@@ -775,7 +812,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Planned' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Ongoing', action: 'Mark as Ongoing' }); setGipOpenMenuId(null) }}
-                          disabled={!canManage('maintenance')}
+                          disabled={!canManage('gip')}
                           className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <PlayCircle size={15} className="text-green-600" />
@@ -785,7 +822,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Ongoing' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Completed', action: 'Mark as Completed' }); setGipOpenMenuId(null) }}
-                          disabled={!canManage('maintenance')}
+                          disabled={!canManage('gip')}
                           className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <CheckCircle size={15} className="text-green-600" />
@@ -795,7 +832,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       {b.status === 'Completed' && (
                         <button
                           onClick={() => { setGipStatusConfirm({ batch: b, nextStatus: 'Planned', action: 'Reopen Batch' }); setGipOpenMenuId(null) }}
-                          disabled={!canManage('maintenance')}
+                          disabled={!canManage('gip')}
                           className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           <RefreshCw size={15} style={{ color: GIP_CONFIRM_COLOR }} />
@@ -805,7 +842,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <div className="my-1 border-t border-gray-100" />
                       <button
                         onClick={() => { setGipDeleteConfirm(b.id); setGipOpenMenuId(null) }}
-                        disabled={!canManage('maintenance')}
+                        disabled={!canManage('gip')}
                         className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
                         <Trash2 size={15} className="text-red-500" />
@@ -1192,16 +1229,23 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    updateSpesBatch({ ...batch, status: nextStatus })
-                    setStatusConfirm(null)
-                    Swal.fire({
-                      icon: 'success',
-                      title: 'Status Updated',
-                      text: `Batch status changed to ${nextStatus}.`,
-                      confirmButtonText: 'OK',
-                      confirmButtonColor: '#0077BE',
-                    })
+                  onClick={async () => {
+                    try {
+                      await spesApiService.updateBatchStatus(batch.id, nextStatus)
+                      await refreshSpesBatches()
+                      await refreshSpesProfiles()
+                      setStatusConfirm(null)
+                      Swal.fire({
+                        icon: 'success',
+                        title: 'Status Updated',
+                        text: `Batch status changed to ${nextStatus}.`,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#0077BE',
+                      })
+                    } catch (e: unknown) {
+                      setStatusConfirm(null)
+                      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch status.'), confirmButtonColor: '#0077BE' })
+                    }
                   }}
                   className={`px-6 py-2.5 rounded-lg transition-colors font-medium ${confirmBtnClass}`}
                 >
@@ -1294,16 +1338,23 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    updateGipBatch({ ...batch, status: nextStatus })
-                    setGipStatusConfirm(null)
-                    Swal.fire({
-                      icon: 'success',
-                      title: 'Status Updated',
-                      text: `Batch status changed to ${nextStatus}.`,
-                      confirmButtonText: 'OK',
-                      confirmButtonColor: GIP_CONFIRM_COLOR,
-                    })
+                  onClick={async () => {
+                    try {
+                      await gipApiService.updateBatchStatus(batch.id, nextStatus)
+                      await refreshGipBatches()
+                      await refreshGipProfiles()
+                      setGipStatusConfirm(null)
+                      Swal.fire({
+                        icon: 'success',
+                        title: 'Status Updated',
+                        text: `Batch status changed to ${nextStatus}.`,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: GIP_CONFIRM_COLOR,
+                      })
+                    } catch (e: unknown) {
+                      setGipStatusConfirm(null)
+                      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch status.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+                    }
                   }}
                   className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white"
                   style={{ backgroundColor: nextStatus === 'Completed' ? '#16a34a' : GIP_CONFIRM_COLOR }}

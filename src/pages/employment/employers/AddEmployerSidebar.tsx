@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Swal from 'sweetalert2';
 import { X, Briefcase } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../services/locationService';
 import ApplicantReviewModal from '../shared/ApplicantReviewModal';
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 
 interface EmployerFormData {
   companyName: string;
@@ -79,6 +80,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
 
   const handleChange = (field: keyof EmployerFormData, value: string) => {
     setFormData({ ...formData, [field]: value });
+    clearFieldError(field);
   };
 
   const handleConfirmSave = async () => {
@@ -99,9 +101,18 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     }
   };
 
-  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation();
 
-  const REQUIRED: Partial<Record<keyof EmployerFormData, string>> = {
+  const companyNameRef = useRef<HTMLInputElement>(null);
+  const tinNumberRef = useRef<HTMLInputElement>(null);
+  const contactPersonNameRef = useRef<HTMLInputElement>(null);
+  const contactNumberRef = useRef<HTMLInputElement>(null);
+  const streetRef = useRef<HTMLInputElement>(null);
+  const provinceWrapRef = useRef<HTMLDivElement>(null);
+  const cityWrapRef = useRef<HTMLDivElement>(null);
+  const barangayWrapRef = useRef<HTMLDivElement>(null);
+
+  const SECTION_OF: Partial<Record<keyof EmployerFormData, Section>> = {
     companyName: 'companyInfo',
     tinNumber: 'companyInfo',
     contactPersonName: 'contactPerson',
@@ -112,55 +123,72 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     barangay: 'companyAddress',
   };
 
-  function fieldError(key: keyof EmployerFormData) {
-    return showFieldErrors && !String(formData[key] ?? '').trim();
-  }
+  // Deferred one tick so that a section switch (which may need to happen
+  // first when the failing field lives on a different tab) has re-rendered
+  // before we try to focus/scroll to the field.
+  const deferFocus = (fn: () => void) => () => setTimeout(fn, 0);
 
   function inputCls(key: keyof EmployerFormData) {
-    return `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors ${
-      fieldError(key)
-        ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300'
-        : 'border-gray-300 focus:ring-brand-blue'
-    }`;
+    return `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors border-gray-300 focus:ring-brand-blue ${errCls(key)}`;
   }
 
   function ErrMsg({ k }: { k: keyof EmployerFormData }) {
-    return fieldError(k) ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null;
+    return fieldMessage(k) ? <p className="text-red-500 text-xs mt-1">{fieldMessage(k)}</p> : null;
   }
 
-  function sectionRequiredKeys(section: Section): (keyof EmployerFormData)[] {
-    return (Object.entries(REQUIRED) as [keyof EmployerFormData, string][])
-      .filter(([, s]) => s === section)
-      .map(([k]) => k);
-  }
+  function buildValidationErrors(scope?: Section): ValidationError[] {
+    const errors: ValidationError[] = [];
+    const contactPersonName = formData.contactPersonName.trim();
 
-  function hasSectionErrors(section: Section) {
-    return sectionRequiredKeys(section).some(k => !String(formData[k] ?? '').trim());
-  }
+    const inScope = (key: keyof EmployerFormData) => !scope || SECTION_OF[key] === scope;
 
-  function hasAllErrors() {
-    return (Object.keys(REQUIRED) as (keyof EmployerFormData)[]).some(k => !String(formData[k] ?? '').trim());
-  }
-
-  function firstFailingSection(): Section {
-    const entry = (Object.entries(REQUIRED) as [keyof EmployerFormData, string][])
-      .find(([k]) => !String(formData[k] ?? '').trim());
-    return (entry?.[1] ?? 'companyInfo') as Section;
+    if (inScope('companyName') && !formData.companyName.trim()) {
+      errors.push({ field: 'companyName', message: 'Company Name is required.', focus: deferFocus(() => companyNameRef.current?.focus()) });
+    }
+    if (inScope('tinNumber') && !formData.tinNumber.trim()) {
+      errors.push({ field: 'tinNumber', message: 'TIN Number is required.', focus: deferFocus(() => tinNumberRef.current?.focus()) });
+    }
+    if (inScope('contactPersonName')) {
+      if (!contactPersonName) {
+        errors.push({ field: 'contactPersonName', message: 'Full Name is required.', focus: deferFocus(() => contactPersonNameRef.current?.focus()) });
+      } else if (!NAME_REGEX.test(contactPersonName)) {
+        errors.push({ field: 'contactPersonName', message: 'Full Name must contain letters only (no numbers or symbols).', focus: deferFocus(() => contactPersonNameRef.current?.focus()) });
+      }
+    }
+    if (inScope('contactNumber') && !formData.contactNumber.trim()) {
+      errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: deferFocus(() => contactNumberRef.current?.focus()) });
+    }
+    if (inScope('street') && !formData.street.trim()) {
+      errors.push({ field: 'street', message: 'Street is required.', focus: deferFocus(() => streetRef.current?.focus()) });
+    }
+    if (inScope('province') && !formData.province.trim()) {
+      errors.push({ field: 'province', message: 'Province is required.', focus: deferFocus(() => provinceWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if (inScope('city') && !formData.city.trim()) {
+      errors.push({ field: 'city', message: 'City/Municipality is required.', focus: deferFocus(() => cityWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if (inScope('barangay') && !formData.barangay.trim()) {
+      errors.push({ field: 'barangay', message: 'Barangay is required.', focus: deferFocus(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    return errors;
   }
 
   const handleNext = () => {
     const currentIndex = sections.findIndex(s => s.id === activeSection);
     const isLast = currentIndex === sections.length - 1;
     if (isLast) {
-      if (hasAllErrors()) {
-        setShowFieldErrors(true);
-        setActiveSection(firstFailingSection());
+      const errors = buildValidationErrors();
+      if (errors.length > 0) {
+        const firstSection = SECTION_OF[errors[0].field as keyof EmployerFormData] ?? 'companyInfo';
+        setActiveSection(firstSection);
+        runValidation(errors);
         return;
       }
       setShowConfirmation(true);
     } else {
-      if (hasSectionErrors(activeSection)) {
-        setShowFieldErrors(true);
+      const errors = buildValidationErrors(activeSection);
+      if (errors.length > 0) {
+        runValidation(errors);
         return;
       }
       setActiveSection(sections[currentIndex + 1].id);
@@ -222,7 +250,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Name <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.companyName}
+                <input ref={companyNameRef} type="text" value={formData.companyName}
                   onChange={e => handleChange('companyName', e.target.value)}
                   placeholder="e.g., ABC Corporation"
                   className={inputCls('companyName')} />
@@ -277,7 +305,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               </div>
               <div className="col-span-2">
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.tinNumber}
+                <input ref={tinNumberRef} type="text" value={formData.tinNumber}
                   onChange={e => handleChange('tinNumber', e.target.value)}
                   placeholder="e.g., 123-456-789-000"
                   className={inputCls('tinNumber')} />
@@ -294,7 +322,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Full Name <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.contactPersonName}
+                <input ref={contactPersonNameRef} type="text" value={formData.contactPersonName}
                   onChange={e => handleChange('contactPersonName', e.target.value)}
                   placeholder="e.g., Maria Santos"
                   className={inputCls('contactPersonName')} />
@@ -309,7 +337,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
-                <input type="tel" value={formData.contactNumber}
+                <input ref={contactNumberRef} type="tel" value={formData.contactNumber}
                   onChange={e => handleChange('contactNumber', e.target.value)}
                   placeholder="e.g., 09123456789"
                   className={inputCls('contactNumber')} />
@@ -339,47 +367,52 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Street <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.street}
+                <input ref={streetRef} type="text" value={formData.street}
                   onChange={e => handleChange('street', e.target.value)}
                   className={inputCls('street')} />
                 <ErrMsg k="street" />
               </div>
               {/* Cascade: Province -> City/Municipality -> Barangay */}
-              <div>
+              <div ref={provinceWrapRef}>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Province <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.province}
                   placeholder="Search province…"
+                  hasError={!!fieldErrors.province}
                   fetchOptions={s => searchProvinces(s)}
-                  onSelect={opt =>
-                    setFormData(prev => ({ ...prev, province: opt.name, provinceId: opt.id, city: '', cityId: null, barangay: '', barangayId: null }))
-                  }
+                  onSelect={opt => {
+                    setFormData(prev => ({ ...prev, province: opt.name, provinceId: opt.id, city: '', cityId: null, barangay: '', barangayId: null }));
+                    clearFieldError('province');
+                  }}
                 />
                 <ErrMsg k="province" />
               </div>
-              <div>
+              <div ref={cityWrapRef}>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">City/Municipality <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.city}
                   placeholder={formData.provinceId ? 'Search city/municipality…' : 'Select province first'}
                   disabled={!formData.provinceId}
+                  hasError={!!fieldErrors.city}
                   refetchKey={formData.provinceId ?? ''}
                   fetchOptions={s => searchCities(formData.provinceId ?? 0, s)}
-                  onSelect={opt =>
-                    setFormData(prev => ({ ...prev, city: opt.name, cityId: opt.id, barangay: '', barangayId: null }))
-                  }
+                  onSelect={opt => {
+                    setFormData(prev => ({ ...prev, city: opt.name, cityId: opt.id, barangay: '', barangayId: null }));
+                    clearFieldError('city');
+                  }}
                 />
                 <ErrMsg k="city" />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2" ref={barangayWrapRef}>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Barangay <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   value={formData.barangay}
                   placeholder={formData.cityId ? 'Search barangay…' : 'Select city first'}
                   disabled={!formData.cityId}
+                  hasError={!!fieldErrors.barangay}
                   refetchKey={formData.cityId ?? ''}
                   fetchOptions={s => searchBarangaysByCity(formData.cityId ?? 0, s)}
-                  onSelect={opt => setFormData(prev => ({ ...prev, barangay: opt.name, barangayId: opt.id }))}
+                  onSelect={opt => { setFormData(prev => ({ ...prev, barangay: opt.name, barangayId: opt.id })); clearFieldError('barangay'); }}
                 />
                 <ErrMsg k="barangay" />
               </div>

@@ -108,7 +108,7 @@ const SECTIONS: Section[] = [
     optionalArgb: "FFFDF1C1",
     columns: [
       { header: "Status",                         width: 12, example: "Active",     options: STATUS_OPTIONS },
-      { header: "Date Registered (YYYY-MM-DD)",   width: 26, example: "2024-01-15" },
+      { header: "Date Registered (MM/DD/YYYY)",   width: 26, example: "01/15/2024" },
       { header: "Remarks",                        width: 30, example: "" },
     ],
   },
@@ -217,8 +217,20 @@ function get(row: Row, header: string): string {
   return (row[norm(header)] ?? "").trim();
 }
 
+// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
+// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
+// rather than letting the Date constructor silently roll it over.
 function toIsoDate(v: string): string | null {
   const s = v.trim();
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    const [, mm, dd, yyyy] = mdy;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    if (d.getFullYear() === Number(yyyy) && d.getMonth() === Number(mm) - 1 && d.getDate() === Number(dd)) {
+      return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    }
+    return null;
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
@@ -371,7 +383,7 @@ export async function importEmployers(
     }
 
     // Date registered — default to today if blank or invalid
-    const dateRaw = get(row, "Date Registered (YYYY-MM-DD)");
+    const dateRaw = get(row, "Date Registered (MM/DD/YYYY)");
     const dateRegistered = (dateRaw && toIsoDate(dateRaw)) ?? new Date().toISOString().split("T")[0];
 
     // Status — default Active if blank

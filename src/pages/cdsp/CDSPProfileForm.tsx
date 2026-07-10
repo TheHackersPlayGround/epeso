@@ -5,6 +5,7 @@ import type { CDSPApplicant } from '../../contexts/CDSPContext'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export const emptyForm: Omit<CDSPApplicant, 'id'> = {
   serviceAvailed: '', assignedActivity: '', assignmentHistory: [],
   careerGoal: '', coachingType: '', careerAssessmentResult: '',
   targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-  school: '', courseProgram: '', yearLevel: '', expectedGraduation: '',
+  school: '', courseProgram: '', expectedGraduation: '',
   applicantSignature: '', dateSignature: '',
   dateApplicationReceived: '', receivedBy: '', counselorName: '',
   status: 'Active', remarks: '',
@@ -291,6 +292,7 @@ export default function CDSPProfileForm({
   const set = (updates: Partial<Omit<CDSPApplicant, 'id'>>) => setFormData((prev) => ({ ...prev, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
   const toggleArr = (field: 'classification' | 'industriesOfInterest' | 'preEmploymentRequirements', value: string) => {
     const arr = formData[field] as string[]
@@ -298,31 +300,106 @@ export default function CDSPProfileForm({
   }
 
   const handleBirthdate = (date: string) => {
-    const age = date ? new Date().getFullYear() - new Date(date).getFullYear() : 0
+    let age = 0
+    if (date) {
+      const birth = new Date(date)
+      const today = new Date()
+      age = today.getFullYear() - birth.getFullYear()
+      const hadBirthdayThisYear =
+        today.getMonth() > birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+      if (!hadBirthdayThisYear) age--
+    }
     set({ birthdate: date, age })
+    clearFieldError('birthdate')
   }
 
-  const [showFieldErrors, setShowFieldErrors] = useState(false)
-  const eduError = showFieldErrors && !formData.highestEducation
-  const empStatusError = showFieldErrors && !formData.employmentStatus
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
   const eduFieldRef = useRef<HTMLSelectElement>(null)
   const empStatusFieldRef = useRef<HTMLSelectElement>(null)
+  const serviceAvailedWrapRef = useRef<HTMLDivElement>(null)
 
+  // Sex, birthdate, civil status, and barangay are required by the underlying
+  // beneficiaries table (NOT NULL columns); name fields additionally reject
+  // digits/symbols.
   const handleSave = () => {
-    if (!formData.lastName || !formData.firstName) { alert('Please fill in Last Name and First Name.'); return }
+    const lastName = formData.lastName.trim()
+    const firstName = formData.firstName.trim()
+    const middleName = formData.middleName.trim()
+    const errors: ValidationError[] = []
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => lastNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: () => lastNameRef.current?.focus() })
+    }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => firstNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: () => firstNameRef.current?.focus() })
+    }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: () => middleNameRef.current?.focus() })
+    }
+
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: () => sexRef.current?.focus() })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: () => civilStatusRef.current?.focus() })
+    }
+
+    if (!formData.barangayId) {
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Section II. Address).',
+        focus: () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
     if (!formData.highestEducation) {
-      setShowFieldErrors(true)
-      eduFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      eduFieldRef.current?.focus()
-      return
+      errors.push({
+        field: 'highestEducation',
+        message: 'Highest Educational Attainment is required (Section IV).',
+        focus: () => eduFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
     }
+
     if (!formData.employmentStatus) {
-      setShowFieldErrors(true)
-      empStatusFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      empStatusFieldRef.current?.focus()
-      return
+      errors.push({
+        field: 'employmentStatus',
+        message: 'Employment Status is required (Section V).',
+        focus: () => empStatusFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
     }
-    if (!formData.serviceAvailed) { alert('Please select a CDSP Service Availed (Section VI).'); return }
+
+    if (!formData.serviceAvailed) {
+      errors.push({
+        field: 'serviceAvailed',
+        message: 'Please select a CDSP Service Availed (Section VI).',
+        focus: () => serviceAvailedWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (runValidation(errors)) return
+
     onSave(formData)
   }
 
@@ -363,29 +440,34 @@ export default function CDSPProfileForm({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.lastName} onChange={(e) => set({ lastName: e.target.value })} placeholder="Enter surname" />
+              <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={(e) => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
+              {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.firstName} onChange={(e) => set({ firstName: e.target.value })} placeholder="Enter first name" />
+              <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={(e) => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Enter first name" />
+              {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
             </div>
             <div>
               <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input className={inp} value={formData.middleName} onChange={(e) => set({ middleName: e.target.value })} placeholder="Enter middle name" />
+              <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={(e) => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="Enter middle name" />
+              {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <label className={lbl}>Sex</label>
-              <select className={sel} value={formData.sex} onChange={(e) => set({ sex: e.target.value as CDSPApplicant['sex'] })}>
+              <label className={lbl}>Sex <span className="text-red-500">*</span></label>
+              <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={(e) => { set({ sex: e.target.value as CDSPApplicant['sex'] }); clearFieldError('sex') }}>
                 <option value="">Select</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
               </select>
+              {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
             </div>
-            <div>
-              <label className={lbl}>Birthdate</label>
-              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
+            <div ref={birthdateWrapRef}>
+              <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
+              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -394,11 +476,12 @@ export default function CDSPProfileForm({
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={lbl}>Civil Status</label>
-              <select className={sel} value={formData.civilStatus} onChange={(e) => set({ civilStatus: e.target.value })}>
+              <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
+              <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={(e) => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
                 <option value="">Select</option>
                 {CIVIL_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
+              {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
@@ -439,16 +522,19 @@ export default function CDSPProfileForm({
                 }}
               />
             </div>
-            <div>
-              <label className={lbl}>Barangay</label>
-              <SearchableSelect
-                value={formData.barangay}
-                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
-                disabled={!cityId}
-                refetchKey={cityId ?? ''}
-                fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
-                onSelect={(opt) => set({ barangay: opt.name, barangayId: opt.id })}
-              />
+            <div ref={barangayWrapRef}>
+              <label className={lbl}>Barangay <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldErrors.barangay ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                  disabled={!cityId}
+                  refetchKey={cityId ?? ''}
+                  fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
+                  onSelect={(opt) => { set({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+                />
+              </div>
+              {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
             </div>
             <div>
               <label className={lbl}>Street / Purok #</label>
@@ -485,16 +571,14 @@ export default function CDSPProfileForm({
                   <label className={lbl}>Highest Educational Attainment <span className="text-red-500">*</span></label>
                   <select
                     ref={eduFieldRef}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white ${
-                      eduError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300' : 'border-gray-300 focus:ring-brand-blue'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white border-gray-300 focus:ring-brand-blue ${errCls('highestEducation')}`}
                     value={edu}
-                    onChange={(e) => { set({ highestEducation: e.target.value, course: '', strand: '', yearLevel: '', yearGraduated: '' }); setShowFieldErrors(false) }}
+                    onChange={(e) => { set({ highestEducation: e.target.value, course: '', strand: '', yearLevel: '', yearGraduated: '' }); clearFieldError('highestEducation') }}
                   >
                     <option value="">Select</option>
                     {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
-                  {eduError && <p className="text-red-500 text-xs mt-1">This field is required.</p>}
+                  {fieldMessage('highestEducation') && <p className="text-red-500 text-xs mt-1">{fieldMessage('highestEducation')}</p>}
                 </div>
                 {showYearLevel && (
                   <div>
@@ -530,16 +614,14 @@ export default function CDSPProfileForm({
               <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
               <select
                 ref={empStatusFieldRef}
-                className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white ${
-                  empStatusError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300' : 'border-gray-300 focus:ring-brand-blue'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg text-sm text-gray-900 focus:ring-2 focus:border-transparent outline-none bg-white border-gray-300 focus:ring-brand-blue ${errCls('employmentStatus')}`}
                 value={formData.employmentStatus}
-                onChange={(e) => { set({ employmentStatus: e.target.value }); setShowFieldErrors(false) }}
+                onChange={(e) => { set({ employmentStatus: e.target.value }); clearFieldError('employmentStatus') }}
               >
                 <option value="">Select</option>
                 {EMPLOYMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
-              {empStatusError && <p className="text-red-500 text-xs mt-1">This field is required.</p>}
+              {fieldMessage('employmentStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('employmentStatus')}</p>}
             </div>
             <div>
               <label className={lbl}>Current Occupation</label>
@@ -548,7 +630,7 @@ export default function CDSPProfileForm({
           </div>
 
           <SectionDivider numeral="VI" title="CDSP Service Availed" />
-          <div className="space-y-2 mb-4">
+          <div ref={serviceAvailedWrapRef} className="space-y-2 mb-1">
             {cdspServices.map((svc) => (
               <label
                 key={svc}
@@ -557,11 +639,12 @@ export default function CDSPProfileForm({
                 <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${formData.serviceAvailed === svc ? 'border-brand-blue' : 'border-gray-300'}`}>
                   {formData.serviceAvailed === svc && <div className="w-2 h-2 rounded-full bg-brand-blue" />}
                 </div>
-                <input type="radio" className="hidden" checked={formData.serviceAvailed === svc} onChange={() => set({ serviceAvailed: svc, assignedActivity: '' })} />
+                <input type="radio" className="hidden" checked={formData.serviceAvailed === svc} onChange={() => { set({ serviceAvailed: svc, assignedActivity: '' }); clearFieldError('serviceAvailed') }} />
                 <span className={`text-sm ${formData.serviceAvailed === svc ? 'text-brand-blue' : 'text-gray-700'}`}>{svc}</span>
               </label>
             ))}
           </div>
+          {fieldMessage('serviceAvailed') && <p className="text-red-500 text-xs mb-4">{fieldMessage('serviceAvailed')}</p>}
 
           <SectionDivider numeral="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">

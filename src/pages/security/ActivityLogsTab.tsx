@@ -5,6 +5,9 @@ import {
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import { listDeleted, restoreRecord, purgeRecord, type RecycleBinRecord } from '../../services/recycleBinService'
+import { useGIP } from '../../contexts/GIPContext'
+import { useCDSP } from '../../contexts/CDSPContext'
+import { useSPES } from '../../contexts/SPESContext'
 
 interface ActivityLog {
   id: number
@@ -40,9 +43,10 @@ const mockActivityLogs: ActivityLog[] = [
   { id: 20, timestamp: '2026-05-11 02:15 PM', user: 'staff002', role: 'Staff',         action: 'Delete Record', module: 'Skills Training', details: 'Unauthorized delete attempt blocked',      status: 'Failed'  },
 ]
 
-// The recycle bin shows real soft-deleted records from the Employment
-// Facilitation module (applicants, employers, referrals). Other modules don't
-// have soft delete yet, so they won't appear here until they do.
+// The recycle bin shows real soft-deleted records from every module that
+// supports soft delete: Employment Facilitation (applicants, employers,
+// referrals), GIP (applicants), CDSP (applicants), and SPES (applicants).
+// Other modules don't have soft delete yet, so they won't appear here until they do.
 type RecycleBinItem = RecycleBinRecord
 
 // Days left before the (display-only) 30-day window elapses, from the real date.
@@ -55,9 +59,12 @@ function getDaysRemaining(deletedAt: string): number {
 const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
 const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
 const logStatuses = ['All', 'Success', 'Failed']
-const binModules  = ['All', 'Applicants', 'Employers', 'Referrals']
+const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants']
 
 export default function ActivityLogsTab() {
+  const { refreshProfiles: refreshGipProfiles } = useGIP()
+  const { refreshProfiles: refreshCdspProfiles } = useCDSP()
+  const { refreshProfiles: refreshSpesProfiles } = useSPES()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logSearch,       setLogSearch]       = useState('')
@@ -127,6 +134,17 @@ export default function ActivityLogsTab() {
   const showError = (message: string) =>
     setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message, onConfirm: closeModal })
 
+  // A restored applicant needs the module's own list refreshed too — GIP/CDSP
+  // applicant tables read from a shared context mounted at the app root
+  // (GIPProvider/CDSPProvider in App.tsx), so refreshing it here means the
+  // table is already up to date the moment the user navigates back to it,
+  // no manual page refresh needed.
+  const refreshModuleFor = async (recordType: RecycleBinItem['recordType']) => {
+    if (recordType === 'gipApplicant') await refreshGipProfiles()
+    if (recordType === 'cdspApplicant') await refreshCdspProfiles()
+    if (recordType === 'spesApplicant') await refreshSpesProfiles()
+  }
+
   const handleRestoreItem = (item: RecycleBinItem) => {
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Restore Record',
@@ -135,7 +153,7 @@ export default function ActivityLogsTab() {
       onConfirm: async () => {
         try {
           await restoreRecord(item.recordType, item.id)
-          await reloadBin()
+          await Promise.all([reloadBin(), refreshModuleFor(item.recordType)])
           setConfirmModal({ isOpen: true, type: 'success', title: 'Record Restored', message: `"${item.name}" has been successfully restored to ${item.module}.`, onConfirm: closeModal })
         } catch (err: unknown) {
           showError(err instanceof Error && err.message ? err.message : `Failed to restore "${item.name}".`)
@@ -375,9 +393,12 @@ export default function ActivityLogsTab() {
                         <td className="px-4 py-3"><span className="text-sm text-gray-800">{item.name}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-xs ${
-                            item.module === 'Applicants' ? 'bg-blue-50 text-blue-700' :
-                            item.module === 'Employers'  ? 'bg-purple-50 text-purple-700' :
-                            item.module === 'Referrals'  ? 'bg-amber-50 text-amber-700' :
+                            item.module === 'Applicants'      ? 'bg-blue-50 text-blue-700' :
+                            item.module === 'Employers'       ? 'bg-purple-50 text-purple-700' :
+                            item.module === 'Referrals'       ? 'bg-amber-50 text-amber-700' :
+                            item.module === 'GIP Applicants'  ? 'bg-sky-50 text-sky-700' :
+                            item.module === 'CDSP Applicants' ? 'bg-teal-50 text-teal-700' :
+                            item.module === 'SPES Applicants' ? 'bg-indigo-50 text-indigo-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>{item.module}</span>
                         </td>

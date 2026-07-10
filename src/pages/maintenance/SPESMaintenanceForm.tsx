@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type RefObject } from 'react'
 import { ArrowLeft, Upload, X, FileText } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
-import { useSPES } from '../../contexts/SPESContext'
-import type { SPESBatch, Attachment } from '../../contexts/SPESContext'
+import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,13 +39,20 @@ function SectionHeader({ title }: { title: string }) {
   )
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, error, containerRef, children }: {
+  label: string
+  required?: boolean
+  error?: string
+  containerRef?: RefObject<HTMLDivElement | null>
+  children: React.ReactNode
+}) {
   return (
-    <div>
+    <div ref={containerRef}>
       <label className="block text-sm text-gray-600 mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
+      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
   )
 }
@@ -65,25 +72,30 @@ const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm f
 const textareaCls = `${inputCls} resize-none`
 
 function StatusRadioGroup({
-  value, onChange, disabled,
+  value, onChange, disabled, lockToOpen,
 }: {
   value: SPESBatch['status']
   onChange: (v: SPESBatch['status']) => void
   disabled?: boolean
+  // When adding a new batch, it can only ever start Open — same rule as
+  // GIP/CDSP (a batch can't be created already Ongoing/Closed/Completed).
+  lockToOpen?: boolean
 }) {
   return (
     <div className="flex flex-wrap gap-x-8 gap-y-3">
-      {STATUS_OPTIONS.map(({ value: v, desc }) => (
+      {STATUS_OPTIONS.map(({ value: v, desc }) => {
+        const isDisabled = disabled || (lockToOpen && v !== 'Open')
+        return (
         <label
           key={v}
-          className={`flex items-start gap-2 select-none ${disabled ? 'cursor-default opacity-70' : 'cursor-pointer'}`}
+          className={`flex items-start gap-2 select-none ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}
         >
           <input
             type="radio"
             name="spes-batch-status"
             checked={value === v}
-            onChange={() => !disabled && onChange(v)}
-            disabled={disabled}
+            onChange={() => !isDisabled && onChange(v)}
+            disabled={isDisabled}
             className="accent-brand-blue w-4 h-4 mt-0.5 flex-shrink-0"
           />
           <div>
@@ -91,63 +103,73 @@ function StatusRadioGroup({
             <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
           </div>
         </label>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 // ─── Document Upload ──────────────────────────────────────────────────────────
 
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
 function DocumentUpload({
   docs, onChange, readOnly,
 }: {
-  docs: Attachment[]
-  onChange: (d: Attachment[]) => void
+  docs: SPESSavedDocument[]
+  onChange: (d: SPESSavedDocument[]) => void
   readOnly?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFiles = (files: FileList | null) => {
     if (!files || readOnly) return
-    const newDocs = Array.from(files).map(f => ({
-      name: f.name,
-      url: URL.createObjectURL(f),
-      fileType: f.type,
-    }))
-    onChange([...docs, ...newDocs])
+    Array.from(files).forEach(file => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        const newDoc: SPESSavedDocument = {
+          id: Date.now().toString() + Math.random().toString(36),
+          fileName: file.name,
+          fileSize: formatFileSize(file.size),
+          url: '',
+          dataUrl,
+        }
+        onChange([...docs, newDoc])
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   return (
     <div>
       {docs.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-          {docs.map((d, i) => {
-            const isImg = d.fileType.startsWith('image/')
-            return (
-              <div key={i} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                {isImg ? (
-                  <img src={d.url} alt={d.name} className="w-full h-20 object-cover" />
-                ) : (
-                  <div className="w-full h-20 flex flex-col items-center justify-center gap-1 px-2">
-                    <FileText size={24} className="text-gray-400" />
-                    <span className="text-xs text-gray-500 text-center leading-tight line-clamp-2">{d.name}</span>
-                  </div>
-                )}
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => onChange(docs.filter((_, j) => j !== i))}
-                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X size={11} />
-                  </button>
-                )}
-                {isImg && (
-                  <p className="text-xs text-gray-500 px-2 py-1 truncate border-t border-gray-100">{d.name}</p>
-                )}
+          {docs.map((d, i) => (
+            <div key={d.id} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+              <div className="w-full h-20 flex flex-col items-center justify-center gap-1 px-2">
+                <FileText size={24} className="text-gray-400" />
+                <span className="text-xs text-gray-500 text-center leading-tight line-clamp-2">{d.fileName}</span>
               </div>
-            )
-          })}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => onChange(docs.filter((_, j) => j !== i))}
+                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={11} />
+                </button>
+              )}
+              {d.url && (
+                <a href={d.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline px-2 py-1 truncate border-t border-gray-100 block text-center">View</a>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -193,6 +215,7 @@ const emptyBatch: Omit<SPESBatch, 'id'> = {
   programStartDate: '',
   programEndDate: '',
   availableSlots: '',
+  assignedCount: 0,
   targetBeneficiaries: '',
   employer: '',
   deploymentLocation: '',
@@ -209,12 +232,13 @@ const emptyBatch: Omit<SPESBatch, 'id'> = {
 export default function SPESMaintenanceForm({
   mode, initialBatch, onSaveBatch, onUpdateBatch, onCancel,
 }: SPESMaintenanceFormProps) {
-  const { updateSpesBatch } = useSPES()
   const [form, setForm] = useState<Omit<SPESBatch, 'id'>>(
     initialBatch ? { ...initialBatch } : emptyBatch
   )
-  const set = (key: keyof typeof emptyBatch, val: unknown) =>
+  const set = (key: keyof typeof emptyBatch, val: unknown) => {
     setForm(f => ({ ...f, [key]: val }))
+    clearFieldError(key)
+  }
 
   const isView = mode === 'batch-view'
   const isEdit = mode === 'batch-edit'
@@ -226,57 +250,52 @@ export default function SPESMaintenanceForm({
     'batch-edit': 'Edit SPES Batch',
   }
 
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+  const batchNameRef = useRef<HTMLDivElement>(null)
+  const applicationStartDateRef = useRef<HTMLDivElement>(null)
+  const applicationEndDateRef = useRef<HTMLDivElement>(null)
+  const programStartDateRef = useRef<HTMLDivElement>(null)
+  const programEndDateRef = useRef<HTMLDivElement>(null)
+  const availableSlotsRef = useRef<HTMLDivElement>(null)
+  const employerRef = useRef<HTMLDivElement>(null)
+  const deploymentLocationRef = useRef<HTMLDivElement>(null)
+  const coordinatorRef = useRef<HTMLDivElement>(null)
+  const fundingSourceRef = useRef<HTMLDivElement>(null)
+  const fundingSourceOtherRef = useRef<HTMLDivElement>(null)
+
+  const scrollTo = (ref: RefObject<HTMLDivElement | null>) => () =>
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
   const validate = (): boolean => {
-    const required: [boolean, string][] = [
-      [!form.batchName.trim(),          'Batch Name is required.'],
-      [!form.applicationStartDate,      'Application Start Date is required.'],
-      [!form.applicationEndDate,        'Application End Date is required.'],
-      [!form.programStartDate,          'Program Start Date is required.'],
-      [!form.programEndDate,            'Program End Date is required.'],
-      [!form.availableSlots.trim(),     'Available Slots is required.'],
-      [!form.employer.trim(),           'Participating Employer / Agency is required.'],
-      [!form.deploymentLocation.trim(), 'Deployment Location is required.'],
-      [!form.coordinator.trim(),        'Program Coordinator is required.'],
-      [!form.fundingSource,             'Funding Source is required.'],
-      [form.fundingSource === 'Other' && !form.fundingSourceOther.trim(), 'Please specify the funding source.'],
-    ]
-    for (const [fail, msg] of required) {
-      if (fail) {
-        alert(msg)
-        return false
-      }
+    const coordinator = form.coordinator.trim()
+    const errors: ValidationError[] = []
+
+    if (!form.batchName.trim())          errors.push({ field: 'batchName', message: 'Batch Name is required.', focus: scrollTo(batchNameRef) })
+    if (!form.applicationStartDate)      errors.push({ field: 'applicationStartDate', message: 'Application Start Date is required.', focus: scrollTo(applicationStartDateRef) })
+    if (!form.applicationEndDate)        errors.push({ field: 'applicationEndDate', message: 'Application End Date is required.', focus: scrollTo(applicationEndDateRef) })
+    if (!form.programStartDate)          errors.push({ field: 'programStartDate', message: 'Program Start Date is required.', focus: scrollTo(programStartDateRef) })
+    if (!form.programEndDate)            errors.push({ field: 'programEndDate', message: 'Program End Date is required.', focus: scrollTo(programEndDateRef) })
+    if (!form.availableSlots.trim())     errors.push({ field: 'availableSlots', message: 'Available Slots is required.', focus: scrollTo(availableSlotsRef) })
+    if (!form.employer.trim())           errors.push({ field: 'employer', message: 'Participating Employer / Agency is required.', focus: scrollTo(employerRef) })
+    if (!form.deploymentLocation.trim()) errors.push({ field: 'deploymentLocation', message: 'Deployment Location is required.', focus: scrollTo(deploymentLocationRef) })
+    if (!coordinator) {
+      errors.push({ field: 'coordinator', message: 'Program Coordinator is required.', focus: scrollTo(coordinatorRef) })
+    } else if (!NAME_REGEX.test(coordinator)) {
+      errors.push({ field: 'coordinator', message: 'Program Coordinator must contain letters only (no numbers or symbols).', focus: scrollTo(coordinatorRef) })
     }
-    return true
+    if (!form.fundingSource)             errors.push({ field: 'fundingSource', message: 'Funding Source is required.', focus: scrollTo(fundingSourceRef) })
+    if (form.fundingSource === 'Other' && !form.fundingSourceOther.trim())
+      errors.push({ field: 'fundingSourceOther', message: 'Please specify the funding source.', focus: scrollTo(fundingSourceOtherRef) })
+
+    return !runValidation(errors)
   }
 
+  // Status here is just part of the whole-form save — the backend's
+  // spesCascadeBatchStatus() applies the actual side effects (stamping
+  // completed_at, flipping assigned applicants Active/Completed) on save.
+  // Quick one-off status transitions with a confirmation dialog are handled
+  // separately by the batch list's status wizard in Maintenance.tsx.
   const handleStatusChange = (newStatus: SPESBatch['status']) => {
-    if (newStatus === form.status) return
-
-    if (newStatus === 'Completed') {
-      if (!confirm('Mark Batch as Completed?\n\nThis will permanently close the batch and automatically set all currently assigned applicants to Inactive. This action cannot be undone.')) return
-      if (initialBatch) updateSpesBatch({ ...initialBatch, ...form, status: 'Completed' })
-      set('status', 'Completed')
-      return
-    }
-
-    if (newStatus === 'Ongoing') {
-      if (!confirm('Set Batch as Ongoing?\n\nAll applicants currently assigned to this batch will automatically be set to Active.')) return
-      if (initialBatch) updateSpesBatch({ ...initialBatch, ...form, status: 'Ongoing' })
-      set('status', 'Ongoing')
-      return
-    }
-
-    if (newStatus === 'Open') {
-      if (!confirm('Set Batch as Open?\n\nPreviously assigned applicants will be restored to Active status.')) return
-      if (initialBatch) updateSpesBatch({ ...initialBatch, ...form, status: 'Open' })
-      set('status', 'Open')
-      return
-    }
-
-    if (newStatus === 'Closed') {
-      if (!confirm('Close This Batch?\n\nClosing the batch will end the application period. Assigned applicants will remain active.')) return
-    }
-
     set('status', newStatus)
   }
 
@@ -319,9 +338,9 @@ export default function SPESMaintenanceForm({
                 {isView ? (
                   <ReadOnlyField label="Batch Name" value={form.batchName} />
                 ) : (
-                  <Field label="Batch Name" required>
+                  <Field label="Batch Name" required containerRef={batchNameRef} error={fieldMessage('batchName')}>
                     <input
-                      className={inputCls}
+                      className={`${inputCls} ${errCls('batchName')}`}
                       placeholder="e.g. SPES Summer Batch 2026"
                       value={form.batchName}
                       onChange={e => set('batchName', e.target.value)}
@@ -360,11 +379,11 @@ export default function SPESMaintenanceForm({
                 </>
               ) : (
                 <>
-                  <Field label="Application Start Date" required>
-                    <DatePicker className={inputCls} value={form.applicationStartDate} onChange={value => set('applicationStartDate', value)} />
+                  <Field label="Application Start Date" required containerRef={applicationStartDateRef} error={fieldMessage('applicationStartDate')}>
+                    <DatePicker className={`${inputCls} ${errCls('applicationStartDate')}`} value={form.applicationStartDate} onChange={value => set('applicationStartDate', value)} />
                   </Field>
-                  <Field label="Application End Date" required>
-                    <DatePicker className={inputCls} value={form.applicationEndDate} onChange={value => set('applicationEndDate', value)} />
+                  <Field label="Application End Date" required containerRef={applicationEndDateRef} error={fieldMessage('applicationEndDate')}>
+                    <DatePicker className={`${inputCls} ${errCls('applicationEndDate')}`} value={form.applicationEndDate} onChange={value => set('applicationEndDate', value)} />
                   </Field>
                 </>
               )}
@@ -384,11 +403,11 @@ export default function SPESMaintenanceForm({
                 </>
               ) : (
                 <>
-                  <Field label="Program Start Date" required>
-                    <DatePicker className={inputCls} value={form.programStartDate} onChange={value => set('programStartDate', value)} />
+                  <Field label="Program Start Date" required containerRef={programStartDateRef} error={fieldMessage('programStartDate')}>
+                    <DatePicker className={`${inputCls} ${errCls('programStartDate')}`} value={form.programStartDate} onChange={value => set('programStartDate', value)} />
                   </Field>
-                  <Field label="Program End Date" required>
-                    <DatePicker className={inputCls} value={form.programEndDate} onChange={value => set('programEndDate', value)} />
+                  <Field label="Program End Date" required containerRef={programEndDateRef} error={fieldMessage('programEndDate')}>
+                    <DatePicker className={`${inputCls} ${errCls('programEndDate')}`} value={form.programEndDate} onChange={value => set('programEndDate', value)} />
                   </Field>
                 </>
               )}
@@ -408,11 +427,11 @@ export default function SPESMaintenanceForm({
                 </>
               ) : (
                 <>
-                  <Field label="Available Slots" required>
+                  <Field label="Available Slots" required containerRef={availableSlotsRef} error={fieldMessage('availableSlots')}>
                     <input
                       type="number"
                       min="1"
-                      className={inputCls}
+                      className={`${inputCls} ${errCls('availableSlots')}`}
                       placeholder="e.g. 100"
                       value={form.availableSlots}
                       onChange={e => set('availableSlots', e.target.value)}
@@ -453,9 +472,9 @@ export default function SPESMaintenanceForm({
               ) : (
                 <>
                   <div className="md:col-span-2">
-                    <Field label="Participating Employer / Agency" required>
+                    <Field label="Participating Employer / Agency" required containerRef={employerRef} error={fieldMessage('employer')}>
                       <input
-                        className={inputCls}
+                        className={`${inputCls} ${errCls('employer')}`}
                         placeholder="Enter employer, company, government office, or establishment"
                         value={form.employer}
                         onChange={e => set('employer', e.target.value)}
@@ -463,18 +482,18 @@ export default function SPESMaintenanceForm({
                     </Field>
                   </div>
                   <div className="md:col-span-2">
-                    <Field label="Deployment Location" required>
+                    <Field label="Deployment Location" required containerRef={deploymentLocationRef} error={fieldMessage('deploymentLocation')}>
                       <input
-                        className={inputCls}
+                        className={`${inputCls} ${errCls('deploymentLocation')}`}
                         placeholder="Enter deployment location"
                         value={form.deploymentLocation}
                         onChange={e => set('deploymentLocation', e.target.value)}
                       />
                     </Field>
                   </div>
-                  <Field label="Program Coordinator / Person In Charge" required>
+                  <Field label="Program Coordinator / Person In Charge" required containerRef={coordinatorRef} error={fieldMessage('coordinator')}>
                     <input
-                      className={inputCls}
+                      className={`${inputCls} ${errCls('coordinator')}`}
                       placeholder="Full name"
                       value={form.coordinator}
                       onChange={e => set('coordinator', e.target.value)}
@@ -510,9 +529,9 @@ export default function SPESMaintenanceForm({
                 />
               ) : (
                 <>
-                  <Field label="Funding Source" required>
+                  <Field label="Funding Source" required containerRef={fundingSourceRef} error={fieldMessage('fundingSource')}>
                     <select
-                      className={inputCls}
+                      className={`${inputCls} ${errCls('fundingSource')}`}
                       value={form.fundingSource}
                       onChange={e => set('fundingSource', e.target.value)}
                     >
@@ -521,9 +540,9 @@ export default function SPESMaintenanceForm({
                     </select>
                   </Field>
                   {form.fundingSource === 'Other' && (
-                    <Field label="Specify Funding Source" required>
+                    <Field label="Specify Funding Source" required containerRef={fundingSourceOtherRef} error={fieldMessage('fundingSourceOther')}>
                       <input
-                        className={inputCls}
+                        className={`${inputCls} ${errCls('fundingSourceOther')}`}
                         placeholder="Please specify..."
                         value={form.fundingSourceOther}
                         onChange={e => set('fundingSourceOther', e.target.value)}
@@ -545,6 +564,7 @@ export default function SPESMaintenanceForm({
                 value={form.status}
                 onChange={v => handleStatusChange(v)}
                 disabled={isView}
+                lockToOpen={isAdd}
               />
             </Field>
           </div>

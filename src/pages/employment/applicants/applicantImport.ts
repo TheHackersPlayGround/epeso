@@ -73,7 +73,7 @@ const SECTION_PERSONAL: TemplateSection = {
     { header: "First Name", width: 18, example: "Juan", required: true },
     { header: "Middle Name", width: 16, example: "Santos" },
     { header: "Suffix", width: 9, example: "Jr." },
-    { header: "Date of Birth (YYYY-MM-DD)", width: 22, example: "1996-05-20", required: true },
+    { header: "Date of Birth (MM/DD/YYYY)", width: 22, example: "05/20/1996", required: true },
     { header: "Sex", width: 10, example: "Male", required: true, options: SEX_OPTIONS },
     { header: "Religion", width: 16, example: "Roman Catholic" },
     { header: "Civil Status", width: 14, example: "Single", required: true, options: CIVIL_STATUS_OPTIONS },
@@ -99,7 +99,7 @@ const SECTION_PERSONAL: TemplateSection = {
     { header: "OFW Country", width: 14, example: "" },
     { header: "A Former OFW?", width: 13, example: "No", options: YES_NO_OPTIONS },
     { header: "Former OFW Country", width: 18, example: "" },
-    { header: "Former OFW Return Date (YYYY-MM-DD)", width: 30, example: "" },
+    { header: "Former OFW Return Date (MM/DD/YYYY)", width: 30, example: "" },
     { header: "A 4Ps Beneficiary?", width: 16, example: "No", options: YES_NO_OPTIONS },
     { header: "Household ID No.", width: 16, example: "" },
   ],
@@ -223,11 +223,11 @@ const SECTION_ELIGIBILITY: TemplateSection = {
   columns: [
     ...Array.from({ length: ELIGIBILITY_ROWS }, (_, i): TemplateColumn[] => [
       { header: `Eligibility ${i + 1} - Name`, width: 28, example: i === 0 ? "Career Service Professional" : "" },
-      { header: `Eligibility ${i + 1} - Date Taken (YYYY-MM-DD)`, width: 28, example: "" },
+      { header: `Eligibility ${i + 1} - Date Taken (MM/DD/YYYY)`, width: 28, example: "" },
     ]).flat(),
     ...Array.from({ length: LICENSE_ROWS }, (_, i): TemplateColumn[] => [
       { header: `Professional License ${i + 1} - Name`, width: 28, example: "" },
-      { header: `Professional License ${i + 1} - Valid Until (YYYY-MM-DD)`, width: 30, example: "" },
+      { header: `Professional License ${i + 1} - Valid Until (MM/DD/YYYY)`, width: 30, example: "" },
     ]).flat(),
   ],
 };
@@ -421,9 +421,20 @@ function pickEnum(value: string, options: string[]): string {
   return options.find((o) => norm(o) === n) ?? "";
 }
 
-// Coerce a cell into a YYYY-MM-DD string, or null if it isn't a parseable date.
+// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
+// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
+// rather than letting the Date constructor silently roll it over.
 function toIsoDate(v: string): string | null {
   const s = v.trim();
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    const [, mm, dd, yyyy] = mdy;
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    if (d.getFullYear() === Number(yyyy) && d.getMonth() === Number(mm) - 1 && d.getDate() === Number(dd)) {
+      return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    }
+    return null;
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
@@ -531,10 +542,10 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   if (!surname) throw new Error("Surname is required.");
   if (!firstName) throw new Error("First Name is required.");
 
-  const dobRaw = get(row, "Date of Birth (YYYY-MM-DD)");
+  const dobRaw = get(row, "Date of Birth (MM/DD/YYYY)");
   if (!dobRaw) throw new Error("Date of Birth is required.");
   const dateOfBirth = toIsoDate(dobRaw);
-  if (!dateOfBirth) throw new Error(`Date of Birth "${dobRaw}" is not a valid date (use YYYY-MM-DD).`);
+  if (!dateOfBirth) throw new Error(`Date of Birth "${dobRaw}" is not a valid date (use MM/DD/YYYY).`);
 
   const sex = get(row, "Sex");
   if (!SEX_OPTIONS.includes(sex)) throw new Error(`Sex must be one of: ${SEX_OPTIONS.join(", ")}.`);
@@ -603,7 +614,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   fd.ofwCountry = get(row, "OFW Country");
   fd.isFormerOFW = yesNo(get(row, "A Former OFW?"));
   fd.formerOFWCountry = get(row, "Former OFW Country");
-  const returnDate = get(row, "Former OFW Return Date (YYYY-MM-DD)");
+  const returnDate = get(row, "Former OFW Return Date (MM/DD/YYYY)");
   if (returnDate) fd.formerOFWReturnDate = toIsoDate(returnDate) ?? returnDate;
 
   // 4Ps.
@@ -747,7 +758,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   for (const i of [...eligIndices].sort((a, b) => a - b)) {
     const eligibility = get(row, `Eligibility ${i} - Name`);
     if (!eligibility) continue;
-    const dateTaken = get(row, `Eligibility ${i} - Date Taken (YYYY-MM-DD)`);
+    const dateTaken = get(row, `Eligibility ${i} - Date Taken (MM/DD/YYYY)`);
     eligibilities.push({ eligibility, dateTaken: dateTaken ? (toIsoDate(dateTaken) ?? dateTaken) : "" });
   }
   fd.eligibilities = eligibilities;
@@ -756,7 +767,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   for (const i of [...licIndices].sort((a, b) => a - b)) {
     const license = get(row, `Professional License ${i} - Name`);
     if (!license) continue;
-    const validUntil = get(row, `Professional License ${i} - Valid Until (YYYY-MM-DD)`);
+    const validUntil = get(row, `Professional License ${i} - Valid Until (MM/DD/YYYY)`);
     professionalLicenses.push({ license, validUntil: validUntil ? (toIsoDate(validUntil) ?? validUntil) : "" });
   }
   fd.professionalLicenses = professionalLicenses;

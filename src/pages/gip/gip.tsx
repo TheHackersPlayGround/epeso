@@ -1,46 +1,104 @@
 import { useState } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
-  AlertCircle, CheckCircle, Upload, Download, ChevronDown, MoreHorizontal,
+  AlertCircle, Upload, Download, ChevronDown, MoreHorizontal,
   ChevronRight, ChevronLeft,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useGIP } from '../../contexts/GIPContext'
 import { canManage } from '../../utils/permissions'
 import type { GIPApplicant, GIPBatch } from '../../contexts/GIPContext'
+import * as gipApiService from '../../services/gipService'
 import GIPProfileForm, {
   ViewApplicantPanel, emptyForm, BATCH_STATUS_COLORS,
   deriveStatus, StatusBadge, CLASSIFICATION_OPTIONS, EDUCATION_OPTIONS, CIVIL_STATUS_OPTIONS,
 } from './GIPProfileForm'
+import { downloadImportTemplate, importGipApplicants, type ImportResult } from './gipImport'
 
 interface GIPViewProps {
   onBack: () => void
 }
 
-// ─── Confirm Modal ─────────────────────────────────────────────────────────────
+// ─── Import modal ──────────────────────────────────────────────────────────────
 
-function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confirmText = 'Confirm' }: {
-  isOpen: boolean; type: 'confirm' | 'success'; title: string; message: string
-  onConfirm: () => void; onCancel: () => void; confirmText?: string
-}) {
-  if (!isOpen) return null
-  const Icon = type === 'success' ? CheckCircle : AlertCircle
-  const iconColor = type === 'success' ? 'text-green-500' : 'text-brand-blue'
+function GIPImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importGipApplicants(file, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
-        <Icon size={56} className={`mx-auto mb-4 ${iconColor}`} />
-        <h3 className="text-xl text-gray-800 mb-3">{title}</h3>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex gap-3 justify-center">
-          {type === 'confirm' ? (
-            <>
-              <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
-            </>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import GIP Applicants</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
           ) : (
-            <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
+            <>
+              <button onClick={() => { void downloadImportTemplate() }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -48,10 +106,72 @@ function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confi
   )
 }
 
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Confirm Modal (delete only — success/error use Swal) ──────────────────────
+
+function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Confirm' }: {
+  isOpen: boolean; title: string; message: string
+  onConfirm: () => void; onCancel: () => void; confirmText?: string
+}) {
+  if (!isOpen) return null
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
+        <AlertCircle size={56} className="mx-auto mb-4 text-brand-blue" />
+        <h3 className="text-xl text-gray-800 mb-3">{title}</h3>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
+          <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function errMsg(e: unknown, fallback: string) {
+  return (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
+    ?? (e as { message?: string })?.message ?? fallback
+}
+
 // ─── Main GIPView ──────────────────────────────────────────────────────────────
 
 export default function GIPView({ onBack }: GIPViewProps) {
-  const { applicants, setApplicants, gipBatches } = useGIP()
+  const { applicants, gipBatches, refreshProfiles, refreshBatches } = useGIP()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -62,7 +182,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
   const availableFilters = [
-    { id: 'status',         label: 'Status',         options: ['Active', 'Inactive'] as string[] },
+    { id: 'status',         label: 'Status',         options: ['Active', 'Inactive', 'Completed', 'Cancelled'] as string[] },
     { id: 'classification', label: 'Classification',  options: [...CLASSIFICATION_OPTIONS, 'Others'] },
     { id: 'sex',            label: 'Sex',             options: ['Male', 'Female'] },
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
@@ -102,10 +222,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; barangay: string; status: string; valid: boolean }[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
-  const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<GIPApplicant | null>(null)
@@ -154,60 +271,68 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, sorted.length)
 
-  const handleAddSave = (data: Omit<GIPApplicant, 'id'>) => {
-    setApplicants(prev => [...prev, { ...data, id: Date.now() }])
-    setIsFormOpen(false)
-    setSuccessModal({ open: true, message: 'Applicant profile has been added successfully.' })
+  const handleAddSave = async (data: Omit<GIPApplicant, 'id'>) => {
+    try {
+      await gipApiService.createProfile(data as unknown as Record<string, unknown>)
+      await refreshProfiles()
+      setIsFormOpen(false)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been added successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleEditSave = (data: Omit<GIPApplicant, 'id'>) => {
+  const handleEditSave = async (data: Omit<GIPApplicant, 'id'>) => {
     if (!editingApplicant) return
-    setApplicants(prev => prev.map(a => a.id === editingApplicant.id ? { ...data, id: a.id } : a))
-    setEditingApplicant(null)
-    setSuccessModal({ open: true, message: 'Applicant profile has been updated successfully.' })
+    try {
+      await gipApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
+      await refreshProfiles()
+      setEditingApplicant(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleDelete = (id: number) => {
-    setApplicants(prev => prev.filter(a => a.id !== id))
-    setDeleteConfirm({ open: false, id: null })
-    setSuccessModal({ open: true, message: 'Applicant profile has been deleted.' })
+  const handleDelete = async (id: number) => {
+    try {
+      await gipApiService.deleteProfile(id)
+      await refreshProfiles()
+      setDeleteConfirm({ open: false, id: null })
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted.', timer: 1500, showConfirmButton: false })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleAssignBatch = (batch: GIPBatch) => {
+  const handleAssignBatch = async (batch: GIPBatch) => {
     if (!assignTarget) return
-    const today = new Date().toISOString().split('T')[0]
-    setApplicants(prev => prev.map(a => a.id === assignTarget.id ? {
-      ...a,
-      assignedBatchId: batch.id,
-      status: 'Active' as const,
-      assignmentHistory: [
-        ...a.assignmentHistory,
-        { batchId: batch.id, batchName: batch.batchName, assignedDate: today },
-      ],
-    } : a))
-    setAssignTarget(null)
-    setAssignStep(1)
-    setSelectedBatch(null)
-    setAssignSearch('')
-    setSuccessModal({ open: true, message: `Assigned to "${batch.batchName}" successfully.` })
+    try {
+      await gipApiService.assignBatch(assignTarget.id, batch.id)
+      await refreshProfiles()
+      await refreshBatches()
+      setAssignTarget(null)
+      setAssignStep(1)
+      setSelectedBatch(null)
+      setAssignSearch('')
+      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${batch.batchName}" successfully.`, confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign batch.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleUnassignBatch = () => {
-    if (!viewBatchTarget) return
-    const today = new Date().toISOString().split('T')[0]
-    const batchId = viewBatchTarget.assignedBatchId
-    setApplicants(prev => prev.map(a => a.id === viewBatchTarget.id ? {
-      ...a,
-      assignedBatchId: null,
-      status: 'Inactive' as const,
-      assignmentHistory: a.assignmentHistory.map(h =>
-        h.batchId === batchId && !h.completedDate
-          ? { ...h, completedDate: today }
-          : h
-      ),
-    } : a))
-    setViewBatchTarget(null)
-    setSuccessModal({ open: true, message: 'Applicant has been unassigned from the batch.' })
+  const handleUnassignBatch = async (targetId?: number) => {
+    const applicant = targetId ? applicants.find(a => a.id === targetId) : viewBatchTarget
+    if (!applicant) return
+    try {
+      await gipApiService.unassignBatch(applicant.id)
+      await refreshProfiles()
+      await refreshBatches()
+      setViewBatchTarget(null)
+      Swal.fire({ icon: 'success', title: 'Removed', text: 'Applicant has been unassigned from the batch.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   const openAssignModal = (applicant: GIPApplicant) => {
@@ -259,23 +384,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setIsExportDropdownOpen(false)
   }
 
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = e => {
-      const data = e.target?.result
-      const wb = XLSX.read(data, { type: 'binary' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(ws) as Record<string, string>[]
-      setImportPreview(rows.slice(0, 5).map(r => ({
-        lastName: r['Last Name'] || '', firstName: r['First Name'] || '',
-        barangay: r['Barangay'] || '', status: r['Status'] || '',
-        valid: !!(r['Last Name'] && r['First Name']),
-      })))
-    }
-    reader.readAsBinaryString(file)
-  }
-
   const closeAssignModal = () => {
     setAssignTarget(null)
     setAssignStep(1)
@@ -301,18 +409,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
   return (
     <>
       <ConfirmModal
-        isOpen={deleteConfirm.open} type="confirm"
-        title="Delete Applicant Profile"
-        message="Are you sure you want to delete this applicant's profile? This action cannot be undone."
+        isOpen={deleteConfirm.open}
+        title="Delete Applicant?"
+        message={(() => {
+          const applicant = applicants.find(a => a.id === deleteConfirm.id)
+          const name = applicant ? `${applicant.firstName} ${applicant.lastName}` : 'this applicant'
+          return `Are you sure you want to delete ${name}? This will move the applicant to the recycle bin.`
+        })()}
         confirmText="Delete"
         onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
         onCancel={() => setDeleteConfirm({ open: false, id: null })}
-      />
-      <ConfirmModal
-        isOpen={successModal.open} type="success"
-        title="Success" message={successModal.message}
-        onConfirm={() => setSuccessModal({ open: false, message: '' })}
-        onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
 
       {/* Assign Batch Modal */}
@@ -357,26 +463,34 @@ export default function GIPView({ onBack }: GIPViewProps) {
                       <p className="text-sm text-gray-400">No available batches.</p>
                       <p className="text-xs text-gray-300 mt-1">Only Planned batches can be assigned.</p>
                     </div>
-                  ) : filteredAssignBatches.map(batch => (
+                  ) : filteredAssignBatches.map(batch => {
+                    const isFull = batch.id !== assignTarget.assignedBatchId
+                      && batch.assignedCount >= parseInt(batch.slots || '0', 10)
+                    return (
                     <button
                       key={batch.id}
-                      onClick={() => { setSelectedBatch(batch); setAssignStep(2) }}
-                      className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-brand-blue hover:bg-blue-50 transition-all"
+                      onClick={() => { if (!isFull) { setSelectedBatch(batch); setAssignStep(2) } }}
+                      disabled={isFull}
+                      title={isFull ? 'This batch is already at full capacity.' : undefined}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
+                        isFull ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800">{batch.batchName}</p>
                           <p className="text-xs text-gray-400 mt-0.5">{batch.batchCode}</p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {batch.assignedOffice} · {batch.startDate} – {batch.endDate}
+                            {batch.assignedOffice} · {batch.startDate} – {batch.endDate} · {batch.assignedCount}/{batch.slots} slots
                           </p>
                         </div>
                         <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold ${BATCH_STATUS_COLORS[batch.status]}`}>
-                          {batch.status}
+                          {isFull ? 'Full' : batch.status}
                         </span>
                       </div>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
                   <button onClick={closeAssignModal} className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
@@ -402,9 +516,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
                       <div><span className="text-gray-400">Location:</span> {selectedBatch.deploymentLocation || '—'}</div>
                       <div><span className="text-gray-400">Start:</span> {selectedBatch.startDate || '—'}</div>
                       <div><span className="text-gray-400">End:</span> {selectedBatch.endDate || '—'}</div>
-                      <div><span className="text-gray-400">Slots:</span> {selectedBatch.slots || '—'}</div>
+                      <div><span className="text-gray-400">Slots:</span> {selectedBatch.assignedCount}/{selectedBatch.slots || '—'}</div>
                       <div><span className="text-gray-400">Allowance:</span> {selectedBatch.allowance ? `₱${selectedBatch.allowance}/mo` : '—'}</div>
-                      {selectedBatch.coordinator && <div className="col-span-2"><span className="text-gray-400">Coordinator:</span> {selectedBatch.coordinator}</div>}
+                      {selectedBatch.supervisor && <div className="col-span-2"><span className="text-gray-400">Supervisor:</span> {selectedBatch.supervisor}</div>}
                     </div>
                   </div>
                   {assignTarget.assignedBatchId && (
@@ -433,7 +547,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       {viewBatchTarget && (() => {
         const currentBatch = gipBatches.find(b => b.id === viewBatchTarget.assignedBatchId)
         if (!currentBatch) return null
-        const canChange = currentBatch.status === 'Completed'
+        // A batch can only be changed/unassigned before it's Completed — once
+        // Completed, doing so would erase the only record this internship happened.
+        const canChange = currentBatch.status !== 'Completed'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
@@ -460,14 +576,19 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     <div><span className="text-gray-400">Location:</span> {currentBatch.deploymentLocation || '—'}</div>
                     <div><span className="text-gray-400">Start:</span> {currentBatch.startDate || '—'}</div>
                     <div><span className="text-gray-400">End:</span> {currentBatch.endDate || '—'}</div>
-                    <div><span className="text-gray-400">Slots:</span> {currentBatch.slots || '—'}</div>
+                    <div><span className="text-gray-400">Slots:</span> {currentBatch.assignedCount}/{currentBatch.slots || '—'}</div>
                     <div><span className="text-gray-400">Allowance:</span> {currentBatch.allowance ? `₱${currentBatch.allowance}/mo` : '—'}</div>
-                    {currentBatch.coordinator && <div className="col-span-2"><span className="text-gray-400">Coordinator:</span> {currentBatch.coordinator}</div>}
+                    {currentBatch.supervisor && <div className="col-span-2"><span className="text-gray-400">Supervisor:</span> {currentBatch.supervisor}</div>}
                   </div>
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
-                <button onClick={handleUnassignBatch} disabled={!canManage('gip')} className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Unassign</button>
+                <button
+                  onClick={() => handleUnassignBatch()}
+                  disabled={!canChange || !canManage('gip')}
+                  title={!canChange ? 'This batch is already completed — unassigning would erase its completion record.' : undefined}
+                  className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                >Unassign</button>
                 <button
                   onClick={() => { setViewBatchTarget(null); openAssignModal(viewBatchTarget) }}
                   disabled={!canChange || !canManage('gip')}
@@ -482,59 +603,10 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
       {/* Import Modal */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-gray-800">Import Applicants</h3>
-              <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <div className="p-6">
-              <div
-                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors"
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
-                onClick={() => document.getElementById('gip-file-input')?.click()}
-              >
-                <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600">Drop your Excel or CSV file here</p>
-                <p className="text-xs text-gray-400 mt-1">or click to browse</p>
-                <input id="gip-file-input" type="file" accept=".xlsx,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
-              </div>
-              {uploadedFile && importPreview.length > 0 && (
-                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden text-xs">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Last Name</th>
-                        <th className="px-3 py-2 text-left">First Name</th>
-                        <th className="px-3 py-2 text-left">Barangay</th>
-                        <th className="px-3 py-2 text-left">Valid</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreview.map((r, i) => (
-                        <tr key={i} className="border-t border-gray-100">
-                          <td className="px-3 py-2">{r.lastName}</td>
-                          <td className="px-3 py-2">{r.firstName}</td>
-                          <td className="px-3 py-2">{r.barangay}</td>
-                          <td className="px-3 py-2">{r.valid ? '✓' : '✗'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button
-                disabled={!uploadedFile || !canManage('gip')}
-                onClick={() => { setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setSuccessModal({ open: true, message: 'File imported successfully.' }) }}
-                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40"
-              >Import</button>
-            </div>
-          </div>
-        </div>
+        <GIPImportModal
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={refreshProfiles}
+        />
       )}
 
       {/* Main Content */}
@@ -686,7 +758,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     return (
                       <tr key={applicant.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
+                          <p className="text-gray-800 font-medium">{applicant.lastName}, {applicant.firstName}{applicant.middleName ? ` ${applicant.middleName.charAt(0)}.` : ''}</p>
                         </td>
                         {activeFilters.includes('sex')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.sex || '—'}</td>}
                         {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age ? `${applicant.age} yrs` : '—'}</td>}
@@ -773,7 +845,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
       </div>
       </div>
 
-      {/* Action dropdown portal */}
       {/* Assignment History Modal */}
       {viewingAssignmentHistoryFor && (() => {
         const a = viewingAssignmentHistoryFor

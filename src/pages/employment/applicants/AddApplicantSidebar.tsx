@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, useRef } from 'react';
 import Swal from 'sweetalert2';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
@@ -6,6 +6,7 @@ import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../../services/locationService';
 import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 import { createDefaultApplicantFormData } from './applicantDefaults';
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 
 interface ApplicantFormData {
   // Personal Information
@@ -240,31 +241,80 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     { id: 'documents' as Section, label: 'X. DOCUMENTS / ATTACHMENTS' },
   ];
 
-  const [showFieldErrors, setShowFieldErrors] = useState(false);
-
   const requiredKeys = ['firstName', 'surname', 'dateOfBirth', 'sex', 'civilStatus', 'contactNumber', 'barangay', 'municipality', 'province'] as const;
 
-  function hasRequiredErrors() {
-    return requiredKeys.some(k => !String(formData[k] ?? '').trim());
-  }
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation();
+
+  const surnameRef = useRef<HTMLInputElement>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const dateOfBirthWrapRef = useRef<HTMLDivElement>(null);
+  const sexRef = useRef<HTMLSelectElement>(null);
+  const civilStatusRef = useRef<HTMLSelectElement>(null);
+  const contactNumberRef = useRef<HTMLInputElement>(null);
+  const provinceWrapRef = useRef<HTMLDivElement>(null);
+  const municipalityWrapRef = useRef<HTMLDivElement>(null);
+  const barangayWrapRef = useRef<HTMLDivElement>(null);
 
   function fieldError(key: typeof requiredKeys[number]) {
-    return showFieldErrors && !String(formData[key] ?? '').trim();
+    return !!fieldErrors[key];
   }
 
   const inputClass = (key: typeof requiredKeys[number]) =>
-    `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors ${
-      fieldError(key)
-        ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-300'
-        : 'border-gray-300 focus:ring-brand-blue'
-    }`;
+    `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors border-gray-300 focus:ring-brand-blue ${errCls(key)}`;
 
   const ErrorMsg = ({ k }: { k: typeof requiredKeys[number] }) =>
-    fieldError(k) ? <p className="text-red-500 text-xs mt-1">This field is required.</p> : null;
+    fieldMessage(k) ? <p className="text-red-500 text-xs mt-1">{fieldMessage(k)}</p> : null;
+
+  // Deferred one tick so the personalInfo section (which may not be the
+  // active tab when Save is pressed from a later section) has re-rendered
+  // before we try to focus/scroll to a field inside it.
+  const deferFocus = (fn: () => void) => () => setTimeout(fn, 0);
+
+  function buildValidationErrors(): ValidationError[] {
+    const errors: ValidationError[] = [];
+    const surname = formData.surname.trim();
+    const firstName = formData.firstName.trim();
+
+    if (!surname) {
+      errors.push({ field: 'surname', message: 'Surname is required.', focus: deferFocus(() => surnameRef.current?.focus()) });
+    } else if (!NAME_REGEX.test(surname)) {
+      errors.push({ field: 'surname', message: 'Surname must contain letters only (no numbers or symbols).', focus: deferFocus(() => surnameRef.current?.focus()) });
+    }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: deferFocus(() => firstNameRef.current?.focus()) });
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: deferFocus(() => firstNameRef.current?.focus()) });
+    }
+
+    if (!formData.dateOfBirth) {
+      errors.push({ field: 'dateOfBirth', message: 'Date of Birth is required.', focus: deferFocus(() => dateOfBirthWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: deferFocus(() => sexRef.current?.focus()) });
+    }
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: deferFocus(() => civilStatusRef.current?.focus()) });
+    }
+    if (!formData.contactNumber.trim()) {
+      errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: deferFocus(() => contactNumberRef.current?.focus()) });
+    }
+    if (!formData.province.trim()) {
+      errors.push({ field: 'province', message: 'Province is required.', focus: deferFocus(() => provinceWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if (!formData.municipality.trim()) {
+      errors.push({ field: 'municipality', message: 'Municipality/City is required.', focus: deferFocus(() => municipalityWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if (!formData.barangay.trim()) {
+      errors.push({ field: 'barangay', message: 'Barangay is required.', focus: deferFocus(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    return errors;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (hasRequiredErrors()) { setShowFieldErrors(true); setActiveSection('personalInfo'); return; }
+    const errors = buildValidationErrors();
+    if (errors.length > 0) { setActiveSection('personalInfo'); runValidation(errors); return; }
     setShowConfirmation(true);
   };
 
@@ -291,13 +341,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const handleNext = () => {
     const currentIndex = sections.findIndex(s => s.id === activeSection);
     if (currentIndex < sections.length - 1) {
-      if (activeSection === 'personalInfo' && hasRequiredErrors()) {
-        setShowFieldErrors(true);
-        return;
+      if (activeSection === 'personalInfo') {
+        const errors = buildValidationErrors();
+        if (errors.length > 0) { runValidation(errors); return; }
       }
       setActiveSection(sections[currentIndex + 1].id);
     } else {
-      if (hasRequiredErrors()) { setShowFieldErrors(true); setActiveSection('personalInfo'); return; }
+      const errors = buildValidationErrors();
+      if (errors.length > 0) { setActiveSection('personalInfo'); runValidation(errors); return; }
       setShowConfirmation(true);
     }
   };
@@ -487,10 +538,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Surname <span className="text-red-500">*</span></label>
                 <input
+                  ref={surnameRef}
                   placeholder="Enter surname"
                   type="text"
                   value={formData.surname}
-                  onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
+                  onChange={(e) => { setFormData({ ...formData, surname: e.target.value }); clearFieldError('surname'); }}
                   className={inputClass('surname')}
                 />
                 <ErrorMsg k="surname" />
@@ -498,10 +550,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">First Name <span className="text-red-500">*</span></label>
                 <input
+                  ref={firstNameRef}
                   placeholder="Enter first name"
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  onChange={(e) => { setFormData({ ...formData, firstName: e.target.value }); clearFieldError('firstName'); }}
                   className={inputClass('firstName')}
                 />
                 <ErrorMsg k="firstName" />
@@ -531,18 +584,21 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="grid grid-cols-5 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth <span className="text-red-500">*</span></label>
-                <DatePicker
-                  className={inputClass('dateOfBirth')}
-                  value={formData.dateOfBirth}
-                  onChange={(value) => setFormData({ ...formData, dateOfBirth: value })}
-                />
+                <div ref={dateOfBirthWrapRef}>
+                  <DatePicker
+                    className={inputClass('dateOfBirth')}
+                    value={formData.dateOfBirth}
+                    onChange={(value) => { setFormData({ ...formData, dateOfBirth: value }); clearFieldError('dateOfBirth'); }}
+                  />
+                </div>
                 <ErrorMsg k="dateOfBirth" />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Sex <span className="text-red-500">*</span></label>
                 <select
+                  ref={sexRef}
                   value={formData.sex}
-                  onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
+                  onChange={(e) => { setFormData({ ...formData, sex: e.target.value }); clearFieldError('sex'); }}
                   className={inputClass('sex')}
                 >
                   <option value=""></option>
@@ -563,8 +619,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Civil Status <span className="text-red-500">*</span></label>
                 <select
+                  ref={civilStatusRef}
                   value={formData.civilStatus}
-                  onChange={(e) => setFormData({ ...formData, civilStatus: e.target.value })}
+                  onChange={(e) => { setFormData({ ...formData, civilStatus: e.target.value }); clearFieldError('civilStatus'); }}
                   className={inputClass('civilStatus')}
                 >
                   <option value=""></option>
@@ -609,21 +666,22 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   />
                 </div>
                 {/* Cascade: Province -> City/Municipality -> Barangay */}
-                <div>
+                <div ref={provinceWrapRef}>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Province <span className="text-red-500">*</span></label>
                   <SearchableSelect
                     value={formData.province}
                     placeholder="Search province…"
                     hasError={fieldError('province')}
                     fetchOptions={(s) => searchProvinces(s)}
-                    onSelect={(opt) =>
+                    onSelect={(opt) => {
                       // Picking a province resets the dependent city + barangay.
-                      setFormData({ ...formData, province: opt.name, provinceId: opt.id, municipality: '', cityId: null, barangay: '', barangayId: null })
-                    }
+                      setFormData({ ...formData, province: opt.name, provinceId: opt.id, municipality: '', cityId: null, barangay: '', barangayId: null });
+                      clearFieldError('province');
+                    }}
                   />
                   <ErrorMsg k="province" />
                 </div>
-                <div>
+                <div ref={municipalityWrapRef}>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Municipality/City <span className="text-red-500">*</span></label>
                   <SearchableSelect
                     value={formData.municipality}
@@ -632,14 +690,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     hasError={fieldError('municipality')}
                     refetchKey={formData.provinceId ?? ''}
                     fetchOptions={(s) => searchCities(formData.provinceId ?? 0, s)}
-                    onSelect={(opt) =>
+                    onSelect={(opt) => {
                       // Picking a city resets the dependent barangay.
-                      setFormData({ ...formData, municipality: opt.name, cityId: opt.id, barangay: '', barangayId: null })
-                    }
+                      setFormData({ ...formData, municipality: opt.name, cityId: opt.id, barangay: '', barangayId: null });
+                      clearFieldError('municipality');
+                    }}
                   />
                   <ErrorMsg k="municipality" />
                 </div>
-                <div>
+                <div ref={barangayWrapRef}>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Barangay <span className="text-red-500">*</span></label>
                   <SearchableSelect
                     value={formData.barangay}
@@ -648,7 +707,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     hasError={fieldError('barangay')}
                     refetchKey={formData.cityId ?? ''}
                     fetchOptions={(s) => searchBarangaysByCity(formData.cityId ?? 0, s)}
-                    onSelect={(opt) => setFormData({ ...formData, barangay: opt.name, barangayId: opt.id })}
+                    onSelect={(opt) => { setFormData({ ...formData, barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay'); }}
                   />
                   <ErrorMsg k="barangay" />
                 </div>
@@ -771,10 +830,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <div>
                   <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
                   <input
+                    ref={contactNumberRef}
                     placeholder="Enter contact number"
                     type="text"
                     value={formData.contactNumber}
-                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                    onChange={(e) => { setFormData({ ...formData, contactNumber: e.target.value }); clearFieldError('contactNumber'); }}
                     className={inputClass('contactNumber')}
                   />
                   <ErrorMsg k="contactNumber" />

@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { X, Users, Upload, Download } from 'lucide-react'
-import type { GIPApplicant, GIPBatch } from '../../contexts/GIPContext'
-import AddressFields from '../../components/AddressFields'
+import { useState, useRef } from 'react'
+import { X, Users, Upload, Download, FileText } from 'lucide-react'
+import type { GIPApplicant, GIPBatch, GIPSavedDocument } from '../../contexts/GIPContext'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -17,10 +19,21 @@ export const EDUCATION_OPTIONS = [
   'High School Level', 'High School Graduate',
   'Senior High School Level', 'Senior High School Graduate',
   'Vocational / Technical',
-  'College Level', 'College Level (2nd Year)', 'College Level (3rd Year)',
-  'College Level (4th Year)', 'College Graduate', "Master's Level",
+  'College Level', 'College Graduate', "Master's Level",
   "Master's Graduate", 'Doctoral',
 ]
+
+// Which Educational Background sub-fields apply to a given Highest Educational
+// Attainment — mirrors CDSPProfileForm.tsx's showYearLevel/showStrand/showCourse/showYearGraduated.
+export function educationFieldFlags(edu: string) {
+  const isSHS = edu === 'Senior High School Level' || edu === 'Senior High School Graduate'
+  const isLevel = edu.endsWith('Level')
+  const showYearLevel = isLevel && edu !== "Master's Level"
+  const showStrand = isSHS
+  const showCourse = ['College Level', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral'].includes(edu)
+  const showYearGraduated = edu.toLowerCase().includes('graduate') || edu === 'Vocational / Technical'
+  return { showYearLevel, showStrand, showCourse, showYearGraduated }
+}
 
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
 
@@ -31,12 +44,13 @@ export const BATCH_STATUS_COLORS: Record<GIPBatch['status'], string> = {
 }
 
 export const emptyForm: Omit<GIPApplicant, 'id'> = {
+  gipProfileId: null, beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '',
   sex: '', birthdate: '', age: 0, civilStatus: '',
   contactNumber: '', email: '',
-  streetPurok: '', barangay: '', cityMunicipality: 'Tangub City', province: 'Misamis Occidental', region: 'Region X',
+  streetPurok: '', barangay: '', barangayId: 0, cityMunicipality: '', province: '', region: '',
   classification: [], classificationOther: '',
-  highestEducation: '', schoolName: '', course: '', yearGraduated: '',
+  highestEducation: '', schoolName: '', course: '', strand: '', yearLevel: '', yearGraduated: '',
   assignedBatchId: null,
   assignmentHistory: [],
   attachedDocuments: [],
@@ -47,6 +61,7 @@ export const emptyForm: Omit<GIPApplicant, 'id'> = {
 // ─── Exported helpers ──────────────────────────────────────────────────────────
 
 export function deriveStatus(applicant: Omit<GIPApplicant, 'id'>, batches: GIPBatch[]): GIPApplicant['status'] {
+  if (applicant.status === 'Completed' || applicant.status === 'Cancelled') return applicant.status
   if (!applicant.assignedBatchId) return 'Inactive'
   const batch = batches.find(b => b.id === applicant.assignedBatchId)
   if (!batch || batch.status === 'Completed') return 'Inactive'
@@ -55,8 +70,10 @@ export function deriveStatus(applicant: Omit<GIPApplicant, 'id'>, batches: GIPBa
 
 export function StatusBadge({ status }: { status: GIPApplicant['status'] }) {
   const colors: Record<string, string> = {
-    Active:   'bg-green-100 text-green-700',
-    Inactive: 'bg-gray-100 text-gray-500',
+    Active:    'bg-green-100 text-green-700',
+    Inactive:  'bg-gray-100 text-gray-500',
+    Completed: 'bg-blue-100 text-blue-700',
+    Cancelled: 'bg-red-100 text-red-600',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -67,52 +84,82 @@ export function StatusBadge({ status }: { status: GIPApplicant['status'] }) {
 
 // ─── Internal helpers ──────────────────────────────────────────────────────────
 
-function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (docs: string[]) => void }) {
-  const [docName, setDocName] = useState('')
-  const addDoc = () => {
-    const trimmed = docName.trim()
-    if (!trimmed) return
-    onChange([...docs, trimmed])
-    setDocName('')
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
+function AttachedDocsEditor({ docs, onChange }: { docs: GIPSavedDocument[]; onChange: (docs: GIPSavedDocument[]) => void }) {
+  const [pendingName, setPendingName] = useState('')
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const customName = pendingName.trim() || file.name
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        customName,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: '',
+        dataUrl,
+      }])
+    }
+    reader.readAsDataURL(file)
+    setPendingName('')
+    e.target.value = ''
   }
+
   const removeDoc = (idx: number) => onChange(docs.filter((_, i) => i !== idx))
+
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
+
   return (
-    <div>
+    <div className="space-y-3">
+      {docs.length > 0 && (
+        <div className="space-y-2 mb-2">
+          {docs.map((doc, i) => (
+            <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <FileText size={14} className="text-brand-blue" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
+              </div>
+              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              <button onClick={() => removeDoc(i)} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"><X size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800"
+          className={inp}
+          value={pendingName}
+          onChange={(e) => setPendingName(e.target.value)}
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
-          value={docName}
-          onChange={e => setDocName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDoc() } }}
         />
-        <button
-          type="button"
-          onClick={addDoc}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm whitespace-nowrap"
-        >
-          <Upload size={15} /> Attach File
-        </button>
+        <label className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg cursor-pointer hover:bg-brand-blue-dark whitespace-nowrap text-sm flex-shrink-0">
+          <Upload size={15} />
+          Attach File
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </label>
       </div>
-      <p className="text-xs text-gray-400 mt-1.5">Supported: PDF, images (JPG, PNG), Word documents.</p>
-      {docs.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {docs.map((doc, i) => (
-            <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-              <span className="flex items-center gap-2">
-                <Download size={14} className="text-gray-400 rotate-180" />
-                {doc}
-              </span>
-              <button onClick={() => removeDoc(i)} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="text-xs text-gray-400">Supported: PDF, images (JPG, PNG), Word documents.</p>
     </div>
   )
 }
-
-
 
 // ─── Exported view panel ───────────────────────────────────────────────────────
 
@@ -141,7 +188,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Users size={18} className="text-brand-blue" />
           </div>
           <div>
-            <h2 className="text-lg" style={{ color: '#000000', fontWeight: 800 }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
+            <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-lg)' }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
             <p className="text-sm text-gray-400">GIP Applicant Profile</p>
           </div>
         </div>
@@ -179,18 +226,26 @@ export function ViewApplicantPanel({ applicant, onClose }: {
               : <span className="text-sm text-gray-400">—</span>}
           </div>
           <Sec num="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Highest Education" value={applicant.highestEducation} />
-            <Field label="School / University" value={applicant.schoolName} />
-            <Field label="Course / Degree" value={applicant.course} />
-            <Field label="Year Graduated" value={applicant.yearGraduated} />
-          </div>
+          {(() => {
+            const { showYearLevel, showStrand, showCourse, showYearGraduated } = educationFieldFlags(applicant.highestEducation)
+            return (
+              <div className="grid grid-cols-2 gap-5">
+                <Field label="Highest Education" value={applicant.highestEducation} />
+                <Field label="School / University" value={applicant.schoolName} />
+                {showStrand && <Field label="Strand" value={applicant.strand} />}
+                {showCourse && <Field label="Course / Degree" value={applicant.course} />}
+                {showYearLevel && <Field label="Year Level" value={applicant.yearLevel} />}
+                {showYearGraduated && <Field label="Year Graduated" value={applicant.yearGraduated} />}
+              </div>
+            )
+          })()}
           <Sec num="V" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
-              {applicant.attachedDocuments.map((doc, i) => (
-                <li key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-                  <Download size={14} className="text-gray-400 rotate-180" />{doc}
+              {applicant.attachedDocuments.map((doc) => (
+                <li key={doc.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
+                  <Download size={14} className="text-gray-400 rotate-180" />
+                  {doc.url ? <a href={doc.url} target="_blank" rel="noreferrer" className="hover:underline text-brand-blue">{doc.fileName}</a> : doc.fileName}
                 </li>
               ))}
             </ul>
@@ -219,7 +274,24 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
   onClose: () => void
 }) {
   const [formData, setFormData] = useState(initial)
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
   const set = (patch: Partial<Omit<GIPApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
+
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
+  const classificationWrapRef = useRef<HTMLDivElement>(null)
+  const classificationOtherRef = useRef<HTMLInputElement>(null)
+  const highestEducationRef = useRef<HTMLSelectElement>(null)
+  const schoolNameRef = useRef<HTMLInputElement>(null)
+  const strandRef = useRef<HTMLInputElement>(null)
+  const courseRef = useRef<HTMLInputElement>(null)
 
   const toggleClassification = (val: string) =>
     set({
@@ -229,15 +301,106 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
     })
 
   const handleBirthdate = (date: string) => {
-    const age = date ? new Date().getFullYear() - new Date(date).getFullYear() : 0
+    let age = 0
+    if (date) {
+      const birth = new Date(date)
+      const today = new Date()
+      age = today.getFullYear() - birth.getFullYear()
+      const hadBirthdayThisYear =
+        today.getMonth() > birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+      if (!hadBirthdayThisYear) age--
+    }
     set({ birthdate: date, age })
+    clearFieldError('birthdate')
   }
 
+  // Sex, birthdate, civil status, and barangay are required by the underlying
+  // beneficiaries table (NOT NULL columns). Each section (I. Personal Info,
+  // II. Address) has at least one required field validated here; name fields
+  // additionally reject digits/symbols.
   const handleSave = () => {
-    if (!formData.lastName.trim() || !formData.firstName.trim()) {
-      alert('Please fill in Last Name and First Name.')
-      return
+    const lastName = formData.lastName.trim()
+    const firstName = formData.firstName.trim()
+    const middleName = formData.middleName.trim()
+    const errors: ValidationError[] = []
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => lastNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: () => lastNameRef.current?.focus() })
     }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => firstNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: () => firstNameRef.current?.focus() })
+    }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: () => middleNameRef.current?.focus() })
+    }
+
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: () => sexRef.current?.focus() })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: () => civilStatusRef.current?.focus() })
+    }
+
+    if (!formData.barangayId) {
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Section II. Address).',
+        focus: () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (formData.classification.length === 0) {
+      errors.push({
+        field: 'classification',
+        message: 'Please select at least one Classification (Section III).',
+        focus: () => classificationWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    } else if (formData.classification.includes('Other') && !formData.classificationOther.trim()) {
+      errors.push({
+        field: 'classificationOther',
+        message: `Please specify the "Other" classification (Section III).`,
+        focus: () => classificationOtherRef.current?.focus(),
+      })
+    }
+
+    const edu = formData.highestEducation
+    if (!edu) {
+      errors.push({
+        field: 'highestEducation',
+        message: 'Highest Educational Attainment is required (Section IV).',
+        focus: () => highestEducationRef.current?.focus(),
+      })
+    } else {
+      const { showStrand, showCourse } = educationFieldFlags(edu)
+      if (!formData.schoolName.trim()) {
+        errors.push({ field: 'schoolName', message: 'School / University is required (Section IV).', focus: () => schoolNameRef.current?.focus() })
+      }
+      if (showStrand && !formData.strand.trim()) {
+        errors.push({ field: 'strand', message: 'Strand is required for Senior High School (Section IV).', focus: () => strandRef.current?.focus() })
+      }
+      if (showCourse && !formData.course.trim()) {
+        errors.push({ field: 'course', message: 'Course / Degree is required for this attainment (Section IV).', focus: () => courseRef.current?.focus() })
+      }
+    }
+
+    if (runValidation(errors)) return
+
     onSave(formData)
   }
 
@@ -287,28 +450,33 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.lastName} onChange={e => set({ lastName: e.target.value })} placeholder="Dela Cruz" />
+              <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Dela Cruz" />
+              {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.firstName} onChange={e => set({ firstName: e.target.value })} placeholder="Juan" />
+              <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Juan" />
+              {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
             </div>
             <div>
               <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input className={inp} value={formData.middleName} onChange={e => set({ middleName: e.target.value })} placeholder="M." />
+              <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="M." />
+              {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <label className={lbl}>Sex</label>
-              <select className={sel} value={formData.sex} onChange={e => set({ sex: e.target.value as GIPApplicant['sex'] })}>
+              <label className={lbl}>Sex <span className="text-red-500">*</span></label>
+              <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={e => { set({ sex: e.target.value as GIPApplicant['sex'] }); clearFieldError('sex') }}>
                 <option value="">Select</option>
                 <option>Male</option><option>Female</option>
               </select>
+              {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
             </div>
-            <div>
-              <label className={lbl}>Birthdate</label>
-              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
+            <div ref={birthdateWrapRef}>
+              <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
+              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -317,11 +485,12 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={lbl}>Civil Status</label>
-              <select className={sel} value={formData.civilStatus} onChange={e => set({ civilStatus: e.target.value })}>
+              <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
+              <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={e => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
                 <option value="">Select</option>
                 {CIVIL_STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
               </select>
+              {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
@@ -334,54 +503,138 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="II" title="Address" />
-          <AddressFields
-            value={{
-              region: formData.region,
-              province: formData.province,
-              cityMunicipality: formData.cityMunicipality,
-              barangay: formData.barangay,
-              streetPurok: formData.streetPurok,
-            }}
-            onChange={(addr) => set(addr)}
-            inputClass={inp}
-            labelClass={lbl}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Province</label>
+              <SearchableSelect
+                value={formData.province}
+                placeholder="Search province..."
+                fetchOptions={(s) => searchProvinces(s)}
+                onSelect={(opt) => {
+                  setProvinceId(opt.id)
+                  setCityId(null)
+                  set({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div>
+              <label className={lbl}>City / Municipality</label>
+              <SearchableSelect
+                value={formData.cityMunicipality}
+                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                disabled={!provinceId}
+                refetchKey={provinceId ?? ''}
+                fetchOptions={(s) => searchCities(provinceId ?? 0, s)}
+                onSelect={(opt) => {
+                  setCityId(opt.id)
+                  set({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div ref={barangayWrapRef}>
+              <label className={lbl}>Barangay <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldErrors.barangay ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                  disabled={!cityId}
+                  refetchKey={cityId ?? ''}
+                  fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
+                  onSelect={(opt) => { set({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+                />
+              </div>
+              {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
+            </div>
+            <div>
+              <label className={lbl}>Street / Purok #</label>
+              <input className={inp} value={formData.streetPurok} onChange={e => set({ streetPurok: e.target.value })} placeholder="e.g. Purok 3, Rizal St." />
+            </div>
+          </div>
 
           <SectionDivider num="III" title="Classification" />
-          <div className="grid grid-cols-2 gap-3">
+          <div
+            ref={classificationWrapRef}
+            className={`grid grid-cols-2 gap-3 p-2 -m-2 rounded-lg ${fieldErrors.classification ? 'ring-2 ring-red-200' : ''}`}
+          >
             {CLASSIFICATION_OPTIONS.map(opt => (
-              <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleClassification(opt)} />
+              <CheckItem
+                key={opt}
+                label={opt}
+                checked={formData.classification.includes(opt)}
+                onChange={() => { toggleClassification(opt); clearFieldError('classification') }}
+              />
             ))}
           </div>
+          {fieldMessage('classification') && <p className="text-red-500 text-xs mt-1">{fieldMessage('classification')}</p>}
           {formData.classification.includes('Other') && (
             <div className="mt-3">
-              <label className={lbl}>Please specify</label>
-              <input className={inp} value={formData.classificationOther} onChange={e => set({ classificationOther: e.target.value })} placeholder="Specify classification" />
+              <label className={lbl}>Please specify <span className="text-red-500">*</span></label>
+              <input
+                ref={classificationOtherRef}
+                className={`${inp} ${errCls('classificationOther')}`}
+                value={formData.classificationOther}
+                onChange={e => { set({ classificationOther: e.target.value }); clearFieldError('classificationOther') }}
+                placeholder="Specify classification"
+              />
+              {fieldMessage('classificationOther') && <p className="text-red-500 text-xs mt-1">{fieldMessage('classificationOther')}</p>}
             </div>
           )}
 
           <SectionDivider num="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="col-span-2">
-              <label className={lbl}>Highest Educational Attainment</label>
-              <select className={sel} value={formData.highestEducation} onChange={e => set({ highestEducation: e.target.value })}>
-                <option value="">Select</option>
-                {EDUCATION_OPTIONS.map(o => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>School / University</label>
-              <input className={inp} value={formData.schoolName} onChange={e => set({ schoolName: e.target.value })} placeholder="University name" />
-            </div>
-            <div>
-              <label className={lbl}>Course / Degree</label>
-              <input className={inp} value={formData.course} onChange={e => set({ course: e.target.value })} placeholder="e.g. BS Public Administration" />
-            </div>
-            <div>
-              <label className={lbl}>Year Graduated</label>
-              <input className={inp} value={formData.yearGraduated} onChange={e => set({ yearGraduated: e.target.value })} placeholder="e.g. 2025" />
-            </div>
-          </div>
+          {(() => {
+            const { showYearLevel, showStrand, showCourse, showYearGraduated } = educationFieldFlags(formData.highestEducation)
+            return (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="col-span-2">
+                  <label className={lbl}>Highest Educational Attainment <span className="text-red-500">*</span></label>
+                  <select
+                    ref={highestEducationRef}
+                    className={`${sel} ${errCls('highestEducation')}`}
+                    value={formData.highestEducation}
+                    onChange={e => {
+                      set({ highestEducation: e.target.value, strand: '', course: '', yearLevel: '', yearGraduated: '' })
+                      clearFieldError('highestEducation')
+                    }}
+                  >
+                    <option value="">Select</option>
+                    {EDUCATION_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                  {fieldMessage('highestEducation') && <p className="text-red-500 text-xs mt-1">{fieldMessage('highestEducation')}</p>}
+                </div>
+                <div>
+                  <label className={lbl}>School / University <span className="text-red-500">*</span></label>
+                  <input ref={schoolNameRef} className={`${inp} ${errCls('schoolName')}`} value={formData.schoolName} onChange={e => { set({ schoolName: e.target.value }); clearFieldError('schoolName') }} placeholder="University name" />
+                  {fieldMessage('schoolName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('schoolName')}</p>}
+                </div>
+                {showStrand && (
+                  <div>
+                    <label className={lbl}>Strand <span className="text-red-500">*</span></label>
+                    <input ref={strandRef} className={`${inp} ${errCls('strand')}`} value={formData.strand} onChange={e => { set({ strand: e.target.value }); clearFieldError('strand') }} placeholder="e.g. STEM, HUMSS, ABM" />
+                    {fieldMessage('strand') && <p className="text-red-500 text-xs mt-1">{fieldMessage('strand')}</p>}
+                  </div>
+                )}
+                {showCourse && (
+                  <div>
+                    <label className={lbl}>Course / Degree <span className="text-red-500">*</span></label>
+                    <input ref={courseRef} className={`${inp} ${errCls('course')}`} value={formData.course} onChange={e => { set({ course: e.target.value }); clearFieldError('course') }} placeholder="e.g. BS Public Administration" />
+                    {fieldMessage('course') && <p className="text-red-500 text-xs mt-1">{fieldMessage('course')}</p>}
+                  </div>
+                )}
+                {showYearLevel && (
+                  <div>
+                    <label className={lbl}>Year Level</label>
+                    <input className={inp} value={formData.yearLevel} onChange={e => set({ yearLevel: e.target.value })} placeholder="e.g. Grade 10, 2nd Year" />
+                  </div>
+                )}
+                {showYearGraduated && (
+                  <div>
+                    <label className={lbl}>Year Graduated</label>
+                    <input className={inp} value={formData.yearGraduated} onChange={e => set({ yearGraduated: e.target.value })} placeholder="e.g. 2025" />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <SectionDivider num="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">

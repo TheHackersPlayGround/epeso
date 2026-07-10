@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
 import {
@@ -10,6 +10,7 @@ import { canManage } from '../../utils/permissions'
 import { useCDSP } from '../../contexts/CDSPContext'
 import type { CdspActivity } from '../../contexts/CDSPContext'
 import * as cdspService from '../../services/cdspService'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -168,6 +169,15 @@ export default function CDSPMaintenanceForm() {
     label: string
   } | null>(null)
 
+  // Field-level validation (activity form + add-service form)
+  const { clearFieldError, errCls, fieldMessage, runValidation, setFieldErrors } = useFieldValidation()
+  const serviceTypeWrapRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
+  const dateWrapRef = useRef<HTMLDivElement>(null)
+  const facilitatorRef = useRef<HTMLInputElement>(null)
+  const counselorRef = useRef<HTMLInputElement>(null)
+  const serviceNameRef = useRef<HTMLInputElement>(null)
+
   // Load participants when viewing
   useEffect(() => {
     if (action === 'view_participants' && selectedActivity) {
@@ -216,6 +226,7 @@ export default function CDSPMaintenanceForm() {
     setSelectedService('')
     setEditingId(null)
     setSelectedActivity(null)
+    setFieldErrors({})
   }
 
   const goToList = () => {
@@ -249,9 +260,26 @@ export default function CDSPMaintenanceForm() {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
-    if (!selectedService) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a service type.', confirmButtonColor: '#0077BE' }); return }
-    if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity title.', confirmButtonColor: '#0077BE' }); return }
-    if (!formData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity date.', confirmButtonColor: '#0077BE' }); return }
+    const facilitator = formData.facilitator.trim()
+    const counselor = formData.counselor.trim()
+    const errors: ValidationError[] = []
+
+    if (!selectedService) {
+      errors.push({ field: 'serviceType', message: 'Please select a service type.', focus: () => serviceTypeWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+    if (!formData.title.trim()) {
+      errors.push({ field: 'title', message: 'Activity title is required.', focus: () => titleRef.current?.focus() })
+    }
+    if (!formData.date) {
+      errors.push({ field: 'date', message: 'Activity date is required.', focus: () => dateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+    if (facilitator && !NAME_REGEX.test(facilitator)) {
+      errors.push({ field: 'facilitator', message: 'Facilitator name must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
+    }
+    if (counselor && !NAME_REGEX.test(counselor)) {
+      errors.push({ field: 'counselor', message: 'Counselor name must contain letters only (no numbers or symbols).', focus: () => counselorRef.current?.focus() })
+    }
+    if (runValidation(errors)) return
 
     const payload = {
       serviceName:     selectedService,
@@ -335,11 +363,15 @@ export default function CDSPMaintenanceForm() {
 
   const handleSaveService = async () => {
     const name = serviceForm.name.trim()
-    if (!name) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a service name.', confirmButtonColor: '#0077BE' }); return }
+    const errors: ValidationError[] = !name
+      ? [{ field: 'serviceName', message: 'Please enter a service name.', focus: () => serviceNameRef.current?.focus() }]
+      : []
+    if (runValidation(errors)) return
     try {
       await cdspService.createService({ serviceName: name })
       await refreshServices()
       setServiceForm({ name: '' })
+      setFieldErrors({})
       Swal.fire({ icon: 'success', title: 'Service Added', text: `"${name}" has been added.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message ?? 'Failed to create service.'
@@ -424,7 +456,7 @@ export default function CDSPMaintenanceForm() {
         </div>
 
         <div className="p-6">
-          <div className="mb-6">
+          <div className="mb-6" ref={serviceTypeWrapRef}>
             <label className={labelCls}>
               Service Type <span className="text-red-500">*</span>
             </label>
@@ -435,14 +467,15 @@ export default function CDSPMaintenanceForm() {
             ) : (
               <select
                 value={selectedService}
-                onChange={e => setSelectedService(e.target.value)}
+                onChange={e => { setSelectedService(e.target.value); clearFieldError('serviceType') }}
                 disabled={isView || mode === 'edit'}
-                className={inputCls + ' bg-white'}
+                className={`${inputCls} bg-white ${errCls('serviceType')}`}
               >
                 <option value="">Select Service Type</option>
                 {services.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             )}
+            {fieldMessage('serviceType') && <p className="text-red-500 text-xs mt-1">{fieldMessage('serviceType')}</p>}
           </div>
 
           {(selectedService || mode !== 'add') && (
@@ -450,13 +483,15 @@ export default function CDSPMaintenanceForm() {
               <div>
                 <label className={labelCls}>Activity Title <span className="text-red-500">*</span></label>
                 <input
+                  ref={titleRef}
                   type="text"
                   value={formData.title}
                   readOnly={isView}
-                  onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
-                  className={inputCls}
+                  onChange={e => { setFormData(p => ({ ...p, title: e.target.value })); clearFieldError('title') }}
+                  className={`${inputCls} ${errCls('title')}`}
                   placeholder="e.g. Career Coaching Workshop – Batch 1"
                 />
+                {fieldMessage('title') && <p className="text-red-500 text-xs mt-1">{fieldMessage('title')}</p>}
               </div>
               <div>
                 <label className={labelCls}>Description</label>
@@ -471,10 +506,11 @@ export default function CDSPMaintenanceForm() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div ref={dateWrapRef}>
                   <label className={labelCls}>Date <span className="text-red-500">*</span></label>
-                  <DatePicker className={inputCls} value={formData.date} readOnly={isView}
-                    onChange={value => setFormData(p => ({ ...p, date: value }))} />
+                  <DatePicker className={`${inputCls} ${errCls('date')}`} value={formData.date} readOnly={isView}
+                    onChange={value => { setFormData(p => ({ ...p, date: value })); clearFieldError('date') }} />
+                  {fieldMessage('date') && <p className="text-red-500 text-xs mt-1">{fieldMessage('date')}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Location / Venue</label>
@@ -487,9 +523,10 @@ export default function CDSPMaintenanceForm() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Person In Charge / Facilitator</label>
-                  <input type="text" value={formData.facilitator} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, facilitator: e.target.value }))}
-                    className={inputCls} placeholder="Enter facilitator name" />
+                  <input ref={facilitatorRef} type="text" value={formData.facilitator} readOnly={isView}
+                    onChange={e => { setFormData(p => ({ ...p, facilitator: e.target.value })); clearFieldError('facilitator') }}
+                    className={`${inputCls} ${errCls('facilitator')}`} placeholder="Enter facilitator name" />
+                  {fieldMessage('facilitator') && <p className="text-red-500 text-xs mt-1">{fieldMessage('facilitator')}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Number of Participants</label>
@@ -529,9 +566,10 @@ export default function CDSPMaintenanceForm() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className={labelCls}>Counselor / Career Advisor</label>
-                    <input type="text" value={formData.counselor} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, counselor: e.target.value }))}
-                      className={inputCls} placeholder="Enter counselor name" />
+                    <input ref={counselorRef} type="text" value={formData.counselor} readOnly={isView}
+                      onChange={e => { setFormData(p => ({ ...p, counselor: e.target.value })); clearFieldError('counselor') }}
+                      className={`${inputCls} ${errCls('counselor')}`} placeholder="Enter counselor name" />
+                    {fieldMessage('counselor') && <p className="text-red-500 text-xs mt-1">{fieldMessage('counselor')}</p>}
                   </div>
                   <div>
                     <label className={labelCls}>Session Duration / No. of Sessions</label>
@@ -935,11 +973,12 @@ export default function CDSPMaintenanceForm() {
         </label>
         <div className="flex gap-3 items-center">
           <input
+            ref={serviceNameRef}
             type="text"
             value={serviceForm.name}
-            onChange={e => setServiceForm({ name: e.target.value })}
+            onChange={e => { setServiceForm({ name: e.target.value }); clearFieldError('serviceName') }}
             onKeyDown={e => { if (e.key === 'Enter') handleSaveService() }}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-400"
+            className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-400 ${errCls('serviceName')}`}
             placeholder="e.g. Career Workshop, Job Matching..."
           />
           <button
@@ -949,6 +988,7 @@ export default function CDSPMaintenanceForm() {
             <Plus size={15} /> Add Service
           </button>
         </div>
+        {fieldMessage('serviceName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('serviceName')}</p>}
         <p className="text-xs text-gray-400 mt-1.5">Press Enter or click "Add Service" to save.</p>
 
         {apiServices.length > 0 && (

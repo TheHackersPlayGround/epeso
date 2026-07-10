@@ -218,7 +218,16 @@ export default function SkillsTrainingProfileForm({
   }
 
   const handleBirthdate = (date: string) => {
-    const age = date ? new Date().getFullYear() - new Date(date).getFullYear() : 0
+    let age = 0
+    if (date) {
+      const birth = new Date(date)
+      const today = new Date()
+      age = today.getFullYear() - birth.getFullYear()
+      const hadBirthdayThisYear =
+        today.getMonth() > birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+      if (!hadBirthdayThisYear) age--
+    }
     set({ birthdate: date, age })
   }
 

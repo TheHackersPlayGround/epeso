@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { X, Users, Upload, Download } from 'lucide-react'
-import type { SPESApplicant } from '../../contexts/SPESContext'
-import AddressFields from '../../components/AddressFields'
+import { useState, useRef } from 'react'
+import { X, Users, Upload, FileText } from 'lucide-react'
+import type { SPESApplicant, SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -17,13 +19,13 @@ export const SCHOOL_TYPE_OPTIONS = [
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated']
 
 export const emptyForm: Omit<SPESApplicant, 'id'> = {
+  spesProfileId: null, beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '',
-  sex: '', birthdate: '', age: 0, civilStatus: 'Single',
+  sex: '', birthdate: '', age: 0, civilStatus: '',
   contactNumber: '', email: '',
-  streetPurok: '', barangay: '', cityMunicipality: 'Tangub City', province: 'Misamis Occidental', region: 'Region X',
+  streetPurok: '', barangay: '', barangayId: 0, cityMunicipality: '', province: '', region: '',
   schoolName: '', schoolType: '', gradeYearLevel: '', course: '',
   annualFamilyIncome: '', numberOfDependents: 0,
-  assignedActivity: '',
   assignedBatchId: null,
   assignmentHistory: [],
   attachedDocuments: [],
@@ -31,12 +33,24 @@ export const emptyForm: Omit<SPESApplicant, 'id'> = {
   status: 'Inactive', remarks: '',
 }
 
+// ─── Exported helpers ──────────────────────────────────────────────────────────
+
+export function deriveStatus(applicant: Omit<SPESApplicant, 'id'>, batches: SPESBatch[]): SPESApplicant['status'] {
+  if (applicant.status === 'Completed' || applicant.status === 'Cancelled') return applicant.status
+  if (!applicant.assignedBatchId) return 'Inactive'
+  const batch = batches.find(b => b.id === applicant.assignedBatchId)
+  if (!batch || batch.status === 'Completed') return 'Inactive'
+  return 'Active'
+}
+
 // ─── Exported badges ───────────────────────────────────────────────────────────
 
 export function StatusBadge({ status }: { status: SPESApplicant['status'] }) {
   const colors: Record<string, string> = {
-    Active:   'bg-blue-100 text-blue-700',
-    Inactive: 'bg-gray-100 text-gray-500',
+    Active:    'bg-blue-100 text-blue-700',
+    Inactive:  'bg-gray-100 text-gray-500',
+    Completed: 'bg-emerald-100 text-emerald-700',
+    Cancelled: 'bg-red-100 text-red-600',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -68,47 +82,79 @@ const GRADE_YEAR_LEVEL_OPTIONS = [
   'ALS Level',
 ]
 
-function AttachedDocsEditor({ docs, onChange }: { docs: string[]; onChange: (docs: string[]) => void }) {
-  const [docName, setDocName] = useState('')
-  const addDoc = () => {
-    const trimmed = docName.trim()
-    if (!trimmed) return
-    onChange([...docs, trimmed])
-    setDocName('')
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
+function AttachedDocsEditor({ docs, onChange }: { docs: SPESSavedDocument[]; onChange: (docs: SPESSavedDocument[]) => void }) {
+  const [pendingName, setPendingName] = useState('')
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const customName = pendingName.trim() || file.name
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        customName,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: '',
+        dataUrl,
+      }])
+    }
+    reader.readAsDataURL(file)
+    setPendingName('')
+    e.target.value = ''
   }
+
   const removeDoc = (idx: number) => onChange(docs.filter((_, i) => i !== idx))
+
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
+
   return (
-    <div>
+    <div className="space-y-3">
+      {docs.length > 0 && (
+        <div className="space-y-2 mb-2">
+          {docs.map((doc, i) => (
+            <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <FileText size={14} className="text-brand-blue" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
+              </div>
+              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              <button onClick={() => removeDoc(i)} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"><X size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+          className={inp}
+          value={pendingName}
+          onChange={(e) => setPendingName(e.target.value)}
           placeholder="Document name (e.g. Resume, Birth Certificate...)"
-          value={docName}
-          onChange={e => setDocName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDoc() } }}
         />
-        <button
-          type="button"
-          onClick={addDoc}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm whitespace-nowrap"
-        >
-          <Upload size={15} /> Attach File
-        </button>
+        <label className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg cursor-pointer hover:bg-brand-blue-dark whitespace-nowrap text-sm flex-shrink-0">
+          <Upload size={15} />
+          Attach File
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </label>
       </div>
-      <p className="text-xs text-gray-400 mt-1.5">Supported: PDF, images (JPG, PNG), Word documents.</p>
-      {docs.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {docs.map((doc, i) => (
-            <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-              <span className="flex items-center gap-2">
-                <Download size={14} className="text-gray-400 rotate-180" />
-                {doc}
-              </span>
-              <button onClick={() => removeDoc(i)} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="text-xs text-gray-400">Supported: PDF, images (JPG, PNG), Word documents.</p>
     </div>
   )
 }
@@ -185,13 +231,20 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           </div>
           <Sec num="V" title="Attached Documents" />
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
-            <ul className="space-y-1.5">
-              {applicant.attachedDocuments.map((doc, i) => (
-                <li key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-                  <Download size={14} className="text-gray-400 rotate-180" />{doc}
-                </li>
+            <div className="space-y-2">
+              {applicant.attachedDocuments.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <FileText size={14} className="text-brand-blue" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                    <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
+                  </div>
+                  {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
@@ -217,19 +270,85 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
 }) {
   const [formData, setFormData] = useState(initial)
   const set = (patch: Partial<Omit<SPESApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
+
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   const handleBirthdate = (date: string) => {
-    const age = date ? new Date().getFullYear() - new Date(date).getFullYear() : 0
+    let age = 0
+    if (date) {
+      const birth = new Date(date)
+      const today = new Date()
+      age = today.getFullYear() - birth.getFullYear()
+      const hadBirthdayThisYear =
+        today.getMonth() > birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+      if (!hadBirthdayThisYear) age--
+    }
     set({ birthdate: date, age })
+    clearFieldError('birthdate')
   }
 
   const derivedStatus: SPESApplicant['status'] = formData.assignedBatchId !== null ? 'Active' : 'Inactive'
 
+  // Sex, birthdate, civil status, and barangay are required by the underlying
+  // beneficiaries table (NOT NULL columns); name fields additionally reject
+  // digits/symbols.
   const handleSave = () => {
-    if (!formData.lastName.trim() || !formData.firstName.trim()) {
-      alert('Please fill in Last Name and First Name.')
-      return
+    const lastName = formData.lastName.trim()
+    const firstName = formData.firstName.trim()
+    const middleName = formData.middleName.trim()
+    const errors: ValidationError[] = []
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => lastNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: () => lastNameRef.current?.focus() })
     }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => firstNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: () => firstNameRef.current?.focus() })
+    }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: () => middleNameRef.current?.focus() })
+    }
+
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: () => sexRef.current?.focus() })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: () => civilStatusRef.current?.focus() })
+    }
+
+    if (!formData.barangayId) {
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Section II. Address).',
+        focus: () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (runValidation(errors)) return
     onSave({ ...formData, status: derivedStatus })
   }
 
@@ -268,28 +387,33 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.lastName} onChange={e => set({ lastName: e.target.value })} placeholder="Dela Cruz" />
+              <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Dela Cruz" />
+              {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={formData.firstName} onChange={e => set({ firstName: e.target.value })} placeholder="Juan" />
+              <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Juan" />
+              {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
             </div>
             <div>
               <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input className={inp} value={formData.middleName} onChange={e => set({ middleName: e.target.value })} placeholder="M." />
+              <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="M." />
+              {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <label className={lbl}>Sex</label>
-              <select className={sel} value={formData.sex} onChange={e => set({ sex: e.target.value as SPESApplicant['sex'] })}>
+              <label className={lbl}>Sex <span className="text-red-500">*</span></label>
+              <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={e => { set({ sex: e.target.value as SPESApplicant['sex'] }); clearFieldError('sex') }}>
                 <option value="">Select</option>
                 <option>Male</option><option>Female</option>
               </select>
+              {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
             </div>
-            <div>
-              <label className={lbl}>Birthdate</label>
-              <DatePicker className={inp} value={formData.birthdate} onChange={handleBirthdate} />
+            <div ref={birthdateWrapRef}>
+              <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
+              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
@@ -298,10 +422,12 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={lbl}>Civil Status</label>
-              <select className={sel} value={formData.civilStatus} onChange={e => set({ civilStatus: e.target.value })}>
+              <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
+              <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={e => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
+                <option value="">Select</option>
                 {CIVIL_STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
               </select>
+              {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
@@ -314,18 +440,53 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="II" title="Address" />
-          <AddressFields
-            value={{
-              region: formData.region,
-              province: formData.province,
-              cityMunicipality: formData.cityMunicipality,
-              barangay: formData.barangay,
-              streetPurok: formData.streetPurok,
-            }}
-            onChange={(addr) => set(addr)}
-            inputClass={inp}
-            labelClass={lbl}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Province</label>
+              <SearchableSelect
+                value={formData.province}
+                placeholder="Search province..."
+                fetchOptions={(s) => searchProvinces(s)}
+                onSelect={(opt) => {
+                  setProvinceId(opt.id)
+                  setCityId(null)
+                  set({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div>
+              <label className={lbl}>City / Municipality</label>
+              <SearchableSelect
+                value={formData.cityMunicipality}
+                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                disabled={!provinceId}
+                refetchKey={provinceId ?? ''}
+                fetchOptions={(s) => searchCities(provinceId ?? 0, s)}
+                onSelect={(opt) => {
+                  setCityId(opt.id)
+                  set({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div ref={barangayWrapRef}>
+              <label className={lbl}>Barangay <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldErrors.barangay ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                  disabled={!cityId}
+                  refetchKey={cityId ?? ''}
+                  fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
+                  onSelect={(opt) => { set({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+                />
+              </div>
+              {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
+            </div>
+            <div>
+              <label className={lbl}>Street / Purok #</label>
+              <input className={inp} value={formData.streetPurok} onChange={e => set({ streetPurok: e.target.value })} placeholder="e.g. Purok 3, Rizal St." />
+            </div>
+          </div>
 
           <SectionDivider num="III" title="Educational Information" />
           <div className="grid grid-cols-2 gap-4 mb-4">

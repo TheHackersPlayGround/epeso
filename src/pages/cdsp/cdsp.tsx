@@ -311,7 +311,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.deleteProfile(id)
       await refreshProfiles()
       setDeleteConfirm({ open: false, id: null })
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been deleted.', confirmButtonColor: '#0077BE' })
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted.', timer: 1500, showConfirmButton: false })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete profile.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
@@ -394,8 +394,12 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     <>
       <ConfirmModal
         isOpen={deleteConfirm.open} type="confirm"
-        title="Delete Applicant Profile"
-        message="Are you sure you want to delete this applicant's profile? This action cannot be undone."
+        title="Delete Applicant?"
+        message={(() => {
+          const applicant = applicants.find(a => a.id === deleteConfirm.id)
+          const name = applicant ? `${applicant.firstName} ${applicant.lastName}` : 'this applicant'
+          return `Are you sure you want to delete ${name}? This will move the applicant to the recycle bin.`
+        })()}
         confirmText="Delete" cancelText="Cancel"
         onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
         onCancel={() => setDeleteConfirm({ open: false, id: null })}

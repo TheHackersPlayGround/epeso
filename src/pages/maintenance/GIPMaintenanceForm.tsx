@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react'
+import type { RefObject } from 'react'
 import { Upload, X, FileText } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
-import type { GIPBatch, GIPBatchDocument } from '../../contexts/GIPContext'
+import type { GIPBatch, GIPSavedDocument } from '../../contexts/GIPContext'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Re-export for consumers ──────────────────────────────────────────────────
 export type { GIPBatch }
@@ -29,6 +31,7 @@ function emptyBatch(): Omit<GIPBatch, 'id'> {
     coordinator: '',
     supervisor: '',
     slots: '',
+    assignedCount: 0,
     fundingSource: 'DOLE',
     fundingSourceOther: '',
     startDate: '',
@@ -51,6 +54,61 @@ function SectionHeader({ title }: { title: string }) {
         {title}
       </span>
       <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  )
+}
+
+// ─── Field ────────────────────────────────────────────────────────────────────
+// Defined at module scope (not inside the form component) so its identity is
+// stable across renders — otherwise React treats it as a brand-new component
+// type on every keystroke and remounts the underlying <input>, losing focus
+// after a single character.
+
+type BatchFormState = Omit<GIPBatch, 'id'>
+
+function Field({
+  label, field, required, placeholder, type = 'text', form, errors, isView, onChange, containerRef,
+}: {
+  label: string
+  field: keyof BatchFormState
+  required?: boolean
+  placeholder?: string
+  type?: string
+  form: BatchFormState
+  errors: Record<string, string>
+  isView: boolean
+  onChange: (field: keyof BatchFormState, value: string) => void
+  containerRef?: RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div ref={containerRef}>
+      <label className={labelCls}>
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {isView ? (
+        <p className="text-sm text-gray-800 py-2 px-3 bg-gray-50 rounded-lg min-h-[38px]">
+          {(form[field] as string) || <span className="text-gray-400">—</span>}
+        </p>
+      ) : (
+        <>
+          {type === 'date' ? (
+            <DatePicker
+              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
+              value={form[field] as string}
+              onChange={v => onChange(field, v)}
+            />
+          ) : (
+            <input
+              type={type}
+              value={form[field] as string}
+              onChange={e => onChange(field, e.target.value)}
+              placeholder={placeholder}
+              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
+            />
+          )}
+          {errors[field] && <p className="text-red-500 text-xs mt-1">{errors[field]}</p>}
+        </>
+      )}
     </div>
   )
 }
@@ -87,83 +145,77 @@ export default function GIPMaintenanceForm({
       ? { ...initialBatch }
       : emptyBatch()
   )
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const { fieldErrors: errors, clearFieldError, runValidation } = useFieldValidation()
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const batchNameRef = useRef<HTMLDivElement>(null)
+  const batchCodeRef = useRef<HTMLDivElement>(null)
+  const assignedOfficeRef = useRef<HTMLDivElement>(null)
+  const deploymentLocationRef = useRef<HTMLDivElement>(null)
+  const supervisorRef = useRef<HTMLDivElement>(null)
+  const slotsRef = useRef<HTMLDivElement>(null)
+  const startDateRef = useRef<HTMLDivElement>(null)
+  const endDateRef = useRef<HTMLDivElement>(null)
+  const fundingSourceOtherRef = useRef<HTMLDivElement>(null)
+
   // ── Field helpers ────────────────────────────────────────────────────────────
 
-  const set = (field: keyof typeof form, value: string) =>
+  const set = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
-
-  const Field = ({
-    label, field, required, placeholder, type = 'text',
-  }: {
-    label: string
-    field: keyof typeof form
-    required?: boolean
-    placeholder?: string
-    type?: string
-  }) => (
-    <div>
-      <label className={labelCls}>
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {isView ? (
-        <p className="text-sm text-gray-800 py-2 px-3 bg-gray-50 rounded-lg min-h-[38px]">
-          {(form[field] as string) || <span className="text-gray-400">—</span>}
-        </p>
-      ) : (
-        <>
-          {type === 'date' ? (
-            <DatePicker
-              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
-              value={form[field] as string}
-              onChange={v => set(field, v)}
-            />
-          ) : (
-            <input
-              type={type}
-              value={form[field] as string}
-              onChange={e => set(field, e.target.value)}
-              placeholder={placeholder}
-              className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
-            />
-          )}
-          {errors[field] && <p className="text-red-500 text-xs mt-1">{errors[field]}</p>}
-        </>
-      )}
-    </div>
-  )
+    clearFieldError(field)
+  }
 
   // ── Validation ───────────────────────────────────────────────────────────────
 
+  const scrollTo = (ref: RefObject<HTMLDivElement | null>) => () =>
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
   const validate = () => {
-    const errs: Record<string, string> = {}
-    if (!form.batchName.trim())     errs.batchName     = 'Batch name is required'
-    if (!form.batchCode.trim())     errs.batchCode     = 'Batch code is required'
-    if (!form.assignedOffice.trim()) errs.assignedOffice = 'Assigned office is required'
-    if (!form.deploymentLocation.trim()) errs.deploymentLocation = 'Deployment location is required'
-    if (!form.coordinator.trim())   errs.coordinator   = 'Coordinator is required'
-    if (!form.slots.trim())         errs.slots         = 'Number of slots is required'
-    if (!form.startDate)            errs.startDate     = 'Start date is required'
-    if (!form.endDate)              errs.endDate       = 'End date is required'
+    const errs: ValidationError[] = []
+    if (!form.batchName.trim())     errs.push({ field: 'batchName', message: 'Batch name is required', focus: scrollTo(batchNameRef) })
+    if (!form.batchCode.trim())     errs.push({ field: 'batchCode', message: 'Batch code is required', focus: scrollTo(batchCodeRef) })
+    if (!form.assignedOffice.trim()) errs.push({ field: 'assignedOffice', message: 'Assigned office is required', focus: scrollTo(assignedOfficeRef) })
+    if (!form.deploymentLocation.trim()) errs.push({ field: 'deploymentLocation', message: 'Deployment location is required', focus: scrollTo(deploymentLocationRef) })
+    if (!form.supervisor.trim()) {
+      errs.push({ field: 'supervisor', message: 'Supervisor is required', focus: scrollTo(supervisorRef) })
+    } else if (!NAME_REGEX.test(form.supervisor.trim())) {
+      errs.push({ field: 'supervisor', message: 'Supervisor must contain letters only (no numbers or symbols)', focus: scrollTo(supervisorRef) })
+    }
+    if (!form.slots.trim())         errs.push({ field: 'slots', message: 'Number of slots is required', focus: scrollTo(slotsRef) })
+    if (!form.startDate)            errs.push({ field: 'startDate', message: 'Start date is required', focus: scrollTo(startDateRef) })
+    if (!form.endDate)              errs.push({ field: 'endDate', message: 'End date is required', focus: scrollTo(endDateRef) })
     if (form.fundingSource === 'Others' && !form.fundingSourceOther.trim())
-      errs.fundingSourceOther = 'Please specify the funding source'
-    setErrors(errs)
-    return Object.keys(errs).length === 0
+      errs.push({ field: 'fundingSourceOther', message: 'Please specify the funding source', focus: scrollTo(fundingSourceOtherRef) })
+    return !runValidation(errs)
   }
 
   // ── Documents ─────────────────────────────────────────────────────────────────
 
+  function formatFileSize(bytes: number) {
+    if (bytes <= 0) return '0 Bytes'
+    const units = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+  }
+
   const addFiles = (files: FileList | null) => {
     if (!files) return
-    const newDocs: GIPBatchDocument[] = Array.from(files).map(f => ({
-      name: f.name,
-      url: URL.createObjectURL(f),
-      fileType: f.type,
-    }))
-    setForm(prev => ({ ...prev, documents: [...prev.documents, ...newDocs] }))
+    Array.from(files).forEach(file => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        const newDoc: GIPSavedDocument = {
+          id: Date.now().toString() + Math.random().toString(36),
+          fileName: file.name,
+          fileSize: formatFileSize(file.size),
+          url: '',
+          dataUrl,
+        }
+        setForm(prev => ({ ...prev, documents: [...prev.documents, newDoc] }))
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   const removeDoc = (idx: number) =>
@@ -215,8 +267,8 @@ export default function GIPMaintenanceForm({
         <section>
           <SectionHeader title="Batch Information" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Batch Name" field="batchName" required placeholder="e.g. Government Internship Program - Batch 1" />
-            <Field label="Batch Code" field="batchCode" required placeholder="e.g. GIP-2026-001" />
+            <Field label="Batch Name" field="batchName" required placeholder="e.g. Government Internship Program - Batch 1" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchNameRef} />
+            <Field label="Batch Code" field="batchCode" required placeholder="e.g. GIP-2026-001" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchCodeRef} />
           </div>
           <div className="mt-4">
             <label className={labelCls}>Description</label>
@@ -240,11 +292,10 @@ export default function GIPMaintenanceForm({
         <section>
           <SectionHeader title="Deployment Information" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Assigned Government Office" field="assignedOffice" required placeholder="e.g. City Hall" />
-            <Field label="Deployment Location" field="deploymentLocation" required placeholder="e.g. Tangub City Hall and Partner Agencies" />
-            <Field label="Program Coordinator / Person In Charge" field="coordinator" required placeholder="Full name" />
-            <Field label="Supervisor / Immediate Head" field="supervisor" placeholder="Full name" />
-            <Field label="Number of GIP Slots" field="slots" required placeholder="e.g. 25" type="number" />
+            <Field label="Assigned Government Office" field="assignedOffice" required placeholder="e.g. City Hall" form={form} errors={errors} isView={isView} onChange={set} containerRef={assignedOfficeRef} />
+            <Field label="Deployment Location" field="deploymentLocation" required placeholder="e.g. Tangub City Hall and Partner Agencies" form={form} errors={errors} isView={isView} onChange={set} containerRef={deploymentLocationRef} />
+            <Field label="Supervisor / Immediate Head" field="supervisor" required placeholder="Full name" form={form} errors={errors} isView={isView} onChange={set} containerRef={supervisorRef} />
+            <Field label="Number of GIP Slots" field="slots" required placeholder="e.g. 25" type="number" form={form} errors={errors} isView={isView} onChange={set} containerRef={slotsRef} />
             <div>
               <label className={labelCls}>Funding Source<span className="text-red-500 ml-0.5">*</span></label>
               {isView ? (
@@ -269,6 +320,8 @@ export default function GIPMaintenanceForm({
                 field="fundingSourceOther"
                 required
                 placeholder="Please specify"
+                form={form} errors={errors} isView={isView} onChange={set}
+                containerRef={fundingSourceOtherRef}
               />
             )}
           </div>
@@ -278,9 +331,9 @@ export default function GIPMaintenanceForm({
         <section>
           <SectionHeader title="Internship Period" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Field label="Start Date" field="startDate" required type="date" />
-            <Field label="End Date" field="endDate" required type="date" />
-            <Field label="Monthly Allowance / Stipend (₱)" field="allowance" placeholder="e.g. 5000" />
+            <Field label="Start Date" field="startDate" required type="date" form={form} errors={errors} isView={isView} onChange={set} containerRef={startDateRef} />
+            <Field label="End Date" field="endDate" required type="date" form={form} errors={errors} isView={isView} onChange={set} containerRef={endDateRef} />
+            <Field label="Monthly Allowance / Stipend (₱)" field="allowance" placeholder="e.g. 5000" form={form} errors={errors} isView={isView} onChange={set} />
           </div>
           <div className="mt-4">
             <label className={labelCls}>Status<span className="text-red-500 ml-0.5">*</span></label>
@@ -343,16 +396,21 @@ export default function GIPMaintenanceForm({
           {form.documents.length > 0 ? (
             <ul className="space-y-2">
               {form.documents.map((doc, i) => (
-                <li key={i} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                <li key={doc.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
                   <FileText size={16} className="text-gray-400 flex-shrink-0" />
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm flex-1 truncate hover:underline text-brand-blue"
-                  >
-                    {doc.name}
-                  </a>
+                  {doc.url ? (
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm flex-1 truncate hover:underline text-brand-blue"
+                    >
+                      {doc.fileName}
+                    </a>
+                  ) : (
+                    <span className="text-sm flex-1 truncate text-gray-700">{doc.fileName}</span>
+                  )}
+                  <span className="text-xs text-gray-400 flex-shrink-0">({doc.fileSize})</span>
                   {!isView && (
                     <button
                       onClick={() => removeDoc(i)}
@@ -390,7 +448,7 @@ export default function GIPMaintenanceForm({
             {isAdd && (
               <button
                 onClick={() => handleSave(true)}
-                disabled={!canManage('maintenance')}
+                disabled={!canManage('gip')}
                 className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Save as Draft
@@ -398,7 +456,7 @@ export default function GIPMaintenanceForm({
             )}
             <button
               onClick={() => handleSave(false)}
-              disabled={!canManage('maintenance')}
+              disabled={!canManage('gip')}
               className="px-6 py-2.5 text-white bg-brand-blue hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
             >
               {isAdd ? 'Save Batch' : 'Save Changes'}

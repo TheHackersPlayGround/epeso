@@ -1325,6 +1325,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Elementary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
+              <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  placeholder="Enter school name"
+                  type="text"
+                  value={formData.elementary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, elementary: { ...formData.elementary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <label className="flex items-center text-sm">
@@ -1388,6 +1398,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             {/* Secondary */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
+              <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  placeholder="Enter school name"
+                  type="text"
+                  value={formData.secondary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, secondary: { ...formData.secondary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <label className="flex items-center text-sm">
                   <input 
@@ -1487,6 +1507,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
               <div>
+                <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                <input
+                  placeholder="Enter school name"
+                  type="text"
+                  value={formData.tertiary.schoolName}
+                  onChange={(e) => setFormData({ ...formData, tertiary: { ...formData.tertiary, schoolName: e.target.value }})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500"
+                />
+              </div>
+              <div>
                 <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
                 <input 
                   type="text" 
@@ -1563,6 +1593,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <div className="font-bold text-sm uppercase">Graduate Studies/Post-Graduate #{gsIdx + 1}</div>
                   <button type="button" onClick={() => setFormData({ ...formData, graduateStudies: formData.graduateStudies.filter((_, i) => i !== gsIdx) })}
                     className="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1 text-xs uppercase">School Name</label>
+                  <input type="text" placeholder="Enter school name"
+                    value={gs.schoolName}
+                    onChange={(e) => { const u=[...formData.graduateStudies]; u[gsIdx]={...u[gsIdx],schoolName:e.target.value}; setFormData({...formData,graduateStudies:u}); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Course / Degree</label>
@@ -2262,6 +2299,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           {formData.elementary.graduated && (
             <div>
               <div className="font-semibold">Elementary</div>
+              {formData.elementary.schoolName && <div><span className="font-semibold">School:</span> {formData.elementary.schoolName}</div>}
               {formData.elementary.graduated === 'Yes'
                 ? <div><span className="font-semibold">Graduated:</span> {formData.elementary.yearGraduated}</div>
                 : <><div><span className="font-semibold">Level Reached:</span> {formData.elementary.levelReached}</div><div><span className="font-semibold">Last Attended:</span> {formData.elementary.yearLastAttended}</div></>}
@@ -2271,6 +2309,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div>
               {formData.elementary.graduated && <hr className="border-t border-gray-300 my-2" />}
               <div className="font-semibold">Secondary</div>
+              {formData.secondary.schoolName && <div><span className="font-semibold">School:</span> {formData.secondary.schoolName}</div>}
               {formData.secondary.type && <div><span className="font-semibold">Type:</span> {formData.secondary.type}{formData.secondary.seniorHighStrand && <span> ({formData.secondary.seniorHighStrand})</span>}</div>}
               {formData.secondary.graduated === 'Yes'
                 ? <div><span className="font-semibold">Graduated:</span> {formData.secondary.yearGraduated}</div>
@@ -2281,6 +2320,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div>
               {(formData.elementary.graduated || formData.secondary.graduated) && <hr className="border-t border-gray-300 my-2" />}
               <div className="font-semibold">Tertiary</div>
+              {formData.tertiary.schoolName && <div><span className="font-semibold">School:</span> {formData.tertiary.schoolName}</div>}
               {formData.tertiary.course && <div><span className="font-semibold">Course:</span> {formData.tertiary.course}</div>}
               {formData.tertiary.graduated === 'Yes'
                 ? <div><span className="font-semibold">Graduated:</span> {formData.tertiary.yearGraduated}</div>

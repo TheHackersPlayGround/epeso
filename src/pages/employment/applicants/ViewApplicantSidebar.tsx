@@ -381,6 +381,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Elementary — title → School Name → Graduated? → 3-col grid (matching Add form) */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Elementary</div>
+              <TF label="School Name" value={el.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4">
                 <label className="block text-gray-700 text-xs">Graduated?</label>
                 <RR label="Yes" checked={el.graduated === 'Yes'} />
@@ -404,6 +405,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Secondary — title → type radios → K-12 strand → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Secondary</div>
+              <TF label="School Name" value={sec.schoolName} lbl={LBL2} />
               <div className="flex items-center gap-4 flex-wrap">
                 <RR label="Non-K12"            checked={sec.type === 'Non-K12'} />
                 <RR label="K-12 (Senior High)" checked={sec.type === 'K-12'} />
@@ -437,6 +439,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {/* Tertiary — title → Course → Graduated? → 3-col grid */}
             <div className="border border-gray-300 rounded p-4 space-y-3">
               <div className="font-bold text-sm uppercase">Tertiary</div>
+              <TF label="School Name" value={ter.schoolName} lbl={LBL2} />
               <div>
                 <label className={LBL2}>Course / Degree</label>
                 <input type="text" readOnly value={ter.course ?? ''} className={INP} />
@@ -465,6 +468,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             {grad.map((g, gsIdx) => (
               <div key={gsIdx} className="border border-gray-300 rounded p-4 space-y-3">
                 <div className="font-bold text-sm uppercase">Graduate Studies/Post-Graduate #{gsIdx + 1}</div>
+                <TF label="School Name" value={g.schoolName} lbl={LBL2} />
                 <div>
                   <label className={LBL2}>Course / Degree</label>
                   <input type="text" readOnly value={g.course ?? ''} className={INP} />

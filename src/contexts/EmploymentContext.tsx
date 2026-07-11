@@ -67,6 +67,9 @@ export type Vacancy = {
   vacanciesCount: number
   industry: string
   jobType: string
+  // Atomic bounds (source of truth); salaryRange is the derived display string.
+  salaryMin?: number
+  salaryMax?: number
   salaryRange: string
   description: string
   requirements: string

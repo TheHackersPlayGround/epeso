@@ -216,12 +216,6 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const resumePhotoInputRef = useRef<HTMLInputElement>(null);
   const [resumePhoto, setResumePhoto] = useState<string | null>(null);
-  // School names are not stored on the applicant; they are entered here per
-  // education level (keyed 'elementary'/'secondary'/'tertiary'/'graduate-<idx>')
-  // and used only for the generated resume.
-  const [schoolNames, setSchoolNames] = useState<Record<string, string>>({});
-  useEffect(() => { setSchoolNames({}); }, [selectedApplicant?.id]);
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -414,23 +408,25 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     setShowDropdown(true);
   }
 
-  // Resume preview: show the school name (entered in the sidebar) as plain text.
-  const schoolNameField = (key: string) =>
-    schoolNames[key]?.trim()
-      ? <div className="text-sm mt-1 text-gray-700">{schoolNames[key]}</div>
-      : null;
+  // School name stored per education level on the applicant (educations.school_name).
+  // Keys: 'elementary' | 'secondary' | 'tertiary' | 'graduate-<idx>'.
+  const schoolNameFor = (key: string): string => {
+    if (!selectedApplicant) return '';
+    if (key === 'elementary') return selectedApplicant.elementary?.schoolName ?? '';
+    if (key === 'secondary')  return selectedApplicant.secondary?.schoolName ?? '';
+    if (key === 'tertiary')   return selectedApplicant.tertiary?.schoolName ?? '';
+    const m = key.match(/^graduate-(\d+)$/);
+    if (m) return selectedApplicant.graduateStudies?.[Number(m[1])]?.schoolName ?? '';
+    return '';
+  };
 
-  // Sidebar: a labeled text input to enter a school name for an education level.
-  const schoolNameInput = (key: string, label: string) => (
-    <div className="ml-8 mb-2 mr-3">
-      <input
-        value={schoolNames[key] ?? ''}
-        onChange={e => setSchoolNames(prev => ({ ...prev, [key]: e.target.value }))}
-        placeholder={`${label} school name`}
-        className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-gray-800 outline-none focus:ring-1 focus:ring-brand-blue placeholder:text-gray-400"
-      />
-    </div>
-  );
+  // Resume preview: show the applicant's stored school name as plain text.
+  const schoolNameField = (key: string) => {
+    const name = schoolNameFor(key);
+    return name.trim()
+      ? <div className="text-sm mt-1 text-gray-700">{name}</div>
+      : null;
+  };
 
   // Each resume section is an independent "block". The blocks are measured and
   // packed into A4 pages so the preview and PDF paginate cleanly.
@@ -846,15 +842,9 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                       <p className="mb-2 px-3 text-xs font-bold uppercase text-brand-blue tracking-wide">Education</p>
                       <div>
                         <ResumeCheckbox label="Elementary" isAvailable={isFieldAvailable('elementary')} isChecked={selectedFields.elementary} onToggle={() => toggleField('elementary')} />
-                        {selectedFields.elementary && isFieldAvailable('elementary') && schoolNameInput('elementary', 'Elementary')}
                         <ResumeCheckbox label="High School" isAvailable={isFieldAvailable('highSchool')} isChecked={selectedFields.highSchool} onToggle={() => toggleField('highSchool')} />
-                        {selectedFields.highSchool && isFieldAvailable('highSchool') && schoolNameInput('secondary', 'High School')}
                         <ResumeCheckbox label="College" isAvailable={isFieldAvailable('college')} isChecked={selectedFields.college} onToggle={() => toggleField('college')} />
-                        {selectedFields.college && isFieldAvailable('college') && schoolNameInput('tertiary', 'College')}
                         {isFieldAvailable('graduateStudies') && <ResumeCheckbox label="Graduate Studies" isAvailable={isFieldAvailable('graduateStudies')} isChecked={selectedFields.graduateStudies} onToggle={() => toggleField('graduateStudies')} />}
-                        {selectedFields.graduateStudies && isFieldAvailable('graduateStudies') && selectedApplicant?.graduateStudies?.map((_, idx) => (
-                          <div key={idx}>{schoolNameInput('graduate-' + idx, `Graduate #${idx + 1}`)}</div>
-                        ))}
                       </div>
                     </div>
                     <div>

@@ -3,7 +3,15 @@ import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-r
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import type { Placement } from '../../contexts/EmploymentContext'
-import { listPlacements, updatePlacement, updatePlacementStatus } from '../../services/placementService'
+import {
+  listPlacements,
+  updatePlacement,
+  updatePlacementStatus,
+  listPromotions,
+  createPromotion,
+  type Promotion,
+  type PromotionInput,
+} from '../../services/placementService'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
@@ -225,9 +233,10 @@ type PlacementsTableProps = {
   onView: (p: Placement) => void
   onEdit: (p: Placement) => void
   onUpdateStatus: (p: Placement) => void
+  onRecordPromotion: (p: Placement) => void
 }
 
-function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatus }: PlacementsTableProps) {
+function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatus, onRecordPromotion }: PlacementsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -237,7 +246,7 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
       return
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuHeight = 110
+    const menuHeight = 145
     const margin = 8
     const spaceBelow = window.innerHeight - rect.bottom
     let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
@@ -321,6 +330,7 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
             <button onClick={() => { onView(menuPlacement); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             <button onClick={() => { onUpdateStatus(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
+            <button onClick={() => { onRecordPromotion(menuPlacement); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-amber-600 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Record Promotion</button>
           </div>
         </>
       )}
@@ -331,6 +341,18 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
 // ── View Placement Modal ──────────────────────────────────────────────────────
 
 function ViewPlacementModal({ placement, onClose }: { placement: Placement; onClose: () => void }) {
+  const [promotions, setPromotions] = useState<Promotion[]>([])
+  const [loadingPromotions, setLoadingPromotions] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    listPromotions(placement.id)
+      .then(rows => { if (alive) setPromotions(rows) })
+      .catch(() => { if (alive) setPromotions([]) })
+      .finally(() => { if (alive) setLoadingPromotions(false) })
+    return () => { alive = false }
+  }, [placement.id])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
@@ -345,7 +367,7 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
           </button>
         </div>
 
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="px-6 py-5 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Applicant Name</p>
@@ -384,6 +406,33 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
                 <p className="text-xs text-gray-500 mb-0.5">Salary Range</p>
                 <p className="text-sm font-medium text-gray-800">{placement.salaryRange}</p>
               </div>
+            )}
+          </div>
+
+          {/* Promotion history — oldest at the bottom, newest first. */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold uppercase text-gray-700 mb-2">Promotion History</p>
+            {loadingPromotions ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : promotions.length === 0 ? (
+              <p className="text-sm text-gray-400">No promotions recorded for this placement.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {promotions.map(pr => (
+                  <li key={pr.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-gray-800">{pr.newJobTitle}</span>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">{pr.promotionDate}</span>
+                    </div>
+                    {pr.newSalaryRange && (
+                      <p className="text-xs text-gray-500 mt-0.5">New salary: {pr.newSalaryRange}</p>
+                    )}
+                    {pr.remarks && (
+                      <p className="text-xs text-gray-500 mt-0.5">{pr.remarks}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
@@ -601,6 +650,173 @@ function UpdatePlacementStatusModal({ placement, onClose, onSave }: UpdatePlacem
   )
 }
 
+// ── Record Promotion Modal ────────────────────────────────────────────────────
+
+type RecordPromotionModalProps = {
+  placement: Placement
+  onClose: () => void
+  onSave: (id: number, input: PromotionInput) => Promise<void>
+}
+
+// Parse a salary form field to a number (₱, commas, spaces ignored), or undefined.
+function parseSalaryInput(s: string): number | undefined {
+  const n = Number(s.replace(/[^\d.]/g, ''))
+  return s.trim() && !Number.isNaN(n) ? n : undefined
+}
+
+function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionModalProps) {
+  const [promotionDate, setPromotionDate] = useState('')
+  const [newJobTitle, setNewJobTitle] = useState('')
+  const [newSalaryMin, setNewSalaryMin] = useState('')
+  const [newSalaryMax, setNewSalaryMax] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [showFieldErrors, setShowFieldErrors] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const fieldCls =
+    'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900'
+
+  async function handleSave() {
+    if (!promotionDate || !newJobTitle.trim()) {
+      setShowFieldErrors(true)
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave(placement.id, {
+        promotionDate,
+        newJobTitle: newJobTitle.trim(),
+        // Atomic numeric bounds; the backend derives the display string.
+        newSalaryMin: parseSalaryInput(newSalaryMin),
+        newSalaryMax: parseSalaryInput(newSalaryMax),
+        remarks: remarks.trim() || undefined,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Record Promotion</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close record promotion modal"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            Recording a promotion for <span className="font-semibold text-gray-800">{placement.applicantName}</span>
+            {' '}at <span className="font-semibold text-gray-800">{placement.employer || 'this employer'}</span>.
+          </p>
+
+          <div>
+            <label htmlFor="promotion-date" className="block text-sm font-medium text-gray-600 mb-1">
+              Promotion Date <span className="text-red-500">*</span>
+            </label>
+            <DatePicker
+              id="promotion-date"
+              className={fieldCls}
+              value={promotionDate}
+              onChange={setPromotionDate}
+            />
+            {showFieldErrors && !promotionDate && (
+              <p className="text-red-500 text-xs mt-1">This field is required.</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="promotion-title" className="block text-sm font-medium text-gray-600 mb-1">
+              New Job Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="promotion-title"
+              type="text"
+              value={newJobTitle}
+              onChange={e => setNewJobTitle(e.target.value)}
+              className={fieldCls}
+              placeholder="e.g. Head Cook"
+            />
+            {showFieldErrors && !newJobTitle.trim() && (
+              <p className="text-red-500 text-xs mt-1">This field is required.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">
+              New Salary Range
+            </label>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={newSalaryMin}
+                  onChange={e => setNewSalaryMin(e.target.value)}
+                  placeholder="Min (e.g. 18,000)"
+                  aria-label="New minimum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
+              <span className="text-gray-400 select-none">–</span>
+              <div className="flex flex-1 items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={newSalaryMax}
+                  onChange={e => setNewSalaryMax(e.target.value)}
+                  placeholder="Max (e.g. 22,000)"
+                  aria-label="New maximum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="promotion-remarks" className="block text-sm font-medium text-gray-600 mb-1">
+              Remarks
+            </label>
+            <textarea
+              id="promotion-remarks"
+              value={remarks}
+              onChange={e => setRemarks(e.target.value)}
+              rows={2}
+              className={fieldCls}
+              placeholder="Optional notes"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Record Promotion'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function PlacementsTab() {
@@ -615,6 +831,7 @@ export default function PlacementsTab() {
   const [viewingPlacement, setViewingPlacement] = useState<Placement | null>(null)
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null)
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
+  const [promotingPlacement, setPromotingPlacement] = useState<Placement | null>(null)
 
   async function reload() {
     const data = await listPlacements()
@@ -680,6 +897,27 @@ export default function PlacementsTab() {
       icon: 'success',
       title: note.title,
       text: note.text,
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#0077BE',
+    })
+  }
+
+  async function handleRecordPromotion(id: number, input: PromotionInput) {
+    const name = placements.find(p => p.id === id)?.applicantName ?? 'The applicant'
+
+    try {
+      await createPromotion(id, input)
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to record promotion. Please try again.'
+      Swal.fire('Error', msg, 'error')
+      throw err // keep the Record Promotion modal open so the user can retry
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Promotion Recorded',
+      text: `${name} has been promoted to ${input.newJobTitle}.`,
       confirmButtonText: 'OK',
       confirmButtonColor: '#0077BE',
     })
@@ -800,6 +1038,7 @@ export default function PlacementsTab() {
           onView={setViewingPlacement}
           onEdit={setEditingPlacement}
           onUpdateStatus={setUpdatingPlacement}
+          onRecordPromotion={setPromotingPlacement}
         />
         <TablePagination
           currentPage={currentPage}
@@ -829,6 +1068,14 @@ export default function PlacementsTab() {
           placement={updatingPlacement}
           onClose={() => setUpdatingPlacement(null)}
           onSave={handleUpdateStatus}
+        />
+      )}
+
+      {promotingPlacement && (
+        <RecordPromotionModal
+          placement={promotingPlacement}
+          onClose={() => setPromotingPlacement(null)}
+          onSave={handleRecordPromotion}
         />
       )}
     </div>

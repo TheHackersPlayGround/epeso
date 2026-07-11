@@ -526,6 +526,24 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
   )
 }
 
+// ── Salary helpers ────────────────────────────────────────────────────────────
+// The salary form fields hold what the user typed; parse to a number on save
+// (₱, commas, spaces ignored). Display is derived from the numeric bounds.
+
+function parseSalaryInput(s: string): number | undefined {
+  const n = Number(s.replace(/[^\d.]/g, ''))
+  return s.trim() && !Number.isNaN(n) ? n : undefined
+}
+function salaryToInput(n?: number | null): string {
+  return n == null ? '' : String(n)
+}
+function buildSalaryDisplay(min?: number, max?: number): string {
+  const peso = (n: number) => `₱${n.toLocaleString()}`
+  if (min == null && max == null) return ''
+  if (min != null && max != null) return `${peso(min)} - ${peso(max)}`
+  return peso((min ?? max)!)
+}
+
 // ── Edit Vacancy Modal ────────────────────────────────────────────────────────
 
 function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Vacancy; onClose: () => void; onSave: (v: Vacancy) => void; employers: EmployerOption[] }) {
@@ -536,7 +554,8 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
   const [vacanciesCount, setVacanciesCount] = useState(String(vacancy.vacanciesCount))
   const [jobType, setJobType] = useState(vacancy.jobType)
-  const [salaryRange, setSalaryRange] = useState(vacancy.salaryRange.replace(/^₱\s*/, ''))
+  const [salaryMin, setSalaryMin] = useState(salaryToInput(vacancy.salaryMin))
+  const [salaryMax, setSalaryMax] = useState(salaryToInput(vacancy.salaryMax))
   const [description, setDescription] = useState(vacancy.description)
   const [requirements, setRequirements] = useState(vacancy.requirements)
 
@@ -544,10 +563,12 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
     e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
 
-  const isValid = jobTitle.trim() && employerId !== null && vacanciesCount && salaryRange.trim()
+  const isValid = jobTitle.trim() && employerId !== null && vacanciesCount && salaryMin.trim() && salaryMax.trim()
 
   function handleSave() {
     if (!isValid) return
+    const min = parseSalaryInput(salaryMin)
+    const max = parseSalaryInput(salaryMax)
     onSave({
       ...vacancy,
       jobTitle: jobTitle.trim(),
@@ -555,7 +576,9 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
       employerId: employerId ?? undefined,
       vacanciesCount: parseInt(vacanciesCount) || 1,
       jobType,
-      salaryRange: salaryRange.trim() ? `₱${salaryRange.trim()}` : '',
+      salaryMin: min,
+      salaryMax: max,
+      salaryRange: buildSalaryDisplay(min, max),
       description: description.trim(),
       requirements: requirements.trim(),
     })
@@ -648,15 +671,32 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
 
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range <span className="text-red-500">*</span></label>
-            <div className="flex items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
-              <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
-              <input
-                type="text"
-                value={salaryRange}
-                onChange={e => setSalaryRange(e.target.value)}
-                placeholder="25,000 - 35,000"
-                className="flex-1 px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
-              />
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={salaryMin}
+                  onChange={e => setSalaryMin(e.target.value)}
+                  placeholder="Min (e.g. 25,000)"
+                  aria-label="Minimum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
+              <span className="text-gray-400 select-none">–</span>
+              <div className="flex flex-1 items-center border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-brand-blue focus-within:border-transparent">
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={salaryMax}
+                  onChange={e => setSalaryMax(e.target.value)}
+                  placeholder="Max (e.g. 35,000)"
+                  aria-label="Maximum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
             </div>
           </div>
 
@@ -712,7 +752,8 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
   const [vacanciesCount, setVacanciesCount] = useState('')
   const [jobType, setJobType] = useState('Full-time')
-  const [salaryRange, setSalaryRange] = useState('')
+  const [salaryMin, setSalaryMin] = useState('')
+  const [salaryMax, setSalaryMax] = useState('')
   const [description, setDescription] = useState('')
   const [requirements, setRequirements] = useState('')
   const [showFieldErrors, setShowFieldErrors] = useState(false)
@@ -732,10 +773,12 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
   }
 
   function handleSave() {
-    if (!jobTitle.trim() || !employerId || !vacanciesCount || !salaryRange.trim() || !requirements.trim()) {
+    if (!jobTitle.trim() || !employerId || !vacanciesCount || !salaryMin.trim() || !salaryMax.trim() || !requirements.trim()) {
       setShowFieldErrors(true)
       return
     }
+    const min = parseSalaryInput(salaryMin)
+    const max = parseSalaryInput(salaryMax)
     onSave({
       jobTitle: jobTitle.trim(),
       employer,
@@ -743,7 +786,9 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
       vacanciesCount: parseInt(vacanciesCount) || 1,
       industry: '',
       jobType,
-      salaryRange: salaryRange.trim() ? `₱${salaryRange.trim()}` : '',
+      salaryMin: min,
+      salaryMax: max,
+      salaryRange: buildSalaryDisplay(min, max),
       description: description.trim(),
       requirements: requirements.trim(),
       status: 'Open',
@@ -844,17 +889,34 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
 
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Salary Range <span className="text-red-500">*</span></label>
-            <div className={`flex items-center border rounded-lg focus-within:ring-2 focus-within:border-transparent ${fieldErr(!salaryRange.trim()) ? 'border-red-500 ring-2 ring-red-200 focus-within:ring-red-300' : 'border-gray-300 focus-within:ring-brand-blue'}`}>
-              <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
-              <input
-                type="text"
-                value={salaryRange}
-                onChange={e => setSalaryRange(e.target.value)}
-                placeholder="25,000 - 35,000"
-                className="flex-1 px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
-              />
+            <div className="flex items-center gap-2">
+              <div className={`flex flex-1 items-center border rounded-lg focus-within:ring-2 focus-within:border-transparent ${fieldErr(!salaryMin.trim()) ? 'border-red-500 ring-2 ring-red-200 focus-within:ring-red-300' : 'border-gray-300 focus-within:ring-brand-blue'}`}>
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={salaryMin}
+                  onChange={e => setSalaryMin(e.target.value)}
+                  placeholder="Min (e.g. 25,000)"
+                  aria-label="Minimum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
+              <span className="text-gray-400 select-none">–</span>
+              <div className={`flex flex-1 items-center border rounded-lg focus-within:ring-2 focus-within:border-transparent ${fieldErr(!salaryMax.trim()) ? 'border-red-500 ring-2 ring-red-200 focus-within:ring-red-300' : 'border-gray-300 focus-within:ring-brand-blue'}`}>
+                <span className="px-3 py-2 text-gray-900 text-sm font-medium border-r border-gray-300 bg-gray-50 rounded-l-lg select-none">₱</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={salaryMax}
+                  onChange={e => setSalaryMax(e.target.value)}
+                  placeholder="Max (e.g. 35,000)"
+                  aria-label="Maximum salary"
+                  className="flex-1 w-full px-3 py-2 text-sm text-gray-900 outline-none rounded-r-lg placeholder:text-gray-400"
+                />
+              </div>
             </div>
-            <ErrMsg show={fieldErr(!salaryRange.trim())} />
+            <ErrMsg show={fieldErr(!salaryMin.trim() || !salaryMax.trim())} />
           </div>
 
           <div>

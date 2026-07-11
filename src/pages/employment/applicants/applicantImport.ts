@@ -155,7 +155,7 @@ const SECTION_LANGUAGE: TemplateSection = {
 // Secondary / Tertiary) plus repeating Graduate Studies. Only fields the backend
 // actually stores are included: the Non-K12/K-12 "type" and "Level Reached" are
 // omitted because the backend doesn't persist them (Secondary keeps only its
-// Senior High Strand).
+// Senior High Strand). School Name is stored per level (educations.school_name).
 const GRADUATE_STUDY_ROWS = 1;
 
 const SECTION_EDUCATION: TemplateSection = {
@@ -165,22 +165,26 @@ const SECTION_EDUCATION: TemplateSection = {
   optionalArgb: "FFFDF1C1",
   columns: [
     { header: "Currently In School?", width: 16, example: "No", options: YES_NO_OPTIONS },
+    { header: "Elementary - School Name", width: 28, example: "Tangub City Central School" },
     { header: "Elementary - Graduated?", width: 18, example: "Yes", options: YES_NO_OPTIONS },
     { header: "Elementary - Year Graduated", width: 20, example: "2008" },
     { header: "Elementary - Level Reached", width: 20, example: "" },
     { header: "Elementary - Year Last Attended", width: 22, example: "" },
+    { header: "Secondary - School Name", width: 28, example: "Tangub City National High School" },
     { header: "Secondary - Type", width: 14, example: "", options: ["Non-K12", "K-12"] },
     { header: "Secondary - Senior High Strand", width: 22, example: "" },
     { header: "Secondary - Graduated?", width: 18, example: "Yes", options: YES_NO_OPTIONS },
     { header: "Secondary - Year Graduated", width: 20, example: "2012" },
     { header: "Secondary - Level Reached", width: 20, example: "" },
     { header: "Secondary - Year Last Attended", width: 22, example: "" },
+    { header: "Tertiary - School Name", width: 28, example: "Tangub City Global College" },
     { header: "Tertiary - Course/Degree", width: 28, example: "BS Information Technology" },
     { header: "Tertiary - Graduated?", width: 18, example: "Yes", options: YES_NO_OPTIONS },
     { header: "Tertiary - Year Graduated", width: 20, example: "2016" },
     { header: "Tertiary - Level Reached", width: 20, example: "" },
     { header: "Tertiary - Year Last Attended", width: 22, example: "" },
     ...Array.from({ length: GRADUATE_STUDY_ROWS }, (_, i): TemplateColumn[] => [
+      { header: `Graduate Study ${i + 1} - School Name`, width: 28, example: "" },
       { header: `Graduate Study ${i + 1} - Course`, width: 26, example: "" },
       { header: `Graduate Study ${i + 1} - Graduated?`, width: 22, example: "", options: YES_NO_OPTIONS },
       { header: `Graduate Study ${i + 1} - Year Graduated`, width: 24, example: "" },
@@ -678,6 +682,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
 
   fd.elementary = {
     ...fd.elementary,
+    schoolName: get(row, "Elementary - School Name"),
     graduated: yesNoOrBlank(get(row, "Elementary - Graduated?")),
     yearGraduated: get(row, "Elementary - Year Graduated"),
     levelReached: get(row, "Elementary - Level Reached"),
@@ -685,6 +690,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   };
   fd.secondary = {
     ...fd.secondary,
+    schoolName: get(row, "Secondary - School Name"),
     type: pickEnum(get(row, "Secondary - Type"), ["Non-K12", "K-12"]),
     seniorHighStrand: get(row, "Secondary - Senior High Strand"),
     graduated: yesNoOrBlank(get(row, "Secondary - Graduated?")),
@@ -694,6 +700,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   };
   fd.tertiary = {
     ...fd.tertiary,
+    schoolName: get(row, "Tertiary - School Name"),
     course: get(row, "Tertiary - Course/Degree"),
     graduated: yesNoOrBlank(get(row, "Tertiary - Graduated?")),
     yearGraduated: get(row, "Tertiary - Year Graduated"),
@@ -709,14 +716,15 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   }
   const graduateStudies: ApplicantFormData["graduateStudies"] = [];
   for (const i of [...gradIndices].sort((a, b) => a - b)) {
+    const schoolName = get(row, `Graduate Study ${i} - School Name`);
     const course = get(row, `Graduate Study ${i} - Course`);
     const graduated = yesNoOrBlank(get(row, `Graduate Study ${i} - Graduated?`));
     const yearGraduated = get(row, `Graduate Study ${i} - Year Graduated`);
     const levelReached = get(row, `Graduate Study ${i} - Level Reached`);
     const yearLastAttended = get(row, `Graduate Study ${i} - Year Last Attended`);
-    if (!course && !graduated && !yearGraduated && !levelReached && !yearLastAttended) continue;
+    if (!schoolName && !course && !graduated && !yearGraduated && !levelReached && !yearLastAttended) continue;
     graduateStudies.push({
-      schoolName: "", schoolCity: "", schoolProvince: "",
+      schoolName, schoolCity: "", schoolProvince: "",
       course, graduated, yearGraduated, levelReached, yearLastAttended,
     });
   }

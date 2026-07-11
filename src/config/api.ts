@@ -48,6 +48,8 @@ export const ENDPOINTS = {
     listPlacements: '/employment/listPlacements',
     updatePlacement: '/employment/updatePlacement',
     updatePlacementStatus: '/employment/updatePlacementStatus',
+    listPromotions: '/employment/listPromotions',
+    createPromotion: '/employment/createPromotion',
     // Recycle bin (soft-deleted EF records)
     listDeleted: '/employment/listDeleted',
     restoreRecord: '/employment/restoreRecord',

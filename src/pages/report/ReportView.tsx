@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import Swal from 'sweetalert2'
@@ -96,13 +97,34 @@ export default function ReportView({ onBack }: ReportViewProps) {
       'general-peso': ['Program / Service', 'Activities Conducted', 'Participants', 'Beneficiaries', 'Placements', 'Status'],
       'employment-facilitation': ['Applicant Name', 'Employer', 'Job Title', 'Referral Status', 'Placement Status', 'Employment Type', 'Date Referred', 'Date Hired'],
       'ofw-services': ['OFW Name', 'Type of Request', 'Employment Status', 'Date Filed', 'Status'],
-      'cdsp': ['Participant Name', 'Program Type', 'Date Conducted', 'Facilitator', 'Status'],
+      'cdsp': ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Conducted', 'Highest Education',
+               'Employment Status', 'Facilitator', 'Course / Program', 'Current Occupation', 'Civil Status',
+               'Contact Number', 'Barangay', 'Status', 'Remarks'],
       'livelihood': ['Beneficiary Name', 'Program Type', 'Assistance Amount', 'Release Date', 'Status'],
       'gip': ['Participant Name', 'Assigned Office', 'Start Date', 'End Date', 'Status'],
       'spes': ['Participant Name', 'Assigned Office', 'Start Date', 'End Date', 'Status'],
       'skills-training': ['Participant Name', 'Training Title', 'Trainer', 'Duration', 'Completion Status'],
     }
     return map[category] || []
+  }
+
+  // Columns shown by default; the rest are optional (user turns them on via the
+  // Columns menu). Only CDSP distinguishes default vs optional; others show all.
+  const getDefaultColumns = (category: ReportCategory): string[] => {
+    // CDSP: the fields that matter for a career-development report are on by default;
+    // the rest (contact, address, occupation, civil status, status, remarks) are optional.
+    if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Conducted', 'Highest Education', 'Employment Status', 'Facilitator']
+    return getReportColumns(category)
+  }
+
+  // True when a date falls within the selected report period (monthly/annual/custom).
+  const inSelectedPeriod = (dateStr: string): boolean => {
+    if (!dateStr) return false
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return false
+    if (reportPeriod === 'annual') return d.getFullYear() === Number(year)
+    if (reportPeriod === 'custom') return d >= new Date(fromDate) && d <= new Date(toDate)
+    return d.getFullYear() === Number(year) && d.getMonth() + 1 === Number(month)
   }
 
   const generateData = (category: ReportCategory): any[] => {
@@ -137,13 +159,29 @@ export default function ReportView({ onBack }: ReportViewProps) {
       }
 
       case 'cdsp':
-        return cdspApplicants.map(a => ({
-          'Participant Name': `${a.firstName} ${a.lastName}`,
-          'Program Type': a.serviceAvailed || '-',
-          'Date Conducted': a.dateApplicationReceived || '-',
-          'Facilitator': a.counselorName || '-',
-          'Status': a.status,
-        }))
+        return cdspApplicants
+          // Program Type filter (from the dropdown; '' = All Programs)
+          .filter(a => !programType || a.serviceAvailed === programType)
+          // Period filter on the date the application was received
+          .filter(a => inSelectedPeriod(a.dateApplicationReceived))
+          .map((a, i) => ({
+            'No.': i + 1,
+            'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
+            'Sex': a.sex || '-',
+            'Program Type': a.serviceAvailed || '-',
+            'Date Conducted': a.dateApplicationReceived || '-',
+            'Facilitator': a.counselorName || '-',
+            'Status': a.status,
+            'Age': a.age || '-',
+            'Civil Status': a.civilStatus || '-',
+            'Highest Education': a.highestEducation || '-',
+            'Course / Program': a.course || a.courseProgram || '-',
+            'Employment Status': a.employmentStatus || '-',
+            'Current Occupation': a.currentOccupation || '-',
+            'Contact Number': a.contactNumber || '-',
+            'Barangay': a.barangay || '-',
+            'Remarks': a.remarks || '-',
+          }))
 
       case 'gip':
         return gipApplicants.map(a => {
@@ -246,6 +284,21 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return { barChartData, pieChartData }
   }
 
+  // CDSP summary: total participants + breakdown by program type and by sex.
+  const generateCdspAnalytics = (rows: any[]) => {
+    const progMap: Record<string, number> = {}
+    let male = 0, female = 0
+    rows.forEach(r => {
+      const p = r['Program Type'] && r['Program Type'] !== '-' ? r['Program Type'] : 'Unspecified'
+      progMap[p] = (progMap[p] || 0) + 1
+      const s = String(r['Sex'] || '').toLowerCase()
+      if (s === 'male') male++
+      else if (s === 'female') female++
+    })
+    const byProgram = Object.entries(progMap).map(([program, value]) => ({ program, value })).sort((a, b) => b.value - a.value)
+    return { total: rows.length, byProgram, male, female }
+  }
+
 
   const [pesoLoading, setPesoLoading] = useState(false)
 
@@ -288,11 +341,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (reportCategory === 'employment-facilitation') { handleGeneratePesoReport(); return }
     const columns = getReportColumns(reportCategory)
     const data = generateData(reportCategory)
+    // Default columns are visible; optional ones start hidden (toggle via Columns menu).
+    const defaults = getDefaultColumns(reportCategory)
     const initialColumns: Record<string, boolean> = {}
-    columns.forEach(col => { initialColumns[col] = true })
+    columns.forEach(col => { initialColumns[col] = defaults.includes(col) })
     setVisibleColumns(initialColumns)
     let analytics = null
     if (reportCategory === 'general-peso') analytics = generateAnalytics()
+    else if (reportCategory === 'cdsp') analytics = generateCdspAnalytics(data)
     // Employment Facilitation is handled earlier (downloads the PESO Excel) and
     // never reaches here, so it has no on-screen analytics branch.
     setGeneratedReport({
@@ -389,9 +445,38 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const fileName = `${generatedReport.categoryName}_${generatedReport.periodDetails}`.replace(/ /g, '_')
 
     if (format === 'excel') {
-      const wb = XLSX.utils.book_new()
+      const wb = new ExcelJS.Workbook()
+      const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
+      const BORDERS = { top: THIN, left: THIN, bottom: THIN, right: THIN }
+
+      // A properly-formatted data table: ALL-CAPS, bold, centered header (plain, no
+      // fill); bordered cells; auto-fit column widths; frozen header row.
+      const addTable = (ws: ExcelJS.Worksheet, cols: string[], rows: any[]) => {
+        const header = ws.addRow(cols.map(c => c.toUpperCase()))
+        header.height = 20
+        header.eachCell(cell => {
+          cell.font = { bold: true, size: 11 }
+          // No wrapText → headers always stay on ONE line.
+          cell.alignment = { horizontal: 'center', vertical: 'middle' }
+          cell.border = BORDERS
+        })
+        rows.forEach(row => {
+          const r = ws.addRow(cols.map(c => row[c] ?? ''))
+          r.eachCell(cell => { cell.border = BORDERS; cell.alignment = { vertical: 'middle' } })
+        })
+        cols.forEach((c, i) => {
+          let dataMax = 0
+          rows.forEach(row => { const v = String(row[c] ?? ''); if (v.length > dataMax) dataMax = v.length })
+          // Column is wide enough for its bold, uppercased header (needs a little
+          // extra room) AND its widest value — so the header never wraps.
+          ws.getColumn(i + 1).width = Math.min(Math.max(c.length + 4, dataMax + 2, 10), 60)
+        })
+        ws.views = [{ state: 'frozen', ySplit: 1 }]
+      }
+
+      // Optional analytics summary sheet (General PESO report).
       if (generatedReport.analytics && generatedReport.category === 'general-peso') {
-        const rows: any[][] = [
+        const aoa: any[][] = [
           ['PESO COMPREHENSIVE REPORT'], [],
           ['Report Period', generatedReport.periodDetails],
           ['Generated On', new Date().toLocaleDateString()], [],
@@ -400,30 +485,43 @@ export default function ReportView({ onBack }: ReportViewProps) {
           ['PROGRAM DISTRIBUTION'], ['Program', 'Percentage'],
           ...generatedReport.analytics.pieChartData.map((d: any) => [d.program, `${d.value.toFixed(1)}%`]),
         ]
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Analytics Summary')
-      } else if (generatedReport.analytics && generatedReport.category === 'employment-facilitation') {
-        const s = generatedReport.analytics.summary
-        const rows: any[][] = [
-          ['LABOR MARKET INFORMATION REPORT'], [],
-          ['Report Period', generatedReport.periodDetails],
-          ['Generated On', new Date().toLocaleDateString()], [],
-          ['LABOR MARKET SUMMARY'],
-          ['Total Applicants', s.totalApplicants], ['Total Vacancies', s.totalVacancies],
-          ['Total Referrals', s.totalReferrals], ['Total Placements', s.totalPlacements],
-          ['Placement Rate', `${s.placementRate}%`], [],
-          ['PLACEMENTS PER MONTH'], ['Month', 'Placements'],
-          ...generatedReport.analytics.placementsPerMonth.map((d: any) => [d.month, d.value]), [],
-          ['REFERRAL STATUS'], ['Status', 'Count', 'Percentage'],
-          ...generatedReport.analytics.referralStatusDistribution.map((d: any) => [d.status, d.count, `${d.value.toFixed(1)}%`]), [],
-          ['TOP JOB VACANCIES'], ['Job Title', 'Count'],
-          ...generatedReport.analytics.jobVacancyDistribution.map((d: any) => [d.jobTitle, d.value]), [],
-          ['TOP EMPLOYERS'], ['Employer', 'Vacancies'],
-          ...generatedReport.analytics.employerParticipation.map((d: any) => [d.employer, d.value]),
-        ]
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Analytics Summary')
+        const ws = wb.addWorksheet('Analytics Summary')
+        aoa.forEach(r => ws.addRow(r))
+        ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
+        ws.getRow(1).font = { bold: true, size: 14 }
       }
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredData), 'Detailed Report')
-      XLSX.writeFile(wb, `${fileName}.xlsx`)
+
+      // CDSP summary sheet (matches the on-screen CDSP Summary).
+      if (generatedReport.analytics && generatedReport.category === 'cdsp') {
+        const a = generatedReport.analytics
+        const aoa: any[][] = [
+          ['CDSP SUMMARY'], [],
+          ['Report Period', generatedReport.periodDetails],
+          ['Program Type', generatedReport.programType || 'All Programs'],
+          ['Generated On', new Date().toLocaleDateString()], [],
+          ['Total Participants', a.total],
+          ['Male', a.male],
+          ['Female', a.female], [],
+          ['PARTICIPANTS BY PROGRAM TYPE'], ['Program', 'Participants'],
+          ...a.byProgram.map((d: any) => [d.program, d.value]),
+        ]
+        const ws = wb.addWorksheet('Summary')
+        aoa.forEach(r => ws.addRow(r))
+        ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
+        ws.getRow(1).font = { bold: true, size: 14 }
+        ws.getRow(11).font = { bold: true } // "PARTICIPANTS BY PROGRAM TYPE"
+      }
+
+      const cols = generatedReport.columns.filter((c: string) => visibleColumns[c])
+      addTable(wb.addWorksheet('Detailed Report'), cols, filteredData)
+
+      const buf = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${fileName}.xlsx`
+      link.click()
+      URL.revokeObjectURL(link.href)
 
     } else if (format === 'csv') {
       let csv = ''
@@ -444,6 +542,13 @@ export default function ReportView({ onBack }: ReportViewProps) {
         csv += '\nREFERRAL STATUS\nStatus,Count,Percentage\n'
         generatedReport.analytics.referralStatusDistribution.forEach((i: any) => { csv += `${i.status},${i.count},${i.value.toFixed(1)}%\n` })
         csv += '\nDETAILED EMPLOYMENT FACILITATION REPORT\n'
+      } else if (generatedReport.category === 'cdsp' && generatedReport.analytics) {
+        const a = generatedReport.analytics
+        csv += `CDSP SUMMARY\n\nReport Period,${generatedReport.periodDetails}\nProgram Type,${generatedReport.programType || 'All Programs'}\nGenerated On,${new Date().toLocaleDateString()}\n\n`
+        csv += `Total Participants,${a.total}\nMale,${a.male}\nFemale,${a.female}\n\n`
+        csv += 'PARTICIPANTS BY PROGRAM TYPE\nProgram,Participants\n'
+        a.byProgram.forEach((d: any) => { csv += `${d.program},${d.value}\n` })
+        csv += '\nDETAILED REPORT\n'
       }
       csv += XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(filteredData))
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -764,9 +869,52 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </div>
       )}
 
+      {/* CDSP Summary */}
+      {generatedReport?.category === 'cdsp' && generatedReport.analytics && (
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
+            <BarChart2 size={20} className="text-[#0077BE]" />
+            CDSP Summary
+          </h3>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[
+              { label: 'Total Participants', value: generatedReport.analytics.total },
+              { label: 'Male', value: generatedReport.analytics.male },
+              { label: 'Female', value: generatedReport.analytics.female },
+            ].map(t => (
+              <div key={t.label} className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm text-gray-500 m-0">{t.label}</p>
+                <p className="text-2xl font-bold text-gray-900 m-0 mt-1">{t.value}</p>
+              </div>
+            ))}
+          </div>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Participants by Program Type</h4>
+          {generatedReport.analytics.byProgram.length === 0 ? (
+            <p className="text-sm text-gray-400">No participants in the selected period.</p>
+          ) : (
+            <div className="space-y-3">
+              {generatedReport.analytics.byProgram.map((item: any, i: number) => {
+                const max = Math.max(...generatedReport.analytics.byProgram.map((d: any) => d.value), 1)
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-700">{item.program}</span>
+                      <span className="font-medium text-gray-800">{item.value}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-[#0077BE] h-2 rounded-full" style={{ width: `${(item.value / max) * 100}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Report Preview Table */}
       {generatedReport && (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-xl shadow-md">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div>
               <h3 className="text-gray-800 m-0">Report Preview</h3>
@@ -783,7 +931,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 </button>
                 {isColumnMenuOpen && <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsColumnMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-2">
+                  <div className="absolute right-0 top-full mt-2 w-64 max-h-80 overflow-y-auto bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-2">
                     {generatedReport.columns.map((col: string) => (
                       <label key={col} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer">
                         <input type="checkbox" checked={visibleColumns[col]} onChange={() => toggleColumn(col)} className="rounded border-gray-300" />
@@ -809,7 +957,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-b-xl">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>

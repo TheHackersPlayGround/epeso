@@ -8,6 +8,7 @@ import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from
 import { listEmployers } from '../../services/employerService'
 import { listApplicants } from '../../services/applicantService'
 import { createReferral } from '../../services/referralService'
+import { confirmReferralOk } from '../../utils/referralGuard'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
@@ -350,7 +351,7 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
             <button onClick={() => { onView(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
             <button onClick={() => { onMatch(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Match</button>
-            {menuVacancy.status === 'Open' ? (
+            {(menuVacancy.manualStatus ?? menuVacancy.status) === 'Open' ? (
               <button
                 onClick={handleConfirmClose}
                 disabled={!canManage('employment')}
@@ -494,6 +495,7 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
                 <button
                   onClick={async () => {
                     if (referred.has(applicant.id)) return
+                    if (!(await confirmReferralOk(applicant.id, vacancy.id, applicant.name))) return
                     try {
                       await createReferral(applicant.id, vacancy.id)
                       setReferred(prev => new Set(prev).add(applicant.id))
@@ -552,7 +554,8 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
   const [employerId, setEmployerId] = useState<number | null>(vacancy.employerId ?? null)
   const [employerSearch, setEmployerSearch] = useState('')
   const [showEmployerDropdown, setShowEmployerDropdown] = useState(false)
-  const [vacanciesCount, setVacanciesCount] = useState(String(vacancy.vacanciesCount))
+  // Edit the TOTAL openings (slotsTotal), not the derived remaining count.
+  const [vacanciesCount, setVacanciesCount] = useState(String(vacancy.slotsTotal ?? vacancy.vacanciesCount))
   const [jobType, setJobType] = useState(vacancy.jobType)
   const [salaryMin, setSalaryMin] = useState(salaryToInput(vacancy.salaryMin))
   const [salaryMax, setSalaryMax] = useState(salaryToInput(vacancy.salaryMax))
@@ -998,8 +1001,12 @@ export default function VacanciesTab() {
 
   async function handleToggleStatus(id: number, _currentStatus: Vacancy['status']) {
     try {
-      const next = await toggleVacancyStatus(id)
-      setVacancies(prev => prev.map(v => v.id === id ? { ...v, status: next } : v))
+      await toggleVacancyStatus(id)
+      // Reload so the derived fields (effective status, remaining) recompute — a
+      // toggle can flip manual intent without changing effective status (e.g. a
+      // full vacancy stays Closed), so an optimistic single-field update is unsafe.
+      const fresh = await listVacancies()
+      setVacancies(fresh)
     } catch {
       Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update vacancy status.' })
     }

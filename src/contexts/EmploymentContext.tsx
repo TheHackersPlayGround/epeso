@@ -64,7 +64,8 @@ export type Vacancy = {
   jobTitle: string
   employer: string
   employerId?: number
-  vacanciesCount: number
+  vacanciesCount: number      // remaining openings (derived: slotsTotal - active placements)
+  slotsTotal?: number         // original openings solicited (source of truth)
   industry: string
   jobType: string
   // Atomic bounds (source of truth); salaryRange is the derived display string.
@@ -73,7 +74,8 @@ export type Vacancy = {
   salaryRange: string
   description: string
   requirements: string
-  status: 'Open' | 'Closed'
+  status: 'Open' | 'Closed'   // effective status (Closed when manually closed OR full)
+  manualStatus?: 'Open' | 'Closed'  // officer's open/close intent (drives the toggle)
 }
 
 export const VACANCY_SEED: Vacancy[] = [

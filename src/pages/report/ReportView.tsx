@@ -4,6 +4,9 @@ import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import Swal from 'sweetalert2'
+import { fetchEfReport } from '../../services/reportService'
+import { generatePesoMonthlyReport } from './pesoMonthlyReport'
 import { useCDSP } from '../../contexts/CDSPContext'
 import { useGIP } from '../../contexts/GIPContext'
 import { useSPES } from '../../contexts/SPESContext'
@@ -243,55 +246,46 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return { barChartData, pieChartData }
   }
 
-  const generateEmploymentFacilitationAnalytics = () => {
-    const applicants = efApplicants()
-    const vacancies = efVacancies()
-    const referrals = efReferrals()
-    const placements = efPlacements()
-    const totalReferrals = referrals.length + placements.length
-    const placementRate = totalReferrals > 0 ? parseFloat(((placements.length / totalReferrals) * 100).toFixed(1)) : 0
 
-    const monthMap: Record<string, number> = {}
-    placements.forEach((p: any) => {
-      if (p.dateHired) {
-        const m = new Date(p.dateHired).toLocaleString('default', { month: 'short' })
-        monthMap[m] = (monthMap[m] || 0) + 1
-      }
-    })
-    const placementsPerMonth = Object.entries(monthMap).length > 0
-      ? Object.entries(monthMap).map(([month, value]) => ({ month, value }))
-      : [{ month: 'No data', value: 0 }]
+  const [pesoLoading, setPesoLoading] = useState(false)
 
-    const statusCounts = { Pending: 0, Interviewed: 0, 'Not Hired': 0, Hired: placements.length }
-    referrals.forEach((r: any) => { const s = r.status as keyof typeof statusCounts; if (s in statusCounts) statusCounts[s]++ })
-    const totalCount = Object.values(statusCounts).reduce((a, b) => a + b, 0) || 1
-    const toP = (n: number) => parseFloat(((n / totalCount) * 100).toFixed(1))
-    const referralStatusDistribution = [
-      { status: 'Hired', value: toP(statusCounts.Hired), count: statusCounts.Hired, color: '#10B981' },
-      { status: 'Interviewed', value: toP(statusCounts.Interviewed), count: statusCounts.Interviewed, color: '#F59E0B' },
-      { status: 'Pending', value: toP(statusCounts.Pending), count: statusCounts.Pending, color: '#3B82F6' },
-      { status: 'Not Hired', value: toP(statusCounts['Not Hired']), count: statusCounts['Not Hired'], color: '#EF4444' },
-    ].filter(item => item.count > 0)
-
-    const jobMap: Record<string, number> = {}
-    vacancies.forEach((v: any) => { jobMap[v.jobTitle] = (jobMap[v.jobTitle] || 0) + (Number(v.vacanciesCount) || 1) })
-    const jobVacancyDistribution = Object.entries(jobMap).map(([jobTitle, value]) => ({ jobTitle, value })).sort((a, b) => b.value - a.value).slice(0, 5)
-
-    const empMap: Record<string, number> = {}
-    vacancies.forEach((v: any) => { empMap[v.employer] = (empMap[v.employer] || 0) + (Number(v.vacanciesCount) || 1) })
-    const employerParticipation = Object.entries(empMap).map(([employer, value]) => ({ employer, value })).sort((a, b) => b.value - a.value).slice(0, 5)
-
-    return {
-      summary: { totalApplicants: applicants.length, totalVacancies: vacancies.length, totalReferrals, totalPlacements: placements.length, placementRate },
-      placementsPerMonth,
-      referralStatusDistribution,
-      jobVacancyDistribution,
-      employerParticipation,
+  // PESO LMI/SPRS report — pulled from LIVE data, exported as the official
+  // 4-sheet .xlsx. Supports Monthly / Annual / Custom Range periods.
+  const handleGeneratePesoReport = async () => {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December']
+    // label = short period (chart title / "Period Covered" / filename);
+    // phrase = the "For the …" line on the Monitoring Form sheets, grammar per mode.
+    let from: string, to: string, label: string, phrase: string
+    if (reportPeriod === 'annual') {
+      from = `${year}-01-01`; to = `${year}-12-31`; label = `Year ${year}`; phrase = `For the Year ${year}`
+    } else if (reportPeriod === 'custom') {
+      if (!fromDate || !toDate) { Swal.fire('Error', 'Please select a From and To date.', 'error'); return }
+      from = fromDate; to = toDate; label = `${fromDate} to ${toDate}`; phrase = `For the period ${fromDate} to ${toDate}`
+    } else {
+      const m = Number(month)
+      const lastDay = new Date(Number(year), m, 0).getDate()
+      from = `${year}-${month}-01`
+      to = `${year}-${month}-${String(lastDay).padStart(2, '0')}`
+      label = `${monthNames[m - 1]} ${year}`; phrase = `For the Month of ${label}`
+    }
+    setPesoLoading(true)
+    try {
+      const data = await fetchEfReport(from, to)
+      await generatePesoMonthlyReport(data, label, phrase)
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the PESO report.'
+      Swal.fire('Error', msg, 'error')
+    } finally {
+      setPesoLoading(false)
     }
   }
 
   const handleGenerateReport = () => {
     if (!reportCategory) return
+    // Employment Facilitation generates the official PESO/LMI report (live data,
+    // downloaded as the 4-sheet .xlsx) rather than the generic on-screen view.
+    if (reportCategory === 'employment-facilitation') { handleGeneratePesoReport(); return }
     const columns = getReportColumns(reportCategory)
     const data = generateData(reportCategory)
     const initialColumns: Record<string, boolean> = {}
@@ -299,7 +293,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setVisibleColumns(initialColumns)
     let analytics = null
     if (reportCategory === 'general-peso') analytics = generateAnalytics()
-    else if (reportCategory === 'employment-facilitation') analytics = generateEmploymentFacilitationAnalytics()
+    // Employment Facilitation is handled earlier (downloads the PESO Excel) and
+    // never reaches here, so it has no on-screen analytics branch.
     setGeneratedReport({
       category: reportCategory,
       categoryName: reportCategories.find(c => c.id === reportCategory)?.name,
@@ -595,18 +590,18 @@ export default function ReportView({ onBack }: ReportViewProps) {
               )}
               {reportPeriod === 'custom' && <>
                 <DatePicker value={fromDate} onChange={setFromDate}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
                 <DatePicker value={toDate} onChange={setToDate}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900" />
               </>}
             </div>
           </div>
 
           <div className="flex justify-end pt-2">
-            <button onClick={handleGenerateReport} disabled={!reportCategory}
+            <button onClick={handleGenerateReport} disabled={!reportCategory || pesoLoading}
               className="px-6 py-2.5 bg-[#0077BE] text-white rounded-lg hover:bg-[#0066A3] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
               <BarChart2 size={18} />
-              Generate Report
+              {pesoLoading ? 'Generating…' : 'Generate Report'}
             </button>
           </div>
         </div>

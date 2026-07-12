@@ -8,6 +8,7 @@ import Swal from "sweetalert2";
 import { listApplicants, createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { listVacancies } from "../../services/vacancyService";
 import { createReferral } from "../../services/referralService";
+import { confirmReferralOk } from "../../utils/referralGuard";
 import ApplicantsTab from "./applicants/ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
@@ -77,6 +78,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
 
   async function handleConfirm() {
     if (!selected) return
+    if (!(await confirmReferralOk(applicant.id, selected.id, applicant.name))) return
     setSubmitting(true)
     setError("")
     try {

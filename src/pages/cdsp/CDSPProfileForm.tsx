@@ -291,7 +291,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
 
           {(applicant.attachedDocuments?.length ?? 0) > 0 && (
             <>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mt-6 mb-2">Attached Documents</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mt-12 mb-4">Attached Documents</p>
               <div className="space-y-2">
                 {applicant.attachedDocuments.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">

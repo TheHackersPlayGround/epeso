@@ -249,7 +249,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Field label="Received By" value={applicant.receivedBy} />
             <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
           </div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mt-6 mb-2">Attached Documents</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mt-12 mb-4">Attached Documents</p>
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <div className="space-y-2">
               {applicant.attachedDocuments.map((doc) => (
@@ -367,7 +367,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
-  const lbl = 'block text-xs uppercase tracking-wide text-gray-400 mb-1'
+  const lbl = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
   const sel = `${inp} bg-white`
 
   const SectionDivider = ({ num, title, gray }: { num: string; title: string; gray?: boolean }) => (
@@ -401,17 +401,17 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Dela Cruz" />
+              <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
               {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Juan" />
+              <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Enter first name" />
               {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
             </div>
             <div>
               <label className={lbl}>Middle Name <span className="text-gray-400 font-normal">(if applicable)</span></label>
-              <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="M." />
+              <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="Enter middle name" />
               {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
@@ -431,7 +431,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={e => set({ age: parseInt(e.target.value) || 0 })} placeholder="0" />
+              <input type="number" className={inp} value={formData.age || ''} onChange={e => set({ age: parseInt(e.target.value) || 0 })} placeholder="Enter age" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -445,11 +445,11 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={e => set({ contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
+              <input className={inp} value={formData.contactNumber} onChange={e => set({ contactNumber: e.target.value })} placeholder="Enter contact number" />
             </div>
             <div>
               <label className={lbl}>Email (optional)</label>
-              <input className={inp} value={formData.email} onChange={e => set({ email: e.target.value })} placeholder="email@example.com" />
+              <input className={inp} value={formData.email} onChange={e => set({ email: e.target.value })} placeholder="Enter email address" />
             </div>
           </div>
 
@@ -538,7 +538,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Number of Dependents</label>
-              <input type="number" className={inp} value={formData.numberOfDependents || ''} onChange={e => set({ numberOfDependents: parseInt(e.target.value) || 0 })} placeholder="0" />
+              <input type="number" className={inp} value={formData.numberOfDependents || ''} onChange={e => set({ numberOfDependents: parseInt(e.target.value) || 0 })} placeholder="Enter number of dependents" />
             </div>
           </div>
 
@@ -550,11 +550,11 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Received By</label>
-              <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Staff name" />
+              <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Enter staff name" />
             </div>
             <div className="col-span-2">
               <label className={lbl}>Remarks</label>
-              <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Optional" />
+              <input className={inp} value={formData.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="Enter remarks" />
             </div>
           </div>
           <div className="mt-6">

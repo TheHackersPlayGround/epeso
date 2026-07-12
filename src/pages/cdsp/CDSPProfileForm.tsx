@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { X, Users, FileText, Upload } from 'lucide-react'
 import { useCDSP } from '../../contexts/CDSPContext'
-import type { CDSPApplicant } from '../../contexts/CDSPContext'
+import type { CDSPApplicant, CDSPSavedDocument } from '../../contexts/CDSPContext'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
@@ -66,6 +66,19 @@ export function StatusBadge({ status }: { status: 'Active' | 'Inactive' }) {
   )
 }
 
+// Which Educational Background sub-fields apply to a given attainment level —
+// shared by the Add/Edit form and the View panel so they never drift apart.
+function eduFieldFlags(edu: string) {
+  const isSHS   = edu === 'Senior High School Level' || edu === 'Senior High School Graduate'
+  const isLevel = edu.endsWith('Level')
+  return {
+    showYearLevel:     isLevel && edu !== 'Doctoral Level' && edu !== "Master's Level",
+    showStrand:        isSHS,
+    showCourse:        ['College Level', 'College Graduate', "Master's Level", "Master's Graduate", 'Doctoral Level', 'Doctoral Graduate'].includes(edu),
+    showYearGraduated: edu.toLowerCase().includes('graduate') || edu === 'Vocational / Technical',
+  }
+}
+
 // ─── Section Divider ──────────────────────────────────────────────────────────
 
 function SectionDivider({ numeral, title, gray }: { numeral: string; title: string; gray?: boolean }) {
@@ -79,20 +92,42 @@ function SectionDivider({ numeral, title, gray }: { numeral: string; title: stri
 
 // ─── Doc Attach Section ───────────────────────────────────────────────────────
 
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
 function DocAttachSection({
   documents,
   onChange,
 }: {
-  documents: { name: string; file: File; url: string }[]
-  onChange: (docs: { name: string; file: File; url: string }[]) => void
+  documents: CDSPSavedDocument[]
+  onChange: (docs: CDSPSavedDocument[]) => void
 }) {
   const [pendingName, setPendingName] = useState('')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const name = pendingName.trim() || file.name
-    onChange([...documents, { name, file, url: URL.createObjectURL(file) }])
+    const customName = pendingName.trim() || file.name
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      onChange([...documents, {
+        id: Date.now().toString() + Math.random().toString(36),
+        customName,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        // A blob: URL (not the data: dataUrl) so "View" works before the
+        // record is saved — Chrome/Brave block opening data: URIs in a new
+        // tab, which would otherwise show a blank "Untitled" tab.
+        url: URL.createObjectURL(file),
+        dataUrl,
+      }])
+    }
+    reader.readAsDataURL(file)
     setPendingName('')
     e.target.value = ''
   }
@@ -104,16 +139,16 @@ function DocAttachSection({
       {documents.length > 0 && (
         <div className="space-y-2 mb-2">
           {documents.map((doc, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+            <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
               <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <FileText size={14} className="text-brand-blue" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800">{doc.name}</p>
-                <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
+                <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
               </div>
-              <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline">View</a>
-              <button onClick={() => onChange(documents.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 ml-1">
+              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              <button onClick={() => onChange(documents.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0">
                 <X size={14} />
               </button>
             </div>
@@ -216,10 +251,18 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           )}
 
           <SectionDivider numeral="IV" title="Educational Background" />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Highest Attainment" value={applicant.highestEducation} />
-            <Field label="Course / Program" value={applicant.course} />
-          </div>
+          {(() => {
+            const { showYearLevel, showStrand, showCourse, showYearGraduated } = eduFieldFlags(applicant.highestEducation)
+            return (
+              <div className="grid grid-cols-2 gap-5">
+                <Field label="Highest Attainment" value={applicant.highestEducation} />
+                {showYearLevel && <Field label="Year Level" value={applicant.yearLevel} />}
+                {showStrand && <Field label="Strand" value={applicant.strand} />}
+                {showCourse && <Field label="Course / Program" value={applicant.course} />}
+                {showYearGraduated && <Field label="Year Graduated" value={applicant.yearGraduated} />}
+              </div>
+            )
+          })()}
 
           <SectionDivider numeral="V" title="Employment Status" />
           <div className="grid grid-cols-2 gap-5">
@@ -238,26 +281,6 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
             ))}
           </div>
 
-          {(applicant.attachedDocuments?.length ?? 0) > 0 && (
-            <>
-              <SectionDivider numeral="VI" title="Attached Documents" />
-              <div className="space-y-2">
-                {applicant.attachedDocuments.map((doc, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <FileText size={14} className="text-brand-blue" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800">{doc.name}</p>
-                      <p className="text-xs text-gray-400 truncate">{doc.file.name}</p>
-                    </div>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline whitespace-nowrap">View</a>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
           <SectionDivider numeral="VII" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
@@ -265,6 +288,26 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
             <Field label="Status" value={getEffectiveStatus(applicant, cdspActivities)} />
             <Field label="Remarks" value={applicant.remarks} />
           </div>
+
+          {(applicant.attachedDocuments?.length ?? 0) > 0 && (
+            <>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mt-6 mb-2">Attached Documents</p>
+              <div className="space-y-2">
+                {applicant.attachedDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <FileText size={14} className="text-brand-blue" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                      <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
+                    </div>
+                    {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline whitespace-nowrap">View</a>}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
         </div>
       </div>
@@ -559,12 +602,7 @@ export default function CDSPProfileForm({
           <SectionDivider numeral="IV" title="Educational Background" />
           {(() => {
             const edu = formData.highestEducation
-            const isSHS             = edu === 'Senior High School Level' || edu === 'Senior High School Graduate'
-            const isLevel           = edu.endsWith('Level')
-            const showYearLevel     = isLevel && edu !== 'Doctoral Level' && edu !== "Master's Level"
-            const showStrand        = isSHS
-            const showCourse        = ['College Level','College Graduate',"Master's Level","Master's Graduate",'Doctoral Level','Doctoral Graduate'].includes(edu)
-            const showYearGraduated = edu.toLowerCase().includes('graduate') || edu === 'Vocational / Technical'
+            const { showYearLevel, showStrand, showCourse, showYearGraduated } = eduFieldFlags(edu)
             return (
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">

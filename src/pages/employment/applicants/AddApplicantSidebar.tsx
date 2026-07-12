@@ -1777,7 +1777,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <DatePicker
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     value={elig.dateTaken}
                     onChange={(value) => {
                       const newEligibilities = [...formData.eligibilities];
@@ -1816,7 +1816,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                   />
                   <DatePicker
-                    className="text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
+                    className="w-full text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm"
                     value={license.validUntil}
                     onChange={(value) => {
                       const newLicenses = [...formData.professionalLicenses];

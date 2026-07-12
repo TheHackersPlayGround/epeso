@@ -311,7 +311,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.deleteProfile(id)
       await refreshProfiles()
       setDeleteConfirm({ open: false, id: null })
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted.', timer: 1500, showConfirmButton: false })
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted and moved to the recycle bin.', timer: 1500, showConfirmButton: false })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete profile.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
@@ -993,7 +993,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
-            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }} className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto">
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} disabled={!canManage('cdsp')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               {applicant.assignedActivity && !isCompleted

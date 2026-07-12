@@ -75,12 +75,22 @@ export function BatchStatusBadge({ status }: { status: string }) {
 
 // ─── Internal helpers ──────────────────────────────────────────────────────────
 
-const GRADE_YEAR_LEVEL_OPTIONS = [
-  'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
-  'Grade 11', 'Grade 12',
-  '1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year',
-  'ALS Level',
-]
+// Grade/Year Level options narrow down to whatever's actually applicable to
+// the selected School Type, instead of showing every level from Grade 7
+// through 5th Year regardless of context. Exported so the bulk importer
+// (spesImport.ts) can enforce the identical pairing on imported rows, since
+// a spreadsheet's Grade/Year Level column can't be a School-Type-conditional
+// dropdown the way the Add/Edit form's <select> can.
+export function gradeYearLevelOptionsFor(schoolType: string): string[] {
+  switch (schoolType) {
+    case 'Junior High School':               return ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10']
+    case 'Senior High School':                return ['Grade 11', 'Grade 12']
+    case 'College':                           return ['1st Year', '2nd Year', '3rd Year', '4th Year']
+    case 'Technical / Vocational':            return ['1st Year', '2nd Year']
+    case 'Alternative Learning System (ALS)': return ['ALS Level']
+    default:                                  return []
+  }
+}
 
 function formatFileSize(bytes: number) {
   if (bytes <= 0) return '0 Bytes'
@@ -104,7 +114,11 @@ function AttachedDocsEditor({ docs, onChange }: { docs: SPESSavedDocument[]; onC
         customName,
         fileName: file.name,
         fileSize: formatFileSize(file.size),
-        url: '',
+        // A blob: URL (not the data: dataUrl) so "View" works before the
+        // record is saved — Chrome/Brave block opening data: URIs in a new
+        // tab as an anti-phishing measure, so a data:-based preview link
+        // would always show a blank "Untitled" tab.
+        url: URL.createObjectURL(file),
         dataUrl,
       }])
     }
@@ -130,7 +144,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: SPESSavedDocument[]; onC
                 <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
                 <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
               </div>
-              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              {(doc.url || doc.dataUrl) && <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
               <button onClick={() => removeDoc(i)} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"><X size={14} /></button>
             </div>
           ))}
@@ -186,7 +200,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Users size={18} className="text-brand-blue" />
           </div>
           <div>
-            <h2 className="text-lg" style={{ color: '#000000', fontWeight: 800 }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</h2>
+            <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-lg)' }}>{applicant.lastName}, {applicant.firstName} {applicant.middleName}</p>
             <p className="text-sm text-gray-400">SPES Applicant Profile</p>
           </div>
         </div>
@@ -229,7 +243,13 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Field label="Annual Family Income" value={applicant.annualFamilyIncome ? `₱${applicant.annualFamilyIncome}` : ''} />
             <Field label="Number of Dependents" value={applicant.numberOfDependents} />
           </div>
-          <Sec num="V" title="Attached Documents" />
+          <Sec num="V" title="For PESO Office Only" gray />
+          <div className="grid grid-cols-2 gap-5">
+            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
+            <Field label="Received By" value={applicant.receivedBy} />
+            <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
+          </div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mt-6 mb-2">Attached Documents</p>
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <div className="space-y-2">
               {applicant.attachedDocuments.map((doc) => (
@@ -248,12 +268,6 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VI" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
-            <Field label="Received By" value={applicant.receivedBy} />
-            <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
-          </div>
         </div>
       </div>
     </div>
@@ -352,7 +366,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
     onSave({ ...formData, status: derivedStatus })
   }
 
-  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-800'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
   const lbl = 'block text-xs uppercase tracking-wide text-gray-400 mb-1'
   const sel = `${inp} bg-white`
 
@@ -496,16 +510,16 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>School Type</label>
-              <select className={sel} value={formData.schoolType} onChange={e => set({ schoolType: e.target.value })}>
+              <select className={sel} value={formData.schoolType} onChange={e => set({ schoolType: e.target.value, gradeYearLevel: '' })}>
                 <option value="">Select</option>
                 {SCHOOL_TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label className={lbl}>Grade / Year Level</label>
-              <select className={sel} value={formData.gradeYearLevel} onChange={e => set({ gradeYearLevel: e.target.value })}>
-                <option value="">Select</option>
-                {GRADE_YEAR_LEVEL_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              <select className={sel} value={formData.gradeYearLevel} disabled={!formData.schoolType} onChange={e => set({ gradeYearLevel: e.target.value })}>
+                <option value="">{formData.schoolType ? 'Select' : 'Select school type first'}</option>
+                {gradeYearLevelOptionsFor(formData.schoolType).map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             {(formData.schoolType === 'College' || formData.schoolType === 'Technical / Vocational') && (

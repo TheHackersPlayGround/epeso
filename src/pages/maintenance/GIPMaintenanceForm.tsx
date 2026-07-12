@@ -209,7 +209,10 @@ export default function GIPMaintenanceForm({
           id: Date.now().toString() + Math.random().toString(36),
           fileName: file.name,
           fileSize: formatFileSize(file.size),
-          url: '',
+          // A blob: URL (not the data: dataUrl) so "View" works before the
+          // batch is saved — Chrome/Brave block opening data: URIs in a new
+          // tab, which would otherwise show a blank "Untitled" tab.
+          url: URL.createObjectURL(file),
           dataUrl,
         }
         setForm(prev => ({ ...prev, documents: [...prev.documents, newDoc] }))

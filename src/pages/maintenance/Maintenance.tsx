@@ -783,8 +783,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setGipOpenMenuId(null)} />
                     <div
-                      style={{ position: 'fixed', top: gipMenuPos.top, left: gipMenuPos.left }}
-                      className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+                      style={{ position: 'fixed', top: gipMenuPos.top, left: gipMenuPos.left, maxHeight: 'calc(100vh - 24px)' }}
+                      className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
                     >
                       <button
                         onClick={() => { setSelectedGipBatch(b); setGipBatchAction('view_batch'); setGipOpenMenuId(null) }}
@@ -1067,8 +1067,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
                     <div
-                      style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
-                      className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+                      style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, maxHeight: 'calc(100vh - 24px)' }}
+                      className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
                     >
                       <button
                         onClick={() => { setSelectedBatch(b); setSpesBatchAction('view_batch'); setOpenMenuId(null) }}

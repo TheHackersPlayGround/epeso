@@ -232,7 +232,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -305,12 +304,23 @@ export default function SPESView({ onBack }: SPESViewProps) {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (applicant: SPESApplicant) => {
+    const name = `${applicant.lastName}, ${applicant.firstName}${applicant.middleName ? ' ' + applicant.middleName.charAt(0) + '.' : ''}`
+    const result = await Swal.fire({
+      title: 'Delete Applicant?',
+      text: `Are you sure you want to delete ${name}? This will move the applicant to the recycle bin.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
     try {
-      await spesApiService.deleteProfile(id)
+      await spesApiService.deleteProfile(applicant.id)
       await refreshProfiles()
-      setDeleteConfirm({ open: false, id: null })
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted.', timer: 1500, showConfirmButton: false })
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted and moved to the recycle bin.', timer: 1500, showConfirmButton: false })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
     }
@@ -397,14 +407,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
 
   return (
     <>
-      <ConfirmModal
-        isOpen={deleteConfirm.open} type="confirm"
-        title="Delete Applicant Profile"
-        message="Are you sure you want to delete this applicant's profile? This will move the applicant to the recycle bin."
-        confirmText="Delete"
-        onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm({ open: false, id: null })}
-      />
 
       {/* Assign Batch — detail modal (step 2) */}
       {assignTarget && selectedBatch && (() => {
@@ -477,9 +479,12 @@ export default function SPESView({ onBack }: SPESViewProps) {
       {viewingAssignedBatchFor && (() => {
         const batch = spesBatches.find(b => b.id === viewingAssignedBatchFor.assignedBatchId)
         const close = () => setViewingAssignedBatchFor(null)
-        // A batch can only be changed/unassigned before it's Completed — once
-        // Completed, doing so would erase the only record this deployment happened.
-        const canChange = batch ? batch.status !== 'Completed' : true
+        // There's no separate assignment-history table — the only record that
+        // this applicant was ever in this batch is the live batch_id link.
+        // Once the batch moves past Open (Closed/Ongoing/Completed), real
+        // progress has happened, so unassigning or changing batch would
+        // silently erase that record.
+        const canChange = batch ? batch.status === 'Open' : true
         const statusColor = (s: string) =>
           s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
           s === 'Completed' ? 'bg-blue-100 text-blue-700'  :
@@ -535,7 +540,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <button
                   onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)}
                   disabled={!canChange || !canManage('spes')}
-                  title={!canChange ? 'This batch is already completed — unassigning would erase its completion record.' : undefined}
+                  title={!canChange ? 'This batch is no longer Open — unassigning would erase the only record of this assignment.' : undefined}
                   className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Unassign</button>
                 <button
@@ -669,7 +674,12 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       <BatchStatusBadge status={currentBatch.status} />
                     </div>
                   </div>
-                  <button onClick={() => setConfirmUnassignId(assignTarget.id)} disabled={!canManage('spes')} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">Unassign</button>
+                  <button
+                    onClick={() => setConfirmUnassignId(assignTarget.id)}
+                    disabled={currentBatch.status !== 'Open' || !canManage('spes')}
+                    title={currentBatch.status !== 'Open' ? 'This batch is no longer Open — unassigning would erase the only record of this assignment.' : undefined}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >Unassign</button>
                 </div>
               )}
               <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
@@ -864,6 +874,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       {activeFilters.includes('sex')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Sex</th>}
                       {activeFilters.includes('age')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Age</th>}
                       {activeFilters.includes('civilStatus') && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Civil Status</th>}
+                      <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">School</th>
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">Grade / Year Level</th>
                       <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Batch</th>
@@ -884,6 +895,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                         {activeFilters.includes('sex')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.sex || '—'}</td>}
                         {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age ? `${applicant.age} yrs` : '—'}</td>}
                         {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.civilStatus || '—'}</td>}
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.barangay || '—'}</td>
                         <td className="px-4 py-3 text-gray-600">
                           <p className="whitespace-nowrap">{applicant.schoolName || '—'}</p>
                           {applicant.schoolType && <p className="text-gray-400 text-xs">{applicant.schoolType}</p>}
@@ -964,8 +976,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div
-              style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-              className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+              style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
+              className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
             >
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
@@ -976,7 +988,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
               )}
               <button onClick={() => { setViewingAssignmentHistoryFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               <div className="my-1 border-t border-gray-100" />
-              <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
+              <button onClick={() => { handleDelete(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>
           </>
         )

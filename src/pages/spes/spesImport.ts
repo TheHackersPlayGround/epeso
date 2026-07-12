@@ -17,7 +17,7 @@ import {
   type LocationOption,
 } from '../../services/locationService'
 import { createProfile } from '../../services/spesService'
-import { CIVIL_STATUS_OPTIONS, SCHOOL_TYPE_OPTIONS } from './SPESProfileForm'
+import { CIVIL_STATUS_OPTIONS, SCHOOL_TYPE_OPTIONS, gradeYearLevelOptionsFor } from './SPESProfileForm'
 
 const SEX_OPTIONS = ['Male', 'Female']
 
@@ -338,6 +338,18 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
 
   const schoolType = pickEnum(get(row, 'School Type'), SCHOOL_TYPE_OPTIONS)
 
+  // The Add/Edit form's Grade/Year Level dropdown is filtered to whatever's
+  // valid for the chosen School Type (e.g. Senior High -> Grade 11/12 only);
+  // a spreadsheet column can't be conditionally filtered like that, so the
+  // pairing is checked here instead, once School Type is known.
+  const gradeYearLevel = get(row, 'Grade / Year Level')
+  if (gradeYearLevel && schoolType) {
+    const validLevels = gradeYearLevelOptionsFor(schoolType)
+    if (!validLevels.some((o) => norm(o) === norm(gradeYearLevel))) {
+      throw new Error(`Grade / Year Level "${gradeYearLevel}" doesn't match School Type "${schoolType}" — expected one of: ${validLevels.join(', ')}.`)
+    }
+  }
+
   const address = await resolveAddress(
     get(row, 'Province'),
     get(row, 'Municipality/City'),
@@ -361,7 +373,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     barangayId: address.barangayId,
     schoolName: get(row, 'School Name'),
     schoolType,
-    gradeYearLevel: get(row, 'Grade / Year Level'),
+    gradeYearLevel,
     course: get(row, 'Course / Program'),
     annualFamilyIncome: get(row, 'Annual Family Income'),
     numberOfDependents,

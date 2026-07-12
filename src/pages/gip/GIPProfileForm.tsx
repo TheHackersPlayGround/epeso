@@ -106,7 +106,11 @@ function AttachedDocsEditor({ docs, onChange }: { docs: GIPSavedDocument[]; onCh
         customName,
         fileName: file.name,
         fileSize: formatFileSize(file.size),
-        url: '',
+        // A blob: URL (not the data: dataUrl) so "View" works before the
+        // record is saved — Chrome/Brave block opening data: URIs in a new
+        // tab as an anti-phishing measure, so a data:-based preview link
+        // would always show a blank "Untitled" tab.
+        url: URL.createObjectURL(file),
         dataUrl,
       }])
     }
@@ -132,7 +136,7 @@ function AttachedDocsEditor({ docs, onChange }: { docs: GIPSavedDocument[]; onCh
                 <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
                 <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
               </div>
-              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              {(doc.url || doc.dataUrl) && <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
               <button onClick={() => removeDoc(i)} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"><X size={14} /></button>
             </div>
           ))}
@@ -239,7 +243,14 @@ export function ViewApplicantPanel({ applicant, onClose }: {
               </div>
             )
           })()}
-          <Sec num="V" title="Attached Documents" />
+          <Sec num="V" title="For PESO Office Only" gray />
+          <div className="grid grid-cols-2 gap-5">
+            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
+            <Field label="Received By" value={applicant.receivedBy} />
+            <Field label="Status" value={applicant.status} />
+            <Field label="Remarks" value={applicant.remarks} />
+          </div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mt-6 mb-2">Attached Documents</p>
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
             <ul className="space-y-1.5">
               {applicant.attachedDocuments.map((doc) => (
@@ -252,13 +263,6 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
-          <Sec num="VI" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
-            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
-            <Field label="Received By" value={applicant.receivedBy} />
-            <Field label="Status" value={applicant.status} />
-            <Field label="Remarks" value={applicant.remarks} />
-          </div>
         </div>
       </div>
     </div>

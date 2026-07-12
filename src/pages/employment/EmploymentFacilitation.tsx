@@ -541,7 +541,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     try {
       await deleteApplicant(applicant.id);
       await reloadApplicants();
-      Swal.fire({ icon: "success", title: "Deleted", text: "The applicant has been deleted.", timer: 1500, showConfirmButton: false });
+      Swal.fire({ icon: "success", title: "Deleted", text: "The applicant has been deleted and moved to the recycle bin.", timer: 1500, showConfirmButton: false });
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : "Failed to delete applicant.";

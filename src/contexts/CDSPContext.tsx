@@ -9,6 +9,16 @@ export interface CDSPAssignment {
   completedDate?: string | null
 }
 
+export interface CDSPSavedDocument {
+  id: string
+  documentType?: string
+  customName?: string
+  fileName: string
+  fileSize: string
+  url: string
+  dataUrl?: string
+}
+
 export interface CDSPApplicant {
   id: number
   beneficiaryServiceId: number
@@ -61,7 +71,7 @@ export interface CDSPApplicant {
   counselorName: string
   status: 'Active' | 'Inactive'
   remarks: string
-  attachedDocuments: { name: string; file: File; url: string }[]
+  attachedDocuments: CDSPSavedDocument[]
 }
 
 export interface CdspActivity {

@@ -667,8 +667,8 @@ export default function CDSPMaintenanceForm() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
               <div
-                style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-                className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+                style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
+                className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
               >
                 <button
                   onClick={() => { fillFormFromActivity(a); setSelectedActivity(a); setAction('view_activity'); setOpenMenuId(null) }}

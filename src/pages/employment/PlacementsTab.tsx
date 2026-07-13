@@ -299,7 +299,7 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
             placements.map(p => (
               <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{p.applicantName}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.jobTitle}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.currentJobTitle}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.employer}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.dateHired}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -340,7 +340,11 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
 
 // ── View Placement Modal ──────────────────────────────────────────────────────
 
-function ViewPlacementModal({ placement, onClose }: { placement: Placement; onClose: () => void }) {
+function ViewPlacementModal({ placement, onClose, onNavigateToVacancy }: {
+  placement: Placement
+  onClose: () => void
+  onNavigateToVacancy?: (id: number) => void
+}) {
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [loadingPromotions, setLoadingPromotions] = useState(true)
 
@@ -374,8 +378,11 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
               <p className="text-sm font-medium text-gray-800">{placement.applicantName}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-0.5">Job Title</p>
-              <p className="text-sm font-medium text-gray-800">{placement.jobTitle}</p>
+              <p className="text-xs text-gray-500 mb-0.5">Current Position</p>
+              <p className="text-sm font-medium text-gray-800">{placement.currentJobTitle}</p>
+              {placement.currentJobTitle !== placement.jobTitle && (
+                <p className="text-xs text-gray-400 mt-0.5">Hired as: {placement.jobTitle}</p>
+              )}
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Employer</p>
@@ -394,12 +401,20 @@ function ViewPlacementModal({ placement, onClose }: { placement: Placement; onCl
               <PlacementStatusBadge status={placement.status} />
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-0.5">Job Reference ID</p>
-              <p className="text-sm font-medium text-gray-800">
-                {placement.referralId && placement.vacancyId
-                  ? `R-${placement.referralId} / V-${placement.vacancyId}`
-                  : '-'}
-              </p>
+              <p className="text-xs text-gray-500 mb-0.5">Linked Vacancy</p>
+              {placement.vacancyId ? (
+                <p className="text-sm font-medium">
+                  <button
+                    type="button"
+                    onClick={() => { onNavigateToVacancy?.(placement.vacancyId as number); onClose(); }}
+                    className="text-brand-blue hover:underline"
+                  >
+                    V-{placement.vacancyId}
+                  </button>
+                </p>
+              ) : (
+                <p className="text-sm font-medium text-gray-800">-</p>
+              )}
             </div>
             {placement.salaryRange && (
               <div>
@@ -506,8 +521,11 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Job Title</label>
-            <input type="text" value={placement.jobTitle} readOnly className={readOnlyCls} />
+            <label className="block text-sm font-medium text-gray-600 mb-1">Current Position</label>
+            <input type="text" value={placement.currentJobTitle} readOnly className={readOnlyCls} />
+            {placement.currentJobTitle !== placement.jobTitle && (
+              <p className="text-xs text-gray-400 mt-1">Hired as: {placement.jobTitle}</p>
+            )}
           </div>
 
           <div>
@@ -819,7 +837,9 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function PlacementsTab() {
+export default function PlacementsTab({ onNavigateToVacancy }: {
+  onNavigateToVacancy?: (id: number) => void
+} = {}) {
   const [placements, setPlacements] = useState<Placement[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -914,6 +934,10 @@ export default function PlacementsTab() {
       throw err // keep the Record Promotion modal open so the user can retry
     }
 
+    // currentJobTitle is computed server-side (latest promotion join), so a
+    // local optimistic merge can't reproduce it correctly — reload instead.
+    await reload()
+
     Swal.fire({
       icon: 'success',
       title: 'Promotion Recorded',
@@ -928,7 +952,8 @@ export default function PlacementsTab() {
   function buildExportRows() {
     return filtered.map(p => ({
       'Applicant Name': p.applicantName,
-      'Job Title': p.jobTitle,
+      'Hired As': p.jobTitle,
+      'Current Position': p.currentJobTitle,
       'Employer': p.employer,
       'Date Hired': p.dateHired,
       'Status': p.status,
@@ -964,6 +989,7 @@ export default function PlacementsTab() {
       result = result.filter(p =>
         p.applicantName.toLowerCase().includes(q) ||
         p.jobTitle.toLowerCase().includes(q) ||
+        p.currentJobTitle.toLowerCase().includes(q) ||
         p.employer.toLowerCase().includes(q)
       )
     }
@@ -1052,6 +1078,7 @@ export default function PlacementsTab() {
         <ViewPlacementModal
           placement={viewingPlacement}
           onClose={() => setViewingPlacement(null)}
+          onNavigateToVacancy={onNavigateToVacancy}
         />
       )}
 

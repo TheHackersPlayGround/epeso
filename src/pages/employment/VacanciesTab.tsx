@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Download } from 'lucide-react'
@@ -207,6 +207,7 @@ type VacanciesTableProps = {
   onMatch: (v: Vacancy) => void
   onToggleStatus: (id: number, currentStatus: Vacancy['status']) => void
   isFiltered: boolean
+  highlightId?: number | null
 }
 
 function StatusBadge({ status }: { status: Vacancy['status'] }) {
@@ -217,9 +218,14 @@ function StatusBadge({ status }: { status: Vacancy['status'] }) {
   )
 }
 
-function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onToggleStatus, isFiltered }: VacanciesTableProps) {
+function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const highlightRowRef = useRef<HTMLTableRowElement | null>(null)
+
+  useEffect(() => {
+    if (highlightId != null) highlightRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightId])
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     if (openMenuId === id) {
@@ -316,7 +322,11 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
               </tr>
             ) : (
               vacancies.map((v) => (
-                <tr key={v.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr
+                  key={v.id}
+                  ref={v.id === highlightId ? highlightRowRef : undefined}
+                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${v.id === highlightId ? 'bg-amber-50 ring-2 ring-inset ring-amber-300' : ''}`}
+                >
                   <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{v.jobTitle}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.employer}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.vacanciesCount}</td>
@@ -961,7 +971,10 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function VacanciesTab() {
+export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
+  focusVacancyId?: number | null
+  onFocusHandled?: () => void
+} = {}) {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [employers, setEmployers] = useState<EmployerOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -975,6 +988,7 @@ export default function VacanciesTab() {
   const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [highlightedVacancyId, setHighlightedVacancyId] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([listVacancies(), listEmployers()])
@@ -1091,6 +1105,23 @@ export default function VacanciesTab() {
     [filtered, currentPage],
   )
 
+  // Jump to a specific vacancy when navigated here from Placements' Job
+  // Reference ID link (e.g. "V-2"): open its View modal, flip to whichever
+  // page it lands on, and flash-highlight its row for a few seconds.
+  useEffect(() => {
+    if (!focusVacancyId || vacancies.length === 0) return
+    const match = vacancies.find(v => v.id === focusVacancyId)
+    if (match) {
+      setViewingVacancy(match)
+      const idx = filtered.findIndex(v => v.id === focusVacancyId)
+      if (idx !== -1) setCurrentPage(Math.floor(idx / EF_ITEMS_PER_PAGE) + 1)
+      setHighlightedVacancyId(focusVacancyId)
+      setTimeout(() => setHighlightedVacancyId(null), 3000)
+    }
+    onFocusHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusVacancyId, vacancies])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
@@ -1139,6 +1170,7 @@ export default function VacanciesTab() {
           onMatch={setMatchingVacancy}
           onToggleStatus={handleToggleStatus}
           isFiltered={searchQuery.trim() !== '' || activeFilters.length > 0}
+          highlightId={highlightedVacancyId}
         />
         <TablePagination
           currentPage={currentPage}

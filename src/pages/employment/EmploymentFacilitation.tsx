@@ -494,6 +494,10 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // ── Modal states ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>("applicants");
 
+  // Cross-tab "jump to record" state for Placements' Linked Vacancy —
+  // set by PlacementsTab, consumed (and cleared) by VacanciesTab.
+  const [pendingVacancyId, setPendingVacancyId] = useState<number | null>(null);
+
   // Load applicants on mount and whenever the user returns to the Applicants tab,
   // so the computed referralState (Refer/Referred/Hired) reflects status changes
   // made in the Referrals/Placements tabs.
@@ -709,9 +713,18 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
             />
           )
         )}
-        {activeTab === "vacancies" && <VacanciesTab />}
+        {activeTab === "vacancies" && (
+          <VacanciesTab
+            focusVacancyId={pendingVacancyId}
+            onFocusHandled={() => setPendingVacancyId(null)}
+          />
+        )}
         {activeTab === "referrals" && <ReferralsTab />}
-        {activeTab === "placements" && <PlacementsTab />}
+        {activeTab === "placements" && (
+          <PlacementsTab
+            onNavigateToVacancy={(id) => { setActiveTab("vacancies"); setPendingVacancyId(id); }}
+          />
+        )}
         {activeTab === "employers" && <EmployersTab />}
       </div>
 

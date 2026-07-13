@@ -33,7 +33,7 @@ type ReportCategory =
 type ReportPeriod = 'monthly' | 'annual' | 'custom'
 
 export default function ReportView({ onBack }: ReportViewProps) {
-  const { applicants: cdspApplicants } = useCDSP()
+  const { applicants: cdspApplicants, activities: cdspActivities } = useCDSP()
   const { applicants: gipApplicants, gipBatches } = useGIP()
   const { applicants: spesApplicants, spesBatches } = useSPES()
   const { profiles: skillsProfiles } = useSkillsTraining()
@@ -177,25 +177,28 @@ export default function ReportView({ onBack }: ReportViewProps) {
           .filter(a => !programType || a.serviceAvailed === programType)
           // Period filter on the date the application was received
           .filter(a => inSelectedPeriod(a.dateApplicationReceived))
-          .map((a, i) => ({
-            'No.': i + 1,
-            'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
-            'Sex': a.sex || '-',
-            'Program Type': a.serviceAvailed || '-',
-            'Date Conducted': a.dateApplicationReceived || '-',
-            'Facilitator': a.counselorName || '-',
-            'Status': a.status,
-            'Age': a.age || '-',
-            'Civil Status': a.civilStatus || '-',
-            'Highest Education': a.highestEducation || '-',
-            'Course / Program': a.course || a.courseProgram || '-',
-            'Strand': a.strand || '-',
-            'Employment Status': a.employmentStatus || '-',
-            'Current Occupation': a.currentOccupation || '-',
-            'Contact Number': a.contactNumber || '-',
-            'Barangay': a.barangay || '-',
-            'Remarks': a.remarks || '-',
-          }))
+          .map((a, i) => {
+            const activity = cdspActivities.find(act => act.id === a.assignedActivityId)
+            return {
+              'No.': i + 1,
+              'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
+              'Sex': a.sex || '-',
+              'Program Type': a.serviceAvailed || '-',
+              'Date Conducted': a.dateApplicationReceived || '-',
+              'Facilitator': activity?.facilitator || '-',
+              'Status': a.status,
+              'Age': a.age || '-',
+              'Civil Status': a.civilStatus || '-',
+              'Highest Education': a.highestEducation || '-',
+              'Course / Program': a.course || a.courseProgram || '-',
+              'Strand': a.strand || '-',
+              'Employment Status': a.employmentStatus || '-',
+              'Current Occupation': a.currentOccupation || '-',
+              'Contact Number': a.contactNumber || '-',
+              'Barangay': a.barangay || '-',
+              'Remarks': a.remarks || '-',
+            }
+          })
 
       case 'gip':
         return gipApplicants

@@ -113,6 +113,7 @@ export type Placement = {
   applicantId: number
   applicantName: string
   jobTitle: string
+  currentJobTitle: string
   employer: string
   dateHired: string
   status: 'Active' | 'Resigned' | 'Terminated' | 'Completed'
@@ -123,7 +124,7 @@ export type Placement = {
 }
 
 export const PLACEMENT_SEED: Placement[] = [
-  { id: 1, applicantId: 3, applicantName: 'Reyes, Ana L.', jobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000' },
+  { id: 1, applicantId: 3, applicantName: 'Reyes, Ana L.', jobTitle: 'Cook', currentJobTitle: 'Cook', employer: 'Tangub City Restaurant', dateHired: '2026-06-05', status: 'Active', employmentType: 'Full-time', referralId: 3, vacancyId: 9, salaryRange: '₱12,000 - ₱16,000' },
 ]
 
 export const SEED: Applicant[] = [

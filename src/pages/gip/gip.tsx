@@ -402,8 +402,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
   const assignableBatches = gipBatches.filter(b => b.status === 'Planned')
   const filteredAssignBatches = assignableBatches.filter(b =>
-    b.batchName.toLowerCase().includes(assignSearch.toLowerCase()) ||
-    b.batchCode.toLowerCase().includes(assignSearch.toLowerCase())
+    b.batchName.toLowerCase().includes(assignSearch.toLowerCase())
   )
 
   return (
@@ -479,7 +478,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800">{batch.batchName}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{batch.batchCode}</p>
                           <p className="text-xs text-gray-500 mt-1">
                             {batch.assignedOffice} · {batch.startDate} – {batch.endDate} · {batch.assignedCount}/{batch.slots} slots
                           </p>
@@ -505,7 +503,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-semibold text-gray-800">{selectedBatch.batchName}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{selectedBatch.batchCode}</p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${BATCH_STATUS_COLORS[selectedBatch.status]}`}>
                         {selectedBatch.status}
@@ -568,7 +565,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-semibold text-gray-800">{currentBatch.batchName}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{currentBatch.batchCode}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${BATCH_STATUS_COLORS[currentBatch.status]}`}>
                       {currentBatch.status}

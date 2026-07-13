@@ -58,7 +58,6 @@ export interface GIPApplicant {
 export interface GIPBatch {
   id: number
   batchName: string
-  batchCode: string
   description: string
   assignedOffice: string
   deploymentLocation: string

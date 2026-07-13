@@ -35,7 +35,20 @@ type Action =
 
 const inputCls =
   'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50 disabled:text-gray-600 text-sm text-gray-900 placeholder:text-gray-400'
-const labelCls = 'block text-sm text-gray-700 mb-1.5'
+const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <span className="text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full text-white bg-brand-blue">
+        {title}
+      </span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  )
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -456,6 +469,7 @@ export default function CDSPMaintenanceForm() {
         </div>
 
         <div className="p-6">
+          <SectionHeader title="Activity Information" />
           <div className="mb-6" ref={serviceTypeWrapRef}>
             <label className={labelCls}>
               Service Type <span className="text-red-500">*</span>
@@ -479,7 +493,7 @@ export default function CDSPMaintenanceForm() {
           </div>
 
           {(selectedService || mode !== 'add') && (
-            <div className="border-t pt-6 space-y-5">
+            <div className="space-y-5">
               <div>
                 <label className={labelCls}>Activity Title <span className="text-red-500">*</span></label>
                 <input
@@ -505,6 +519,7 @@ export default function CDSPMaintenanceForm() {
                 />
               </div>
 
+              <SectionHeader title="Schedule & Personnel" />
               <div className="grid grid-cols-2 gap-4">
                 <div ref={dateWrapRef}>
                   <label className={labelCls}>Date <span className="text-red-500">*</span></label>
@@ -559,24 +574,20 @@ export default function CDSPMaintenanceForm() {
                 </div>
               </div>
 
-              <div className="border-t pt-5 mt-1">
-                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wider mb-4">
-                  Additional Counseling / Session Information
-                </p>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className={labelCls}>Counselor / Career Advisor</label>
-                    <input ref={counselorRef} type="text" value={formData.counselor} readOnly={isView}
-                      onChange={e => { setFormData(p => ({ ...p, counselor: e.target.value })); clearFieldError('counselor') }}
-                      className={`${inputCls} ${errCls('counselor')}`} placeholder="Enter counselor name" />
-                    {fieldMessage('counselor') && <p className="text-red-500 text-xs mt-1">{fieldMessage('counselor')}</p>}
-                  </div>
-                  <div>
-                    <label className={labelCls}>Session Duration / No. of Sessions</label>
-                    <input type="text" value={formData.sessionDuration} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, sessionDuration: e.target.value }))}
-                      className={inputCls} placeholder="e.g. 3 sessions, 1 hour each" />
-                  </div>
+              <SectionHeader title="Additional Counseling / Session Information" />
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className={labelCls}>Counselor / Career Advisor</label>
+                  <input ref={counselorRef} type="text" value={formData.counselor} readOnly={isView}
+                    onChange={e => { setFormData(p => ({ ...p, counselor: e.target.value })); clearFieldError('counselor') }}
+                    className={`${inputCls} ${errCls('counselor')}`} placeholder="Enter counselor name" />
+                  {fieldMessage('counselor') && <p className="text-red-500 text-xs mt-1">{fieldMessage('counselor')}</p>}
+                </div>
+                <div>
+                  <label className={labelCls}>Session Duration / No. of Sessions</label>
+                  <input type="text" value={formData.sessionDuration} readOnly={isView}
+                    onChange={e => setFormData(p => ({ ...p, sessionDuration: e.target.value }))}
+                    className={inputCls} placeholder="e.g. 3 sessions, 1 hour each" />
                 </div>
               </div>
 

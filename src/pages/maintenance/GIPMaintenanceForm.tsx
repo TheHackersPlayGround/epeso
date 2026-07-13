@@ -24,7 +24,6 @@ const FUNDING_SOURCES = ['DOLE', 'Local Government Unit (LGU)', 'Private / CSR',
 function emptyBatch(): Omit<GIPBatch, 'id'> {
   return {
     batchName: '',
-    batchCode: '',
     description: '',
     assignedOffice: '',
     deploymentLocation: '',
@@ -150,7 +149,6 @@ export default function GIPMaintenanceForm({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const batchNameRef = useRef<HTMLDivElement>(null)
-  const batchCodeRef = useRef<HTMLDivElement>(null)
   const assignedOfficeRef = useRef<HTMLDivElement>(null)
   const deploymentLocationRef = useRef<HTMLDivElement>(null)
   const supervisorRef = useRef<HTMLDivElement>(null)
@@ -174,7 +172,6 @@ export default function GIPMaintenanceForm({
   const validate = () => {
     const errs: ValidationError[] = []
     if (!form.batchName.trim())     errs.push({ field: 'batchName', message: 'Batch name is required', focus: scrollTo(batchNameRef) })
-    if (!form.batchCode.trim())     errs.push({ field: 'batchCode', message: 'Batch code is required', focus: scrollTo(batchCodeRef) })
     if (!form.assignedOffice.trim()) errs.push({ field: 'assignedOffice', message: 'Assigned office is required', focus: scrollTo(assignedOfficeRef) })
     if (!form.deploymentLocation.trim()) errs.push({ field: 'deploymentLocation', message: 'Deployment location is required', focus: scrollTo(deploymentLocationRef) })
     if (!form.supervisor.trim()) {
@@ -270,8 +267,9 @@ export default function GIPMaintenanceForm({
         <section>
           <SectionHeader title="Batch Information" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Batch Name" field="batchName" required placeholder="e.g. Government Internship Program - Batch 1" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchNameRef} />
-            <Field label="Batch Code" field="batchCode" required placeholder="e.g. GIP-2026-001" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchCodeRef} />
+            <div className="md:col-span-2">
+              <Field label="Batch Name" field="batchName" required placeholder="e.g. Government Internship Program - Batch 1" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchNameRef} />
+            </div>
           </div>
           <div className="mt-4">
             <label className={labelCls}>Description</label>

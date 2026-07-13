@@ -40,21 +40,24 @@ export interface SPESApplicant {
   cityMunicipality: string
   province: string
   region: string
-  // III. Educational Information
+  // III. Classification
+  classification: string[]
+  classificationOther: string
+  // IV. Educational Information
   schoolName: string
   schoolType: string
   gradeYearLevel: string
   course: string
-  // IV. Family / Economic Information
+  // V. Family / Economic Information
   annualFamilyIncome: string
   numberOfDependents: number
-  // V. Current Assignment
+  // VI. Current Assignment
   assignedBatchId: number | null
-  // VI. Assignment History
+  // VII. Assignment History
   assignmentHistory: SPESAssignmentHistory[]
-  // VII. Attached Documents
+  // VIII. Attached Documents
   attachedDocuments: SPESSavedDocument[]
-  // VIII. PESO Office
+  // IX. PESO Office
   dateApplicationReceived: string
   receivedBy: string
   status: 'Active' | 'Inactive' | 'Completed' | 'Cancelled'
@@ -65,20 +68,16 @@ export interface SPESBatch {
   id: number
   batchName: string
   description: string
-  applicationStartDate: string
-  applicationEndDate: string
   programStartDate: string
   programEndDate: string
   availableSlots: string
   assignedCount: number
-  targetBeneficiaries: string
   employer: string
   deploymentLocation: string
   coordinator: string
-  supervisor: string
   fundingSource: string
   fundingSourceOther: string
-  status: 'Open' | 'Ongoing' | 'Completed' | 'Closed'
+  status: 'Planned' | 'Ongoing' | 'Completed'
   documents: SPESSavedDocument[]
   isDraft?: boolean
 }

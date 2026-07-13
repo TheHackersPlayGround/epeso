@@ -256,6 +256,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
             return (
               <div className="grid grid-cols-2 gap-5">
                 <Field label="Highest Attainment" value={applicant.highestEducation} />
+                <Field label="School / University" value={applicant.schoolName} />
                 {showYearLevel && <Field label="Year Level" value={applicant.yearLevel} />}
                 {showStrand && <Field label="Strand" value={applicant.strand} />}
                 {showCourse && <Field label="Course / Program" value={applicant.course} />}
@@ -617,6 +618,10 @@ export default function CDSPProfileForm({
                     {EDUCATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                   {fieldMessage('highestEducation') && <p className="text-red-500 text-xs mt-1">{fieldMessage('highestEducation')}</p>}
+                </div>
+                <div className="col-span-2">
+                  <label className={lbl}>School / University</label>
+                  <input className={inp} value={formData.schoolName} onChange={(e) => set({ schoolName: e.target.value })} placeholder="Enter school name" />
                 </div>
                 {showYearLevel && (
                   <div>

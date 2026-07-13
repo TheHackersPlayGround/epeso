@@ -414,7 +414,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
         const statusColor =
           selectedBatch.status === 'Ongoing'   ? 'bg-green-100 text-green-700' :
           selectedBatch.status === 'Completed' ? 'bg-blue-100 text-blue-700'  :
-          selectedBatch.status === 'Open'      ? 'bg-blue-50 text-blue-600'   :
+          selectedBatch.status === 'Planned'   ? 'bg-yellow-100 text-yellow-700' :
                                                   'bg-gray-100 text-gray-600'
         const Row = ({ label, value }: { label: string; value?: string | number }) =>
           value ? (
@@ -447,12 +447,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     <Row label="Employer / Agency" value={selectedBatch.employer} />
                     <Row label="Deployment Location" value={selectedBatch.deploymentLocation} />
                     <Row label="Program Coordinator" value={selectedBatch.coordinator} />
-                    <Row label="Supervisor" value={selectedBatch.supervisor} />
-                    <Row label="Application Period" value={selectedBatch.applicationStartDate && selectedBatch.applicationEndDate ? `${selectedBatch.applicationStartDate} – ${selectedBatch.applicationEndDate}` : ''} />
                     <Row label="Program Start Date" value={selectedBatch.programStartDate} />
                     <Row label="Program End Date" value={selectedBatch.programEndDate} />
                     <Row label="Available Slots" value={`${selectedBatch.assignedCount}/${selectedBatch.availableSlots}`} />
-                    {selectedBatch.targetBeneficiaries && <Row label="Target Beneficiaries" value={selectedBatch.targetBeneficiaries} />}
                     <Row label="Funding Source" value={selectedBatch.fundingSource === 'Other' ? `Other — ${selectedBatch.fundingSourceOther}` : selectedBatch.fundingSource} />
                   </div>
                 </div>
@@ -481,14 +478,14 @@ export default function SPESView({ onBack }: SPESViewProps) {
         const close = () => setViewingAssignedBatchFor(null)
         // There's no separate assignment-history table — the only record that
         // this applicant was ever in this batch is the live batch_id link.
-        // Once the batch moves past Open (Closed/Ongoing/Completed), real
+        // Once the batch moves past Planned (Ongoing/Completed), real
         // progress has happened, so unassigning or changing batch would
         // silently erase that record.
-        const canChange = batch ? batch.status === 'Open' : true
+        const canChange = batch ? batch.status === 'Planned' : true
         const statusColor = (s: string) =>
           s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
           s === 'Completed' ? 'bg-blue-100 text-blue-700'  :
-          s === 'Open'      ? 'bg-blue-50 text-blue-600'   :
+          s === 'Planned'   ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-600'
         const Row = ({ label, value }: { label: string; value?: string | number }) =>
           value ? (
@@ -521,12 +518,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       <Row label="Employer / Agency" value={batch.employer} />
                       <Row label="Deployment Location" value={batch.deploymentLocation} />
                       <Row label="Program Coordinator" value={batch.coordinator} />
-                      <Row label="Supervisor" value={batch.supervisor} />
-                      <Row label="Application Period" value={batch.applicationStartDate && batch.applicationEndDate ? `${batch.applicationStartDate} – ${batch.applicationEndDate}` : ''} />
                       <Row label="Program Start Date" value={batch.programStartDate} />
                       <Row label="Program End Date" value={batch.programEndDate} />
                       <Row label="Available Slots" value={`${batch.assignedCount}/${batch.availableSlots}`} />
-                      {batch.targetBeneficiaries && <Row label="Target Beneficiaries" value={batch.targetBeneficiaries} />}
                       <Row label="Funding Source" value={batch.fundingSource === 'Other' ? `Other — ${batch.fundingSourceOther}` : batch.fundingSource} />
                     </div>
                   </>
@@ -560,7 +554,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
         const badgeCls = (s: string) =>
           s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
           s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
-          s === 'Open'      ? 'bg-sky-100 text-sky-700 border border-sky-200' :
+          s === 'Planned'   ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
           'bg-amber-100 text-amber-700 border border-amber-200'
         const visibleHistory = a.assignmentHistory.filter(entry => {
           const batch = spesBatches.find(b => b.id === entry.batchId)
@@ -626,7 +620,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
           ? spesBatches.find(b => b.id === assignTarget.assignedBatchId) ?? null
           : null
         const filteredBatches = spesBatches
-          .filter(b => b.status === 'Open')
+          .filter(b => b.status === 'Planned')
           .filter(b =>
             batchSearch === '' ||
             b.batchName.toLowerCase().includes(batchSearch.toLowerCase()) ||
@@ -634,7 +628,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
             b.coordinator.toLowerCase().includes(batchSearch.toLowerCase())
           )
         const scBadge = (s: string) =>
-          s === 'Open'    ? 'bg-blue-50 text-blue-600 font-medium'   :
+          s === 'Planned' ? 'bg-yellow-100 text-yellow-700 font-medium' :
           s === 'Ongoing' ? 'bg-green-100 text-green-700 font-medium' :
                             'bg-gray-100 text-gray-600 font-medium'
         const close = () => { setAssignTarget(null); setBatchSearch('') }
@@ -661,7 +655,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 </div>
                 <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1 px-1">
                   <AlertCircle size={11} className="flex-shrink-0" />
-                  Only batches with <span className="font-semibold">Open</span> status are shown
+                  Only batches with <span className="font-semibold">Planned</span> status are shown
                 </p>
               </div>
               {currentBatch && (
@@ -676,8 +670,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   </div>
                   <button
                     onClick={() => setConfirmUnassignId(assignTarget.id)}
-                    disabled={currentBatch.status !== 'Open' || !canManage('spes')}
-                    title={currentBatch.status !== 'Open' ? 'This batch is no longer Open — unassigning would erase the only record of this assignment.' : undefined}
+                    disabled={currentBatch.status !== 'Planned' || !canManage('spes')}
+                    title={currentBatch.status !== 'Planned' ? 'This batch is no longer Planned — unassigning would erase the only record of this assignment.' : undefined}
                     className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >Unassign</button>
                 </div>
@@ -686,7 +680,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 {filteredBatches.length === 0 ? (
                   <div className="py-12 text-center">
                     <AlertCircle size={32} className="mx-auto mb-2 text-gray-300" />
-                    <p className="text-gray-400 text-sm">{batchSearch ? 'No batches match your search.' : 'No Open SPES batches available.'}</p>
+                    <p className="text-gray-400 text-sm">{batchSearch ? 'No batches match your search.' : 'No Planned SPES batches available.'}</p>
                     <p className="text-gray-400 text-xs mt-1">Add batches in Maintenance → SPES first.</p>
                   </div>
                 ) : filteredBatches.map(batch => {

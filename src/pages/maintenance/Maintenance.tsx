@@ -34,8 +34,7 @@ interface MaintenanceProps {
 // ─── Status badge colors ──────────────────────────────────────────────────────
 
 const SPES_BATCH_STATUS_COLORS: Record<SPESBatch['status'], string> = {
-  Open:      'bg-green-100 text-green-700',
-  Closed:    'bg-gray-100 text-gray-600',
+  Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
 }
@@ -251,7 +250,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const filteredGipBatches = gipBatches.filter(b => {
     const matchSearch = !gipSearch ||
       b.batchName.toLowerCase().includes(gipSearch.toLowerCase()) ||
-      b.batchCode.toLowerCase().includes(gipSearch.toLowerCase()) ||
       b.assignedOffice.toLowerCase().includes(gipSearch.toLowerCase())
     const matchStatus = gipStatusFilter === 'All' || b.status === gipStatusFilter
     return matchSearch && matchStatus
@@ -665,7 +663,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Name</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Code</th>
                           <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Assigned Office</th>
                           <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Slots</th>
                           <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Period</th>
@@ -692,7 +689,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-gray-600 font-mono text-sm">{b.batchCode || '—'}</td>
                               <td className="px-6 py-4 text-gray-600 max-w-[180px]">
                                 <p className="line-clamp-1">{b.assignedOffice || '—'}</p>
                                 {b.deploymentLocation && (
@@ -984,7 +980,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                               )}
                             </td>
                             <td className="px-6 py-4 text-gray-600 text-center whitespace-nowrap">
-                              {b.availableSlots || '—'}
+                              {b.availableSlots ? (
+                                <span className={b.assignedCount >= parseInt(b.availableSlots, 10) ? 'text-red-500 font-semibold' : ''}>
+                                  {b.assignedCount}/{b.availableSlots}
+                                </span>
+                              ) : '—'}
                             </td>
                             <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                               {b.programStartDate && b.programEndDate
@@ -1093,23 +1093,13 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                         <Edit2 size={15} className="text-blue-500" />
                         Edit
                       </button>
-                      {b.status === 'Open' && (
-                        <button
-                          onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Closed', action: 'Close Batch' }); setOpenMenuId(null) }}
-                          disabled={!canManage('maintenance')}
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                        >
-                          <Users size={15} className="text-gray-500" />
-                          Close Batch
-                        </button>
-                      )}
-                      {b.status === 'Closed' && (
+                      {b.status === 'Planned' && (
                         <button
                           onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Ongoing', action: 'Mark as Ongoing' }); setOpenMenuId(null) }}
                           disabled={!canManage('maintenance')}
-                          className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                          className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
-                          <PlayCircle size={15} className="text-blue-500" />
+                          <PlayCircle size={15} className="text-green-600" />
                           Mark as Ongoing
                         </button>
                       )}
@@ -1125,7 +1115,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       )}
                       {b.status === 'Completed' && (
                         <button
-                          onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Open', action: 'Reopen Batch' }); setOpenMenuId(null) }}
+                          onClick={() => { setStatusConfirm({ batch: b, nextStatus: 'Planned', action: 'Reopen Batch' }); setOpenMenuId(null) }}
                           disabled={!canManage('maintenance')}
                           className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
@@ -1154,7 +1144,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       {/* ── SPES status change modal ───────────────────────────────────────────── */}
       {statusConfirm !== null && (() => {
         const { batch, nextStatus, action } = statusConfirm
-        const stepOrder: SPESBatch['status'][] = ['Open', 'Closed', 'Ongoing', 'Completed']
+        const stepOrder: SPESBatch['status'][] = ['Planned', 'Ongoing', 'Completed']
         const currentIdx = stepOrder.indexOf(batch.status)
         const nextIdx = stepOrder.indexOf(nextStatus)
         const isForward = nextIdx > currentIdx
@@ -1198,7 +1188,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
               <div className="relative flex items-start justify-between mb-6 px-2">
                 <div className="absolute top-4 left-10 right-10 flex">
-                  {[0, 1, 2].map(i => (
+                  {[0, 1].map(i => (
                     <div key={i} className={`flex-1 h-0.5 ${connectorClass(i)}`} />
                   ))}
                 </div>

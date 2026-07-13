@@ -18,12 +18,19 @@ export const SCHOOL_TYPE_OPTIONS = [
 
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated']
 
+export const CLASSIFICATION_OPTIONS = [
+  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
+  'Out of School Youth', 'Person with Disability', 'Solo Parent',
+  'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
+]
+
 export const emptyForm: Omit<SPESApplicant, 'id'> = {
   spesProfileId: null, beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '',
   sex: '', birthdate: '', age: 0, civilStatus: '',
   contactNumber: '', email: '',
   streetPurok: '', barangay: '', barangayId: 0, cityMunicipality: '', province: '', region: '',
+  classification: [], classificationOther: '',
   schoolName: '', schoolType: '', gradeYearLevel: '', course: '',
   annualFamilyIncome: '', numberOfDependents: 0,
   assignedBatchId: null,
@@ -61,10 +68,9 @@ export function StatusBadge({ status }: { status: SPESApplicant['status'] }) {
 
 export function BatchStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
+    Planned:   'bg-yellow-100 text-yellow-700',
     Ongoing:   'bg-green-100 text-green-700',
     Completed: 'bg-blue-100 text-blue-700',
-    Open:      'bg-sky-50 text-sky-600',
-    Closed:    'bg-gray-100 text-gray-500',
   }
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-500'}`}>
@@ -231,19 +237,28 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Field label="Barangay" value={applicant.barangay} />
             <div className="col-span-2"><Field label="Street / Purok #" value={applicant.streetPurok} /></div>
           </div>
-          <Sec num="III" title="Educational Information" />
+          <Sec num="III" title="Classification" />
+          <div className="flex flex-wrap gap-2">
+            {applicant.classification.length > 0
+              ? applicant.classification.map(c => <span key={c} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">{c}</span>)
+              : <span className="text-sm text-gray-400">—</span>}
+          </div>
+          {applicant.classificationOther && (
+            <p className="text-sm text-gray-600 mt-2">Other: {applicant.classificationOther}</p>
+          )}
+          <Sec num="IV" title="Educational Information" />
           <div className="grid grid-cols-2 gap-5">
             <Field label="School Name" value={applicant.schoolName} />
             <Field label="School Type" value={applicant.schoolType} />
             <Field label="Grade / Year Level" value={applicant.gradeYearLevel} />
             <Field label="Course / Program" value={applicant.course} />
           </div>
-          <Sec num="IV" title="Family / Economic Information" />
+          <Sec num="V" title="Family / Economic Information" />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Annual Family Income" value={applicant.annualFamilyIncome ? `₱${applicant.annualFamilyIncome}` : ''} />
             <Field label="Number of Dependents" value={applicant.numberOfDependents} />
           </div>
-          <Sec num="V" title="For PESO Office Only" gray />
+          <Sec num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
@@ -284,6 +299,12 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
 }) {
   const [formData, setFormData] = useState(initial)
   const set = (patch: Partial<Omit<SPESApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
+  const toggleClassification = (val: string) =>
+    set({
+      classification: formData.classification.includes(val)
+        ? formData.classification.filter(c => c !== val)
+        : [...formData.classification, val],
+    })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
 
@@ -375,6 +396,18 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
       <span className="text-white text-xs font-bold">{num}.</span>
       <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
     </div>
+  )
+
+  const CheckItem = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <div
+        onClick={onChange}
+        className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${checked ? 'bg-brand-blue border-brand-blue' : 'border-gray-300 bg-white'}`}
+      >
+        {checked && <span className="text-white text-xs leading-none">✓</span>}
+      </div>
+      <span className="text-sm text-gray-700">{label}</span>
+    </label>
   )
 
   return (
@@ -502,7 +535,21 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="III" title="Educational Information" />
+          <SectionDivider num="III" title="Classification" />
+          <div className="grid grid-cols-2 gap-3">
+            {CLASSIFICATION_OPTIONS.filter(o => o !== 'Other').map(opt => (
+              <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleClassification(opt)} />
+            ))}
+            <CheckItem label="Other" checked={formData.classification.includes('Other')} onChange={() => toggleClassification('Other')} />
+          </div>
+          {formData.classification.includes('Other') && (
+            <div className="mt-3">
+              <label className={lbl}>Please specify</label>
+              <input className={inp} value={formData.classificationOther} onChange={e => set({ classificationOther: e.target.value })} placeholder="Enter classification" />
+            </div>
+          )}
+
+          <SectionDivider num="IV" title="Educational Information" />
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="col-span-2">
               <label className={lbl}>School Name</label>
@@ -530,7 +577,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             )}
           </div>
 
-          <SectionDivider num="IV" title="Family / Economic Information" />
+          <SectionDivider num="V" title="Family / Economic Information" />
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={lbl}>Annual Family Income (₱)</label>
@@ -542,7 +589,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
-          <SectionDivider num="V" title="For PESO Office Only" gray />
+          <SectionDivider num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>

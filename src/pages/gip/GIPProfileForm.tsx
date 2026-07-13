@@ -9,9 +9,9 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 // ─── Exported constants ────────────────────────────────────────────────────────
 
 export const CLASSIFICATION_OPTIONS = [
-  'Fresh Graduate', 'Unemployed', 'Underemployed',
-  'Person with Disability (PWD)', 'Women', 'Solo Parent',
-  'Senior Citizen', 'Indigenous People (IP)', 'Returning OFW', 'Other',
+  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
+  'Out of School Youth', 'Person with Disability', 'Solo Parent',
+  'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]
 
 export const EDUCATION_OPTIONS = [
@@ -607,7 +607,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
                 </div>
                 <div>
                   <label className={lbl}>School / University <span className="text-red-500">*</span></label>
-                  <input ref={schoolNameRef} className={`${inp} ${errCls('schoolName')}`} value={formData.schoolName} onChange={e => { set({ schoolName: e.target.value }); clearFieldError('schoolName') }} placeholder="University name" />
+                  <input ref={schoolNameRef} className={`${inp} ${errCls('schoolName')}`} value={formData.schoolName} onChange={e => { set({ schoolName: e.target.value }); clearFieldError('schoolName') }} placeholder="Enter school name" />
                   {fieldMessage('schoolName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('schoolName')}</p>}
                 </div>
                 {showStrand && (

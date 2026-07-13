@@ -20,10 +20,9 @@ interface SPESMaintenanceFormProps {
 const FUNDING_SOURCES = ['DOLE', 'LGU', 'DOLE + LGU', 'Partner Agency', 'Other']
 
 const STATUS_OPTIONS: { value: SPESBatch['status']; desc: string }[] = [
-  { value: 'Open',      desc: 'Accepting applications'      },
-  { value: 'Closed',    desc: 'Application period ended'    },
-  { value: 'Ongoing',   desc: 'Students currently deployed' },
-  { value: 'Completed', desc: 'Program completed'           },
+  { value: 'Planned',   desc: 'Not yet deployed'             },
+  { value: 'Ongoing',   desc: 'Students currently deployed'  },
+  { value: 'Completed', desc: 'Program completed'            },
 ]
 
 const ACCEPT = 'image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -33,8 +32,10 @@ const ACCEPT = 'image/jpeg,image/png,application/pdf,application/msword,applicat
 function SectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <div className="h-5 w-1 rounded-full bg-brand-blue" />
-      <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{title}</h4>
+      <span className="text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full text-white bg-brand-blue">
+        {title}
+      </span>
+      <div className="flex-1 h-px bg-gray-200" />
     </div>
   )
 }
@@ -48,7 +49,7 @@ function Field({ label, required, error, containerRef, children }: {
 }) {
   return (
     <div ref={containerRef}>
-      <label className="block text-sm text-gray-600 mb-1.5">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
@@ -72,19 +73,19 @@ const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm f
 const textareaCls = `${inputCls} resize-none`
 
 function StatusRadioGroup({
-  value, onChange, disabled, lockToOpen,
+  value, onChange, disabled, lockToPlanned,
 }: {
   value: SPESBatch['status']
   onChange: (v: SPESBatch['status']) => void
   disabled?: boolean
-  // When adding a new batch, it can only ever start Open — same rule as
-  // GIP/CDSP (a batch can't be created already Ongoing/Closed/Completed).
-  lockToOpen?: boolean
+  // When adding a new batch, it can only ever start Planned — same rule as
+  // GIP/CDSP (a batch can't be created already Ongoing/Completed).
+  lockToPlanned?: boolean
 }) {
   return (
     <div className="flex flex-wrap gap-x-8 gap-y-3">
       {STATUS_OPTIONS.map(({ value: v, desc }) => {
-        const isDisabled = disabled || (lockToOpen && v !== 'Open')
+        const isDisabled = disabled || (lockToPlanned && v !== 'Planned')
         return (
         <label
           key={v}
@@ -213,20 +214,16 @@ function DocumentUpload({
 const emptyBatch: Omit<SPESBatch, 'id'> = {
   batchName: '',
   description: '',
-  applicationStartDate: '',
-  applicationEndDate: '',
   programStartDate: '',
   programEndDate: '',
   availableSlots: '',
   assignedCount: 0,
-  targetBeneficiaries: '',
   employer: '',
   deploymentLocation: '',
   coordinator: '',
-  supervisor: '',
   fundingSource: '',
   fundingSourceOther: '',
-  status: 'Open',
+  status: 'Planned',
   documents: [],
 }
 
@@ -255,8 +252,6 @@ export default function SPESMaintenanceForm({
 
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
   const batchNameRef = useRef<HTMLDivElement>(null)
-  const applicationStartDateRef = useRef<HTMLDivElement>(null)
-  const applicationEndDateRef = useRef<HTMLDivElement>(null)
   const programStartDateRef = useRef<HTMLDivElement>(null)
   const programEndDateRef = useRef<HTMLDivElement>(null)
   const availableSlotsRef = useRef<HTMLDivElement>(null)
@@ -274,8 +269,6 @@ export default function SPESMaintenanceForm({
     const errors: ValidationError[] = []
 
     if (!form.batchName.trim())          errors.push({ field: 'batchName', message: 'Batch Name is required.', focus: scrollTo(batchNameRef) })
-    if (!form.applicationStartDate)      errors.push({ field: 'applicationStartDate', message: 'Application Start Date is required.', focus: scrollTo(applicationStartDateRef) })
-    if (!form.applicationEndDate)        errors.push({ field: 'applicationEndDate', message: 'Application End Date is required.', focus: scrollTo(applicationEndDateRef) })
     if (!form.programStartDate)          errors.push({ field: 'programStartDate', message: 'Program Start Date is required.', focus: scrollTo(programStartDateRef) })
     if (!form.programEndDate)            errors.push({ field: 'programEndDate', message: 'Program End Date is required.', focus: scrollTo(programEndDateRef) })
     if (!form.availableSlots.trim())     errors.push({ field: 'availableSlots', message: 'Available Slots is required.', focus: scrollTo(availableSlotsRef) })
@@ -353,6 +346,22 @@ export default function SPESMaintenanceForm({
               </div>
               <div className="md:col-span-2">
                 {isView ? (
+                  <ReadOnlyField label="Available Slots" value={form.availableSlots} />
+                ) : (
+                  <Field label="Available Slots" required containerRef={availableSlotsRef} error={fieldMessage('availableSlots')}>
+                    <input
+                      type="number"
+                      min="1"
+                      className={`${inputCls} ${errCls('availableSlots')}`}
+                      placeholder="e.g. 100"
+                      value={form.availableSlots}
+                      onChange={e => set('availableSlots', e.target.value)}
+                    />
+                  </Field>
+                )}
+              </div>
+              <div className="md:col-span-2">
+                {isView ? (
                   <ReadOnlyField label="Description" value={form.description} />
                 ) : (
                   <Field label="Description">
@@ -371,31 +380,7 @@ export default function SPESMaintenanceForm({
 
           <div className="border-t border-gray-100" />
 
-          {/* II. Application Period */}
-          <div>
-            <SectionHeader title="Application Period" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {isView ? (
-                <>
-                  <ReadOnlyField label="Application Start Date" value={form.applicationStartDate} />
-                  <ReadOnlyField label="Application End Date" value={form.applicationEndDate} />
-                </>
-              ) : (
-                <>
-                  <Field label="Application Start Date" required containerRef={applicationStartDateRef} error={fieldMessage('applicationStartDate')}>
-                    <DatePicker className={`${inputCls} ${errCls('applicationStartDate')}`} value={form.applicationStartDate} onChange={value => set('applicationStartDate', value)} />
-                  </Field>
-                  <Field label="Application End Date" required containerRef={applicationEndDateRef} error={fieldMessage('applicationEndDate')}>
-                    <DatePicker className={`${inputCls} ${errCls('applicationEndDate')}`} value={form.applicationEndDate} onChange={value => set('applicationEndDate', value)} />
-                  </Field>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100" />
-
-          {/* III. Employment Period */}
+          {/* II. Employment Period */}
           <div>
             <SectionHeader title="Employment Period" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -419,45 +404,7 @@ export default function SPESMaintenanceForm({
 
           <div className="border-t border-gray-100" />
 
-          {/* IV. Slot Information */}
-          <div>
-            <SectionHeader title="Slot Information" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {isView ? (
-                <>
-                  <ReadOnlyField label="Available Slots" value={form.availableSlots} />
-                  <ReadOnlyField label="Target Beneficiaries" value={form.targetBeneficiaries} />
-                </>
-              ) : (
-                <>
-                  <Field label="Available Slots" required containerRef={availableSlotsRef} error={fieldMessage('availableSlots')}>
-                    <input
-                      type="number"
-                      min="1"
-                      className={`${inputCls} ${errCls('availableSlots')}`}
-                      placeholder="e.g. 100"
-                      value={form.availableSlots}
-                      onChange={e => set('availableSlots', e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Target Beneficiaries">
-                    <input
-                      type="number"
-                      min="0"
-                      className={inputCls}
-                      placeholder="e.g. 100"
-                      value={form.targetBeneficiaries}
-                      onChange={e => set('targetBeneficiaries', e.target.value)}
-                    />
-                  </Field>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100" />
-
-          {/* V. Employer / Deployment Information */}
+          {/* III. Employer / Deployment Information */}
           <div>
             <SectionHeader title="Employer / Deployment Information" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -469,8 +416,9 @@ export default function SPESMaintenanceForm({
                   <div className="md:col-span-2">
                     <ReadOnlyField label="Deployment Location" value={form.deploymentLocation} />
                   </div>
-                  <ReadOnlyField label="Program Coordinator / Person In Charge" value={form.coordinator} />
-                  <ReadOnlyField label="Supervisor / Immediate Head" value={form.supervisor} />
+                  <div className="md:col-span-2">
+                    <ReadOnlyField label="Program Coordinator / Person In Charge" value={form.coordinator} />
+                  </div>
                 </>
               ) : (
                 <>
@@ -494,22 +442,16 @@ export default function SPESMaintenanceForm({
                       />
                     </Field>
                   </div>
-                  <Field label="Program Coordinator / Person In Charge" required containerRef={coordinatorRef} error={fieldMessage('coordinator')}>
-                    <input
-                      className={`${inputCls} ${errCls('coordinator')}`}
-                      placeholder="Full name"
-                      value={form.coordinator}
-                      onChange={e => set('coordinator', e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Supervisor / Immediate Head">
-                    <input
-                      className={inputCls}
-                      placeholder="Full name"
-                      value={form.supervisor}
-                      onChange={e => set('supervisor', e.target.value)}
-                    />
-                  </Field>
+                  <div className="md:col-span-2">
+                    <Field label="Program Coordinator / Person In Charge" required containerRef={coordinatorRef} error={fieldMessage('coordinator')}>
+                      <input
+                        className={`${inputCls} ${errCls('coordinator')}`}
+                        placeholder="Full name"
+                        value={form.coordinator}
+                        onChange={e => set('coordinator', e.target.value)}
+                      />
+                    </Field>
+                  </div>
                 </>
               )}
             </div>
@@ -517,7 +459,7 @@ export default function SPESMaintenanceForm({
 
           <div className="border-t border-gray-100" />
 
-          {/* VI. Funding Information */}
+          {/* IV. Funding Information */}
           <div>
             <SectionHeader title="Funding Information" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -559,7 +501,7 @@ export default function SPESMaintenanceForm({
 
           <div className="border-t border-gray-100" />
 
-          {/* VII. Batch Status */}
+          {/* V. Batch Status */}
           <div>
             <SectionHeader title="Batch Status" />
             <Field label="Status">
@@ -567,14 +509,14 @@ export default function SPESMaintenanceForm({
                 value={form.status}
                 onChange={v => handleStatusChange(v)}
                 disabled={isView}
-                lockToOpen={isAdd}
+                lockToPlanned={isAdd}
               />
             </Field>
           </div>
 
           <div className="border-t border-gray-100" />
 
-          {/* VIII. Documents */}
+          {/* VI. Documents */}
           <div>
             <SectionHeader title="Documents" />
             {!isView && (

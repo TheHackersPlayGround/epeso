@@ -130,6 +130,16 @@ export async function generatePesoMonthlyReport(data: EfMonthlyReport, periodLab
   s1 = setCell(s1, 'J44',
     `Based on the comparative data, the placement rate for ${periodLabel} is ${pct(c.current.placementRate)}, ` +
     `compared to ${pct(c.previous.placementRate)} for the same period in ${c.previousYear}.`, false)
+  // The LMI summary sheet has no print setup in the PESO template — give it one so
+  // the analysis + charts print as one clean landscape page. (The list sheets keep
+  // the PESO's own page sizes.) Only add if not already present, to stay idempotent.
+  if (!s1.includes('<pageSetup')) {
+    if (!s1.includes('<sheetPr')) {
+      s1 = s1.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>')
+    }
+    s1 = s1.replace(/(<pageMargins[^>]*\/>)/,
+      '$1<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/>')
+  }
   zip.file(SUMMARY, s1)
 
   // ── Charts: refresh cached series values ──

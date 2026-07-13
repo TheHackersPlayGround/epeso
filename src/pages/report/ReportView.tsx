@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2 } from 'lucide-react'
+import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import ExcelJS from 'exceljs'
@@ -51,6 +51,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
+  // Preview pagination — same pattern as the CDSP/GIP/SPES module list tables.
+  const [previewPage, setPreviewPage] = useState(1)
+  const [previewPerPage, setPreviewPerPage] = useState(10)
 
   const readLS = (key: string, fallback: any[] = []): any[] => {
     try {
@@ -98,11 +101,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
       'employment-facilitation': ['Applicant Name', 'Employer', 'Job Title', 'Referral Status', 'Placement Status', 'Employment Type', 'Date Referred', 'Date Hired'],
       'ofw-services': ['OFW Name', 'Type of Request', 'Employment Status', 'Date Filed', 'Status'],
       'cdsp': ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Conducted', 'Highest Education',
-               'Employment Status', 'Facilitator', 'Course / Program', 'Current Occupation', 'Civil Status',
+               'Employment Status', 'Facilitator', 'Course / Program', 'Strand', 'Current Occupation', 'Civil Status',
                'Contact Number', 'Barangay', 'Status', 'Remarks'],
       'livelihood': ['Beneficiary Name', 'Program Type', 'Assistance Amount', 'Release Date', 'Status'],
-      'gip': ['Participant Name', 'Assigned Office', 'Start Date', 'End Date', 'Status'],
-      'spes': ['Participant Name', 'Assigned Office', 'Start Date', 'End Date', 'Status'],
+      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office',
+              'Start Date', 'End Date', 'Status', 'Batch', 'School Name', 'Course', 'Strand', 'Civil Status',
+              'Contact Number', 'Barangay', 'Coordinator', 'Supervisor', 'Allowance', 'Remarks'],
+      'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'School Name', 'Grade/Year Level', 'Assigned Office',
+               'Start Date', 'End Date', 'Status', 'Course', 'School Type', 'Civil Status', 'Contact Number',
+               'Barangay', 'Annual Family Income', 'No. of Dependents', 'Remarks'],
       'skills-training': ['Participant Name', 'Training Title', 'Trainer', 'Duration', 'Completion Status'],
     }
     return map[category] || []
@@ -114,6 +121,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
     // CDSP: the fields that matter for a career-development report are on by default;
     // the rest (contact, address, occupation, civil status, status, remarks) are optional.
     if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Conducted', 'Highest Education', 'Employment Status', 'Facilitator']
+    // GIP: interns deployed to government offices — identity, education, deployment office and period.
+    // (Status is optional, matching CDSP.)
+    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Start Date', 'End Date']
+    // SPES: working students — identity, school/year level, deployment office and period.
+    // (Status is optional, matching CDSP.)
+    if (category === 'spes') return ['No.', 'Participant Name', 'Sex', 'Age', 'School Name', 'Grade/Year Level', 'Assigned Office', 'Start Date', 'End Date']
     return getReportColumns(category)
   }
 
@@ -176,6 +189,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Civil Status': a.civilStatus || '-',
             'Highest Education': a.highestEducation || '-',
             'Course / Program': a.course || a.courseProgram || '-',
+            'Strand': a.strand || '-',
             'Employment Status': a.employmentStatus || '-',
             'Current Occupation': a.currentOccupation || '-',
             'Contact Number': a.contactNumber || '-',
@@ -184,28 +198,62 @@ export default function ReportView({ onBack }: ReportViewProps) {
           }))
 
       case 'gip':
-        return gipApplicants.map(a => {
-          const batch = gipBatches.find(b => b.id === a.assignedBatchId)
-          return {
-            'Participant Name': `${a.firstName} ${a.lastName}`,
-            'Assigned Office': batch?.assignedOffice || '-',
-            'Start Date': batch?.startDate || '-',
-            'End Date': batch?.endDate || '-',
-            'Status': a.status,
-          }
-        })
+        return gipApplicants
+          // Period filter on the date the application was received
+          .filter(a => inSelectedPeriod(a.dateApplicationReceived))
+          .map((a, i) => {
+            const batch = gipBatches.find(b => b.id === a.assignedBatchId)
+            return {
+              'No.': i + 1,
+              'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
+              'Sex': a.sex || '-',
+              'Age': a.age || '-',
+              'Highest Education': a.highestEducation || '-',
+              'Assigned Office': batch?.assignedOffice || '-',
+              'Start Date': batch?.startDate || '-',
+              'End Date': batch?.endDate || '-',
+              'Status': a.status,
+              'Batch': batch?.batchName || '-',
+              'School Name': a.schoolName || '-',
+              'Course': a.course || '-',
+              'Strand': a.strand || '-',
+              'Civil Status': a.civilStatus || '-',
+              'Contact Number': a.contactNumber || '-',
+              'Barangay': a.barangay || '-',
+              'Coordinator': batch?.coordinator || '-',
+              'Supervisor': batch?.supervisor || '-',
+              'Allowance': batch?.allowance || '-',
+              'Remarks': a.remarks || '-',
+            }
+          })
 
       case 'spes':
-        return spesApplicants.map(a => {
-          const batch = spesBatches.find(b => b.id === a.assignedBatchId)
-          return {
-            'Participant Name': `${a.firstName} ${a.lastName}`,
-            'Assigned Office': batch?.employer || '-',
-            'Start Date': batch?.programStartDate || '-',
-            'End Date': batch?.programEndDate || '-',
-            'Status': a.status,
-          }
-        })
+        return spesApplicants
+          // Period filter on the date the application was received
+          .filter(a => inSelectedPeriod(a.dateApplicationReceived))
+          .map((a, i) => {
+            const batch = spesBatches.find(b => b.id === a.assignedBatchId)
+            return {
+              'No.': i + 1,
+              'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
+              'Sex': a.sex || '-',
+              'Age': a.age || '-',
+              'School Name': a.schoolName || '-',
+              'Grade/Year Level': a.gradeYearLevel || '-',
+              'Assigned Office': batch?.employer || '-',
+              'Start Date': batch?.programStartDate || '-',
+              'End Date': batch?.programEndDate || '-',
+              'Status': a.status,
+              'Course': a.course || '-',
+              'School Type': a.schoolType || '-',
+              'Civil Status': a.civilStatus || '-',
+              'Contact Number': a.contactNumber || '-',
+              'Barangay': a.barangay || '-',
+              'Annual Family Income': a.annualFamilyIncome || '-',
+              'No. of Dependents': a.numberOfDependents ?? '-',
+              'Remarks': a.remarks || '-',
+            }
+          })
 
       case 'skills-training':
         return skillsProfiles.map(p => {
@@ -284,19 +332,21 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return { barChartData, pieChartData }
   }
 
-  // CDSP summary: total participants + breakdown by program type and by sex.
-  const generateCdspAnalytics = (rows: any[]) => {
-    const progMap: Record<string, number> = {}
+  // Participant-program summary (CDSP / GIP / SPES): total participants, a breakdown
+  // grouped by the given column, and a male/female split. `groupLabel` is shown as the
+  // breakdown heading (e.g. "Participants by Program Type" / "…by Assigned Office").
+  const generateProgramAnalytics = (rows: any[], groupCol: string, groupLabel: string) => {
+    const groupMap: Record<string, number> = {}
     let male = 0, female = 0
     rows.forEach(r => {
-      const p = r['Program Type'] && r['Program Type'] !== '-' ? r['Program Type'] : 'Unspecified'
-      progMap[p] = (progMap[p] || 0) + 1
+      const g = r[groupCol] && r[groupCol] !== '-' ? r[groupCol] : 'Unspecified'
+      groupMap[g] = (groupMap[g] || 0) + 1
       const s = String(r['Sex'] || '').toLowerCase()
       if (s === 'male') male++
       else if (s === 'female') female++
     })
-    const byProgram = Object.entries(progMap).map(([program, value]) => ({ program, value })).sort((a, b) => b.value - a.value)
-    return { total: rows.length, byProgram, male, female }
+    const byGroup = Object.entries(groupMap).map(([group, value]) => ({ group, value })).sort((a, b) => b.value - a.value)
+    return { total: rows.length, byGroup, groupLabel, male, female }
   }
 
 
@@ -346,9 +396,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const initialColumns: Record<string, boolean> = {}
     columns.forEach(col => { initialColumns[col] = defaults.includes(col) })
     setVisibleColumns(initialColumns)
+    setPreviewPage(1) // start a freshly generated report on the first page
     let analytics = null
     if (reportCategory === 'general-peso') analytics = generateAnalytics()
-    else if (reportCategory === 'cdsp') analytics = generateCdspAnalytics(data)
+    else if (reportCategory === 'cdsp') analytics = generateProgramAnalytics(data, 'Program Type', 'Participants by Program Type')
+    else if (reportCategory === 'gip') analytics = generateProgramAnalytics(data, 'Assigned Office', 'Participants by Assigned Office')
+    else if (reportCategory === 'spes') analytics = generateProgramAnalytics(data, 'Assigned Office', 'Participants by Assigned Office')
     // Employment Facilitation is handled earlier (downloads the PESO Excel) and
     // never reaches here, so it has no on-screen analytics branch.
     setGeneratedReport({
@@ -449,6 +502,20 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
       const BORDERS = { top: THIN, left: THIN, bottom: THIN, right: THIN }
 
+      // Print setup for a report meant to be printed/submitted: Folio ("long", 8.5×13"),
+      // landscape, scaled to fit all columns across one page width, header row repeated.
+      const applyPrint = (ws: ExcelJS.Worksheet, repeatHeader = false) => {
+        ws.pageSetup = {
+          paperSize: 14, // 14 = Folio / Long bond (8.5 × 13")
+          orientation: 'landscape',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0, // unlimited pages tall; rows flow down
+          margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+        }
+        if (repeatHeader) ws.pageSetup.printTitlesRow = '1:1'
+      }
+
       // A properly-formatted data table: ALL-CAPS, bold, centered header (plain, no
       // fill); bordered cells; auto-fit column widths; frozen header row.
       const addTable = (ws: ExcelJS.Worksheet, cols: string[], rows: any[]) => {
@@ -472,6 +539,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           ws.getColumn(i + 1).width = Math.min(Math.max(c.length + 4, dataMax + 2, 10), 60)
         })
         ws.views = [{ state: 'frozen', ySplit: 1 }]
+        applyPrint(ws, true) // repeat the header row on each printed page
       }
 
       // Optional analytics summary sheet (General PESO report).
@@ -489,27 +557,33 @@ export default function ReportView({ onBack }: ReportViewProps) {
         aoa.forEach(r => ws.addRow(r))
         ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
         ws.getRow(1).font = { bold: true, size: 14 }
+        applyPrint(ws)
       }
 
-      // CDSP summary sheet (matches the on-screen CDSP Summary).
-      if (generatedReport.analytics && generatedReport.category === 'cdsp') {
+      // Participant-program summary sheet (CDSP / GIP / SPES) — matches the on-screen Summary.
+      if (generatedReport.analytics && ['cdsp', 'gip', 'spes'].includes(generatedReport.category)) {
         const a = generatedReport.analytics
+        const groupHeaderLabel = a.groupLabel.toUpperCase()
+        const groupColHeader = a.groupLabel.replace(/^Participants by /i, '')
         const aoa: any[][] = [
-          ['CDSP SUMMARY'], [],
+          [`${String(generatedReport.categoryName).toUpperCase()} SUMMARY`], [],
           ['Report Period', generatedReport.periodDetails],
-          ['Program Type', generatedReport.programType || 'All Programs'],
+          // Program Type filter only applies to CDSP; GIP/SPES have no such filter.
+          ...(generatedReport.category === 'cdsp' ? [['Program Type', generatedReport.programType || 'All Programs']] : []),
           ['Generated On', new Date().toLocaleDateString()], [],
           ['Total Participants', a.total],
           ['Male', a.male],
           ['Female', a.female], [],
-          ['PARTICIPANTS BY PROGRAM TYPE'], ['Program', 'Participants'],
-          ...a.byProgram.map((d: any) => [d.program, d.value]),
+          [groupHeaderLabel], [groupColHeader, 'Participants'],
+          ...a.byGroup.map((d: any) => [d.group, d.value]),
         ]
         const ws = wb.addWorksheet('Summary')
         aoa.forEach(r => ws.addRow(r))
         ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
         ws.getRow(1).font = { bold: true, size: 14 }
-        ws.getRow(11).font = { bold: true } // "PARTICIPANTS BY PROGRAM TYPE"
+        const groupHeaderRow = aoa.findIndex(r => r[0] === groupHeaderLabel) + 1
+        if (groupHeaderRow > 0) ws.getRow(groupHeaderRow).font = { bold: true }
+        applyPrint(ws)
       }
 
       const cols = generatedReport.columns.filter((c: string) => visibleColumns[c])
@@ -542,12 +616,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
         csv += '\nREFERRAL STATUS\nStatus,Count,Percentage\n'
         generatedReport.analytics.referralStatusDistribution.forEach((i: any) => { csv += `${i.status},${i.count},${i.value.toFixed(1)}%\n` })
         csv += '\nDETAILED EMPLOYMENT FACILITATION REPORT\n'
-      } else if (generatedReport.category === 'cdsp' && generatedReport.analytics) {
+      } else if (['cdsp', 'gip', 'spes'].includes(generatedReport.category) && generatedReport.analytics) {
         const a = generatedReport.analytics
-        csv += `CDSP SUMMARY\n\nReport Period,${generatedReport.periodDetails}\nProgram Type,${generatedReport.programType || 'All Programs'}\nGenerated On,${new Date().toLocaleDateString()}\n\n`
+        const groupColHeader = a.groupLabel.replace(/^Participants by /i, '')
+        csv += `${String(generatedReport.categoryName).toUpperCase()} SUMMARY\n\nReport Period,${generatedReport.periodDetails}\n`
+        // Program Type filter only applies to CDSP; GIP/SPES have no such filter.
+        if (generatedReport.category === 'cdsp') csv += `Program Type,${generatedReport.programType || 'All Programs'}\n`
+        csv += `Generated On,${new Date().toLocaleDateString()}\n\n`
         csv += `Total Participants,${a.total}\nMale,${a.male}\nFemale,${a.female}\n\n`
-        csv += 'PARTICIPANTS BY PROGRAM TYPE\nProgram,Participants\n'
-        a.byProgram.forEach((d: any) => { csv += `${d.program},${d.value}\n` })
+        csv += `${a.groupLabel.toUpperCase()}\n${groupColHeader},Participants\n`
+        a.byGroup.forEach((d: any) => { csv += `${d.group},${d.value}\n` })
         csv += '\nDETAILED REPORT\n'
       }
       csv += XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(filteredData))
@@ -869,12 +947,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </div>
       )}
 
-      {/* CDSP Summary */}
-      {generatedReport?.category === 'cdsp' && generatedReport.analytics && (
+      {/* Participant-program Summary (CDSP / GIP / SPES) */}
+      {generatedReport && ['cdsp', 'gip', 'spes'].includes(generatedReport.category) && generatedReport.analytics && (
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
             <BarChart2 size={20} className="text-[#0077BE]" />
-            CDSP Summary
+            {generatedReport.categoryName} Summary
           </h3>
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
@@ -888,17 +966,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </div>
             ))}
           </div>
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Participants by Program Type</h4>
-          {generatedReport.analytics.byProgram.length === 0 ? (
+          <h4 className="text-sm font-medium text-gray-700 mb-3">{generatedReport.analytics.groupLabel}</h4>
+          {generatedReport.analytics.byGroup.length === 0 ? (
             <p className="text-sm text-gray-400">No participants in the selected period.</p>
           ) : (
             <div className="space-y-3">
-              {generatedReport.analytics.byProgram.map((item: any, i: number) => {
-                const max = Math.max(...generatedReport.analytics.byProgram.map((d: any) => d.value), 1)
+              {generatedReport.analytics.byGroup.map((item: any, i: number) => {
+                const max = Math.max(...generatedReport.analytics.byGroup.map((d: any) => d.value), 1)
                 return (
                   <div key={i}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700">{item.program}</span>
+                      <span className="text-gray-700">{item.group}</span>
                       <span className="font-medium text-gray-800">{item.value}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -913,7 +991,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
       )}
 
       {/* Report Preview Table */}
-      {generatedReport && (
+      {generatedReport && (() => {
+        // Pagination — mirrors the CDSP/GIP/SPES module list tables.
+        const rows: any[] = generatedReport.data
+        const totalRows = rows.length
+        const totalPages = Math.max(1, Math.ceil(totalRows / previewPerPage))
+        const safePage = Math.min(previewPage, totalPages)
+        const paginated = rows.slice((safePage - 1) * previewPerPage, safePage * previewPerPage)
+        const recordStart = totalRows === 0 ? 0 : (safePage - 1) * previewPerPage + 1
+        const recordEnd = Math.min(safePage * previewPerPage, totalRows)
+        return (
         <div className="bg-white rounded-xl shadow-md">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div>
@@ -957,7 +1044,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-b-xl">
+          <div className={`overflow-x-auto ${totalRows > 0 ? '' : 'rounded-b-xl'}`}>
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -967,9 +1054,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 </tr>
               </thead>
               <tbody>
-                {generatedReport.data.length > 0
-                  ? generatedReport.data.map((row: any, i: number) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                {totalRows > 0
+                  ? paginated.map((row: any, i: number) => (
+                    <tr key={recordStart + i} className="border-b border-gray-100 hover:bg-gray-50">
                       {generatedReport.columns.filter((col: string) => visibleColumns[col]).map((col: string) => (
                         <td key={col} className="px-6 py-3 text-sm text-gray-800 whitespace-nowrap">{row[col] || '-'}</td>
                       ))}
@@ -986,8 +1073,35 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </tbody>
             </table>
           </div>
+          {totalRows > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 rounded-b-xl">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                Show
+                <select
+                  value={previewPerPage}
+                  onChange={e => { setPreviewPerPage(Number(e.target.value)); setPreviewPage(1) }}
+                  className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                per page
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <button onClick={() => setPreviewPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  <ChevronLeft size={16} />
+                </button>
+                <span>{recordStart} to {recordEnd} of {totalRows} records</span>
+                <button onClick={() => setPreviewPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        )
+      })()}
 
       {/* Empty State */}
       {!generatedReport && (

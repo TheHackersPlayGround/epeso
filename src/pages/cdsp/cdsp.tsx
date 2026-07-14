@@ -190,7 +190,7 @@ function ConfirmModal({
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
-  const { applicants, activities: cdspActivities, services: svcList, refreshProfiles } = useCDSP()
+  const { applicants, activities: cdspActivities, services: svcList, refreshProfiles, refreshActivities } = useCDSP()
   const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -321,7 +321,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     if (!assignTarget?.beneficiaryServiceId) return
     try {
       await cdspApiService.addParticipant({ activityId: activity.id, beneficiaryServiceId: assignTarget.beneficiaryServiceId })
-      await refreshProfiles()
+      await Promise.all([refreshProfiles(), refreshActivities()])
       setAssignTarget(null)
       setSelectedActivity(null)
       Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${activity.title}" successfully.`, confirmButtonText: 'OK', confirmButtonColor: '#0077BE' })
@@ -337,7 +337,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     if (!applicant?.beneficiaryServiceId || !applicant?.assignedActivityId) return
     try {
       await cdspApiService.removeParticipant({ activityId: applicant.assignedActivityId, beneficiaryServiceId: applicant.beneficiaryServiceId })
-      await refreshProfiles()
+      await Promise.all([refreshProfiles(), refreshActivities()])
       setAssignTarget(null)
       setSelectedActivity(null)
       setViewingAssignedFor(null)
@@ -585,10 +585,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input placeholder="Search activities..." className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" readOnly />
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1 px-1">
-                  <AlertCircle size={11} className="flex-shrink-0" />
-                  Showing <span className="font-semibold text-brand-blue mx-1">Planned</span> activities
-                  {assignTarget.serviceAvailed && <> for <span className="font-semibold text-brand-blue mx-1">{assignTarget.serviceAvailed}</span> only</>}
+                <p className="text-xs text-gray-400 mt-1.5 px-1 leading-relaxed">
+                  <AlertCircle size={11} className="inline-block -mt-0.5 mr-1" />
+                  Showing <span className="font-semibold text-brand-blue">Planned</span> activities
+                  {assignTarget.serviceAvailed && <> for <span className="font-semibold text-brand-blue">{assignTarget.serviceAvailed}</span> only</>}
                 </p>
               </div>
 

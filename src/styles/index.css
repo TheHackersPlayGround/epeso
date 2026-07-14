@@ -106,16 +106,22 @@ h2 {
 
 /* Typed input text should read as near-black, not the lighter body-text gray
    (--text). Placeholder hints keep their own explicit gray (Tailwind's
-   placeholder:text-* utilities), which take precedence since they're more
-   specific than this element selector.
+   placeholder:text-* utilities, or a manually-applied text-gray-* class),
+   which take precedence — but only because this is in @layer base: Tailwind
+   v4's utilities live in @layer utilities, which beats @layer base regardless
+   of selector specificity. Left unlayered, this plain `select`/`input` element
+   selector would beat EVERY utility class no matter its specificity, since
+   unlayered CSS always wins over layered CSS.
    Hardcoded (not var(--text-h)): these admin screens are a fixed light theme
    (bg-white cards throughout, no dark-mode support), but --text-h flips to a
    near-white #f3f4f6 under prefers-color-scheme: dark, which made every input's
    text nearly invisible on OS dark mode. */
-input,
-textarea,
-select {
-  color: #111827;
+@layer base {
+  input,
+  textarea,
+  select {
+    color: #111827;
+  }
 }
 
 h1 {

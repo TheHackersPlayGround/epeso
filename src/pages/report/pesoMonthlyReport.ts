@@ -164,7 +164,24 @@ export async function generatePesoMonthlyReport(data: EfMonthlyReport, periodLab
   const drawing = zip.file('xl/drawings/drawing1.xml')
   if (drawing) {
     let d = await drawing.async('string')
-    d = d.replace(/<a:t>[^<]*JUNE 2026[^<]*<\/a:t>/, `<a:t> ${xmlEsc(periodLabel)}</a:t>`)
+    const titleMarker = '<a:t>LMI Graphical Presentation for'
+    const titleStart = d.indexOf(titleMarker)
+    if (titleStart !== -1) {
+      // The box is a FIXED width (spAutoFit only grows height, not width), sized
+      // for the original short placeholder ("JUNE 2026"). A custom-range label can
+      // run much longer and get clipped, so shrink the font to fit instead —
+      // scoped to just this shape's <xdr:txBody> so it can't touch other shapes'
+      // font sizes elsewhere in the drawing.
+      const bodyStart = d.lastIndexOf('<xdr:txBody>', titleStart)
+      const bodyEnd = d.indexOf('</xdr:txBody>', titleStart) + '</xdr:txBody>'.length
+      let body = d.slice(bodyStart, bodyEnd)
+      const fullTitle = `LMI Graphical Presentation for  ${periodLabel}`
+      const CHARS_AT_11PT = 40 // ≈ box width (267pt) / avg bold-Century-Gothic char width at 11pt
+      const fitFontSz = Math.min(1100, Math.max(600, Math.round(1100 * CHARS_AT_11PT / fullTitle.length)))
+      body = body.replace(/sz="1100"/g, `sz="${fitFontSz}"`)
+      body = body.replace(/<a:t>[^<]*JUNE 2026[^<]*<\/a:t>/, `<a:t> ${xmlEsc(periodLabel)}</a:t>`)
+      d = d.slice(0, bodyStart) + body + d.slice(bodyEnd)
+    }
     zip.file('xl/drawings/drawing1.xml', d)
   }
 

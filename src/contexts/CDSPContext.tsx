@@ -97,10 +97,16 @@ export interface CdspService {
   name: string
 }
 
+export interface CdspProgramInfo {
+  code: string
+  name: string
+}
+
 interface CDSPContextValue {
   applicants: CDSPApplicant[]
   activities: CdspActivity[]
   services: CdspService[]
+  programInfo: CdspProgramInfo | null
   loading: boolean
   loadingActivities: boolean
   refreshProfiles: () => Promise<void>
@@ -114,6 +120,7 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<CDSPApplicant[]>([])
   const [activities, setActivities] = useState<CdspActivity[]>([])
   const [services, setServices] = useState<CdspService[]>([])
+  const [programInfo, setProgramInfo] = useState<CdspProgramInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
@@ -145,6 +152,7 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
     try {
       const res = await cdspService.listCdspServices()
       setServices(res.data ?? [])
+      setProgramInfo(res.program ?? null)
     } catch {
       // silent
     }
@@ -157,7 +165,7 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
   }, [refreshProfiles, refreshActivities, refreshServices])
 
   return (
-    <CDSPContext.Provider value={{ applicants, activities, services, loading, loadingActivities, refreshProfiles, refreshActivities, refreshServices }}>
+    <CDSPContext.Provider value={{ applicants, activities, services, programInfo, loading, loadingActivities, refreshProfiles, refreshActivities, refreshServices }}>
       {children}
     </CDSPContext.Provider>
   )

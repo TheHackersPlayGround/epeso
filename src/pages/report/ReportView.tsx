@@ -32,8 +32,23 @@ type ReportCategory =
 
 type ReportPeriod = 'monthly' | 'annual' | 'custom'
 
+// Hoisted to module scope (rather than declared inside the component) so its
+// first entry can seed the reportCategory state's initial value below — the
+// dropdown no longer has an empty placeholder option, so it always needs a
+// real default category selected from the start.
+const REPORT_CATEGORIES: { id: ReportCategory; name: string }[] = [
+  { id: 'general-peso', name: 'General PESO Report' },
+  { id: 'employment-facilitation', name: 'Employment Facilitation' },
+  { id: 'ofw-services', name: 'OFW Services' },
+  { id: 'cdsp', name: 'CDSP' },
+  { id: 'livelihood', name: 'Livelihood' },
+  { id: 'gip', name: 'GIP' },
+  { id: 'spes', name: 'SPES' },
+  { id: 'skills-training', name: 'Skills Training' },
+]
+
 export default function ReportView({ onBack }: ReportViewProps) {
-  const { applicants: cdspApplicants, activities: cdspActivities } = useCDSP()
+  const { applicants: cdspApplicants, activities: cdspActivities, services: cdspServices, programInfo: cdspProgramInfo } = useCDSP()
   const { applicants: gipApplicants, gipBatches } = useGIP()
   const { applicants: spesApplicants, spesBatches } = useSPES()
   const { profiles: skillsProfiles } = useSkillsTraining()
@@ -69,18 +84,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const efReferrals  = () => readLS('ef_referrals',  REFERRAL_SEED)
   const efPlacements = () => readLS('ef_placements', PLACEMENT_SEED)
 
-  const reportCategories = [
-    { id: 'general-peso', name: 'General PESO Report' },
-    { id: 'employment-facilitation', name: 'Employment Facilitation' },
-    { id: 'ofw-services', name: 'OFW Services' },
-    { id: 'cdsp', name: 'CDSP' },
-    { id: 'livelihood', name: 'Livelihood' },
-    { id: 'gip', name: 'GIP' },
-    { id: 'spes', name: 'SPES' },
-    { id: 'skills-training', name: 'Skills Training' },
-  ]
-
-  const cdspPrograms = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
+  const cdspPrograms = cdspServices.length > 0 ? cdspServices.map(s => s.name) : ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
   const livelihoodPrograms = ['DILEEP (DILP)', 'DILEEP (TUPAD)', 'SLP', 'CLPEP']
 
   const months = [
@@ -338,8 +342,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // Participant-program summary (CDSP / GIP / SPES): total participants, a breakdown
   // grouped by the given column, and a male/female split. `groupLabel` is shown as the
   // breakdown heading (e.g. "Participants by Program Type" / "…by Assigned Office").
-  const generateProgramAnalytics = (rows: any[], groupCol: string, groupLabel: string) => {
+  const generateProgramAnalytics = (rows: any[], groupCol: string, groupLabel: string, allGroups?: string[]) => {
     const groupMap: Record<string, number> = {}
+    allGroups?.forEach(g => { groupMap[g] = 0 })
     let male = 0, female = 0
     rows.forEach(r => {
       const g = r[groupCol] && r[groupCol] !== '-' ? r[groupCol] : 'Unspecified'
@@ -367,7 +372,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
       from = `${year}-01-01`; to = `${year}-12-31`; label = `Year ${year}`; phrase = `For the Year ${year}`
     } else if (reportPeriod === 'custom') {
       if (!fromDate || !toDate) { Swal.fire('Error', 'Please select a From and To date.', 'error'); return }
-      from = fromDate; to = toDate; label = `${fromDate} to ${toDate}`; phrase = `For the period ${fromDate} to ${toDate}`
+      from = fromDate; to = toDate
+      const rangeLabel = `${formatLongDate(fromDate)} to ${formatLongDate(toDate)}`
+      label = rangeLabel; phrase = `For the period ${rangeLabel}`
     } else {
       const m = Number(month)
       const lastDay = new Date(Number(year), m, 0).getDate()
@@ -402,14 +409,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setPreviewPage(1) // start a freshly generated report on the first page
     let analytics = null
     if (reportCategory === 'general-peso') analytics = generateAnalytics()
-    else if (reportCategory === 'cdsp') analytics = generateProgramAnalytics(data, 'Program Type', 'Participants by Program Type')
+    else if (reportCategory === 'cdsp') analytics = generateProgramAnalytics(data, 'Program Type', 'Participants by Program Type', cdspPrograms)
     else if (reportCategory === 'gip') analytics = generateProgramAnalytics(data, 'Assigned Office', 'Participants by Assigned Office')
     else if (reportCategory === 'spes') analytics = generateProgramAnalytics(data, 'Assigned Office', 'Participants by Assigned Office')
     // Employment Facilitation is handled earlier (downloads the PESO Excel) and
     // never reaches here, so it has no on-screen analytics branch.
     setGeneratedReport({
       category: reportCategory,
-      categoryName: reportCategories.find(c => c.id === reportCategory)?.name,
+      categoryName: REPORT_CATEGORIES.find(c => c.id === reportCategory)?.name,
       programType,
       period: reportPeriod,
       periodDetails: getPeriodDetails(),
@@ -419,10 +426,19 @@ export default function ReportView({ onBack }: ReportViewProps) {
     })
   }
 
+  // Parses "YYYY-MM-DD" into local-date parts (rather than `new Date(str)`, which
+  // reads it as UTC midnight and can shift the displayed day by one depending on
+  // the viewer's timezone) and spells it out to match the Monthly/Annual style.
+  const formatLongDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  }
+
   const getPeriodDetails = () => {
     if (reportPeriod === 'monthly') return `${months.find(m => m.value === month)?.label} ${year}`
     if (reportPeriod === 'annual') return `Year ${year}`
-    return `${fromDate} to ${toDate}`
+    return `${formatLongDate(fromDate)} to ${formatLongDate(toDate)}`
   }
 
   const toggleColumn = (column: string) => {
@@ -491,6 +507,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
     resolve(canvas.toDataURL('image/png'))
   })
 
+  // Report titles show the spelled-out program name alongside its abbreviation
+  // (e.g. "Career Development and Services Program (CDSP)"), matching the naming
+  // convention used on the CDSP page itself — sourced from the `services` table
+  // rather than hardcoded, so it stays correct if the program name ever changes.
+  const reportDisplayTitle = (categoryId: string, shortName?: string): string => {
+    if (categoryId === 'cdsp' && cdspProgramInfo) return `${cdspProgramInfo.name} (${cdspProgramInfo.code})`
+    return shortName ?? ''
+  }
+
   const handleExport = async (format: 'excel' | 'csv' | 'pdf') => {
     if (!generatedReport) return
     const filteredData = generatedReport.data.map((row: any) => {
@@ -538,8 +563,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
           let dataMax = 0
           rows.forEach(row => { const v = String(row[c] ?? ''); if (v.length > dataMax) dataMax = v.length })
           // Column is wide enough for its bold, uppercased header (needs a little
-          // extra room) AND its widest value — so the header never wraps.
-          ws.getColumn(i + 1).width = Math.min(Math.max(c.length + 4, dataMax + 2, 10), 60)
+          // extra room) AND its widest value — so the header never wraps. Floor of 6
+          // (not 10) so short columns like "No." don't get padded far wider than
+          // their single- or double-digit values actually need.
+          ws.getColumn(i + 1).width = Math.min(Math.max(c.length + 4, dataMax + 2, 6), 60)
         })
         ws.views = [{ state: 'frozen', ySplit: 1 }]
         applyPrint(ws, true) // repeat the header row on each printed page
@@ -549,8 +576,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       if (generatedReport.analytics && generatedReport.category === 'general-peso') {
         const aoa: any[][] = [
           ['PESO COMPREHENSIVE REPORT'], [],
-          ['Report Period', generatedReport.periodDetails],
-          ['Generated On', new Date().toLocaleDateString()], [],
+          ['Report Period', generatedReport.periodDetails], [],
           ['PROGRAM PARTICIPATION SUMMARY'], ['Program', 'Participants'],
           ...generatedReport.analytics.barChartData.map((d: any) => [d.program, d.value]), [],
           ['PROGRAM DISTRIBUTION'], ['Program', 'Percentage'],
@@ -568,17 +594,19 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const a = generatedReport.analytics
         const groupHeaderLabel = a.groupLabel.toUpperCase()
         const groupColHeader = a.groupLabel.replace(/^Participants by /i, '')
+        // Breakdown by program is only meaningful when viewing all programs — see
+        // matching note on the on-screen summary.
+        const showBreakdown = generatedReport.category !== 'cdsp' || !generatedReport.programType
         const aoa: any[][] = [
           [`${String(generatedReport.categoryName).toUpperCase()} SUMMARY`], [],
+          ...(generatedReport.category === 'cdsp' && cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
           ['Report Period', generatedReport.periodDetails],
           // Program Type filter only applies to CDSP; GIP/SPES have no such filter.
-          ...(generatedReport.category === 'cdsp' ? [['Program Type', generatedReport.programType || 'All Programs']] : []),
-          ['Generated On', new Date().toLocaleDateString()], [],
+          ...(generatedReport.category === 'cdsp' ? [['Program Type', generatedReport.programType || cdspPrograms.join(', ')]] : []), [],
           ['Total Participants', a.total],
           ['Male', a.male],
           ['Female', a.female], [],
-          [groupHeaderLabel], [groupColHeader, 'Participants'],
-          ...a.byGroup.map((d: any) => [d.group, d.value]),
+          ...(showBreakdown ? [[groupHeaderLabel], [groupColHeader, 'Participants'], ...a.byGroup.map((d: any) => [d.group, d.value])] : []),
         ]
         const ws = wb.addWorksheet('Summary')
         aoa.forEach(r => ws.addRow(r))
@@ -601,37 +629,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
       URL.revokeObjectURL(link.href)
 
     } else if (format === 'csv') {
-      let csv = ''
-      if (generatedReport.category === 'general-peso' && generatedReport.analytics) {
-        csv += `PESO COMPREHENSIVE REPORT\n\nReport Period,${generatedReport.periodDetails}\nGenerated On,${new Date().toLocaleDateString()}\n\n`
-        csv += 'PROGRAM PARTICIPATION SUMMARY\nProgram,Participants,Bar\n'
-        const maxB = Math.max(...generatedReport.analytics.barChartData.map((d: any) => d.value), 1)
-        generatedReport.analytics.barChartData.forEach((i: any) => { csv += `${i.program},${i.value},${'█'.repeat(Math.round((i.value / maxB) * 50))}\n` })
-        csv += '\nPROGRAM DISTRIBUTION\nProgram,Percentage\n'
-        generatedReport.analytics.pieChartData.forEach((i: any) => { csv += `${i.program},${i.value.toFixed(1)}%\n` })
-        csv += '\nDETAILED REPORT\n'
-      } else if (generatedReport.category === 'employment-facilitation' && generatedReport.analytics) {
-        const s = generatedReport.analytics.summary
-        csv += `LABOR MARKET INFORMATION REPORT\n\nReport Period,${generatedReport.periodDetails}\nGenerated On,${new Date().toLocaleDateString()}\n\n`
-        csv += `LABOR MARKET SUMMARY\nTotal Applicants,${s.totalApplicants}\nTotal Vacancies,${s.totalVacancies}\nTotal Referrals,${s.totalReferrals}\nTotal Placements,${s.totalPlacements}\nPlacement Rate,${s.placementRate}%\n\n`
-        csv += 'PLACEMENTS PER MONTH\nMonth,Placements\n'
-        generatedReport.analytics.placementsPerMonth.forEach((i: any) => { csv += `${i.month},${i.value}\n` })
-        csv += '\nREFERRAL STATUS\nStatus,Count,Percentage\n'
-        generatedReport.analytics.referralStatusDistribution.forEach((i: any) => { csv += `${i.status},${i.count},${i.value.toFixed(1)}%\n` })
-        csv += '\nDETAILED EMPLOYMENT FACILITATION REPORT\n'
-      } else if (['cdsp', 'gip', 'spes'].includes(generatedReport.category) && generatedReport.analytics) {
-        const a = generatedReport.analytics
-        const groupColHeader = a.groupLabel.replace(/^Participants by /i, '')
-        csv += `${String(generatedReport.categoryName).toUpperCase()} SUMMARY\n\nReport Period,${generatedReport.periodDetails}\n`
-        // Program Type filter only applies to CDSP; GIP/SPES have no such filter.
-        if (generatedReport.category === 'cdsp') csv += `Program Type,${generatedReport.programType || 'All Programs'}\n`
-        csv += `Generated On,${new Date().toLocaleDateString()}\n\n`
-        csv += `Total Participants,${a.total}\nMale,${a.male}\nFemale,${a.female}\n\n`
-        csv += `${a.groupLabel.toUpperCase()}\n${groupColHeader},Participants\n`
-        a.byGroup.forEach((d: any) => { csv += `${d.group},${d.value}\n` })
-        csv += '\nDETAILED REPORT\n'
-      }
-      csv += XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(filteredData))
+      // CSV is a flat, single-table format — unlike Excel it has no sheets/tabs to
+      // hold a separate summary, so it exports just the detailed data table.
+      const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(filteredData))
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
@@ -642,21 +642,37 @@ export default function ReportView({ onBack }: ReportViewProps) {
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
 
     } else if (format === 'pdf') {
-      const doc = new jsPDF()
+      // Wide tables (many visible columns) don't fit an A4 portrait page, so switch
+      // to landscape whenever the columns need more room than portrait can offer.
+      const visibleColsForOrientation = generatedReport.columns.filter((c: string) => visibleColumns[c])
+      const MIN_COL_WIDTH_MM = 22
+      const orientation: 'portrait' | 'landscape' =
+        visibleColsForOrientation.length * MIN_COL_WIDTH_MM > 182 ? 'landscape' : 'portrait'
+      const doc = new jsPDF({ orientation })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const centerX = pageWidth / 2
+      const usableWidth = pageWidth - 28 // 14mm margin on each side
       let y = 20
-      doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-      doc.text(generatedReport.categoryName, 105, y, { align: 'center' }); y += 10
+      // Title shows the spelled-out program name alongside its abbreviation for CDSP
+      // (e.g. "Career Development and Services Program (CDSP)") — long titles get a
+      // smaller font and wrap across lines instead of running off the page edge.
+      const pdfTitle = reportDisplayTitle(generatedReport.category, generatedReport.categoryName)
+      const titleFontSize = pdfTitle.length > 45 ? 14 : 18
+      doc.setFontSize(titleFontSize); doc.setFont('helvetica', 'bold')
+      const titleLines = doc.splitTextToSize(pdfTitle, usableWidth)
+      titleLines.forEach((line: string) => { doc.text(line, centerX, y, { align: 'center' }); y += titleFontSize * 0.5 })
+      y += 4
       doc.setFontSize(11); doc.setFont('helvetica', 'normal')
-      doc.text(`Report Period: ${generatedReport.periodDetails}`, 105, y, { align: 'center' }); y += 5
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, y, { align: 'center' }); y += 15
+      doc.text(`Report Period: ${generatedReport.periodDetails}`, centerX, y, { align: 'center' }); y += 15
 
       if (generatedReport.category === 'general-peso' && generatedReport.analytics) {
         doc.setFontSize(14); doc.setFont('helvetica', 'bold')
         doc.text('Program Participation Summary', 14, y); y += 6
-        doc.addImage(await createBarChartImage(generatedReport.analytics.barChartData), 'PNG', 14, y, 180, 90); y += 92
+        doc.addImage(await createBarChartImage(generatedReport.analytics.barChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5); y += usableWidth * 0.5 + 2
         doc.setFontSize(14); doc.setFont('helvetica', 'bold')
         doc.text('Program Distribution', 14, y); y += 6
-        doc.addImage(await createPieChartImage(generatedReport.analytics.pieChartData), 'PNG', 14, y, 180, 100); y += 102
+        doc.addImage(await createPieChartImage(generatedReport.analytics.pieChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5556); y += usableWidth * 0.5556 + 2
         doc.addPage(); y = 20
         doc.setFontSize(14); doc.setFont('helvetica', 'bold')
         doc.text('Detailed Report', 14, y); y += 6
@@ -673,32 +689,86 @@ export default function ReportView({ onBack }: ReportViewProps) {
         doc.text(`Placement Rate: ${s.placementRate}%`, 75, y); y += 10
         doc.setFontSize(12); doc.setFont('helvetica', 'bold')
         doc.text('Placements Per Month', 14, y); y += 6
-        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.placementsPerMonth, '', '#10B981'), 'PNG', 14, y, 180, 78.75); y += 80
+        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.placementsPerMonth, '', '#10B981'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
         doc.setFontSize(12); doc.setFont('helvetica', 'bold')
         doc.text('Referral Status Distribution', 14, y); y += 6
-        doc.addImage(await createPieChartImage(generatedReport.analytics.referralStatusDistribution), 'PNG', 14, y, 180, 101.25); y += 103
+        doc.addImage(await createPieChartImage(generatedReport.analytics.referralStatusDistribution), 'PNG', 14, y, usableWidth, usableWidth * 0.5625); y += usableWidth * 0.5625 + 2
         doc.addPage(); y = 20
         doc.setFontSize(12); doc.setFont('helvetica', 'bold')
         doc.text('Top Job Vacancies', 14, y); y += 6
-        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.jobVacancyDistribution, '', '#3B82F6'), 'PNG', 14, y, 180, 78.75); y += 80
+        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.jobVacancyDistribution, '', '#3B82F6'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
         doc.setFontSize(12); doc.setFont('helvetica', 'bold')
         doc.text('Top Employers by Vacancies', 14, y); y += 6
-        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.employerParticipation, '', '#0077BE'), 'PNG', 14, y, 180, 78.75); y += 80
+        doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.employerParticipation, '', '#0077BE'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
         doc.addPage(); y = 20
         doc.setFontSize(14); doc.setFont('helvetica', 'bold')
         doc.text('Detailed Employment Facilitation Report', 14, y); y += 6
+
+      } else if (['cdsp', 'gip', 'spes'].includes(generatedReport.category) && generatedReport.analytics) {
+        // Matches the Summary sheet in the Excel export — General PESO and
+        // Employment Facilitation already got a PDF summary section above; CDSP/
+        // GIP/SPES previously jumped straight to the detailed table with nothing.
+        const a = generatedReport.analytics
+        doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+        doc.text(`${generatedReport.categoryName} Summary`, 14, y); y += 8
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+        if (generatedReport.category === 'cdsp' && cdspProgramInfo) {
+          doc.text(`Program: ${reportDisplayTitle('cdsp')}`, 14, y); y += 5
+        }
+        doc.text(`Report Period: ${generatedReport.periodDetails}`, 14, y); y += 5
+        // Program Type filter only applies to CDSP; GIP/SPES have no such filter.
+        if (generatedReport.category === 'cdsp') {
+          doc.text(`Program Type: ${generatedReport.programType || cdspPrograms.join(', ')}`, 14, y); y += 5
+        }
+        y += 3
+        doc.text(`Total Participants: ${a.total}`, 14, y)
+        doc.text(`Male: ${a.male}`, 90, y)
+        doc.text(`Female: ${a.female}`, 140, y); y += 10
+
+        // Breakdown by program is only meaningful when viewing all programs — see
+        // matching note on the on-screen summary and Excel/CSV exports.
+        if (generatedReport.category !== 'cdsp' || !generatedReport.programType) {
+          doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+          doc.text(a.groupLabel, 14, y); y += 6
+          doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+          a.byGroup.forEach((d: any) => {
+            if (y > pageHeight - 20) { doc.addPage(); y = 20 } // long lists (e.g. many Assigned Offices) paginate instead of running off the page
+            doc.text(`${d.group}: ${d.value}`, 14, y); y += 5
+          })
+          y += 3
+        }
+
+        doc.addPage(); y = 20
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+        doc.text('Detailed Report', 14, y); y += 6
       }
 
       const visibleCols = generatedReport.columns.filter((col: string) => visibleColumns[col])
+      // Shrink text as columns increase so a wide table (e.g. all optional CDSP/GIP
+      // columns enabled) still fits the page width instead of spilling past the margin.
+      const tableFontSize = visibleCols.length > 14 ? 6 : visibleCols.length > 10 ? 7 : 8
+      // Give each column a share of the usable page width proportional to how much
+      // text it actually holds (header vs. longest value seen, same idea as the
+      // Excel column auto-width below) — an equal split wastes space on short
+      // columns like "No." while cramping long ones like "Participant Name". The
+      // shares always sum to exactly usableWidth, so the table still can't overflow.
+      const colWeights = visibleCols.map((col: string) => {
+        const dataLen = filteredData.reduce((max: number, row: any) => Math.max(max, String(row[col] ?? '').length), 0)
+        return Math.max(col.length, Math.min(dataLen, 30), 4)
+      })
+      const totalWeight = colWeights.reduce((a: number, b: number) => a + b, 0)
+      const columnStyles = Object.fromEntries(visibleCols.map((_, i) => [i, { cellWidth: (colWeights[i] / totalWeight) * usableWidth }]))
       autoTable(doc, {
         startY: y,
         head: [visibleCols],
         body: filteredData.map((row: any) => visibleCols.map((col: string) => row[col] || '-')),
         theme: 'grid',
-        headStyles: { fillColor: [0, 119, 190], textColor: 255, fontStyle: 'bold', fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
+        headStyles: { fillColor: [0, 119, 190], textColor: 255, fontStyle: 'bold', fontSize: tableFontSize + 1 },
+        bodyStyles: { fontSize: tableFontSize },
         margin: { left: 14, right: 14 },
-        styles: { overflow: 'linebreak', cellWidth: 'wrap' },
+        tableWidth: usableWidth,
+        columnStyles,
+        styles: { overflow: 'linebreak' },
       })
       doc.save(`${fileName}.pdf`)
     }
@@ -729,50 +799,68 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">1. Report Category</label>
-            <select value={reportCategory} onChange={e => handleCategoryChange(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-              <option value="">Select Report Category</option>
-              {reportCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Report Category</label>
+            <div className="relative">
+              <select value={reportCategory} onChange={e => handleCategoryChange(e.target.value)}
+                className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                <option value=""></option>
+                {REPORT_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
           </div>
 
           {showProgramType && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">2. Program Type</label>
-              <select value={programType} onChange={e => setProgramType(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-                <option value="">All Programs</option>
-                {reportCategory === 'cdsp' && cdspPrograms.map(p => <option key={p} value={p}>{p}</option>)}
-                {reportCategory === 'livelihood' && livelihoodPrograms.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Program Type</label>
+              <div className="relative">
+                <select value={programType} onChange={e => setProgramType(e.target.value)}
+                  className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                  <option value="">All Programs</option>
+                  {reportCategory === 'cdsp' && cdspPrograms.map(p => <option key={p} value={p}>{p}</option>)}
+                  {reportCategory === 'livelihood' && livelihoodPrograms.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              </div>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{showProgramType ? '3' : '2'}. Report Period</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select Report Period</label>
             <div className="grid grid-cols-4 gap-4">
-              <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
-                className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-                <option value="monthly">Monthly</option>
-                <option value="annual">Annual</option>
-                <option value="custom">Custom Range</option>
-              </select>
+              <div className="relative">
+                <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
+                  className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                  <option value="monthly">Monthly</option>
+                  <option value="annual">Annual</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              </div>
               {reportPeriod === 'monthly' && <>
-                <select value={month} onChange={e => setMonth(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-                  {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-                <select value={year} onChange={e => setYear(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <div className="relative">
+                  <select value={month} onChange={e => setMonth(e.target.value)}
+                    className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                    {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <select value={year} onChange={e => setYear(e.target.value)}
+                    className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                </div>
               </>}
               {reportPeriod === 'annual' && (
-                <select value={year} onChange={e => setYear(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <div className="relative">
+                  <select value={year} onChange={e => setYear(e.target.value)}
+                    className="appearance-none w-full pl-4 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900">
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                </div>
               )}
               {reportPeriod === 'custom' && <>
                 <DatePicker value={fromDate} onChange={setFromDate}
@@ -969,6 +1057,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </div>
             ))}
           </div>
+          {/* Breakdown by program is only meaningful when viewing all programs — with a
+              specific Program Type selected, every other program would show a
+              misleading "0" (it wasn't queried, not actually empty) and the sole
+              remaining bar just repeats the Total above. */}
+          {(generatedReport.category !== 'cdsp' || !generatedReport.programType) && (<>
           <h4 className="text-sm font-medium text-gray-700 mb-3">{generatedReport.analytics.groupLabel}</h4>
           {generatedReport.analytics.byGroup.length === 0 ? (
             <p className="text-sm text-gray-400">No participants in the selected period.</p>
@@ -990,6 +1083,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               })}
             </div>
           )}
+          </>)}
         </div>
       )}
 
@@ -1112,10 +1206,21 @@ export default function ReportView({ onBack }: ReportViewProps) {
           <div className="flex justify-center mb-4">
             <BarChart2 size={64} className="text-gray-300" />
           </div>
-          <h3 className="text-gray-800 m-0 mb-2">No report generated yet.</h3>
-          <p className="text-gray-500 m-0">
-            Select a report category, configure the period, and click "Generate Report" to view the data.
-          </p>
+          {reportCategory === 'employment-facilitation' ? (
+            <>
+              <h3 className="text-gray-800 m-0 mb-2">No preview for this report.</h3>
+              <p className="text-gray-500 m-0">
+                Employment Facilitation reports download directly as an Excel file (PESO LMI Report) when you click "Generate Report" — no preview is shown.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-gray-800 m-0 mb-2">No report generated yet.</h3>
+              <p className="text-gray-500 m-0">
+                Select a report category, configure the period, and click "Generate Report" to view the data.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

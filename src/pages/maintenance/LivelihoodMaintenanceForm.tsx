@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
 import {
-  PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
+  PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
   Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
@@ -11,6 +11,10 @@ import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
 import type { LivelihoodBeneficiary, CLPEPIntervention } from '../../contexts/LivelihoodContext'
+import { useDILP } from '../../contexts/DILPContext'
+import * as dilpService from '../../services/dilpService'
+import { useTUPAD } from '../../contexts/TUPADContext'
+import * as tupadService from '../../services/tupadService'
 import DILPForm from './DILPForm'
 import type { DILPFormData, AttachmentItem } from './DILPForm'
 import TUPADForm from './TUPADForm'
@@ -19,6 +23,15 @@ import SLPForm from './SLPForm'
 import type { SLPFormData } from './SLPForm'
 import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
+
+// DILP/TUPAD projects now live in their own backend-persisted tables (see
+// DILPContext/TUPADContext), not ProgramActivitiesContext's localStorage blob.
+// For this shared "all Livelihood projects" table, they're converted into
+// ProgramActivity-shaped rows with an ID offset — same trick already used
+// below for CLPEP interventions (id + 900000) — so the existing table/filter/
+// pagination code doesn't need a parallel implementation.
+const DILP_ID_OFFSET = 700000
+const TUPAD_ID_OFFSET = 800000
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -33,7 +46,6 @@ const DEFAULT_SERVICES = [
 
 const CLPEP_INTERVENTIONS_LS_KEY = 'lp_clpep_interventions_v1'
 const SLP_BENEFICIARIES_LS_KEY = 'lp_slp_v7'
-const DILP_BENEFICIARIES_LS_KEY = 'lp_dileep_v5'
 const CLPEP_BENEFICIARIES_LS_KEY = 'lp_clpep_v8'
 
 function loadCLPEPInterventions(): CLPEPIntervention[] {
@@ -62,8 +74,6 @@ type Action =
   | 'view_project'
   | 'view_projects'
   | 'view_participants'
-  | 'add_service'
-  | 'view_services'
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -154,7 +164,6 @@ const blankTupadForm: TUPADFormData = {
   status: 'Planned',
   assistanceAmount: '',
   dateReleased: '',
-  beneficiaryType: '',
 }
 
 const blankSlpForm: SLPFormData = {
@@ -194,6 +203,7 @@ const blankDilpForm: DILPFormData = {
   province: '',
   cityMunicipality: '',
   barangay: '',
+  barangayId: null,
   streetPurok: '',
   assistanceAmount: '',
   dateReleased: '',
@@ -201,15 +211,6 @@ const blankDilpForm: DILPFormData = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function loadBeneficiaries(): LivelihoodBeneficiary[] {
-  const raw = localStorage.getItem(DILP_BENEFICIARIES_LS_KEY)
-  return raw ? JSON.parse(raw) : LIVELIHOOD_SEED
-}
-
-function saveBeneficiaries(data: LivelihoodBeneficiary[]) {
-  localStorage.setItem(DILP_BENEFICIARIES_LS_KEY, JSON.stringify(data))
-}
 
 function loadSlpBeneficiaries(): LivelihoodBeneficiary[] {
   try {
@@ -229,16 +230,17 @@ function loadClpepBeneficiaries(): LivelihoodBeneficiary[] {
 
 export default function LivelihoodMaintenanceForm() {
   const { activities, setActivities } = useProgramActivities()
+  const dilp = useDILP()
+  const tupad = useTUPAD()
 
   // Navigation
   const [action, setAction] = useState<Action>('')
   const [selectedProject, setSelectedProject] = useState<ProgramActivity | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
 
-  // Services list (user-editable)
-  const [services, setServices] = useState<string[]>(DEFAULT_SERVICES)
-  const [newServiceName, setNewServiceName] = useState('')
-  const [serviceDeleteConfirm, setServiceDeleteConfirm] = useState<string | null>(null)
+  // Fixed set of Livelihood services — DILP/TUPAD/SLP/CLPEP are the only
+  // sub-programs, so this is no longer a user-editable list.
+  const services = DEFAULT_SERVICES
 
   // Project form
   const [selectedService, setSelectedService] = useState('')
@@ -258,8 +260,6 @@ export default function LivelihoodMaintenanceForm() {
   const [perPage, setPerPage] = useState(10)
   const [participantPage, setParticipantPage] = useState(1)
   const [participantPerPage, setParticipantPerPage] = useState(10)
-  const [servicePage, setServicePage] = useState(1)
-  const [servicePerPage, setServicePerPage] = useState(10)
 
   // CLPEP interventions from CLPEPTab localStorage (settable so new adds appear immediately)
   const [clpepInterventions, setClpepInterventions] = useState<CLPEPIntervention[]>(loadCLPEPInterventions)
@@ -277,8 +277,6 @@ export default function LivelihoodMaintenanceForm() {
     nextStatus: ProjectStatus
     label: string
   } | null>(null)
-
-  const newServiceRef = useRef<HTMLInputElement>(null)
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
@@ -300,8 +298,40 @@ export default function LivelihoodMaintenanceForm() {
     partnerAgency: i.partnerAgency,
   }))
 
+  // DILP/TUPAD projects converted to ProgramActivity shape for display (ID
+  // offsets 700000/800000) — the real data lives in DILPContext/TUPADContext,
+  // backed by dilp_projects/tupad_projects, not this localStorage context.
+  const dilpAsActivities: ProgramActivity[] = dilp.projects.map(p => ({
+    id: p.id + DILP_ID_OFFSET,
+    program: 'Livelihood',
+    service: 'DILEEP (DILP)',
+    title: p.projectName,
+    date: p.dateReleased,
+    location: [p.cityMunicipality, p.province].filter(Boolean).join(', '),
+    status: p.status as ProjectStatus,
+    assistanceAmount: p.assistanceAmount,
+    dateReleased: p.dateReleased,
+  }))
+
+  const tupadAsActivities: ProgramActivity[] = tupad.projects.map(p => ({
+    id: p.id + TUPAD_ID_OFFSET,
+    program: 'Livelihood',
+    service: 'DILEEP (TUPAD)',
+    title: p.title,
+    date: p.date,
+    location: p.location,
+    description: p.description,
+    facilitator: p.facilitator,
+    participants: p.participants ? parseInt(p.participants) : undefined,
+    status: p.status as ProjectStatus,
+    assistanceAmount: p.assistanceAmount,
+    dateReleased: p.dateReleased,
+  }))
+
   const livelihoodProjects = [
-    ...activities.filter(a => a.program === 'Livelihood' || DEFAULT_SERVICES.includes(a.service)),
+    ...activities.filter(a => a.program === 'Livelihood' && a.service !== 'DILEEP (DILP)' && a.service !== 'DILEEP (TUPAD)'),
+    ...dilpAsActivities,
+    ...tupadAsActivities,
     ...clpepAsActivities,
   ]
 
@@ -319,11 +349,6 @@ export default function LivelihoodMaintenanceForm() {
   const paginatedProjects = filteredProjects.slice((safePage - 1) * perPage, safePage * perPage)
   const recordStart = filteredProjects.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredProjects.length)
-  const sTotalPages = Math.max(1, Math.ceil(services.length / servicePerPage))
-  const sSafePage = Math.min(servicePage, sTotalPages)
-  const paginatedServices = services.slice((sSafePage - 1) * servicePerPage, sSafePage * servicePerPage)
-  const sRecordStart = services.length === 0 ? 0 : (sSafePage - 1) * servicePerPage + 1
-  const sRecordEnd = Math.min(sSafePage * servicePerPage, services.length)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -358,33 +383,37 @@ export default function LivelihoodMaintenanceForm() {
   const fillFormFromProject = (a: ProgramActivity) => {
     setSelectedService(a.service)
     if (a.service === 'DILEEP (DILP)') {
+      const p = dilp.projects.find(x => x.id === a.id - DILP_ID_OFFSET)
       setDilpFormData({
-        projectIdNumber:    a.projectIdNumber    ?? '',
-        projectName:        a.projectName        ?? a.title,
-        typeOfProject:      a.typeOfProject      ?? '',
-        programComponent:   a.programComponent   ?? '',
-        wayOfImplementation: a.wayOfImplementation ?? '',
-        region:             a.region             ?? '',
-        province:           a.province           ?? '',
-        cityMunicipality:   a.cityMunicipality   ?? a.location ?? '',
-        barangay:           a.barangay           ?? '',
-        streetPurok:        a.streetPurok        ?? '',
-        assistanceAmount:   a.assistanceAmount   ?? '',
-        dateReleased:       a.dateReleased       ?? '',
-        status:             a.status,
+        projectIdNumber:    p?.projectIdNumber    ?? '',
+        projectName:        p?.projectName        ?? a.title,
+        typeOfProject:      (p?.typeOfProject      ?? '') as DILPFormData['typeOfProject'],
+        programComponent:   (p?.programComponent   ?? '') as DILPFormData['programComponent'],
+        wayOfImplementation: (p?.wayOfImplementation ?? '') as DILPFormData['wayOfImplementation'],
+        region:             p?.region             ?? '',
+        province:           p?.province           ?? '',
+        cityMunicipality:   p?.cityMunicipality   ?? '',
+        barangay:           p?.barangay           ?? '',
+        barangayId:         p?.barangayId         ?? null,
+        streetPurok:        p?.streetPurok        ?? '',
+        assistanceAmount:   p?.assistanceAmount   ?? '',
+        dateReleased:       p?.dateReleased       ?? '',
+        status:             (p?.status ?? a.status) as DILPFormData['status'],
       })
+      setDilpAttachments((p?.documents ?? []).map(d => ({ name: d.fileName, url: d.url, fileType: '', id: d.id })))
     } else if (a.service === 'DILEEP (TUPAD)') {
+      const p = tupad.projects.find(x => x.id === a.id - TUPAD_ID_OFFSET)
+      setTupadAttachments((p?.documents ?? []).map(d => ({ name: d.fileName, url: d.url, fileType: '', id: d.id })))
       setTupadFormData({
-        title:            a.title,
-        description:      a.description      ?? '',
-        date:             a.date,
-        location:         a.location,
-        facilitator:      a.facilitator      ?? '',
-        participants:     a.participants != null ? String(a.participants) : '',
-        status:           (a.status === 'Cancelled' ? 'Planned' : a.status) as TUPADFormData['status'],
-        assistanceAmount: a.assistanceAmount  ?? '',
-        dateReleased:     a.dateReleased      ?? '',
-        beneficiaryType:  a.beneficiaryType   ?? '',
+        title:            p?.title ?? a.title,
+        description:      p?.description      ?? '',
+        date:             p?.date ?? a.date,
+        location:         p?.location ?? a.location,
+        facilitator:      p?.facilitator      ?? '',
+        participants:     p?.participants ?? '',
+        status:           (p?.status ?? (a.status === 'Cancelled' ? 'Planned' : a.status)) as TUPADFormData['status'],
+        assistanceAmount: p?.assistanceAmount  ?? '',
+        dateReleased:     p?.dateReleased      ?? '',
       })
     } else if (a.service === 'CLPEP') {
       setClpepFormData({
@@ -432,57 +461,74 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
+  // DILP/TUPAD projects are backend-persisted (dilp_projects/tupad_projects),
+  // not part of this component's localStorage ProgramActivity model — build
+  // and send the payload directly, then refresh the relevant context.
+  const handleSaveDilpProject = async () => {
+    if (!dilpFormData.projectIdNumber.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project ID Number.', confirmButtonColor: '#0077BE' }); return }
+    if (!dilpFormData.projectName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project Name.', confirmButtonColor: '#0077BE' }); return }
+
+    const realId = editingId !== null ? editingId - DILP_ID_OFFSET : null
+    const payload = {
+      projectIdNumber:     dilpFormData.projectIdNumber,
+      projectName:         dilpFormData.projectName,
+      typeOfProject:       dilpFormData.typeOfProject,
+      programComponent:    dilpFormData.programComponent,
+      wayOfImplementation: dilpFormData.wayOfImplementation,
+      barangayId:          dilpFormData.barangayId,
+      streetPurok:         dilpFormData.streetPurok,
+      assistanceAmount:    dilpFormData.assistanceAmount,
+      dateReleased:        dilpFormData.dateReleased,
+      status:              dilpFormData.status,
+      documents:           dilpAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
+    }
+    try {
+      if (realId !== null) await dilpService.updateProject(realId, payload)
+      else await dilpService.createProject(payload)
+      await dilp.refreshProjects()
+      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New DILP project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      goToList()
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    }
+  }
+
+  const handleSaveTupadProject = async () => {
+    if (!tupadFormData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity title.', confirmButtonColor: '#0077BE' }); return }
+
+    const realId = editingId !== null ? editingId - TUPAD_ID_OFFSET : null
+    const payload = {
+      title:            tupadFormData.title.trim(),
+      description:      tupadFormData.description.trim(),
+      date:             tupadFormData.date,
+      location:         tupadFormData.location,
+      facilitator:      tupadFormData.facilitator,
+      participants:     tupadFormData.participants,
+      status:           tupadFormData.status,
+      assistanceAmount: tupadFormData.assistanceAmount,
+      dateReleased:     tupadFormData.dateReleased,
+      documents:        tupadAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
+    }
+    try {
+      if (realId !== null) await tupadService.updateProject(realId, payload)
+      else await tupadService.createProject(payload)
+      await tupad.refreshProjects()
+      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New TUPAD project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      goToList()
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    }
+  }
+
   const handleSave = () => {
     if (!selectedService) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a service type.', confirmButtonColor: '#0077BE' }); return }
 
+    if (selectedService === 'DILEEP (DILP)') { handleSaveDilpProject(); return }
+    if (selectedService === 'DILEEP (TUPAD)') { handleSaveTupadProject(); return }
+
     let payload: ProgramActivity
 
-    if (selectedService === 'DILEEP (DILP)') {
-      if (!dilpFormData.projectIdNumber.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project ID Number.', confirmButtonColor: '#0077BE' }); return }
-      if (!dilpFormData.projectName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project Name.', confirmButtonColor: '#0077BE' }); return }
-
-      const loc = [dilpFormData.cityMunicipality, dilpFormData.province].filter(Boolean).join(', ')
-      payload = {
-        id:                 editingId ?? Date.now(),
-        program:            'Livelihood',
-        service:            'DILEEP (DILP)',
-        title:              dilpFormData.projectName.trim(),
-        date:               dilpFormData.dateReleased,
-        location:           loc,
-        status:             dilpFormData.status,
-        projectIdNumber:    dilpFormData.projectIdNumber,
-        projectName:        dilpFormData.projectName,
-        typeOfProject:      dilpFormData.typeOfProject        || undefined,
-        programComponent:   dilpFormData.programComponent     || undefined,
-        wayOfImplementation: dilpFormData.wayOfImplementation || undefined,
-        region:             dilpFormData.region               || undefined,
-        province:           dilpFormData.province             || undefined,
-        cityMunicipality:   dilpFormData.cityMunicipality     || undefined,
-        barangay:           dilpFormData.barangay             || undefined,
-        streetPurok:        dilpFormData.streetPurok          || undefined,
-        assistanceAmount:   dilpFormData.assistanceAmount      || undefined,
-        dateReleased:       dilpFormData.dateReleased          || undefined,
-      }
-    } else if (selectedService === 'DILEEP (TUPAD)') {
-      if (!tupadFormData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an activity title.', confirmButtonColor: '#0077BE' }); return }
-
-      payload = {
-        id:               editingId ?? Date.now(),
-        program:          'Livelihood',
-        service:          'DILEEP (TUPAD)',
-        title:            tupadFormData.title.trim(),
-        description:      tupadFormData.description.trim() || undefined,
-        date:             tupadFormData.date,
-        location:         tupadFormData.location,
-        facilitator:      tupadFormData.facilitator         || undefined,
-        participants:     parseInt(tupadFormData.participants) || undefined,
-        status:           tupadFormData.status,
-        assistanceAmount: tupadFormData.assistanceAmount    || undefined,
-        dateReleased:     tupadFormData.dateReleased        || undefined,
-        beneficiaryType:  (tupadFormData.beneficiaryType as 'Individual' | 'Group') || undefined,
-        tupadDocuments:   tupadAttachments.map(a => a.name),
-      }
-    } else if (selectedService === 'CLPEP') {
+    if (selectedService === 'CLPEP') {
       if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
       if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
       if (!clpepFormData.startDate) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Start Date.', confirmButtonColor: '#0077BE' }); return }
@@ -594,9 +640,23 @@ export default function LivelihoodMaintenanceForm() {
     goToList()
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteConfirm === null) return
-    if (deleteConfirm >= 900000) {
+    if (deleteConfirm >= TUPAD_ID_OFFSET) {
+      try {
+        await tupadService.deleteProject(deleteConfirm - TUPAD_ID_OFFSET)
+        await tupad.refreshProjects()
+      } catch (e: unknown) {
+        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
+      }
+    } else if (deleteConfirm >= DILP_ID_OFFSET) {
+      try {
+        await dilpService.deleteProject(deleteConfirm - DILP_ID_OFFSET)
+        await dilp.refreshProjects()
+      } catch (e: unknown) {
+        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
+      }
+    } else if (deleteConfirm >= 900000) {
       const realId = deleteConfirm - 900000
       const updated = clpepInterventions.filter(i => i.id !== realId)
       localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
@@ -607,10 +667,33 @@ export default function LivelihoodMaintenanceForm() {
     setDeleteConfirm(null)
   }
 
-  const handleStatusChange = () => {
+  // DILP/TUPAD beneficiary status is derived server-side from the assigned
+  // project's own status — no client-side cascade write needed here anymore
+  // (unlike SLP, which still tracks status locally in localStorage).
+  const handleStatusChange = async () => {
     if (!statusConfirm) return
     const { project, nextStatus } = statusConfirm
-    if (project.id >= 900000) {
+    if (project.id >= TUPAD_ID_OFFSET) {
+      try {
+        await tupadService.updateProjectStatus(project.id - TUPAD_ID_OFFSET, nextStatus)
+        await tupad.refreshProjects()
+        await tupad.refreshProfiles()
+      } catch (e: unknown) {
+        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
+        setStatusConfirm(null)
+        return
+      }
+    } else if (project.id >= DILP_ID_OFFSET) {
+      try {
+        await dilpService.updateProjectStatus(project.id - DILP_ID_OFFSET, nextStatus)
+        await dilp.refreshProjects()
+        await dilp.refreshProfiles()
+      } catch (e: unknown) {
+        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
+        setStatusConfirm(null)
+        return
+      }
+    } else if (project.id >= 900000) {
       const realId = project.id - 900000
       const clpepStatus = nextStatus === 'Ongoing' ? 'Active' : nextStatus as 'Planned' | 'Active' | 'Completed'
       const updated = clpepInterventions.map(i => i.id === realId ? { ...i, status: clpepStatus } : i)
@@ -620,50 +703,25 @@ export default function LivelihoodMaintenanceForm() {
       setActivities(prev =>
         prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a)
       )
-      if (nextStatus === 'Completed') {
-        // Auto-Inactive DILP beneficiaries
-        const dilpBeneficiaries = loadBeneficiaries()
-        const updatedDilp = dilpBeneficiaries.map(b =>
-          b.assignedDilpProjectId === project.id ? { ...b, status: 'Inactive' as const } : b
-        )
-        saveBeneficiaries(updatedDilp)
-        // Auto-Inactive SLP beneficiaries (stored separately)
-        if (project.service === 'SLP') {
-          try {
-            const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
-            if (raw) {
-              const slpBeneficiaries: LivelihoodBeneficiary[] = JSON.parse(raw)
-              const updatedSlp = slpBeneficiaries.map(b =>
-                b.assignedSlpProjectId === project.id && b.status === 'Active'
-                  ? { ...b, status: 'Inactive' as const }
-                  : b
-              )
-              localStorage.setItem(SLP_BENEFICIARIES_LS_KEY, JSON.stringify(updatedSlp))
-            }
-          } catch { /* storage unavailable */ }
-        }
+      if (nextStatus === 'Completed' && project.service === 'SLP') {
+        // Auto-Inactive SLP beneficiaries (stored separately) — SLP hasn't
+        // been migrated to a derived-status backend model yet.
+        try {
+          const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
+          if (raw) {
+            const slpBeneficiaries: LivelihoodBeneficiary[] = JSON.parse(raw)
+            const updatedSlp = slpBeneficiaries.map(b =>
+              b.assignedSlpProjectId === project.id && b.status === 'Active'
+                ? { ...b, status: 'Inactive' as const }
+                : b
+            )
+            localStorage.setItem(SLP_BENEFICIARIES_LS_KEY, JSON.stringify(updatedSlp))
+          }
+        } catch { /* storage unavailable */ }
       }
     }
     Swal.fire({ icon: 'success', title: 'Status Updated', text: `Project is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
     setStatusConfirm(null)
-  }
-
-  const handleAddService = () => {
-    const name = newServiceName.trim()
-    if (!name) return
-    if (services.includes(name)) {
-      Swal.fire({ icon: 'warning', title: 'Duplicate', text: 'This service already exists.', confirmButtonColor: '#0077BE' })
-      return
-    }
-    setServices(prev => [...prev, name])
-    setNewServiceName('')
-    newServiceRef.current?.focus()
-  }
-
-  const handleDeleteService = () => {
-    if (!serviceDeleteConfirm) return
-    setServices(prev => prev.filter(s => s !== serviceDeleteConfirm))
-    setServiceDeleteConfirm(null)
   }
 
   // ── Render: landing ───────────────────────────────────────────────────────
@@ -671,9 +729,7 @@ export default function LivelihoodMaintenanceForm() {
   const renderLanding = () => {
     const cards: { key: Action; icon: React.ReactNode; label: string; desc: string }[] = [
       { key: 'add_project',   icon: <PlusCircle    size={32} />, label: 'Add Project',    desc: 'Create a new Livelihood project' },
-      { key: 'add_service',   icon: <Tag           size={32} />, label: 'Add Service',    desc: 'Add a new service type' },
       { key: 'view_projects', icon: <FolderOpen    size={32} />, label: 'View Projects',  desc: 'Browse all Livelihood projects' },
-      { key: 'view_services', icon: <ClipboardList size={32} />, label: 'View Services',  desc: 'Manage service types' },
     ]
 
     return (
@@ -681,7 +737,7 @@ export default function LivelihoodMaintenanceForm() {
         <p className="text-gray-500 mb-5">
           Select an action for <span className="text-brand-blue font-medium">Livelihood</span>
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 gap-5">
           {cards.map(card => (
             <button
               key={card.key}
@@ -738,21 +794,15 @@ export default function LivelihoodMaintenanceForm() {
             <label className={labelCls}>
               Service Type <span className="text-red-500">*</span>
             </label>
-            {services.length === 1 ? (
-              <div className="px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm">
-                {services[0]}
-              </div>
-            ) : (
-              <select
-                value={selectedService}
-                onChange={e => setSelectedService(e.target.value)}
-                disabled={isView || mode === 'edit'}
-                className={inputCls + ' bg-white'}
-              >
-                <option value="">Select Service Type</option>
-                {services.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            )}
+            <select
+              value={selectedService}
+              onChange={e => setSelectedService(e.target.value)}
+              disabled={isView || mode === 'edit'}
+              className={inputCls + ' bg-white'}
+            >
+              <option value="">Select Service Type</option>
+              {services.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
 
           {/* DILP-specific form */}
@@ -968,15 +1018,6 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── Participant count helpers (read from localStorage on each render) ────────
 
-  const dilpBeneficiaryCountMap = (() => {
-    const map: Record<number, number> = {}
-    loadBeneficiaries().forEach(b => {
-      if (b.assignedDilpProjectId != null)
-        map[b.assignedDilpProjectId] = (map[b.assignedDilpProjectId] ?? 0) + 1
-    })
-    return map
-  })()
-
   const slpBeneficiaryCountMap = (() => {
     const map: Record<number, number> = {}
     loadSlpBeneficiaries().forEach(b => {
@@ -996,13 +1037,25 @@ export default function LivelihoodMaintenanceForm() {
   })()
 
   const getParticipantCount = (a: ProgramActivity): number | undefined => {
-    if (a.service === 'DILEEP (DILP)' || a.service === 'DILEEP (TUPAD)')
-      return dilpBeneficiaryCountMap[a.id]
+    if (a.service === 'DILEEP (DILP)')
+      return dilp.projects.find(p => p.id === a.id - DILP_ID_OFFSET)?.assignedCount
+    if (a.service === 'DILEEP (TUPAD)')
+      return tupad.projects.find(p => p.id === a.id - TUPAD_ID_OFFSET)?.assignedCount
     if (a.service === 'SLP')
       return slpBeneficiaryCountMap[a.id]
     if (a.id >= 900000)
       return clpepBeneficiaryCountMap[a.id - 900000]
     return undefined
+  }
+
+  // TUPAD's "Number of Participants" is a target headcount the backend now
+  // enforces as a cap — show "assigned/target" there instead of a bare count.
+  const getParticipantLabel = (a: ProgramActivity): string => {
+    const count = getParticipantCount(a)
+    if (a.service === 'DILEEP (TUPAD)' && a.participants != null) {
+      return `${count ?? 0}/${a.participants}`
+    }
+    return count != null ? String(count) : '—'
   }
 
   // ── Render: view projects ─────────────────────────────────────────────────
@@ -1171,7 +1224,7 @@ export default function LivelihoodMaintenanceForm() {
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Date</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location</th>
-                  <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Participants</th>
+                  <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Members</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                 </tr>
@@ -1193,7 +1246,7 @@ export default function LivelihoodMaintenanceForm() {
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 text-center">
-                      {getParticipantCount(a) ?? '—'}
+                      {getParticipantLabel(a)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={a.status} />
@@ -1245,15 +1298,27 @@ export default function LivelihoodMaintenanceForm() {
   const renderViewParticipants = () => {
     if (!selectedProject) return null
     const isCLPEP = selectedProject.id >= 900000
-    let participants: LivelihoodBeneficiary[]
+    type ParticipantRow = { id: number; name: string; service: string; barangay?: string; contactNumber?: string; status: string }
+    let participants: ParticipantRow[]
     if (isCLPEP) {
       const realId = selectedProject.id - 900000
       participants = loadClpepBeneficiaries().filter(b => b.assignedInterventionId === realId)
     } else if (selectedProject.service === 'SLP') {
       participants = loadSlpBeneficiaries().filter(b => b.assignedSlpProjectId === selectedProject.id)
+    } else if (selectedProject.service === 'DILEEP (DILP)') {
+      const realId = selectedProject.id - DILP_ID_OFFSET
+      participants = dilp.applicants
+        .filter(b => b.assignedProjectId === realId)
+        .map(b => ({ id: b.id, name: `${b.lastName}, ${b.firstName}`, service: 'DILEEP (DILP)', barangay: b.barangay, contactNumber: b.contactNumber, status: b.status }))
     } else {
-      // DILEEP (DILP) or DILEEP (TUPAD)
-      participants = loadBeneficiaries().filter(b => b.assignedDilpProjectId === selectedProject.id)
+      // DILEEP (TUPAD) — unlike DILP, a beneficiary can move on to a new
+      // project after this one completes, so their *current* assignedProjectId
+      // may no longer point here. Check the full assignmentHistory instead,
+      // so a completed project keeps showing everyone who was ever part of it.
+      const realId = selectedProject.id - TUPAD_ID_OFFSET
+      participants = tupad.applicants
+        .filter(b => b.assignmentHistory.some(h => h.projectId === realId))
+        .map(b => ({ id: b.id, name: `${b.lastName}, ${b.firstName}`, service: 'DILEEP (TUPAD)', barangay: b.barangay, contactNumber: b.contactNumber, status: b.status }))
     }
 
     const ptotal = Math.max(1, Math.ceil(participants.length / participantPerPage))
@@ -1347,143 +1412,6 @@ export default function LivelihoodMaintenanceForm() {
     )
   }
 
-  // ── Render: add service ───────────────────────────────────────────────────
-
-  const renderAddService = () => (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="bg-brand-blue px-6 py-4">
-        <h3 className="text-white m-0">Add New Service</h3>
-        <p className="text-white/70 text-sm">Livelihood Program</p>
-      </div>
-      <div className="p-6">
-        <p className="text-gray-600 text-sm mb-6">
-          Add a new service type to the Livelihood program. This service will be available when creating new projects.
-        </p>
-        <div className="max-w-lg">
-          <label className={labelCls}>Service Name <span className="text-red-500">*</span></label>
-          <div className="flex gap-3">
-            <input
-              ref={newServiceRef}
-              type="text"
-              value={newServiceName}
-              onChange={e => setNewServiceName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddService()}
-              placeholder="e.g. Community Livelihood, Skills Development..."
-              className={inputCls + ' flex-1'}
-            />
-            <button
-              onClick={handleAddService}
-              disabled={!canManage('maintenance')}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
-            >
-              <Plus size={16} /> Add Service
-            </button>
-          </div>
-          <p className="text-gray-400 text-xs mt-1.5">Press Enter or click "Add Service" to save.</p>
-        </div>
-
-        {services.length > 0 && (
-          <div className="mt-8">
-            <h4 className="text-gray-700 text-sm font-semibold mb-3">Current Services in Livelihood</h4>
-            <div className="flex flex-wrap gap-2">
-              {services.map(s => (
-                <span key={s} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-brand-blue border border-blue-200 rounded-lg text-sm">
-                  {s}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-
-  // ── Render: view services ─────────────────────────────────────────────────
-
-  const renderViewServices = () => (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-white m-0">Livelihood Services</h3>
-        </div>
-        <button
-          onClick={() => setAction('add_service')}
-          disabled={!canManage('maintenance')}
-          className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-        >
-          <Plus size={15} /> Add Service
-        </button>
-      </div>
-
-      {services.length === 0 ? (
-        <div className="py-16 text-center">
-          <Tag size={40} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-500 text-sm">No services defined yet.</p>
-          <button onClick={() => setAction('add_service')} disabled={!canManage('maintenance')} className="mt-4 px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            Add First Service
-          </button>
-        </div>
-      ) : (
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service Name</th>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Projects Count</th>
-              <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-20">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedServices.map(svc => {
-              const count = livelihoodProjects.filter(a => a.service === svc).length
-              return (
-                <tr key={svc} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm font-medium text-gray-800">{svc}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {count} project{count !== 1 ? 's' : ''}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => setServiceDeleteConfirm(svc)}
-                      disabled={!canManage('maintenance')}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      title="Remove service"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      )}
-      {services.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Rows per page:</span>
-            <select value={servicePerPage} onChange={e => { setServicePerPage(Number(e.target.value)); setServicePage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue">
-              {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{sRecordStart}–{sRecordEnd} of {services.length} records</span>
-            <div className="flex gap-1">
-              <button onClick={() => setServicePage(p => Math.max(1, p - 1))} disabled={sSafePage === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
-              <button onClick={() => setServicePage(p => Math.min(sTotalPages, p + 1))} disabled={sSafePage === sTotalPages} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
@@ -1509,8 +1437,6 @@ export default function LivelihoodMaintenanceForm() {
       {action === 'view_project'     && renderProjectForm('view')}
       {action === 'view_projects'    && renderViewProjects()}
       {action === 'view_participants' && renderViewParticipants()}
-      {action === 'add_service'      && renderAddService()}
-      {action === 'view_services'    && renderViewServices()}
 
       {/* Delete project modal */}
       <ConfirmModal
@@ -1521,17 +1447,6 @@ export default function LivelihoodMaintenanceForm() {
         destructive
         onConfirm={handleDelete}
         onCancel={() => setDeleteConfirm(null)}
-      />
-
-      {/* Delete service modal */}
-      <ConfirmModal
-        open={serviceDeleteConfirm !== null}
-        title="Remove Service"
-        message={`Remove "${serviceDeleteConfirm}" from Livelihood?\nExisting projects with this service will not be affected.`}
-        confirmLabel="Remove"
-        destructive
-        onConfirm={handleDeleteService}
-        onCancel={() => setServiceDeleteConfirm(null)}
       />
 
       {/* Status change modal */}

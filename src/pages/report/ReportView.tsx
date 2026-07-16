@@ -757,7 +757,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         return Math.max(col.length, Math.min(dataLen, 30), 4)
       })
       const totalWeight = colWeights.reduce((a: number, b: number) => a + b, 0)
-      const columnStyles = Object.fromEntries(visibleCols.map((_, i) => [i, { cellWidth: (colWeights[i] / totalWeight) * usableWidth }]))
+      const columnStyles = Object.fromEntries(visibleCols.map((_: string, i: number) => [i, { cellWidth: (colWeights[i] / totalWeight) * usableWidth }]))
       autoTable(doc, {
         startY: y,
         head: [visibleCols],

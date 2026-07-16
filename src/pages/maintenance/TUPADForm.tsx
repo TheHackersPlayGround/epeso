@@ -1,5 +1,5 @@
-import { useRef } from 'react'
-import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
@@ -16,7 +16,6 @@ export interface TUPADFormData {
   status: 'Planned' | 'Ongoing' | 'Completed'
   assistanceAmount: string
   dateReleased: string
-  beneficiaryType: 'Individual' | 'Group' | ''
 }
 
 interface TUPADFormProps {
@@ -36,6 +35,16 @@ const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:out
 const labelCls = 'block text-sm text-gray-700 mb-1.5'
 const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-brand-blue mb-4'
 
+// Previously-saved attachments (loaded back from the server) don't carry a
+// browser File's MIME type, only a fileName — fall back to the extension so
+// "View" still previews them correctly, not just freshly-uploaded ones.
+function isImageAttachment(att: AttachmentItem) {
+  return att.fileType.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(att.name)
+}
+function isPdfAttachment(att: AttachmentItem) {
+  return att.fileType === 'application/pdf' || /\.pdf$/i.test(att.name)
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TUPADForm({
@@ -45,6 +54,7 @@ export default function TUPADForm({
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
 
   function field<K extends keyof TUPADFormData>(key: K, value: TUPADFormData[K]) {
     onChange({ ...formData, [key]: value })
@@ -53,7 +63,17 @@ export default function TUPADForm({
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !onAddAttachment) return
-    onAddAttachment({ name: file.name, url: URL.createObjectURL(file), fileType: file.type })
+    const reader = new FileReader()
+    reader.onload = () => {
+      onAddAttachment({
+        name: file.name,
+        url: reader.result as string,
+        dataUrl: reader.result as string,
+        fileType: file.type,
+        id: Date.now().toString() + Math.random().toString(36),
+      })
+    }
+    reader.readAsDataURL(file)
     e.target.value = ''
   }
 
@@ -208,26 +228,6 @@ export default function TUPADForm({
             />
           </div>
         </div>
-
-        <div>
-          <label className={labelCls}>Beneficiary Type</label>
-          <div className="flex gap-6 mt-1">
-            {(['Individual', 'Group'] as const).map(t => (
-              <label key={t} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
-                <input
-                  type="radio"
-                  name="tupad-beneficiaryType"
-                  value={t}
-                  checked={formData.beneficiaryType === t}
-                  onChange={() => field('beneficiaryType', t)}
-                  disabled={isView}
-                  className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default"
-                />
-                <span className="text-sm text-gray-700">{t}</span>
-              </label>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* ─── Documents ────────────────────────────────────────────────────────── */}
@@ -243,13 +243,20 @@ export default function TUPADForm({
             {attachments.map((att, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
                 <div className="flex-shrink-0">
-                  {att.fileType.startsWith('image/') ? (
+                  {isImageAttachment(att) ? (
                     <ImageIcon size={16} className="text-blue-400" />
                   ) : (
                     <FileText size={16} className="text-gray-400" />
                   )}
                 </div>
                 <span className="flex-1 text-sm text-gray-700 truncate">{att.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewItem(att)}
+                  className="text-brand-blue hover:text-brand-blue-dark text-sm font-medium flex items-center gap-1 flex-shrink-0"
+                >
+                  <Eye size={14} /> View
+                </button>
                 {!isView && onRemoveAttachment && (
                   <button
                     type="button"
@@ -316,6 +323,43 @@ export default function TUPADForm({
           </button>
         )}
       </div>
+
+      {/* ─── File preview modal ───────────────────────────────────────────────── */}
+      {previewItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div>
+                <p className="text-sm font-semibold text-gray-800 truncate max-w-lg">{previewItem.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{previewItem.fileType || 'Document'}</p>
+              </div>
+              <button onClick={() => setPreviewItem(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-50 min-h-[300px]">
+              {isImageAttachment(previewItem) ? (
+                <div className="flex items-center justify-center h-full">
+                  <img src={previewItem.url} alt={previewItem.name} className="max-w-full max-h-[70vh] object-contain rounded-lg shadow" />
+                </div>
+              ) : isPdfAttachment(previewItem) ? (
+                <iframe src={previewItem.url} className="w-full min-h-[600px] rounded-lg shadow" title="PDF Preview" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400 py-16">
+                  <FileText size={56} className="mb-4" />
+                  <p className="text-base font-medium text-gray-600 mb-1">Preview not available</p>
+                  <p className="text-sm">This file type cannot be previewed directly.</p>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
+              <button onClick={() => setPreviewItem(null)} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

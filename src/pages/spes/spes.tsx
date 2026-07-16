@@ -226,7 +226,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
   const [confirmingBatch, setConfirmingBatch] = useState<SPESBatch | null>(null)
   const [viewingAssignedBatchFor, setViewingAssignedBatchFor] = useState<SPESApplicant | null>(null)
-  const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<SPESApplicant | null>(null)
   const [confirmUnassignId, setConfirmUnassignId] = useState<number | null>(null)
   const [batchSearch, setBatchSearch] = useState('')
 
@@ -522,6 +521,11 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       <Row label="Program End Date" value={batch.programEndDate} />
                       <Row label="Available Slots" value={`${batch.assignedCount}/${batch.availableSlots}`} />
                       <Row label="Funding Source" value={batch.fundingSource === 'Other' ? `Other — ${batch.fundingSourceOther}` : batch.fundingSource} />
+                      {/* No separate history table (single batch_id link), so this
+                          applicant's own assigned/completed dates live here instead
+                          of a now-removed separate "Assignment History" modal. */}
+                      <Row label="Date Assigned" value={viewingAssignedBatchFor.assignmentHistory[0]?.assignedDate ? fmtDate(viewingAssignedBatchFor.assignmentHistory[0].assignedDate) : undefined} />
+                      <Row label="Date Completed" value={viewingAssignedBatchFor.assignmentHistory[0]?.completedDate ? fmtDate(viewingAssignedBatchFor.assignmentHistory[0].completedDate) : undefined} />
                     </div>
                   </>
                 ) : (
@@ -542,72 +546,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   disabled={!canChange || !canManage('spes')}
                   className={`px-4 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium${(!canChange || !canManage('spes')) ? ' opacity-50 cursor-not-allowed' : ''}`}
                 >Change Batch</button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Assignment History Modal */}
-      {viewingAssignmentHistoryFor && (() => {
-        const a = viewingAssignmentHistoryFor
-        const badgeCls = (s: string) =>
-          s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
-          s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
-          s === 'Planned'   ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
-          'bg-amber-100 text-amber-700 border border-amber-200'
-        const visibleHistory = a.assignmentHistory.filter(entry => {
-          const batch = spesBatches.find(b => b.id === entry.batchId)
-          const batchStatus = batch?.status ?? (entry.completedDate ? 'Completed' : null)
-          const isCurrent = a.assignedBatchId === entry.batchId
-          return batchStatus === 'Completed' || isCurrent
-        })
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
-              <div className="bg-white border-b border-gray-200 rounded-t-2xl px-6 py-5 flex items-center justify-between flex-shrink-0">
-                <div>
-                  <p className="text-black font-extrabold text-lg tracking-tight">Assignment History</p>
-                  <p className="text-gray-500 text-sm mt-0.5">{a.lastName}, {a.firstName} {a.middleName}</p>
-                </div>
-                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><X size={20} /></button>
-              </div>
-              <div className="px-6 py-5 overflow-y-auto flex-1">
-                {visibleHistory.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Users size={26} className="text-gray-400" />
-                    </div>
-                    <p className="text-sm font-bold text-black">No assignments yet</p>
-                    <p className="text-xs text-gray-600 text-center">Completed or active batch assignments will appear here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {[...visibleHistory].reverse().map((entry, i) => {
-                      const batch = spesBatches.find(b => b.id === entry.batchId)
-                      const batchStatus = batch?.status ?? (entry.completedDate ? 'Completed' : null)
-                      const isCurrent = a.assignedBatchId === entry.batchId
-                      return (
-                        <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-gray-800 font-semibold leading-snug">{entry.batchName}</p>
-                            <p className="text-xs text-gray-400 mt-1">Date Assigned: {fmtDate(entry.assignedDate)}</p>
-                            {entry.completedDate && batchStatus === 'Completed' && (
-                              <p className="text-xs text-blue-500 mt-0.5">Date Completed: {fmtDate(entry.completedDate)}</p>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
-                            {batchStatus && <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${badgeCls(batchStatus)}`}>{batchStatus}</span>}
-                            {isCurrent && <span className="text-[10px] px-2.5 py-1 rounded-full bg-brand-blue text-white font-semibold">Current</span>}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="px-6 pb-6 flex-shrink-0">
-                <button onClick={() => setViewingAssignmentHistoryFor(null)} className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 text-sm font-semibold transition-colors">Close</button>
               </div>
             </div>
           </div>
@@ -962,10 +900,6 @@ export default function SPESView({ onBack }: SPESViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find(a => a.id === openActionMenuId)
         if (!applicant) return null
-        const assignedBatch = applicant.assignedBatchId
-          ? spesBatches.find(b => b.id === applicant.assignedBatchId)
-          : null
-        const isCompleted = assignedBatch?.status === 'Completed'
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
@@ -975,12 +909,11 @@ export default function SPESView({ onBack }: SPESViewProps) {
             >
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-              {applicant.assignedBatchId && !isCompleted ? (
+              {applicant.assignedBatchId ? (
                 <button onClick={() => { setViewingAssignedBatchFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue font-medium hover:bg-blue-50">View Assigned Batch</button>
               ) : (
                 <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Batch</button>
               )}
-              <button onClick={() => { setViewingAssignmentHistoryFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { handleDelete(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>

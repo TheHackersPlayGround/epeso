@@ -1,14 +1,12 @@
 import { useState } from 'react'
-import { X, Upload, Users } from 'lucide-react'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import { X, Upload, Users, FileText } from 'lucide-react'
+import type { TUPADApplicant, TUPADSavedDocument } from '../../contexts/TUPADContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const TUPAD_STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Accepted', 'Waitlisted', 'Rejected',
-]
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
 
@@ -20,39 +18,40 @@ const STEPS = [
 
 const ROMAN_NUMERALS = ['I', 'II', 'III'] as const
 
-export const EMPTY_TUPAD_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
-  name: '',
-  service: 'DILEEP (TUPAD)',
-  status: 'Waitlisted',
+export const EMPTY_TUPAD_RECORD: Omit<TUPADApplicant, 'id'> = {
+  beneficiaryServiceId: 0,
   firstName: '',
   lastName: '',
   middleName: '',
   nameExtension: '',
   sex: '',
   birthdate: '',
-  age: undefined,
+  age: 0,
   civilStatus: '',
   contactNumber: '',
   streetPurok: '',
   barangay: '',
-  cityMunicipality: 'Tangub City',
-  province: 'Misamis Occidental',
+  barangayId: 0,
+  cityMunicipality: '',
+  province: '',
+  region: '',
+  assignedProjectId: null,
+  assignedProjectName: '',
+  assignedProjectStatus: '',
+  assignmentHistory: [],
+  attachedDocuments: [],
   dateApplied: '',
   remarks: '',
-  attachedForms: [],
-  dateApplicationReceived: '',
   receivedBy: '',
-  projectName: '',
-  projectDuration: '',
-  wageRate: '',
+  status: 'Inactive',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TUPADProfileFormProps = {
   mode: 'add' | 'edit' | 'view'
-  initial: Omit<LivelihoodBeneficiary, 'id'>
-  onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
+  initial: Omit<TUPADApplicant, 'id'>
+  onSave: (data: Omit<TUPADApplicant, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
 }
@@ -68,43 +67,37 @@ const inputClass = [
 const selectClass = inputClass + ' bg-white'
 const labelClass = 'block text-gray-700 mb-2 text-xs font-semibold uppercase'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Document upload section (base64, matches SPES/GIP's backend contract) ───
 
-function resolveInitial(initial: Omit<LivelihoodBeneficiary, 'id'>): Omit<LivelihoodBeneficiary, 'id'> {
-  const base = { ...EMPTY_TUPAD_RECORD }
-  for (const key of Object.keys(initial) as (keyof typeof initial)[]) {
-    if (initial[key] !== undefined) {
-      (base as Record<string, unknown>)[key] = initial[key]
-    }
-  }
-  if (!base.firstName && !base.lastName && base.name) {
-    const commaIdx = base.name.indexOf(', ')
-    if (commaIdx > -1) {
-      base.lastName = base.name.slice(0, commaIdx)
-      const parts = base.name.slice(commaIdx + 2).split(' ')
-      base.firstName = parts[0] ?? ''
-      base.middleName = parts.slice(1).join(' ')
-    } else {
-      base.firstName = base.name
-    }
-  }
-  return base
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-// ─── File upload section ──────────────────────────────────────────────────────
-
-function FormUploadSection({ forms, onChange }: { forms: string[] | undefined; onChange: (f: string[]) => void }) {
-  const fileList = forms ?? []
-
+function AttachedDocsEditor({ docs, onChange }: { docs: TUPADSavedDocument[]; onChange: (docs: TUPADSavedDocument[]) => void }) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    onChange([...fileList, file.name])
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        customName: file.name,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: URL.createObjectURL(file),
+        dataUrl,
+      }])
+    }
+    reader.readAsDataURL(file)
     e.target.value = ''
   }
 
   function handleRemoveFile(index: number) {
-    onChange(fileList.filter((_, i) => i !== index))
+    onChange(docs.filter((_, i) => i !== index))
   }
 
   return (
@@ -115,11 +108,15 @@ function FormUploadSection({ forms, onChange }: { forms: string[] | undefined; o
         <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG files accepted</p>
         <input type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
       </label>
-      {fileList.length > 0 && (
+      {docs.length > 0 && (
         <ul className="space-y-2">
-          {fileList.map((fileName, i) => (
-            <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-              <span className="text-sm text-gray-700 truncate">{fileName}</span>
+          {docs.map((doc, i) => (
+            <li key={doc.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+              <FileText size={16} className="text-brand-blue flex-shrink-0" />
+              <span className="flex-1 text-sm text-gray-700 truncate">{doc.customName || doc.fileName}</span>
+              {(doc.url || doc.dataUrl) && (
+                <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>
+              )}
               <button type="button" onClick={() => handleRemoveFile(i)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0">
                 <X size={14} />
               </button>
@@ -135,27 +132,26 @@ function FormUploadSection({ forms, onChange }: { forms: string[] | undefined; o
 
 export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdit }: TUPADProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>(resolveInitial(initial))
+  const [formData, setFormData] = useState<Omit<TUPADApplicant, 'id'>>({
+    ...EMPTY_TUPAD_RECORD,
+    ...initial,
+  })
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
 
   const isViewMode = mode === 'view'
   const isLastStep = currentStep === STEPS.length
 
-  function updateField(fields: Partial<Omit<LivelihoodBeneficiary, 'id'>>) {
+  function updateField(fields: Partial<Omit<TUPADApplicant, 'id'>>) {
     if (isViewMode) return
     setFormData(prev => ({ ...prev, ...fields }))
   }
 
   function handleBirthdateChange(value: string) {
-    let calculatedAge: number | undefined
-    if (value) {
-      const birth = new Date(value)
-      const today = new Date()
-      let age = today.getFullYear() - birth.getFullYear()
-      const monthDiff = today.getMonth() - birth.getMonth()
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
-      calculatedAge = age >= 0 ? age : undefined
-    }
-    updateField({ birthdate: value, age: calculatedAge })
+    const ageCalculated = value
+      ? Math.floor((Date.now() - new Date(value).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : 0
+    updateField({ birthdate: value, age: ageCalculated })
   }
 
   function handleNext() { if (currentStep < STEPS.length) setCurrentStep(s => s + 1) }
@@ -166,15 +162,17 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       alert('Last name and first name are required.')
       return
     }
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
-    const fullName = `${formData.lastName}, ${givenNames}`
-    onSave({ ...formData, name: fullName })
-  }
-
-  function handleSaveAsDraft() {
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
-    const fullName = (formData.lastName ? `${formData.lastName}, ${givenNames}` : givenNames) || 'Draft'
-    onSave({ ...formData, name: fullName, status: 'Waitlisted' })
+    if (!formData.sex || !formData.birthdate || !formData.civilStatus) {
+      alert('Sex, birthdate, and civil status are required.')
+      setCurrentStep(1)
+      return
+    }
+    if (!formData.barangayId) {
+      alert('Barangay is required.')
+      setCurrentStep(2)
+      return
+    }
+    onSave(formData)
   }
 
   function SectionHeader({ title }: { title: string }) {
@@ -214,7 +212,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-5 gap-4">
           <div>
             <label className={labelClass}>Sex <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.sex ?? ''} onChange={e => updateField({ sex: e.target.value })}>
+            <select className={selectClass} value={formData.sex ?? ''} onChange={e => updateField({ sex: e.target.value as TUPADApplicant['sex'] })}>
               <option value=""></option>
               <option>Male</option>
               <option>Female</option>
@@ -249,22 +247,49 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="II. ADDRESS INFORMATION" />
 
-        <div>
-          <label className={labelClass}>Street / Purok</label>
-          <input className={inputClass} placeholder="Enter street or purok" value={formData.streetPurok ?? ''} onChange={e => updateField({ streetPurok: e.target.value })} />
-        </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Barangay <span className="text-red-500">*</span></label>
-            <input className={inputClass} placeholder="Enter barangay" value={formData.barangay ?? ''} onChange={e => updateField({ barangay: e.target.value })} />
+            <label className={labelClass}>Province</label>
+            <SearchableSelect
+              value={formData.province}
+              placeholder="Search province..."
+              disabled={isViewMode}
+              fetchOptions={s => searchProvinces(s)}
+              onSelect={opt => {
+                setProvinceId(opt.id)
+                setCityId(null)
+                updateField({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0, region: '' })
+              }}
+            />
           </div>
           <div>
             <label className={labelClass}>City / Municipality</label>
-            <input className={inputClass} placeholder="Tangub City" value={formData.cityMunicipality ?? ''} onChange={e => updateField({ cityMunicipality: e.target.value })} />
+            <SearchableSelect
+              value={formData.cityMunicipality}
+              placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+              disabled={isViewMode || !provinceId}
+              refetchKey={provinceId ?? ''}
+              fetchOptions={s => searchCities(provinceId ?? 0, s)}
+              onSelect={opt => {
+                setCityId(opt.id)
+                updateField({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+              }}
+            />
           </div>
           <div>
-            <label className={labelClass}>Province</label>
-            <input className={inputClass} placeholder="Misamis Occidental" value={formData.province ?? ''} onChange={e => updateField({ province: e.target.value })} />
+            <label className={labelClass}>Barangay <span className="text-red-500">*</span></label>
+            <SearchableSelect
+              value={formData.barangay}
+              placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+              disabled={isViewMode || !cityId}
+              refetchKey={cityId ?? ''}
+              fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+              onSelect={opt => updateField({ barangay: opt.name, barangayId: opt.id })}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Street / Purok</label>
+            <input className={inputClass} placeholder="Enter street or purok" value={formData.streetPurok ?? ''} onChange={e => updateField({ streetPurok: e.target.value })} />
           </div>
         </div>
       </div>
@@ -279,23 +304,15 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div>
           <p className={labelClass}>Supporting Documents</p>
           <p className="text-xs text-gray-400">Attach TUPAD Application Form, Valid ID, and other supporting documents.</p>
-          <FormUploadSection
-            forms={formData.attachedForms}
-            onChange={attachedForms => updateField({ attachedForms })}
+          <AttachedDocsEditor
+            docs={formData.attachedDocuments ?? []}
+            onChange={attachedDocuments => updateField({ attachedDocuments })}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Date Applied</label>
-            <DatePicker className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
-          </div>
-          <div>
-            <label className={labelClass}>Status</label>
-            <select className={selectClass} value={formData.status} onChange={e => updateField({ status: e.target.value as LivelihoodStatus })}>
-              {TUPAD_STATUS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
+        <div>
+          <label className={labelClass}>Date Applied</label>
+          <DatePicker className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
         </div>
 
         <div>
@@ -408,9 +425,6 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
               <>
                 <button type="button" onClick={onClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                   Cancel
-                </button>
-                <button type="button" onClick={handleSaveAsDraft} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                  Save as Draft
                 </button>
                 {isLastStep ? (
                   <button type="button" onClick={handleSubmit} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors">

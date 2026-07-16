@@ -1,6 +1,7 @@
 ﻿import { useRef, useState } from 'react'
 import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
-import AddressFields, { type AddressValue } from '../../components/AddressFields'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 
@@ -16,6 +17,7 @@ export interface DILPFormData {
   province: string
   cityMunicipality: string
   barangay: string
+  barangayId: number | null
   streetPurok: string
   assistanceAmount: string
   dateReleased: string
@@ -26,6 +28,8 @@ export interface AttachmentItem {
   name: string
   url: string
   fileType: string
+  dataUrl?: string
+  id?: string
 }
 
 interface DILPFormProps {
@@ -47,6 +51,16 @@ const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-
 
 const STATUS_OPTIONS: DILPFormData['status'][] = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
 
+// Previously-saved attachments (loaded back from the server) don't carry a
+// browser File's MIME type, only a fileName — fall back to the extension so
+// "View" still previews them correctly, not just freshly-uploaded ones.
+function isImageAttachment(att: AttachmentItem) {
+  return att.fileType.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(att.name)
+}
+function isPdfAttachment(att: AttachmentItem) {
+  return att.fileType === 'application/pdf' || /\.pdf$/i.test(att.name)
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DILPForm({
@@ -57,23 +71,23 @@ export default function DILPForm({
   const isAdd  = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
-
-  const addressValue: AddressValue = {
-    region: formData.region,
-    province: formData.province,
-    cityMunicipality: formData.cityMunicipality,
-    barangay: formData.barangay,
-    streetPurok: formData.streetPurok,
-  }
-
-  const handleAddressChange = (partial: Partial<AddressValue>) => {
-    onChange({ ...formData, ...partial })
-  }
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !onAddAttachment) return
-    onAddAttachment({ name: file.name, url: URL.createObjectURL(file), fileType: file.type })
+    const reader = new FileReader()
+    reader.onload = () => {
+      onAddAttachment({
+        name: file.name,
+        url: reader.result as string,
+        dataUrl: reader.result as string,
+        fileType: file.type,
+        id: Date.now().toString() + Math.random().toString(36),
+      })
+    }
+    reader.readAsDataURL(file)
     e.target.value = ''
   }
 
@@ -148,12 +162,55 @@ export default function DILPForm({
             ))}
           </div>
         ) : (
-          <AddressFields
-            value={addressValue}
-            onChange={handleAddressChange}
-            inputClass="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent text-sm text-gray-900"
-            labelClass={labelCls}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Province</label>
+              <SearchableSelect
+                value={formData.province}
+                placeholder="Search province..."
+                fetchOptions={s => searchProvinces(s)}
+                onSelect={opt => {
+                  setProvinceId(opt.id)
+                  setCityId(null)
+                  onChange({ ...formData, province: opt.name, cityMunicipality: '', barangay: '', barangayId: null, region: '' })
+                }}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>City / Municipality</label>
+              <SearchableSelect
+                value={formData.cityMunicipality}
+                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                disabled={!provinceId}
+                refetchKey={provinceId ?? ''}
+                fetchOptions={s => searchCities(provinceId ?? 0, s)}
+                onSelect={opt => {
+                  setCityId(opt.id)
+                  onChange({ ...formData, cityMunicipality: opt.name, barangay: '', barangayId: null })
+                }}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Barangay</label>
+              <SearchableSelect
+                value={formData.barangay}
+                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                disabled={!cityId}
+                refetchKey={cityId ?? ''}
+                fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+                onSelect={opt => onChange({ ...formData, barangay: opt.name, barangayId: opt.id })}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Street / Purok #</label>
+              <input
+                className={inputCls}
+                value={formData.streetPurok}
+                onChange={e => onChange({ ...formData, streetPurok: e.target.value })}
+                placeholder="e.g. Purok 3, Rizal St."
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -212,7 +269,7 @@ export default function DILPForm({
             {attachments.map((att, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
                 <div className="flex-shrink-0">
-                  {att.fileType.startsWith('image/') ? <ImageIcon size={16} className="text-blue-400" /> : <FileText size={16} className="text-gray-400" />}
+                  {isImageAttachment(att) ? <ImageIcon size={16} className="text-blue-400" /> : <FileText size={16} className="text-gray-400" />}
                 </div>
                 <span className="flex-1 text-sm text-gray-700 truncate">{att.name}</span>
                 <button type="button" onClick={() => setPreviewItem(att)}
@@ -271,11 +328,11 @@ export default function DILPForm({
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4 bg-gray-50 min-h-[300px]">
-              {previewItem.fileType.startsWith('image/') ? (
+              {isImageAttachment(previewItem) ? (
                 <div className="flex items-center justify-center h-full">
                   <img src={previewItem.url} alt={previewItem.name} className="max-w-full max-h-[70vh] object-contain rounded-lg shadow" />
                 </div>
-              ) : previewItem.fileType === 'application/pdf' ? (
+              ) : isPdfAttachment(previewItem) ? (
                 <iframe src={previewItem.url} className="w-full min-h-[600px] rounded-lg shadow" title="PDF Preview" />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 py-16">

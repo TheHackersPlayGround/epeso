@@ -25,6 +25,8 @@ import { OFWProvider } from './contexts/OFWContext'
 import { SkillsTrainingProvider } from './contexts/SkillsTrainingContext'
 import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
+import { DILPProvider } from './contexts/DILPContext'
+import { TUPADProvider } from './contexts/TUPADContext'
 import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED, CLPEP_INTERVENTIONS_SEED } from './contexts/LivelihoodContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import './styles/App.css'
@@ -339,7 +341,11 @@ export default function App() {
           <OFWProvider>
             <SkillsTrainingProvider>
               <ProgramActivitiesProvider>
-                <AppContent onLogout={handleLogout} />
+                <DILPProvider>
+                  <TUPADProvider>
+                    <AppContent onLogout={handleLogout} />
+                  </TUPADProvider>
+                </DILPProvider>
               </ProgramActivitiesProvider>
             </SkillsTrainingProvider>
           </OFWProvider>

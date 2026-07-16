@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { X, Upload, Users } from 'lucide-react'
-import type { LivelihoodBeneficiary, LivelihoodService, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import { X, Upload, Users, FileText } from 'lucide-react'
+import type { DILPApplicant, DILPSavedDocument } from '../../contexts/DILPContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { DILPActivity } from '../../contexts/ProgramActivitiesContext'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -15,18 +15,12 @@ const BENEFICIARY_CLASSIFICATION_OPTIONS = [
   'Farmer', 'Fisherfolk', 'OFW', 'Solo Parent', 'PWD', 'Others',
 ] as const
 
-const STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Accepted', 'Waitlisted', 'Rejected',
-]
-
-const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
+const ROMAN_NUMERALS = ['I', 'II', 'III'] as const
 
 const STEPS = [
-  { id: 1, label: 'DILP PROJECT INFO' },
-  { id: 2, label: 'PERSONAL INFORMATION' },
-  { id: 3, label: 'ADDRESS INFORMATION' },
-  { id: 4, label: 'DEPENDENT INFORMATION' },
-  { id: 5, label: 'PESO OFFICE ONLY' },
+  { id: 1, label: 'PERSONAL INFORMATION' },
+  { id: 2, label: 'ADDRESS INFORMATION' },
+  { id: 3, label: 'PESO OFFICE ONLY' },
 ] as const
 
 // ─── Shared CSS class strings ─────────────────────────────────────────────────
@@ -43,10 +37,8 @@ const labelClass = 'block text-gray-700 mb-2 text-xs font-semibold uppercase'
 
 // ─── Empty record — used as the initial value when adding a new profile ──────
 
-export const EMPTY_DILP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
-  name: '',
-  service: 'DILEEP (DILP)',
-  status: 'Waitlisted',
+export const EMPTY_DILP_RECORD: Omit<DILPApplicant, 'id'> = {
+  beneficiaryServiceId: 0,
   firstName: '',
   lastName: '',
   middleName: '',
@@ -58,60 +50,66 @@ export const EMPTY_DILP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   contactNumber: '',
   email: '',
   beneficiaryClassification: '',
+  beneficiaryClassificationOther: '',
   streetPurok: '',
   barangay: '',
+  barangayId: 0,
   cityMunicipality: '',
   province: '',
+  region: '',
   is4PsBeneficiary: false,
   yearGraduated4Ps: '',
-  monthlyIncome: '',
-  facebookAccount: '',
-  instagramAccount: '',
-  dependentNames: '',
-  dependentContactNumber: '',
-  pagibigNo: '',
-  philhealthNo: '',
-  sssNo: '',
-  otherId: '',
+  assignedProjectId: null,
+  assignedProjectName: '',
+  assignedProjectStatus: '',
+  attachedDocuments: [],
   dateApplied: '',
   remarks: '',
-  dateApplicationReceived: '',
   receivedBy: '',
-  assignedDilpProjectId: null,
-  dilpBeneficiaryType: '',
-  attachedForms: [],
+  status: 'Inactive',
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type DILPProfileFormProps = {
-  initial: Omit<LivelihoodBeneficiary, 'id'>
+  initial: Omit<DILPApplicant, 'id'>
   mode: 'add' | 'edit' | 'view'
-  onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
+  onSave: (data: Omit<DILPApplicant, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
 }
 
-// ─── FormUploadSection — simple file attachment list for step 8 ───────────────
+// ─── Document upload section (base64, matches SPES/GIP's backend contract) ───
 
-type FormUploadSectionProps = {
-  service: LivelihoodService
-  forms: string[] | undefined
-  onChange: (forms: string[]) => void
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-function FormUploadSection({ forms, onChange }: FormUploadSectionProps) {
-  const fileList = forms ?? []
-
+function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onChange: (docs: DILPSavedDocument[]) => void }) {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    onChange([...fileList, file.name])
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        customName: file.name,
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: URL.createObjectURL(file),
+        dataUrl,
+      }])
+    }
+    reader.readAsDataURL(file)
     event.target.value = ''
   }
 
   function handleRemoveFile(index: number) {
-    onChange(fileList.filter((_, fileIndex) => fileIndex !== index))
+    onChange(docs.filter((_, i) => i !== index))
   }
 
   return (
@@ -128,18 +126,22 @@ function FormUploadSection({ forms, onChange }: FormUploadSectionProps) {
         />
       </label>
 
-      {fileList.length > 0 && (
+      {docs.length > 0 && (
         <ul className="space-y-2">
-          {fileList.map((fileName, fileIndex) => (
+          {docs.map((doc, index) => (
             <li
-              key={fileIndex}
-              className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
+              key={doc.id}
+              className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
             >
-              <span className="text-sm text-gray-700 truncate">{fileName}</span>
+              <FileText size={16} className="text-brand-blue flex-shrink-0" />
+              <span className="flex-1 text-sm text-gray-700 truncate">{doc.customName || doc.fileName}</span>
+              {(doc.url || doc.dataUrl) && (
+                <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>
+              )}
               <button
                 type="button"
-                onClick={() => handleRemoveFile(fileIndex)}
-                aria-label={`Remove ${fileName}`}
+                onClick={() => handleRemoveFile(index)}
+                aria-label={`Remove ${doc.fileName}`}
                 className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0"
               >
                 <X size={14} />
@@ -156,25 +158,18 @@ function FormUploadSection({ forms, onChange }: FormUploadSectionProps) {
 
 export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit }: DILPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
+  const [formData, setFormData] = useState<Omit<DILPApplicant, 'id'>>({
     ...EMPTY_DILP_RECORD,
     ...initial,
   })
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
 
   const isViewMode = mode === 'view'
-  const { activities } = useProgramActivities()
-
-  const dilpProjects = activities.filter(
-    (activity): activity is DILPActivity => activity.service === 'DILEEP (DILP)'
-  )
-
-  const selectedProject = formData.assignedDilpProjectId
-    ? dilpProjects.find(project => project.id === formData.assignedDilpProjectId) ?? null
-    : null
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  function updateField(changes: Partial<Omit<LivelihoodBeneficiary, 'id'>>) {
+  function updateField(changes: Partial<Omit<DILPApplicant, 'id'>>) {
     if (isViewMode) return
     setFormData(prev => ({ ...prev, ...changes }))
   }
@@ -200,15 +195,17 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       alert('Last name and first name are required.')
       return
     }
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
-    const fullName = formData.lastName ? `${formData.lastName}, ${givenNames}` : givenNames
-    onSave({ ...formData, name: fullName })
-  }
-
-  function handleSaveAsDraft() {
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
-    const fullName = (formData.lastName ? `${formData.lastName}, ${givenNames}` : givenNames) || 'Draft'
-    onSave({ ...formData, name: fullName, status: 'Waitlisted' })
+    if (!formData.sex || !formData.birthdate || !formData.civilStatus) {
+      alert('Sex, birthdate, and civil status are required.')
+      setCurrentStep(1)
+      return
+    }
+    if (!formData.barangayId) {
+      alert('Barangay is required.')
+      setCurrentStep(2)
+      return
+    }
+    onSave(formData)
   }
 
   // ── Section header — inset block matching AddApplicantSidebar style ──
@@ -226,86 +223,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   function renderStep1() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="I. DILP PROJECT INFORMATION" />
-
-        <div>
-          <label className={labelClass}>
-            Assigned Project <span className="text-red-500">*</span>
-          </label>
-          <select
-            className={selectClass}
-            value={formData.assignedDilpProjectId ?? ''}
-            onChange={e => {
-              const projectId = e.target.value ? Number(e.target.value) : null
-              const chosenProject = projectId ? dilpProjects.find(p => p.id === projectId) : null
-              updateField({
-                assignedDilpProjectId: projectId,
-                projectName: chosenProject?.projectName ?? '',
-              })
-            }}
-          >
-            <option value="">Select DILP Project</option>
-            {dilpProjects.map(project => (
-              <option key={project.id} value={project.id}>{project.projectName}</option>
-            ))}
-          </select>
-          {dilpProjects.length === 0 && (
-            <p className="text-xs text-gray-400 mt-1 italic">
-              No DILP projects found. Create one in Maintenance first.
-            </p>
-          )}
-        </div>
-
-        {selectedProject && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">
-              Project Details (Read-Only)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['Project ID Number', selectedProject.projectIdNumber],
-                ['Project Name', selectedProject.projectName],
-                ['Project Type', selectedProject.typeOfProject],
-                ['Program Component', selectedProject.programComponent],
-                ['Implementation Type', selectedProject.wayOfImplementation],
-              ].map(([detailLabel, detailValue]) => (
-                <div key={detailLabel} className={detailLabel === 'Implementation Type' ? 'col-span-2' : ''}>
-                  <p className="text-xs text-gray-500">{detailLabel}</p>
-                  <p className="text-sm text-gray-800 font-medium">{detailValue || '—'}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label className={labelClass}>
-            Beneficiary Type <span className="text-red-500">*</span>
-          </label>
-          <div className="flex gap-6 mt-1">
-            {['Individual', 'Group'].map(beneficiaryType => (
-              <label key={beneficiaryType} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="dilpBeneficiaryType"
-                  value={beneficiaryType}
-                  checked={formData.dilpBeneficiaryType === beneficiaryType}
-                  onChange={() => updateField({ dilpBeneficiaryType: beneficiaryType })}
-                  className="w-4 h-4 accent-brand-blue"
-                />
-                <span className="text-sm text-gray-700">{beneficiaryType}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep2() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="II. PERSONAL INFORMATION" />
+        <SectionHeader title="I. PERSONAL INFORMATION" />
 
         <div className="grid grid-cols-4 gap-4">
           <div>
@@ -365,7 +283,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               id="dilp-sex"
               className={selectClass}
               value={formData.sex ?? ''}
-              onChange={e => updateField({ sex: e.target.value })}
+              onChange={e => updateField({ sex: e.target.value as DILPApplicant['sex'] })}
               required
             >
               <option value=""></option>
@@ -442,7 +360,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             id="dilp-classification"
             className={selectClass}
             value={formData.beneficiaryClassification ?? ''}
-            onChange={e => updateField({ beneficiaryClassification: e.target.value })}
+            onChange={e => updateField({ beneficiaryClassification: e.target.value, beneficiaryClassificationOther: '' })}
           >
             <option value=""></option>
             {BENEFICIARY_CLASSIFICATION_OPTIONS.map(classification => (
@@ -450,6 +368,21 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             ))}
           </select>
         </div>
+
+        {formData.beneficiaryClassification === 'Others' && (
+          <div>
+            <label htmlFor="dilp-classificationOther" className={labelClass}>
+              Please Specify
+            </label>
+            <input
+              id="dilp-classificationOther"
+              className={inputClass}
+              value={formData.beneficiaryClassificationOther ?? ''}
+              onChange={e => updateField({ beneficiaryClassificationOther: e.target.value })}
+              placeholder="Enter classification"
+            />
+          </div>
+        )}
 
         <div>
           <label className={labelClass}>4Ps Beneficiary?</label>
@@ -487,131 +420,92 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
     )
   }
 
+  function renderStep2() {
+    return (
+      <div className="space-y-5">
+        <SectionHeader title="II. ADDRESS INFORMATION" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Province</label>
+            <SearchableSelect
+              value={formData.province}
+              placeholder="Search province..."
+              disabled={isViewMode}
+              fetchOptions={s => searchProvinces(s)}
+              onSelect={opt => {
+                setProvinceId(opt.id)
+                setCityId(null)
+                updateField({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0, region: '' })
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>City / Municipality</label>
+            <SearchableSelect
+              value={formData.cityMunicipality}
+              placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+              disabled={isViewMode || !provinceId}
+              refetchKey={provinceId ?? ''}
+              fetchOptions={s => searchCities(provinceId ?? 0, s)}
+              onSelect={opt => {
+                setCityId(opt.id)
+                updateField({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>
+              Barangay <span className="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              value={formData.barangay}
+              placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+              disabled={isViewMode || !cityId}
+              refetchKey={cityId ?? ''}
+              fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+              onSelect={opt => updateField({ barangay: opt.name, barangayId: opt.id })}
+            />
+          </div>
+          <div>
+            <label htmlFor="dilp-streetPurok" className={labelClass}>Street / Purok</label>
+            <input
+              id="dilp-streetPurok"
+              className={inputClass}
+              placeholder="Enter street or purok"
+              value={formData.streetPurok ?? ''}
+              onChange={e => updateField({ streetPurok: e.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderStep3() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="III. ADDRESS INFORMATION" />
-
-        <div>
-          <label htmlFor="dilp-streetPurok" className={labelClass}>Street / Purok</label>
-          <input
-            id="dilp-streetPurok"
-            className={inputClass}
-            placeholder="Enter street or purok"
-            value={formData.streetPurok ?? ''}
-            onChange={e => updateField({ streetPurok: e.target.value })}
-          />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="dilp-barangay" className={labelClass}>
-              Barangay <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="dilp-barangay"
-              className={inputClass}
-              placeholder="Enter barangay"
-              value={formData.barangay ?? ''}
-              onChange={e => updateField({ barangay: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-city" className={labelClass}>City / Municipality</label>
-            <input
-              id="dilp-city"
-              className={inputClass}
-              placeholder="Enter city"
-              value={formData.cityMunicipality ?? ''}
-              onChange={e => updateField({ cityMunicipality: e.target.value })}
-            />
-          </div>
-          <div className="col-span-2">
-            <label htmlFor="dilp-province" className={labelClass}>Province</label>
-            <input
-              id="dilp-province"
-              className={inputClass}
-              placeholder="Enter province"
-              value={formData.province ?? ''}
-              onChange={e => updateField({ province: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep4() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="IV. DEPENDENT INFORMATION" />
-
-        <div>
-          <label htmlFor="dilp-dependentNames" className={labelClass}>Dependent Name</label>
-          <input
-            id="dilp-dependentNames"
-            className={inputClass}
-            value={formData.dependentNames ?? ''}
-            onChange={e => updateField({ dependentNames: e.target.value })}
-            placeholder="Enter dependent's full name"
-          />
-        </div>
-        <div>
-          <label htmlFor="dilp-dependentContact" className={labelClass}>
-            Contact Number of Dependent
-          </label>
-          <input
-            id="dilp-dependentContact"
-            className={inputClass}
-            value={formData.dependentContactNumber ?? ''}
-            onChange={e => updateField({ dependentContactNumber: e.target.value })}
-            placeholder="09XXXXXXXXX"
-          />
-        </div>
-      </div>
-    )
-  }
-
-  function renderStep5() {
-    return (
-      <div className="space-y-5">
-        <SectionHeader title="V. PESO OFFICE ONLY" />
+        <SectionHeader title="III. PESO OFFICE ONLY" />
 
         <div>
           <p className={labelClass}>Supporting Documents</p>
           <p className="text-xs text-gray-400">
             Attach DILP Application Form, Valid ID, and other supporting documents.
           </p>
-          <FormUploadSection
-            service={formData.service}
-            forms={formData.attachedForms}
-            onChange={attachedForms => updateField({ attachedForms })}
+          <AttachedDocsEditor
+            docs={formData.attachedDocuments ?? []}
+            onChange={attachedDocuments => updateField({ attachedDocuments })}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
-            <DatePicker
-              id="dilp-dateApplied"
-              className={inputClass}
-              value={formData.dateApplied ?? ''}
-              onChange={value => updateField({ dateApplied: value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="dilp-status" className={labelClass}>Status</label>
-            <select
-              id="dilp-status"
-              className={selectClass}
-              value={formData.status}
-              onChange={e => updateField({ status: e.target.value as LivelihoodStatus })}
-            >
-              {STATUS_OPTIONS.map(statusOption => (
-                <option key={statusOption} value={statusOption}>{statusOption}</option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
+          <DatePicker
+            id="dilp-dateApplied"
+            className={inputClass}
+            value={formData.dateApplied ?? ''}
+            onChange={value => updateField({ dateApplied: value })}
+          />
         </div>
 
         <div>
@@ -644,8 +538,6 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       case 1: return renderStep1()
       case 2: return renderStep2()
       case 3: return renderStep3()
-      case 4: return renderStep4()
-      case 5: return renderStep5()
       default: return null
     }
   }
@@ -764,13 +656,6 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Save as Draft
                 </button>
                 {isLastStep ? (
                   <button

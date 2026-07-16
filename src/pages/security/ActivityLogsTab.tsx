@@ -8,6 +8,8 @@ import { listDeleted, restoreRecord, purgeRecord, type RecycleBinRecord } from '
 import { useGIP } from '../../contexts/GIPContext'
 import { useCDSP } from '../../contexts/CDSPContext'
 import { useSPES } from '../../contexts/SPESContext'
+import { useDILP } from '../../contexts/DILPContext'
+import { useTUPAD } from '../../contexts/TUPADContext'
 
 interface ActivityLog {
   id: number
@@ -45,8 +47,9 @@ const mockActivityLogs: ActivityLog[] = [
 
 // The recycle bin shows real soft-deleted records from every module that
 // supports soft delete: Employment Facilitation (applicants, employers,
-// referrals), GIP (applicants), CDSP (applicants), and SPES (applicants).
-// Other modules don't have soft delete yet, so they won't appear here until they do.
+// referrals), GIP (applicants), CDSP (applicants), SPES (applicants), and
+// DILP/TUPAD (beneficiaries). Other modules don't have soft delete yet, so
+// they won't appear here until they do.
 type RecycleBinItem = RecycleBinRecord
 
 // Days left before the (display-only) 30-day window elapses, from the real date.
@@ -59,12 +62,14 @@ function getDaysRemaining(deletedAt: string): number {
 const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
 const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
 const logStatuses = ['All', 'Success', 'Failed']
-const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants']
+const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants', 'DILP Beneficiaries', 'TUPAD Beneficiaries']
 
 export default function ActivityLogsTab() {
   const { refreshProfiles: refreshGipProfiles } = useGIP()
   const { refreshProfiles: refreshCdspProfiles } = useCDSP()
   const { refreshProfiles: refreshSpesProfiles } = useSPES()
+  const { refreshProfiles: refreshDilpProfiles } = useDILP()
+  const { refreshProfiles: refreshTupadProfiles } = useTUPAD()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logSearch,       setLogSearch]       = useState('')
@@ -143,6 +148,8 @@ export default function ActivityLogsTab() {
     if (recordType === 'gipApplicant') await refreshGipProfiles()
     if (recordType === 'cdspApplicant') await refreshCdspProfiles()
     if (recordType === 'spesApplicant') await refreshSpesProfiles()
+    if (recordType === 'dilpApplicant') await refreshDilpProfiles()
+    if (recordType === 'tupadApplicant') await refreshTupadProfiles()
   }
 
   const handleRestoreItem = (item: RecycleBinItem) => {

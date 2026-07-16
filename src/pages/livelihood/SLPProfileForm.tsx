@@ -1,20 +1,144 @@
 import { useState } from 'react'
-import { X, Users, Plus, Paperclip } from 'lucide-react'
-import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
+import { X, Users, Upload, FileText, Eye, Trash2 } from 'lucide-react'
+import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
+
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
+function AttachedDocsEditor({ docs, onChange }: { docs: LivelihoodSavedDocument[]; onChange: (docs: LivelihoodSavedDocument[]) => void }) {
+  const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: URL.createObjectURL(file),
+        dataUrl: reader.result as string,
+      }])
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  function handleRemoveFile(index: number) {
+    onChange(docs.filter((_, i) => i !== index))
+  }
+
+  return (
+    <div>
+      <input
+        type="file"
+        id="slp-document-upload"
+        className="hidden"
+        onChange={handleFileChange}
+        accept=".pdf,.jpg,.jpeg,.png"
+      />
+      <label
+        htmlFor="slp-document-upload"
+        className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-dashed border-brand-blue bg-blue-50 text-brand-blue rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+      >
+        <Upload size={20} />
+        <span className="font-medium">Upload Document</span>
+      </label>
+      <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG</p>
+
+      {docs.length > 0 && (
+        <div className="space-y-3 pt-4 mt-4 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-gray-700">Uploaded Documents</h4>
+          <div className="space-y-2">
+            {docs.map((doc, index) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+              >
+                <div
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                  onClick={() => setPreviewDoc(doc)}
+                >
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <FileText size={20} className="text-brand-blue" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
+                    <p className="text-xs text-gray-500">{doc.fileSize}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDoc(doc)}
+                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Preview document"
+                  >
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(index)}
+                    className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete document"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {previewDoc && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <p className="text-sm text-gray-500 truncate">{previewDoc.fileName}</p>
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                aria-label="Close preview"
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
+                <div className="flex items-center justify-center h-full">
+                  <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                </div>
+              ) : /\.pdf$/i.test(previewDoc.fileName) ? (
+                <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <FileText size={64} className="mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">Preview not available</p>
+                  <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
 
-const STATUS_BADGE: Record<string, string> = {
-  Active:   'bg-green-100 text-green-700',
-  Inactive: 'bg-gray-100 text-gray-500',
-  Dropped:  'bg-red-100 text-red-600',
-}
-
-const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Special'] as const
+const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Disaster-affected', 'Area-Based Convergence', 'Walk-in', 'Referral'] as const
 
 const SLP_TRACK_OPTIONS = [
   'Enterprise - Individual',
@@ -27,26 +151,29 @@ const VULNERABILITY_SEVERITY_OPTIONS = ['Low', 'Medium', 'High'] as const
 const ASSESSMENT_RESULT_OPTIONS = ['Qualified', 'Not Qualified'] as const
 
 const EDUCATIONAL_ATTAINMENT_OPTIONS = [
-  'No Formal Education',
-  'Elementary Level',
-  'Elementary Graduate',
-  'High School Level',
-  'High School Graduate',
-  'Vocational/Technical',
-  'College Level',
-  'College Graduate',
   'Post Graduate',
+  'College Graduate',
+  'College Level',
+  'Vocational/Technical',
+  'High School Graduate (Senior High/K-12)',
+  'High School Graduate (Junior High-4 Years)',
+  'High School Level',
+  'Elementary Graduate',
+  'Elementary Level',
+  'ALS Graduate',
+  'No grade completed',
 ] as const
 
 const SECTOR_OPTIONS = [
   'Indigenous People (IP)',
-  'Internally Displaced Person (IDP)',
-  'Overseas Filipino Worker (OFW)',
-  'Person with Disability (PWD)',
   'Senior Citizen',
   'Solo Parent',
-  'Agrarian Reform Beneficiary (ARB)',
-  'Farmer/Fisherfolk',
+  'Internally Displaced Person (IDP)',
+  'Overseas Filipino Worker (OFW)',
+  'Fisherfolks',
+  'Farmers',
+  'Person with Disability (PWD)',
+  'Not Applicable',
   'Others',
 ] as const
 
@@ -89,7 +216,6 @@ export const EMPTY_SLP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   civilStatus: '',
   contactNumber: '',
   email: '',
-  houseBlockLotNo: '',
   streetPurok: '',
   barangay: '',
   cityMunicipality: 'Tangub City',
@@ -97,8 +223,11 @@ export const EMPTY_SLP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   is4PsBeneficiary: false,
   slpParticipantIdNumber: '',
   eligibilityType: 'Regular',
+  referringParty: '',
   sector: [],
   sectorOthersSpecify: '',
+  sectorIpGroupSpecify: '',
+  sectorDisabilitySpecify: '',
   educationalAttainment: '',
   sourceOfIncome: '',
   totalHouseholdMonthlyIncome: '',
@@ -108,7 +237,7 @@ export const EMPTY_SLP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   slpTrack: 'Enterprise - Individual',
   remarks: '',
   dateApplied: '',
-  attachedForms: [],
+  attachedDocuments: [],
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -129,9 +258,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     ...EMPTY_SLP_RECORD,
     ...initial,
   })
-  const [newFormName, setNewFormName] = useState('')
-  const [isAddingForm, setIsAddingForm] = useState(false)
-
   const isViewMode = mode === 'view'
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -174,46 +300,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
     onSave({ ...formData, name: fullName })
-  }
-
-  function handleSaveAsDraft() {
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
-    const fullName = (formData.lastName
-      ? `${formData.lastName}, ${givenNames}`
-      : givenNames) || 'Draft'
-    onSave({ ...formData, name: fullName, status: 'Pending' })
-  }
-
-  function handleStartAddingForm() {
-    setIsAddingForm(true)
-    setNewFormName('')
-  }
-
-  function handleCommitForm() {
-    if (!newFormName.trim()) return
-    const current = formData.attachedForms ?? []
-    updateField({ attachedForms: [...current, newFormName.trim()] })
-    setNewFormName('')
-    setIsAddingForm(false)
-  }
-
-  function handleCancelAddingForm() {
-    setNewFormName('')
-    setIsAddingForm(false)
-  }
-
-  function handleAttachFileToForm(index: number, event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const current = [...(formData.attachedForms ?? [])]
-    current[index] = file.name
-    updateField({ attachedForms: current })
-    event.target.value = ''
-  }
-
-  function handleRemoveAttachment(index: number) {
-    const current = formData.attachedForms ?? []
-    updateField({ attachedForms: current.filter((_, i) => i !== index) })
   }
 
   // ── Section header ─────────────────────────────────────────────────
@@ -279,6 +365,15 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               <option key={opt}>{opt}</option>
             ))}
           </select>
+          {formData.eligibilityType === 'Referral' && (
+            <input
+              id="slp-referringParty"
+              className={inputClass + ' mt-2'}
+              placeholder="Please specify the referring party"
+              value={formData.referringParty ?? ''}
+              onChange={e => updateField({ referringParty: e.target.value })}
+            />
+          )}
         </div>
       </div>
     )
@@ -357,6 +452,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               id="slp-age"
               type="number"
               className={inputClass + ' bg-gray-50'}
+              placeholder="From birthdate"
               value={formData.age || ''}
               readOnly
             />
@@ -420,19 +516,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     return (
       <div className="space-y-5">
         <SectionHeader title="III. ADDRESS INFORMATION" />
-
-        <div>
-          <label htmlFor="slp-houseBlockLot" className={labelClass}>
-            House / Block / Lot Number
-          </label>
-          <input
-            id="slp-houseBlockLot"
-            className={inputClass}
-            placeholder="Enter house, block, or lot number"
-            value={formData.houseBlockLotNo ?? ''}
-            onChange={e => updateField({ houseBlockLotNo: e.target.value })}
-          />
-        </div>
 
         <div>
           <label htmlFor="slp-streetPurok" className={labelClass}>Street / Purok / Zone</label>
@@ -504,6 +587,22 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               </label>
             ))}
           </div>
+          {selectedSectors.includes('Indigenous People (IP)') && (
+            <input
+              className={inputClass + ' mt-3'}
+              placeholder="Please specify group"
+              value={formData.sectorIpGroupSpecify ?? ''}
+              onChange={e => updateField({ sectorIpGroupSpecify: e.target.value })}
+            />
+          )}
+          {selectedSectors.includes('Person with Disability (PWD)') && (
+            <input
+              className={inputClass + ' mt-3'}
+              placeholder="Please specify the disability"
+              value={formData.sectorDisabilitySpecify ?? ''}
+              onChange={e => updateField({ sectorDisabilitySpecify: e.target.value })}
+            />
+          )}
           {selectedSectors.includes('Others') && (
             <input
               className={inputClass + ' mt-3'}
@@ -643,8 +742,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   }
 
   function renderStep6() {
-    const attachedForms = formData.attachedForms ?? []
-
     return (
       <div className="space-y-5">
         <SectionHeader title="VI. ATTACHMENTS" />
@@ -655,75 +752,10 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             Attach supporting documents / forms (optional / if applicable).
           </p>
 
-          <div>
-            {attachedForms.map((name, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-2 px-3 py-2 border border-dashed border-brand-blue rounded-lg mt-5 bg-gray-50"
-              >
-                <span className="text-sm text-gray-700 truncate flex-1">{name}</span>
-                <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 border border-gray-300 rounded-full cursor-pointer hover:bg-gray-50 transition-colors flex-shrink-0">
-                  <Paperclip size={13} />
-                  Attach File
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={e => handleAttachFileToForm(idx, e)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveAttachment(idx)}
-                  aria-label={`Remove ${name}`}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-
-            {isAddingForm ? (
-              <div className="flex items-center gap-2 px-3 py-2 border border-dashed border-brand-blue rounded-lg bg-blue-50 mt-5">
-                <input
-                  type="text"
-                  autoFocus
-                  className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder:text-gray-400"
-                  placeholder="Enter form name..."
-                  value={newFormName}
-                  onChange={e => setNewFormName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleCommitForm()
-                    if (e.key === 'Escape') handleCancelAddingForm()
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleCommitForm}
-                  disabled={!newFormName.trim()}
-                  className="px-3 py-1 text-sm text-white bg-brand-blue rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity flex-shrink-0"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelAddingForm}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartAddingForm}
-                className="w-full flex items-center mt-5 justify-center gap-1.5 py-2.5 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors"
-              >
-                <Plus size={14} />
-                Add form
-              </button>
-            )}
-          </div>
+          <AttachedDocsEditor
+            docs={formData.attachedDocuments ?? []}
+            onChange={attachedDocuments => updateField({ attachedDocuments })}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -747,18 +779,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               onChange={e => updateField({ receivedBy: e.target.value })}
             />
           </div>
-        </div>
-
-        <div>
-          <label className={labelClass}>Status</label>
-          <div className="flex items-center gap-3">
-            <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_BADGE[formData.status] ?? 'bg-gray-100 text-gray-500'}`}>
-              {formData.status}
-            </span>
-          </div>
-          {!isViewMode && (
-            <p className="text-xs text-gray-400 mt-1.5">Active / Inactive are set automatically based on project assignment.</p>
-          )}
         </div>
       </div>
     )
@@ -888,20 +908,13 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Save as Draft
-                </button>
                 {isLastStep ? (
                   <button
                     type="button"
                     onClick={() => handleSubmit()}
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
                   >
-                    {mode === 'add' ? 'Save Beneficiary' : 'Save Changes'}
+                    {mode === 'add' ? 'Save' : 'Save Changes'}
                   </button>
                 ) : (
                   <button

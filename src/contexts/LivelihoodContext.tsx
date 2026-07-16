@@ -3,6 +3,14 @@
 
 export type LivelihoodService = 'DILEEP (DILP)' | 'DILEEP (TUPAD)' | 'SLP' | 'CLPEP'
 
+export interface LivelihoodSavedDocument {
+  id: string
+  fileName: string
+  fileSize: string
+  url: string
+  dataUrl?: string
+}
+
 // ─── SLP Project ──────────────────────────────────────────────────────────────
 
 export type SLPProject = {
@@ -48,23 +56,24 @@ export type CLPEPIntervention = {
   id: number
   title: string
   type: string
-  status: 'Planned' | 'Active' | 'Completed'
+  status: 'Planned' | 'Ongoing' | 'Completed'
   location: string
   description: string
   targetBeneficiaries?: number
-  startDate?: string
-  endDate?: string
+  date?: string
   implementingOfficer?: string
   partnerAgency?: string
+  partnerAgencyOther?: string
+  typeOther?: string
 }
 
 export const CLPEP_INTERVENTIONS_SEED: CLPEPIntervention[] = [
   {
     id: 1, title: 'Educational Assistance Program',
-    type: 'Educational Assistance', status: 'Active',
+    type: 'Educational Assistance', status: 'Ongoing',
     location: 'Barangay Community Center, Tangub City',
     description: 'Provides educational support and school supplies to child laborers and at-risk children.',
-    targetBeneficiaries: 15, startDate: '2026-03-22', endDate: '2026-12-22',
+    targetBeneficiaries: 15, date: '2026-03-22',
     implementingOfficer: 'Angela Martinez', partnerAgency: 'DepEd',
   },
   {
@@ -72,7 +81,7 @@ export const CLPEP_INTERVENTIONS_SEED: CLPEPIntervention[] = [
     type: 'Family Intervention', status: 'Planned',
     location: 'Community Hall, Tangub City',
     description: 'Educational program for families to prevent child labor through awareness and livelihood support.',
-    targetBeneficiaries: 20, startDate: '2026-04-15', endDate: '2026-12-15',
+    targetBeneficiaries: 20, date: '2026-04-15',
     implementingOfficer: 'Roberto Dela Cruz', partnerAgency: 'DSWD',
   },
 ]
@@ -146,16 +155,17 @@ export type LivelihoodBeneficiary = {
   assistanceAmount?: string
   dateReleased?: string
   // ── Attachments (stored as file name list only)
-  attachedForms?: string[]
   // ── SLP fields
   assignedSlpProjectId?: number | null
   slpTrack?: string
   livelihoodGrantAmount?: string
   slpParticipantIdNumber?: string
-  eligibilityType?: string           // "Regular", "Special", etc.
-  houseBlockLotNo?: string
+  eligibilityType?: string           // "Regular", "Disaster-affected", "Area-Based Convergence", "Walk-in", "Referral"
+  referringParty?: string           // free-text when eligibilityType is "Referral"
   sector?: string[]                  // multi-select: IP, IDP, OFW, PWD, etc.
   sectorOthersSpecify?: string       // free-text when "Others" is checked
+  sectorIpGroupSpecify?: string      // free-text when "Indigenous People (IP)" is checked
+  sectorDisabilitySpecify?: string   // free-text when "Person with Disability (PWD)" is checked
   educationalAttainment?: string
   sourceOfIncome?: string
   totalHouseholdMonthlyIncome?: string
@@ -177,6 +187,7 @@ export type LivelihoodBeneficiary = {
   guardianRelationship?: string
   guardianContactNumber?: string
   caseReportFile?: string
+  attachedDocuments?: LivelihoodSavedDocument[]
 }
 
 export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
@@ -206,7 +217,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     assistanceAmount: '50000',
     dateReleased: '2026-04-05',
     dateApplied: '2026-03-01',
-    attachedForms: [],
   },
   {
     id: 2,
@@ -230,7 +240,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     receivedBy: 'Carlo Bautista',
     assignedDilpProjectId: 204,
     projectName: 'TUPAD Road Maintenance and Repair',
-    attachedForms: [],
     projectAssignmentHistory: [
       { projectId: 202, projectName: 'TUPAD Cemetery and Memorial Park Maintenance', assignedDate: '2026-01-20', completedDate: '2026-02-28' },
       { projectId: 204, projectName: 'TUPAD Road Maintenance and Repair', assignedDate: '2026-03-05' },
@@ -249,7 +258,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     age: 33,
     civilStatus: 'Married',
     contactNumber: '09191234003',
-    houseBlockLotNo: '12',
     streetPurok: 'Purok 1',
     barangay: 'Pangabuan',
     cityMunicipality: 'Tangub City',
@@ -271,7 +279,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-02-20',
     dateApplicationReceived: '2026-02-20',
     receivedBy: 'Maria Santos',
-    attachedForms: [],
   },
   {
     id: 4,
@@ -302,7 +309,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     guardianRelationship: 'Mother',
     guardianContactNumber: '09201234100',
     dateApplied: '2026-04-01',
-    attachedForms: [],
     dateApplicationReceived: '2026-04-01',
     receivedBy: 'Carlo Bautista',
   },
@@ -333,7 +339,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     assistanceAmount: '5000',
     dateReleased: '2026-02-15',
     dateApplied: '2026-01-20',
-    attachedForms: [],
   },
   {
     id: 7,
@@ -360,7 +365,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     region: 'Region X (Northern Mindanao)',
     assistanceAmount: '7500',
     dateApplied: '2026-03-10',
-    attachedForms: [],
   },
   {
     id: 8,
@@ -388,7 +392,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     assistanceAmount: '2500',
     dateReleased: '2026-02-28',
     dateApplied: '2026-02-05',
-    attachedForms: [],
   },
   {
     id: 9,
@@ -415,7 +418,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     region: 'Region X (Northern Mindanao)',
     assistanceAmount: '10000',
     dateApplied: '2026-04-02',
-    attachedForms: [],
   },
   // ── DILEEP (TUPAD) additional ────────────────────────────────────────────
   {
@@ -440,7 +442,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-04-12',
     dateApplicationReceived: '2026-04-12',
     receivedBy: 'Maria Santos',
-    attachedForms: [],
     projectAssignmentHistory: [
       { projectId: 202, projectName: 'TUPAD Cemetery and Memorial Park Maintenance', assignedDate: '2026-04-12' },
     ],
@@ -466,7 +467,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-03-20',
     dateApplicationReceived: '2026-03-20',
     receivedBy: 'Carlo Bautista',
-    attachedForms: [],
     projectAssignmentHistory: [
       { projectId: 203, projectName: 'TUPAD Street Cleaning and Beautification', assignedDate: '2026-03-20', completedDate: '2026-04-10' },
     ],
@@ -493,7 +493,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-04-16',
     dateApplicationReceived: '2026-04-16',
     receivedBy: 'Maria Santos',
-    attachedForms: [],
     projectAssignmentHistory: [
       { projectId: 204, projectName: 'TUPAD Road Maintenance and Repair', assignedDate: '2026-04-16' },
     ],
@@ -520,7 +519,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-05-16',
     dateApplicationReceived: '2026-05-16',
     receivedBy: 'Carlo Bautista',
-    attachedForms: [],
     projectAssignmentHistory: [
       { projectId: 203, projectName: 'TUPAD Street Cleaning and Beautification', assignedDate: '2026-05-16' },
     ],
@@ -557,7 +555,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-04-26',
     dateApplicationReceived: '2026-04-26',
     receivedBy: 'Maria Santos',
-    attachedForms: [],
   },
   {
     id: 15,
@@ -578,11 +575,10 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     province: 'Misamis Occidental',
     slpParticipantIdNumber: 'SLP-2026-015',
     eligibilityType: 'Regular',
-    educationalAttainment: 'High School Graduate',
+    educationalAttainment: 'High School Graduate (Junior High-4 Years)',
     assessmentResult: 'Not Qualified',
     assignedSlpProjectId: null,
     dateApplied: '2026-03-15',
-    attachedForms: [],
   },
   {
     id: 16,
@@ -603,7 +599,7 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     province: 'Misamis Occidental',
     is4PsBeneficiary: true,
     slpParticipantIdNumber: 'SLP-2026-016',
-    eligibilityType: 'Special',
+    eligibilityType: 'Regular',
     sector: ['Solo Parent', 'Women'],
     educationalAttainment: 'Elementary Graduate',
     totalHouseholdMonthlyIncome: '4500',
@@ -615,7 +611,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     dateApplied: '2026-05-11',
     dateApplicationReceived: '2026-05-11',
     receivedBy: 'Maria Santos',
-    attachedForms: [],
   },
   {
     id: 17,
@@ -643,11 +638,10 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     assessmentResult: 'Qualified',
     assignedSlpProjectId: 301,
     projectName: 'Sustainable Livelihood Program - Handicrafts',
-    slpTrack: 'Employment Facilitation',
+    slpTrack: 'Enterprise - Individual',
     dateApplied: '2026-03-19',
     dateApplicationReceived: '2026-03-19',
     receivedBy: 'Carlo Bautista',
-    attachedForms: [],
   },
   // ── CLPEP additional ─────────────────────────────────────────────────────
   {
@@ -680,7 +674,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     guardianRelationship: 'Mother',
     guardianContactNumber: '09301234100',
     dateApplied: '2026-03-25',
-    attachedForms: [],
     dateApplicationReceived: '2026-03-25',
     receivedBy: 'Maria Santos',
   },
@@ -714,7 +707,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     guardianRelationship: 'Father',
     guardianContactNumber: '09311234200',
     dateApplied: '2026-04-18',
-    attachedForms: [],
     dateApplicationReceived: '2026-04-18',
     receivedBy: 'Carlo Bautista',
   },
@@ -747,7 +739,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     guardianRelationship: 'Grandmother',
     guardianContactNumber: '09321234300',
     dateApplied: '2026-03-30',
-    attachedForms: [],
     dateApplicationReceived: '2026-03-30',
     receivedBy: 'Maria Santos',
   },
@@ -781,7 +772,6 @@ export const LIVELIHOOD_SEED: LivelihoodBeneficiary[] = [
     guardianRelationship: 'Aunt',
     guardianContactNumber: '09331234400',
     dateApplied: '2026-04-05',
-    attachedForms: [],
     dateApplicationReceived: '2026-04-05',
     receivedBy: 'Carlo Bautista',
   },

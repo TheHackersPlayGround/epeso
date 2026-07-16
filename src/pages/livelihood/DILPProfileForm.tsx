@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Upload, Users, FileText } from 'lucide-react'
+import { X, Upload, Users, FileText, Eye, Trash2 } from 'lucide-react'
 import type { DILPApplicant, DILPSavedDocument } from '../../contexts/DILPContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
@@ -89,6 +89,8 @@ function formatFileSize(bytes: number) {
 }
 
 function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onChange: (docs: DILPSavedDocument[]) => void }) {
+  const [previewDoc, setPreviewDoc] = useState<DILPSavedDocument | null>(null)
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -113,42 +115,99 @@ function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onC
   }
 
   return (
-    <div className="space-y-4">
-      <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-blue transition-colors">
-        <Upload size={32} className="text-gray-400 mb-2" />
-        <p className="text-sm font-medium text-gray-600">Click to upload</p>
-        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG files accepted</p>
-        <input
-          type="file"
-          className="sr-only"
-          onChange={handleFileChange}
-          accept=".pdf,.jpg,.jpeg,.png"
-        />
+    <div>
+      <input
+        type="file"
+        id="dilp-document-upload"
+        className="hidden"
+        onChange={handleFileChange}
+        accept=".pdf,.jpg,.jpeg,.png"
+      />
+      <label
+        htmlFor="dilp-document-upload"
+        className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-dashed border-brand-blue bg-blue-50 text-brand-blue rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+      >
+        <Upload size={20} />
+        <span className="font-medium">Upload Document</span>
       </label>
+      <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG</p>
 
       {docs.length > 0 && (
-        <ul className="space-y-2">
-          {docs.map((doc, index) => (
-            <li
-              key={doc.id}
-              className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
-            >
-              <FileText size={16} className="text-brand-blue flex-shrink-0" />
-              <span className="flex-1 text-sm text-gray-700 truncate">{doc.customName || doc.fileName}</span>
-              {(doc.url || doc.dataUrl) && (
-                <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>
-              )}
+        <div className="space-y-3 pt-4 mt-4 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-gray-700">Uploaded Documents</h4>
+          <div className="space-y-2">
+            {docs.map((doc, index) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+              >
+                <div
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                  onClick={() => setPreviewDoc(doc)}
+                >
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <FileText size={20} className="text-brand-blue" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
+                    <p className="text-xs text-gray-500">{doc.fileSize}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDoc(doc)}
+                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Preview document"
+                  >
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(index)}
+                    className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete document"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {previewDoc && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <p className="text-sm text-gray-500 truncate">{previewDoc.customName || previewDoc.fileName}</p>
               <button
                 type="button"
-                onClick={() => handleRemoveFile(index)}
-                aria-label={`Remove ${doc.fileName}`}
-                className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                onClick={() => setPreviewDoc(null)}
+                aria-label="Close preview"
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
               >
-                <X size={14} />
+                <X size={20} />
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
+                <div className="flex items-center justify-center h-full">
+                  <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+                </div>
+              ) : /\.pdf$/i.test(previewDoc.fileName) ? (
+                <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <FileText size={64} className="mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">Preview not available</p>
+                  <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

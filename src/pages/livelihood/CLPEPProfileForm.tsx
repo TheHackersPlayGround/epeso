@@ -1,14 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Users, Plus, Paperclip, Upload, ChevronDown } from 'lucide-react'
+import { X, Users, Upload, FileText, Eye, Trash2, ChevronDown } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
-import type { LivelihoodBeneficiary, LivelihoodStatus } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const STATUS_OPTIONS: LivelihoodStatus[] = ['Accepted', 'Waitlisted', 'Rejected']
-
-const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
 
 const CHILD_LABOR_STATUS_OPTIONS = [
   'Child Laborer',
@@ -21,12 +17,20 @@ const SCHOOL_STATUS_OPTIONS = [
   'Currently Enrolled',
   'Out of School',
   'ALS Learner',
+  'ALS Graduate',
   'Graduated',
 ] as const
 
 const RELATIONSHIP_OPTIONS = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Relative', 'Others'] as const
 
 const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
+
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
 
 // ─── Custom Select Dropdown ───────────────────────────────────────────────────
 
@@ -150,10 +154,6 @@ export const EMPTY_CLPEP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   sex: '',
   birthdate: '',
   age: 0,
-  civilStatus: '',
-  contactNumber: '',
-  email: '',
-  houseBlockLotNo: '',
   streetPurok: '',
   barangay: '',
   cityMunicipality: 'Tangub City',
@@ -172,8 +172,7 @@ export const EMPTY_CLPEP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   cooperativeName: '',
   cooperativeRole: '',
   remarks: '',
-  caseReportFile: '',
-  attachedForms: [],
+  attachedDocuments: [],
   dateApplicationReceived: '',
   receivedBy: '',
 }
@@ -196,8 +195,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     ...EMPTY_CLPEP_RECORD,
     ...initial,
   })
-  const [newFormName, setNewFormName] = useState('')
-  const [isAddingForm, setIsAddingForm] = useState(false)
+  const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
 
   const isViewMode = mode === 'view'
 
@@ -236,53 +234,29 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     onSave({ ...formData, name: fullName })
   }
 
-  function handleSaveAsDraft() {
-    const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
-      .filter(Boolean)
-      .join(' ')
-    const fullName = (formData.lastName
-      ? `${formData.lastName}, ${givenNames}`
-      : givenNames) || 'Draft'
-    onSave({ ...formData, name: fullName, status: 'Pending' })
-  }
-
-  function handleStartAddingForm() {
-    setIsAddingForm(true)
-    setNewFormName('')
-  }
-
-  function handleCommitForm() {
-    if (!newFormName.trim()) return
-    const current = formData.attachedForms ?? []
-    updateField({ attachedForms: [...current, newFormName.trim()] })
-    setNewFormName('')
-    setIsAddingForm(false)
-  }
-
-  function handleCancelAddingForm() {
-    setNewFormName('')
-    setIsAddingForm(false)
-  }
-
-  function handleAttachFileToForm(index: number, event: React.ChangeEvent<HTMLInputElement>) {
+  function handleDocumentUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    const current = [...(formData.attachedForms ?? [])]
-    current[index] = file.name
-    updateField({ attachedForms: current })
+    const reader = new FileReader()
+    reader.onload = () => {
+      const current = formData.attachedDocuments ?? []
+      updateField({
+        attachedDocuments: [...current, {
+          id: Date.now().toString() + Math.random().toString(36),
+          fileName: file.name,
+          fileSize: formatFileSize(file.size),
+          url: URL.createObjectURL(file),
+          dataUrl: reader.result as string,
+        }],
+      })
+    }
+    reader.readAsDataURL(file)
     event.target.value = ''
   }
 
-  function handleRemoveAttachment(index: number) {
-    const current = formData.attachedForms ?? []
-    updateField({ attachedForms: current.filter((_, i) => i !== index) })
-  }
-
-  function handleCaseReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    updateField({ caseReportFile: file.name })
-    event.target.value = ''
+  function handleRemoveDocument(id: string) {
+    const current = formData.attachedDocuments ?? []
+    updateField({ attachedDocuments: current.filter(doc => doc.id !== id) })
   }
 
   // ── Section header ─────────────────────────────────────────────────
@@ -349,7 +323,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label htmlFor="clpep-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
@@ -367,6 +341,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               id="clpep-age"
               type="number"
               className={inputClass + ' bg-gray-50'}
+              placeholder="From birthdate"
               value={formData.age || ''}
               readOnly
             />
@@ -386,40 +361,6 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               <option>Female</option>
             </select>
           </div>
-          <div>
-            <label htmlFor="clpep-civilStatus" className={labelClass}>Civil Status</label>
-            <select
-              id="clpep-civilStatus"
-              className={selectClass}
-              value={formData.civilStatus ?? ''}
-              onChange={e => updateField({ civilStatus: e.target.value })}
-            >
-              <option value="">Select</option>
-              {CIVIL_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="clpep-contactNumber" className={labelClass}>Contact Number</label>
-            <input
-              id="clpep-contactNumber"
-              className={inputClass}
-              placeholder="09XXXXXXXXX"
-              value={formData.contactNumber ?? ''}
-              onChange={e => updateField({ contactNumber: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="clpep-email" className={labelClass}>Email Address</label>
-          <input
-            id="clpep-email"
-            type="email"
-            className={inputClass}
-            placeholder="juan.delacruz@example.com"
-            value={formData.email ?? ''}
-            onChange={e => updateField({ email: e.target.value })}
-          />
         </div>
       </div>
     )
@@ -430,41 +371,14 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="II. ADDRESS INFORMATION" />
 
-        <div>
-          <label htmlFor="clpep-houseBlockLot" className={labelClass}>
-            House / Block / Lot Number
-          </label>
-          <input
-            id="clpep-houseBlockLot"
-            className={inputClass}
-            placeholder="Enter house, block, or lot number"
-            value={formData.houseBlockLotNo ?? ''}
-            onChange={e => updateField({ houseBlockLotNo: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="clpep-streetPurok" className={labelClass}>Street / Purok / Zone</label>
-          <input
-            id="clpep-streetPurok"
-            className={inputClass}
-            placeholder="Enter street, purok, or zone"
-            value={formData.streetPurok ?? ''}
-            onChange={e => updateField({ streetPurok: e.target.value })}
-          />
-        </div>
-
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label htmlFor="clpep-barangay" className={labelClass}>
-              Barangay <span className="text-red-500">*</span>
-            </label>
+            <label htmlFor="clpep-province" className={labelClass}>Province</label>
             <input
-              id="clpep-barangay"
+              id="clpep-province"
               className={inputClass}
-              placeholder="Enter barangay"
-              value={formData.barangay ?? ''}
-              onChange={e => updateField({ barangay: e.target.value })}
+              value={formData.province ?? ''}
+              onChange={e => updateField({ province: e.target.value })}
             />
           </div>
           <div>
@@ -477,45 +391,54 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             />
           </div>
           <div>
-            <label htmlFor="clpep-province" className={labelClass}>Province</label>
+            <label htmlFor="clpep-barangay" className={labelClass}>
+              Barangay <span className="text-red-500">*</span>
+            </label>
             <input
-              id="clpep-province"
+              id="clpep-barangay"
               className={inputClass}
-              value={formData.province ?? ''}
-              onChange={e => updateField({ province: e.target.value })}
+              placeholder="Enter barangay"
+              value={formData.barangay ?? ''}
+              onChange={e => updateField({ barangay: e.target.value })}
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="clpep-streetPurok" className={labelClass}>Street / Purok / Zone</label>
+          <input
+            id="clpep-streetPurok"
+            className={inputClass}
+            placeholder="Enter street, purok, or zone"
+            value={formData.streetPurok ?? ''}
+            onChange={e => updateField({ streetPurok: e.target.value })}
+          />
         </div>
       </div>
     )
   }
 
   function renderStep3() {
+    const isCurrentlyInSchool = formData.schoolStatus === 'Currently Enrolled' || formData.schoolStatus === 'ALS Learner'
+
+    const schoolNameLabel = isCurrentlyInSchool ? 'School Name' : 'Last School Attended'
+    const gradeYearLevelLabel = isCurrentlyInSchool ? 'Grade Level' : 'Last Grade Level Completed'
+    const schoolNamePlaceholder = isCurrentlyInSchool ? 'Enter school name' : 'Enter last school attended'
+    const gradeYearLevelPlaceholder = 'e.g. Grade 7'
+
     return (
       <div className="space-y-5">
         <SectionHeader title="III. CHILD LABOR INFORMATION" />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-childLaborStatus" className={labelClass}>Child Labor Status</label>
-            <SelectDropdown
-              id="clpep-childLaborStatus"
-              value={formData.childLaborStatus ?? ''}
-              options={CHILD_LABOR_STATUS_OPTIONS}
-              onChange={v => updateField({ childLaborStatus: v })}
-              disabled={isViewMode}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-schoolStatus" className={labelClass}>School Status</label>
-            <SelectDropdown
-              id="clpep-schoolStatus"
-              value={formData.schoolStatus ?? ''}
-              options={SCHOOL_STATUS_OPTIONS}
-              onChange={v => updateField({ schoolStatus: v })}
-              disabled={isViewMode}
-            />
-          </div>
+        <div>
+          <label htmlFor="clpep-childLaborStatus" className={labelClass}>Child Labor Status</label>
+          <SelectDropdown
+            id="clpep-childLaborStatus"
+            value={formData.childLaborStatus ?? ''}
+            options={CHILD_LABOR_STATUS_OPTIONS}
+            onChange={v => updateField({ childLaborStatus: v })}
+            disabled={isViewMode}
+          />
         </div>
 
         <div>
@@ -560,23 +483,34 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           />
         </div>
 
+        <div>
+          <label htmlFor="clpep-schoolStatus" className={labelClass}>School Status</label>
+          <SelectDropdown
+            id="clpep-schoolStatus"
+            value={formData.schoolStatus ?? ''}
+            options={SCHOOL_STATUS_OPTIONS}
+            onChange={v => updateField({ schoolStatus: v })}
+            disabled={isViewMode}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="clpep-schoolName" className={labelClass}>School Name</label>
+            <label htmlFor="clpep-schoolName" className={labelClass}>{schoolNameLabel}</label>
             <input
               id="clpep-schoolName"
               className={inputClass}
-              placeholder="Enter school name"
+              placeholder={schoolNamePlaceholder}
               value={formData.schoolName ?? ''}
               onChange={e => updateField({ schoolName: e.target.value })}
             />
           </div>
           <div>
-            <label htmlFor="clpep-gradeYearLevel" className={labelClass}>Grade / Year Level</label>
+            <label htmlFor="clpep-gradeYearLevel" className={labelClass}>{gradeYearLevelLabel}</label>
             <input
               id="clpep-gradeYearLevel"
               className={inputClass}
-              placeholder="e.g. Grade 7, 2nd Year"
+              placeholder={gradeYearLevelPlaceholder}
               value={formData.gradeYearLevel ?? ''}
               onChange={e => updateField({ gradeYearLevel: e.target.value })}
             />
@@ -631,43 +565,11 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   }
 
   function renderStep5() {
-    const attachedForms = formData.attachedForms ?? []
+    const attachedDocuments = formData.attachedDocuments ?? []
 
     return (
       <div className="space-y-5">
         <SectionHeader title="V. PESO OFFICE ONLY" />
-
-        <div>
-          <p className={labelClass}>Case Report / Referral Form</p>
-          <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg py-8 cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors">
-            {formData.caseReportFile ? (
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <Paperclip size={16} className="text-brand-blue" />
-                <span className="font-medium">{formData.caseReportFile}</span>
-                <button
-                  type="button"
-                  onClick={e => { e.preventDefault(); updateField({ caseReportFile: '' }) }}
-                  aria-label="Remove case report file"
-                  className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <>
-                <Upload size={28} className="text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500">Click to upload or drag and drop</p>
-                <p className="text-xs text-gray-400 mt-1">PDF, JPG, JPEG, PNG (max. 10MB)</p>
-              </>
-            )}
-            <input
-              type="file"
-              className="sr-only"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleCaseReportUpload}
-            />
-          </label>
-        </div>
 
         <div>
           <p className={labelClass}>Supporting Documents</p>
@@ -675,99 +577,76 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             Attach supporting documents / forms (optional / if applicable).
           </p>
 
-          <div>
-            {attachedForms.map((name, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-2 px-3 py-2 border border-dashed border-brand-blue rounded-lg mt-5 bg-gray-50"
-              >
-                <span className="text-sm text-gray-700 truncate flex-1">{name}</span>
-                <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 border border-gray-300 rounded-full cursor-pointer hover:bg-gray-50 transition-colors flex-shrink-0">
-                  <Paperclip size={13} />
-                  Attach File
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={e => handleAttachFileToForm(idx, e)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveAttachment(idx)}
-                  aria-label={`Remove ${name}`}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+          <input
+            type="file"
+            id="clpep-document-upload"
+            className="hidden"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleDocumentUpload}
+          />
+          <label
+            htmlFor="clpep-document-upload"
+            className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-dashed border-brand-blue bg-blue-50 text-brand-blue rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+          >
+            <Upload size={20} />
+            <span className="font-medium">Upload Document</span>
+          </label>
+          <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG</p>
 
-            {isAddingForm ? (
-              <div className="flex items-center gap-2 px-3 py-2 border border-dashed border-brand-blue rounded-lg bg-blue-50 mt-5">
-                <input
-                  type="text"
-                  autoFocus
-                  className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder:text-gray-400"
-                  placeholder="Enter form name..."
-                  value={newFormName}
-                  onChange={e => setNewFormName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleCommitForm()
-                    if (e.key === 'Escape') handleCancelAddingForm()
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleCommitForm}
-                  disabled={!newFormName.trim()}
-                  className="px-3 py-1 text-sm text-white bg-brand-blue rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity flex-shrink-0"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelAddingForm}
-                  aria-label="Cancel adding form"
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
+          {attachedDocuments.length > 0 && (
+            <div className="space-y-3 pt-4 mt-4 border-t border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700">Uploaded Documents</h4>
+              <div className="space-y-2">
+                {attachedDocuments.map(doc => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                  >
+                    <div
+                      className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                      onClick={() => setPreviewDoc(doc)}
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <FileText size={20} className="text-brand-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
+                        <p className="text-xs text-gray-500">{doc.fileSize}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc(doc)}
+                        className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Preview document"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDocument(doc.id)}
+                        className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete document"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartAddingForm}
-                className="w-full flex items-center mt-5 justify-center gap-1.5 py-2.5 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors"
-              >
-                <Plus size={14} />
-                Add form
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
-            <DatePicker
-              id="clpep-dateApplied"
-              className={inputClass}
-              value={formData.dateApplied ?? ''}
-              onChange={value => updateField({ dateApplied: value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="clpep-status" className={labelClass}>Status</label>
-            <SelectDropdown
-              id="clpep-status"
-              value={formData.status}
-              options={STATUS_OPTIONS}
-              placeholder="Select"
-              onChange={v => updateField({ status: v as LivelihoodStatus })}
-              disabled={isViewMode}
-            />
-          </div>
+        <div>
+          <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
+          <DatePicker
+            id="clpep-dateApplied"
+            className={inputClass}
+            value={formData.dateApplied ?? ''}
+            onChange={value => updateField({ dateApplied: value })}
+          />
         </div>
 
         <div>
@@ -818,6 +697,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-md flex">
 
       {/* Left sidebar — section stepper */}
@@ -919,20 +799,13 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAsDraft}
-                  className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Save as Draft
-                </button>
                 {isLastStep ? (
                   <button
                     type="button"
                     onClick={() => handleSubmit()}
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
                   >
-                    {mode === 'add' ? 'Save Beneficiary' : 'Save Changes'}
+                    {mode === 'add' ? 'Save' : 'Save Changes'}
                   </button>
                 ) : (
                   <button
@@ -950,5 +823,39 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
 
       </div>
     </div>
+
+    {previewDoc && (
+      <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <p className="text-sm text-gray-500 truncate">{previewDoc.fileName}</p>
+            <button
+              type="button"
+              onClick={() => setPreviewDoc(null)}
+              aria-label="Close preview"
+              className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto p-4 bg-gray-50">
+            {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
+              <div className="flex items-center justify-center h-full">
+                <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+              </div>
+            ) : /\.pdf$/i.test(previewDoc.fileName) ? (
+              <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <FileText size={64} className="mb-4 text-gray-400" />
+                <p className="text-lg font-medium mb-2">Preview not available</p>
+                <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

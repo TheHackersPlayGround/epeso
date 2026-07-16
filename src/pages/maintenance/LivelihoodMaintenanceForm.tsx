@@ -170,7 +170,6 @@ const blankSlpForm: SLPFormData = {
   projectName: '',
   description: '',
   slpTrack: '',
-  projectCategory: '',
   dateStarted: '',
   location: '',
   facilitator: '',
@@ -183,13 +182,13 @@ const blankClpepForm: CLPEPFormData = {
   interventionName: '',
   description: '',
   interventionCategory: '',
+  interventionCategoryOther: '',
   targetBeneficiaries: '',
-  startDate: '',
-  endDate: '',
+  date: '',
   implementingOfficer: '',
   partnerAgency: '',
+  partnerAgencyOther: '',
   location: '',
-  referralRequired: 'No',
   status: 'Planned',
 }
 
@@ -286,16 +285,16 @@ export default function LivelihoodMaintenanceForm() {
     program: 'Livelihood',
     service: 'CLPEP',
     title: i.title,
-    date: i.startDate ?? '',
+    date: i.date ?? '',
     location: i.location,
     description: i.description,
     participants: i.targetBeneficiaries,
-    status: (i.status === 'Active' ? 'Ongoing' : i.status) as ProjectStatus,
+    status: i.status as ProjectStatus,
     facilitator: i.implementingOfficer,
     typeOfProject: i.type,
-    startDate: i.startDate,
-    endDate: i.endDate,
     partnerAgency: i.partnerAgency,
+    partnerAgencyOther: i.partnerAgencyOther,
+    interventionCategoryOther: i.typeOther,
   }))
 
   // DILP/TUPAD projects converted to ProgramActivity shape for display (ID
@@ -420,21 +419,20 @@ export default function LivelihoodMaintenanceForm() {
         interventionName:     a.title,
         description:          a.description          ?? '',
         interventionCategory: a.typeOfProject         ?? '',
+        interventionCategoryOther: a.interventionCategoryOther ?? '',
         targetBeneficiaries:  a.participants != null ? String(a.participants) : '',
-        startDate:            a.startDate             ?? '',
-        endDate:              a.endDate               ?? '',
+        date:                 a.date                  ?? '',
         implementingOfficer:  a.facilitator           ?? '',
         partnerAgency:        a.partnerAgency         ?? '',
+        partnerAgencyOther:   a.partnerAgencyOther    ?? '',
         location:             a.location              ?? '',
-        referralRequired:     'No',
-        status:               (a.status === 'Ongoing' ? 'Active' : a.status) as CLPEPFormData['status'],
+        status:               a.status as CLPEPFormData['status'],
       })
     } else if (a.service === 'SLP') {
       setSlpFormData({
         projectName:      a.projectName      ?? a.title,
         description:      a.description      ?? '',
         slpTrack:         a.slpTrack         ?? '',
-        projectCategory:  a.projectCategory  ?? '',
         dateStarted:      a.date             ?? '',
         location:         a.location         ?? '',
         facilitator:      a.facilitator      ?? '',
@@ -531,25 +529,25 @@ export default function LivelihoodMaintenanceForm() {
     if (selectedService === 'CLPEP') {
       if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
       if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
-      if (!clpepFormData.startDate) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Start Date.', confirmButtonColor: '#0077BE' }); return }
+      if (!clpepFormData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Date.', confirmButtonColor: '#0077BE' }); return }
       if (!clpepFormData.implementingOfficer.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Implementing Officer.', confirmButtonColor: '#0077BE' }); return }
 
       // CLPEP interventions are stored in shared localStorage so CLPEPTab stays in sync
       const realId = editingId !== null ? editingId - 900000 : null
       const existing = loadCLPEPInterventions()
-      const clpepStatus = clpepFormData.status === 'Archived' ? 'Completed' : clpepFormData.status as 'Planned' | 'Active' | 'Completed'
       const intervention: CLPEPIntervention = {
         id:                   realId ?? Math.max(0, ...existing.map(i => i.id)) + 1,
         title:                clpepFormData.interventionName.trim(),
         type:                 clpepFormData.interventionCategory,
-        status:               clpepStatus,
+        status:               clpepFormData.status,
         location:             clpepFormData.location,
         description:          clpepFormData.description,
         targetBeneficiaries:  parseInt(clpepFormData.targetBeneficiaries) || undefined,
-        startDate:            clpepFormData.startDate  || undefined,
-        endDate:              clpepFormData.endDate    || undefined,
+        date:                 clpepFormData.date       || undefined,
         implementingOfficer:  clpepFormData.implementingOfficer || undefined,
         partnerAgency:        clpepFormData.partnerAgency       || undefined,
+        partnerAgencyOther:   clpepFormData.partnerAgency === 'Other' ? clpepFormData.partnerAgencyOther || undefined : undefined,
+        typeOther:            clpepFormData.interventionCategory === 'Other' ? clpepFormData.interventionCategoryOther || undefined : undefined,
       }
       const updatedInterventions = realId !== null
         ? existing.map(i => i.id === realId ? intervention : i)
@@ -579,7 +577,6 @@ export default function LivelihoodMaintenanceForm() {
         dateReleased:     slpFormData.dateReleased           || undefined,
         projectName:      slpFormData.projectName,
         slpTrack:         slpFormData.slpTrack               || undefined,
-        projectCategory:  slpFormData.projectCategory        || undefined,
       }
     } else {
       if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a project title.', confirmButtonColor: '#0077BE' }); return }
@@ -628,10 +625,11 @@ export default function LivelihoodMaintenanceForm() {
       location:            clpepFormData.location,
       description:         clpepFormData.description,
       targetBeneficiaries: parseInt(clpepFormData.targetBeneficiaries) || undefined,
-      startDate:           clpepFormData.startDate           || undefined,
-      endDate:             clpepFormData.endDate             || undefined,
+      date:                clpepFormData.date                || undefined,
       implementingOfficer: clpepFormData.implementingOfficer || undefined,
       partnerAgency:       clpepFormData.partnerAgency       || undefined,
+      partnerAgencyOther:  clpepFormData.partnerAgency === 'Other' ? clpepFormData.partnerAgencyOther || undefined : undefined,
+      typeOther:           clpepFormData.interventionCategory === 'Other' ? clpepFormData.interventionCategoryOther || undefined : undefined,
     }
     const updated = [...existing, draft]
     localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
@@ -695,8 +693,7 @@ export default function LivelihoodMaintenanceForm() {
       }
     } else if (project.id >= 900000) {
       const realId = project.id - 900000
-      const clpepStatus = nextStatus === 'Ongoing' ? 'Active' : nextStatus as 'Planned' | 'Active' | 'Completed'
-      const updated = clpepInterventions.map(i => i.id === realId ? { ...i, status: clpepStatus } : i)
+      const updated = clpepInterventions.map(i => i.id === realId ? { ...i, status: nextStatus as 'Planned' | 'Ongoing' | 'Completed' } : i)
       localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
       setClpepInterventions(updated)
     } else {
@@ -1127,7 +1124,6 @@ export default function LivelihoodMaintenanceForm() {
         {openMenuId !== null && menuPos !== null && (() => {
           const a = livelihoodProjects.find(x => x.id === openMenuId)
           if (!a) return null
-          const isCLPEP = a.id >= 900000
           return (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
@@ -1160,12 +1156,12 @@ export default function LivelihoodMaintenanceForm() {
                 </button>
                 {a.status === 'Planned' && (
                   <button
-                    onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Ongoing', label: isCLPEP ? 'Mark as Active' : 'Mark as Ongoing' }); setOpenMenuId(null) }}
+                    onClick={() => { setStatusConfirm({ project: a, nextStatus: 'Ongoing', label: 'Mark as Ongoing' }); setOpenMenuId(null) }}
                     disabled={!canManage('maintenance')}
                     className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <PlayCircle size={14} className="text-blue-500" />
-                    {isCLPEP ? 'Mark as Active' : 'Mark as Ongoing'}
+                    Mark as Ongoing
                   </button>
                 )}
                 {a.status === 'Ongoing' && (

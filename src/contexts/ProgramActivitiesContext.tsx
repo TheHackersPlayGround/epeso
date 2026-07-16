@@ -35,10 +35,10 @@ export interface ProgramActivity {
   tupadDocuments?: string[]
   // SLP-specific fields (only present when service === 'SLP')
   slpTrack?: string
-  projectCategory?: string
   // CLPEP-specific fields (only present when service === 'CLPEP')
   partnerAgency?: string
-  referralRequired?: 'Yes' | 'No'
+  partnerAgencyOther?: string
+  interventionCategoryOther?: string
 }
 
 // Narrowed type for DILP activities — used in the DILP beneficiary form
@@ -62,7 +62,7 @@ const SEED: ProgramActivity[] = [
     date: '2026-03-18', location: 'Community Center, Tangub City', status: 'Ongoing',
     description: 'Livelihood training for handicraft production.',
     projectName: 'Sustainable Livelihood Program - Handicrafts',
-    slpTrack: 'Micro-enterprise Development', projectCategory: 'Non-Food Based Enterprise',
+    slpTrack: 'Enterprise - Individual',
     facilitator: 'Rosa Garcia', assistanceAmount: '15000', dateReleased: '2026-04-01',
   },
   {
@@ -70,7 +70,7 @@ const SEED: ProgramActivity[] = [
     date: '2026-04-25', location: 'DOLE Training Center, Tangub City', status: 'Planned',
     description: 'Livelihood training for food processing microenterprises.',
     projectName: 'SLP Food Processing and Packaging',
-    slpTrack: 'Micro-enterprise Development', projectCategory: 'Food Production',
+    slpTrack: 'Enterprise - Individual',
     facilitator: 'Maribel Santos', assistanceAmount: '12000', dateReleased: '2026-06-01',
   },
   {
@@ -78,7 +78,7 @@ const SEED: ProgramActivity[] = [
     date: '2026-05-10', location: 'Barangay Hall, Tangub City', status: 'Planned',
     description: 'Skills-based livelihood training on garments and dressmaking.',
     projectName: 'SLP Sewing and Garments Production',
-    slpTrack: 'Micro-enterprise Development', projectCategory: 'Non-Food Based Enterprise',
+    slpTrack: 'Enterprise - Individual',
     facilitator: 'Leonora Reyes', assistanceAmount: '10000', dateReleased: '2026-06-30',
   },
   {

@@ -10,14 +10,14 @@ export interface CLPEPFormData {
   interventionName: string
   description: string
   interventionCategory: string
+  interventionCategoryOther: string
   targetBeneficiaries: string
-  startDate: string
-  endDate: string
+  date: string
   implementingOfficer: string
   partnerAgency: string
+  partnerAgencyOther: string
   location: string
-  referralRequired: 'Yes' | 'No'
-  status: 'Planned' | 'Active' | 'Completed' | 'Archived'
+  status: 'Planned' | 'Ongoing' | 'Completed'
 }
 
 interface CLPEPFormProps {
@@ -42,6 +42,10 @@ const INTERVENTION_CATEGORIES = [
   'Livelihood Support',
   'Medical / Health Assistance',
   'Psychosocial Support',
+  'Financial Assistance',
+  'Housing Assistance',
+  'Emergency Employment / Job Placement',
+  'Temporary Shelter',
   'Other',
 ]
 
@@ -52,11 +56,14 @@ const PARTNER_AGENCIES = [
   'DOLE',
   'TESDA',
   'LGU',
+  'DILG',
+  'DOJ',
+  'PNP / Law Enforcement',
   'NGO / CSO',
   'Other',
 ]
 
-const STATUS_OPTIONS: CLPEPFormData['status'][] = ['Planned', 'Active', 'Completed']
+const STATUS_OPTIONS: CLPEPFormData['status'][] = ['Planned', 'Ongoing', 'Completed']
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -135,6 +142,17 @@ export default function CLPEPForm({
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
+            {formData.interventionCategory === 'Other' && (
+              <input
+                id="clpep-interventionCategoryOther"
+                type="text"
+                value={formData.interventionCategoryOther}
+                readOnly={isView}
+                onChange={e => field('interventionCategoryOther', e.target.value)}
+                className={inputCls + ' mt-2'}
+                placeholder="Please specify category"
+              />
+            )}
           </div>
 
           <div>
@@ -159,30 +177,17 @@ export default function CLPEPForm({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label htmlFor="clpep-startDate" className={labelCls}>
-              Start Date <span className="text-red-500">*</span>
+            <label htmlFor="clpep-date" className={labelCls}>
+              Date <span className="text-red-500">*</span>
             </label>
             <DatePicker
-              id="clpep-startDate"
+              id="clpep-date"
               className={inputCls}
-              value={formData.startDate}
+              value={formData.date}
               readOnly={isView}
-              onChange={value => field('startDate', value)}
+              onChange={value => field('date', value)}
             />
           </div>
-          <div>
-            <label htmlFor="clpep-endDate" className={labelCls}>End Date</label>
-            <DatePicker
-              id="clpep-endDate"
-              className={inputCls}
-              value={formData.endDate}
-              readOnly={isView}
-              onChange={value => field('endDate', value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label htmlFor="clpep-implementingOfficer" className={labelCls}>
               Implementing Officer <span className="text-red-500">*</span>
@@ -197,6 +202,9 @@ export default function CLPEPForm({
               placeholder="Enter officer name"
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label htmlFor="clpep-partnerAgency" className={labelCls}>Partner Agency</label>
             <select
@@ -211,6 +219,17 @@ export default function CLPEPForm({
                 <option key={agency} value={agency}>{agency}</option>
               ))}
             </select>
+            {formData.partnerAgency === 'Other' && (
+              <input
+                id="clpep-partnerAgencyOther"
+                type="text"
+                value={formData.partnerAgencyOther}
+                readOnly={isView}
+                onChange={e => field('partnerAgencyOther', e.target.value)}
+                className={inputCls + ' mt-2'}
+                placeholder="Please specify agency"
+              />
+            )}
           </div>
         </div>
 

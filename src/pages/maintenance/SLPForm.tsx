@@ -10,7 +10,6 @@ export interface SLPFormData {
   projectName: string
   description: string
   slpTrack: string
-  projectCategory: string
   dateStarted: string
   location: string
   facilitator: string
@@ -33,16 +32,9 @@ interface SLPFormProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SLP_TRACKS = [
-  'Micro-enterprise Development (MED)',
-  'Employment Facilitation (EF)',
-]
-
-const PROJECT_CATEGORIES = [
-  'Food Production',
-  'Non-Food Based Enterprise',
-  'Services',
-  'Livelihood Kit Distribution',
-  'Other',
+  'Enterprise - Association',
+  'Enterprise - Individual',
+  'Employment',
 ]
 
 const STATUS_OPTIONS: SLPFormData['status'][] = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
@@ -94,7 +86,7 @@ export default function SLPForm({
           />
         </div>
 
-        <div>
+        <div className="mb-4">
           <label htmlFor="slp-description" className={labelCls}>Description</label>
           <textarea
             id="slp-description"
@@ -106,48 +98,23 @@ export default function SLPForm({
             placeholder="Enter project description"
           />
         </div>
-      </div>
 
-      {/* ─── Project Classification ───────────────────────────────────────────── */}
-      <div className="border-t pt-5 mb-6">
-        <p className={sectionHeadingCls}>Project Classification</p>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="slp-slpTrack" className={labelCls}>
-              SLP Track <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="slp-slpTrack"
-              value={formData.slpTrack}
-              disabled={isView}
-              onChange={e => field('slpTrack', e.target.value)}
-              className={inputCls + ' bg-white'}
-            >
-              <option value="">Select SLP Track</option>
-              {SLP_TRACKS.map(track => (
-                <option key={track} value={track}>{track}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="slp-projectCategory" className={labelCls}>
-              Project Category <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="slp-projectCategory"
-              value={formData.projectCategory}
-              disabled={isView}
-              onChange={e => field('projectCategory', e.target.value)}
-              className={inputCls + ' bg-white'}
-            >
-              <option value="">Select Category</option>
-              {PROJECT_CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="slp-slpTrack" className={labelCls}>
+            SLP Track <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="slp-slpTrack"
+            value={formData.slpTrack}
+            disabled={isView}
+            onChange={e => field('slpTrack', e.target.value)}
+            className={inputCls + ' bg-white'}
+          >
+            <option value="">Select SLP Track</option>
+            {SLP_TRACKS.map(track => (
+              <option key={track} value={track}>{track}</option>
+            ))}
+          </select>
         </div>
       </div>
 

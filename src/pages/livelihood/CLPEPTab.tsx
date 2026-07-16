@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
-import type { LivelihoodBeneficiary, LivelihoodStatus, CLPEPIntervention } from '../../contexts/LivelihoodContext'
+import type { LivelihoodBeneficiary, CLPEPIntervention } from '../../contexts/LivelihoodContext'
 import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
 import CLPEPProfileForm, { EMPTY_CLPEP_RECORD } from './CLPEPProfileForm'
 
@@ -13,24 +13,8 @@ import CLPEPProfileForm, { EMPTY_CLPEP_RECORD } from './CLPEPProfileForm'
 const LS_KEY = 'lp_clpep_v8'
 const LS_INTERVENTIONS_KEY = 'lp_clpep_interventions_v1'
 
-const STATUS_OPTIONS: LivelihoodStatus[] = ['Accepted', 'Waitlisted', 'Rejected']
-
-const STATUS_COLORS: Record<LivelihoodStatus, string> = {
-  Active:    'bg-green-100 text-green-700',
-  Completed: 'bg-blue-100 text-blue-700',
-  Dropped:   'bg-red-100 text-red-600',
-  Pending:   'bg-yellow-100 text-yellow-700',
-  Closed:    'bg-gray-100 text-gray-500',
-  Approved:  'bg-emerald-100 text-emerald-700',
-  Released:  'bg-purple-100 text-purple-700',
-  Inactive:  'bg-gray-200 text-gray-400',
-  Accepted:  'bg-emerald-100 text-emerald-700',
-  Waitlisted:'bg-yellow-100 text-yellow-700',
-  Rejected:  'bg-red-100 text-red-600',
-}
-
 const INTERVENTION_STATUS_COLORS: Record<string, string> = {
-  Active:    'bg-green-100 text-green-700 border border-green-200',
+  Ongoing:   'bg-green-100 text-green-700 border border-green-200',
   Planned:   'bg-yellow-100 text-yellow-700 border border-yellow-200',
   Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
 }
@@ -64,16 +48,6 @@ function loadBeneficiaries(): LivelihoodBeneficiary[] {
   } catch {
     return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
   }
-}
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: LivelihoodStatus }) {
-  return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'}`}>
-      {status}
-    </span>
-  )
 }
 
 // ─── Search Bar ───────────────────────────────────────────────────────────────
@@ -249,7 +223,6 @@ type AssignInterventionModalProps = {
 
 function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose }: AssignInterventionModalProps) {
   const [search, setSearch] = useState('')
-  const canAssign = !['Waitlisted', 'Rejected'].includes(beneficiary.status)
 
   const currentIntervention = beneficiary.assignedInterventionId
     ? interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
@@ -278,15 +251,6 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
             </button>
           </div>
         </div>
-
-        {!canAssign && (
-          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
-            <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700">
-              Applicant status is <span className="font-semibold">{beneficiary.status}</span>. Update to <span className="font-semibold">Accepted</span> before assigning an intervention.
-            </p>
-          </div>
-        )}
 
         <div className="px-6 pt-5">
           {/* Currently Assigned card */}
@@ -334,7 +298,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
         </div>
 
         {/* Intervention list */}
-        <div className={`px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100${!canAssign ? ' pointer-events-none opacity-40' : ''}`}>
+        <div className="px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100">
           {filtered.length === 0 ? (
             <p className="text-sm text-gray-400 italic text-center py-8">No interventions found</p>
           ) : (
@@ -356,7 +320,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {intervention.type} &bull; {intervention.location}
+                        {intervention.type === 'Other' ? (intervention.typeOther || 'Other') : intervention.type} &bull; {intervention.location}
                       </p>
                       {intervention.description && (
                         <p className="text-xs text-gray-400 mt-1 line-clamp-2">{intervention.description}</p>
@@ -433,7 +397,9 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <p className="font-bold text-gray-900 text-base">{intervention.title}</p>
-                  <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">{intervention.type}</span>
+                  <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">
+                    {intervention.type === 'Other' ? (intervention.typeOther || 'Other') : intervention.type}
+                  </span>
                 </div>
                 <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
                   {intervention.status}
@@ -442,10 +408,12 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
 
               <Row label="Description" value={intervention.description} />
               <Row label="Target Beneficiaries" value={intervention.targetBeneficiaries} />
-              <Row label="Start Date" value={intervention.startDate} />
-              <Row label="End Date" value={intervention.endDate} />
+              <Row label="Date" value={intervention.date} />
               <Row label="Implementing Officer" value={intervention.implementingOfficer} />
-              <Row label="Partner Agency" value={intervention.partnerAgency} />
+              <Row
+                label="Partner Agency"
+                value={intervention.partnerAgency === 'Other' ? (intervention.partnerAgencyOther || 'Other') : intervention.partnerAgency}
+              />
               <Row label="Location" value={intervention.location} />
             </>
           ) : (
@@ -540,11 +508,9 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
           <tr className="bg-brand-blue">
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Name</th>
             {activeFilters.includes('sex') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>}
-            {activeFilters.includes('civilStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Civil Status</th>}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Barangay</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assigned Intervention</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Applied</th>
-            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Application Details</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>
           </tr>
@@ -552,7 +518,7 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
         <tbody>
           {beneficiaries.length === 0 ? (
             <tr>
-              <td colSpan={8 + ['sex', 'civilStatus'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
+              <td colSpan={6 + ['sex'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -576,7 +542,6 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
                 {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
-                {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus ?? '—'}</td>}
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
                 <td className="px-4 py-3">
                   {b.cooperativeName ? (
@@ -596,9 +561,6 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
                   )}
                 </td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.dateApplied)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <StatusBadge status={b.status} />
-                </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {(() => {
                     const iv = interventions.find(i => i.id === b.assignedInterventionId)
@@ -690,9 +652,7 @@ export default function CLPEPTab() {
   const [isExportOpen, setIsExportOpen] = useState(false)
 
   const availableFilters: FilterOption[] = useMemo(() => [
-    { id: 'status', label: 'Status', options: STATUS_OPTIONS },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
-    { id: 'civilStatus', label: 'Civil Status', options: ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] },
   ], [])
 
   function persist(next: LivelihoodBeneficiary[]) {
@@ -749,9 +709,7 @@ export default function CLPEPTab() {
     for (const filterId of activeFilters) {
       const value = filterValues[filterId]
       if (!value) continue
-      if (filterId === 'status') result = result.filter(b => b.status === value)
       if (filterId === 'sex') result = result.filter(b => b.sex === value)
-      if (filterId === 'civilStatus') result = result.filter(b => b.civilStatus === value)
     }
     return result
   }, [beneficiaries, searchQuery, activeFilters, filterValues])

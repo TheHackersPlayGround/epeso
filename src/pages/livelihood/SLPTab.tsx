@@ -1,96 +1,185 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
-import type { LivelihoodBeneficiary, LivelihoodStatus, SLPProject } from '../../contexts/LivelihoodContext'
-import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED } from '../../contexts/LivelihoodContext'
+import * as slpService from '../../services/slpService'
+import { useSLP } from '../../contexts/SLPContext'
+import type { SLPApplicant, SLPProject } from '../../contexts/SLPContext'
+import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 import SLPProfileForm, { EMPTY_SLP_RECORD } from './SLPProfileForm'
+import { downloadImportTemplate, importSlpApplicants, type ImportResult } from './slpImport'
+
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importSlpApplicants(file, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import SLP Applicants</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <button onClick={() => { void downloadImportTemplate() }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LS_KEY = 'lp_slp_v7'
-const ACTIVITIES_LS_KEY = 'lp_program_activities_v2'
+const STATUS_COLORS: Record<string, string> = {
+  Active:    'bg-green-100 text-green-700',
+  Completed: 'bg-blue-100 text-blue-700',
+  Inactive:  'bg-gray-200 text-gray-400',
+}
 
-const STATUS_OPTIONS: LivelihoodStatus[] = [
-  'Active', 'Inactive',
-]
+const PROJECT_STATUS_COLORS: Record<string, string> = {
+  Ongoing: 'text-green-600 border border-green-500 bg-white',
+  Planned: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+  Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
+  Cancelled: 'bg-red-100 text-red-600 border border-red-200',
+}
 
+function errMsg(e: unknown, fallback: string) {
+  return (e as { message?: string })?.message ?? fallback
+}
 
-const STATUS_COLORS: Record<LivelihoodStatus, string> = {
-  Active:     'bg-green-100 text-green-700',
-  Completed:  'bg-blue-100 text-blue-700',
-  Dropped:    'bg-red-100 text-red-600',
-  Pending:    'bg-yellow-100 text-yellow-700',
-  Closed:     'bg-gray-100 text-gray-500',
-  Approved:   'bg-emerald-100 text-emerald-700',
-  Released:   'bg-purple-100 text-purple-700',
-  Inactive:   'bg-gray-200 text-gray-400',
-  Accepted:   'bg-teal-100 text-teal-700',
-  Waitlisted: 'bg-orange-100 text-orange-700',
-  Rejected:   'bg-red-100 text-red-700',
+function formatDisplayName(b: { lastName: string; firstName: string; middleName?: string; nameExtension?: string }): string {
+  const given = [b.firstName, b.middleName, b.nameExtension].filter(Boolean).join(' ')
+  return `${b.lastName}, ${given}`
+}
+
+function formatTableName(b: { lastName: string; firstName: string; middleName?: string; nameExtension?: string }): string {
+  const middleInitial = b.middleName?.trim() ? `${b.middleName.trim().charAt(0)}.` : ''
+  const given = [b.firstName, middleInitial, b.nameExtension].filter(Boolean).join(' ')
+  return `${b.lastName}, ${given}`
+}
+
+// Adapts an SLPApplicant (context/API shape) into the generic
+// LivelihoodBeneficiary shape SLPProfileForm expects -- field names match
+// almost 1:1 by design, this just adds the display `name`/`service`.
+function toFormRecord(a: SLPApplicant): Omit<LivelihoodBeneficiary, 'id'> {
+  return {
+    ...a,
+    name: formatDisplayName(a),
+    service: 'SLP',
+    status: a.status,
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterOption = { id: string; label: string; options: string[] }
 
-const PROJECT_STATUS_COLORS: Record<string, string> = {
-  Ongoing: 'text-green-600 border border-green-500 bg-white',
-  Planned: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
-}
-
-
-function loadSLPProjects(): SLPProject[] {
-  try {
-    const raw = localStorage.getItem(ACTIVITIES_LS_KEY)
-    if (raw) {
-      const activities = JSON.parse(raw) as Array<{
-        id: number; service: string; title: string; date: string
-        location?: string; description?: string; status: string
-        facilitator?: string; participants?: number
-        assistanceAmount?: string; dateReleased?: string
-      }>
-      const slp = activities.filter(a => a.service === 'SLP')
-      if (slp.length > 0) {
-        return slp.map(a => ({
-          id: a.id,
-          title: a.title,
-          date: a.date,
-          location: a.location ?? '',
-          description: a.description ?? '',
-          status: a.status as SLPProject['status'],
-          facilitator: a.facilitator,
-          participants: a.participants,
-          assistanceAmount: a.assistanceAmount,
-          dateReleased: a.dateReleased,
-        }))
-      }
-    }
-  } catch { /* ignore */ }
-  return SLP_PROJECTS_SEED
-}
-
-// ─── Data helpers ─────────────────────────────────────────────────────────────
-
-function loadBeneficiaries(): LivelihoodBeneficiary[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    if (parsed.length > 0) return parsed
-    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'SLP')
-    try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
-    return seed
-  } catch {
-    return LIVELIHOOD_SEED.filter(b => b.service === 'SLP')
-  }
-}
-
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: LivelihoodStatus }) {
+function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'}`}>
       {status}
@@ -264,15 +353,16 @@ function FilterBadges({
 // ─── Assign Project Modal ─────────────────────────────────────────────────────
 
 type AssignProjectModalProps = {
-  beneficiary: LivelihoodBeneficiary
+  beneficiary: SLPApplicant
   projects: SLPProject[]
-  onAssign: (projectName: string, projectId: number) => void
+  onAssign: (projectId: number) => void
   onUnassign: () => void
   onClose: () => void
 }
 
 function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClose }: AssignProjectModalProps) {
   const [search, setSearch] = useState('')
+  const [confirmProject, setConfirmProject] = useState<SLPProject | null>(null)
   const canAssign = beneficiary.assessmentResult === 'Qualified'
 
   const currentProject = beneficiary.assignedSlpProjectId
@@ -280,22 +370,28 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
     : null
 
   const filtered = useMemo(() => {
-    const active = projects.filter(p => p.status === 'Planned')
+    // A project's SLP Track represents a distinct assistance mechanism from
+    // the applicant's own track (Individual/Association/Employment) -- only
+    // matching-track projects can ever be assigned, so mismatched ones are
+    // filtered out here rather than shown and then rejected on click.
+    const active = projects.filter(p => p.status === 'Planned' && p.slpTrack === beneficiary.slpTrack)
     if (!search.trim()) return active
     const q = search.toLowerCase()
-    return active.filter(p => p.title.toLowerCase().includes(q))
-  }, [projects, search])
+    return active.filter(p => p.projectName.toLowerCase().includes(q))
+  }, [projects, search, beneficiary.slpTrack])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
-        <div className="bg-brand-blue px-5 pt-5 pb-4">
+        <div className="bg-brand-blue px-5 pt-5 pb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-base font-bold text-white">Assign Project</h2>
-              <p className="text-blue-200 text-xs mt-0.5">{beneficiary.name}</p>
+              <h2 className="text-base font-bold text-white">
+                {confirmProject ? 'Confirm Assignment' : 'Assign Project'}
+              </h2>
+              <p className="text-blue-200 text-xs mt-0.5">{formatDisplayName(beneficiary)}</p>
             </div>
             <button
               type="button"
@@ -308,109 +404,167 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
           </div>
         </div>
 
-        {!canAssign && (
-          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
-            <AlertCircle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700">
-              Assessment result is <span className="font-semibold">{beneficiary.assessmentResult || 'Not Set'}</span>. Update to <span className="font-semibold">Qualified</span> before assigning a project.
-            </p>
-          </div>
-        )}
+        {confirmProject ? (
+          <>
+            {/* Step 2: confirm details before assigning */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-bold text-gray-900">{confirmProject.projectName}</p>
+                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[confirmProject.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {confirmProject.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div><span className="text-gray-400">SLP Track:</span> {confirmProject.slpTrack || '—'}</div>
+                  <div><span className="text-gray-400">Date Started:</span> {confirmProject.dateStarted || '—'}</div>
+                  <div><span className="text-gray-400">Location:</span> {confirmProject.location || '—'}</div>
+                  <div><span className="text-gray-400">Facilitator:</span> {confirmProject.facilitator || '—'}</div>
+                  {confirmProject.assistanceAmount && (
+                    <div><span className="text-gray-400">Assistance:</span> ₱{Number(confirmProject.assistanceAmount).toLocaleString()}</div>
+                  )}
+                  {confirmProject.dateReleased && (
+                    <div><span className="text-gray-400">Date Released:</span> {confirmProject.dateReleased}</div>
+                  )}
+                  {confirmProject.description && (
+                    <div className="col-span-2"><span className="text-gray-400">Description:</span> {confirmProject.description}</div>
+                  )}
+                </div>
+              </div>
+              {currentProject && currentProject.id !== confirmProject.id && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                  This applicant is currently assigned to "{currentProject.projectName}". Assigning will replace the current assignment.
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 flex gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setConfirmProject(null)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => { onAssign(confirmProject.id); onClose() }}
+                disabled={!canManage('livelihood')}
+                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-xs font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Assign
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {!canAssign && (
+              <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2 flex-shrink-0">
+                <AlertCircle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">
+                  Assessment result is <span className="font-semibold">{beneficiary.assessmentResult || 'Not Set'}</span>. Update to <span className="font-semibold">Qualified</span> before assigning a project.
+                </p>
+              </div>
+            )}
 
-        <div className="px-4 pt-4">
-          {/* Currently Assigned card */}
-          {currentProject && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1.5">Currently Assigned</p>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs font-bold text-brand-blue">{currentProject.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[currentProject.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {currentProject.status}
-                    </span>
+            <div className="px-4 pt-4 flex-shrink-0">
+              {/* Currently Assigned card */}
+              {currentProject && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
+                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1.5">Currently Assigned</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-brand-blue">{currentProject.projectName}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[currentProject.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {currentProject.status}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { onUnassign(); onClose() }}
+                      disabled={!canManage('livelihood')}
+                      className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Unassign
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { onUnassign(); onClose() }}
-                  disabled={!canManage('livelihood')}
-                  className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Unassign
-                </button>
+              )}
+
+              {/* Search */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="assign-project-search"
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search projects..."
+                  aria-label="Search SLP projects"
+                  className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+                />
+              </div>
+              <div className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-400">
+                <Info size={11} className="flex-shrink-0 mt-0.5" />
+                <p>
+                  Showing <span className="font-semibold">Planned</span> projects for SLP Track:{' '}
+                  <span className="font-semibold text-gray-600">{beneficiary.slpTrack || 'Not set'}</span>
+                </p>
               </div>
             </div>
-          )}
 
-          {/* Search */}
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              id="assign-project-search"
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search projects..."
-              aria-label="Search SLP projects"
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
-            />
-          </div>
-          <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
-            <Info size={11} className="flex-shrink-0" />
-            Only SLP projects with <span className="font-semibold">Planned</span> status are shown
-          </p>
-        </div>
-
-        {/* Project list */}
-        <div className={`px-4 py-2 max-h-56 overflow-y-auto divide-y divide-gray-100${!canAssign ? ' pointer-events-none opacity-40' : ''}`}>
-          {filtered.length === 0 ? (
-            <p className="text-xs text-gray-400 italic text-center py-6">No projects found</p>
-          ) : (
-            filtered.map(project => {
-              const isCurrent = project.id === beneficiary.assignedSlpProjectId
-              return (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() => { onAssign(project.title, project.id); onClose() }}
-                  className="w-full text-left py-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-xs font-bold text-gray-900">{project.title}</p>
-                        {isCurrent && (
-                          <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-600 rounded-full">Current</span>
-                        )}
+            {/* Project list */}
+            <div className={`flex-1 px-4 py-2 overflow-y-auto divide-y divide-gray-100${!canAssign ? ' pointer-events-none opacity-40' : ''}`}>
+              {filtered.length === 0 ? (
+                <p className="text-xs text-gray-400 italic text-center py-6">No projects found</p>
+              ) : (
+                filtered.map(project => {
+                  const isCurrent = project.id === beneficiary.assignedSlpProjectId
+                  return (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => setConfirmProject(project)}
+                      className="w-full text-left py-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs font-bold text-gray-900">{project.projectName}</p>
+                            {isCurrent && (
+                              <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-600 rounded-full">Current</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            SLP &bull; {project.dateStarted} &bull; {project.location}
+                          </p>
+                          {project.description && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{project.description}</p>
+                          )}
+                        </div>
+                        <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[project.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {project.status}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        SLP &bull; {project.date} &bull; {project.location}
-                      </p>
-                      {project.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{project.description}</p>
-                      )}
-                    </div>
-                    <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[project.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {project.status}
-                    </span>
-                  </div>
-                </button>
-              )
-            })
-          )}
-        </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
 
-        {/* Footer */}
-        <div className="px-4 pb-4 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2.5 border border-gray-200 rounded-xl text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+            {/* Footer */}
+            <div className="px-4 pb-4 pt-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 border border-gray-200 rounded-xl text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -419,14 +573,15 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
 // ─── View Assigned Project Modal ──────────────────────────────────────────────
 
 type ViewAssignedProjectModalProps = {
-  beneficiary: LivelihoodBeneficiary
+  beneficiary: SLPApplicant
   projects: SLPProject[]
-  onChangeAssignment: (b: LivelihoodBeneficiary) => void
+  onChangeAssignment: (b: SLPApplicant) => void
   onClose: () => void
 }
 
 function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, onClose }: ViewAssignedProjectModalProps) {
   const project = projects.find(p => p.id === beneficiary.assignedSlpProjectId) ?? null
+  const canChange = project?.status === 'Planned'
 
   function Row({ label, value }: { label: string; value?: string }) {
     return (
@@ -446,7 +601,7 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-base font-bold text-white">Assigned Project</h2>
-              <p className="text-blue-200 text-sm mt-1">{beneficiary.name}</p>
+              <p className="text-blue-200 text-sm mt-1">{formatDisplayName(beneficiary)}</p>
             </div>
             <button
               type="button"
@@ -466,7 +621,7 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
               {/* Project title + status badge */}
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <p className="font-bold text-gray-900 text-base">{project.title}</p>
+                  <p className="font-bold text-gray-900 text-base">{project.projectName}</p>
                   <span className="inline-block mt-1 text-xs font-semibold text-gray-500">SLP</span>
                 </div>
                 <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[project.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -476,13 +631,26 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
 
               <div>
                 <Row label="Description" value={project.description} />
-                <Row label="Date" value={project.date} />
+                <Row label="Date Started" value={project.dateStarted} />
                 <Row label="Location" value={project.location} />
                 {project.facilitator && <Row label="Facilitator" value={project.facilitator} />}
-                {project.participants != null && <Row label="Participants" value={String(project.participants)} />}
                 {project.assistanceAmount && <Row label="Assistance Amount" value={`₱${Number(project.assistanceAmount).toLocaleString()}`} />}
                 {project.dateReleased && <Row label="Date Released" value={project.dateReleased} />}
               </div>
+
+              {beneficiary.assignmentHistory.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
+                  <div className="space-y-2">
+                    {beneficiary.assignmentHistory.map((h, i) => (
+                      <div key={`${h.projectId}-${i}`} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">{h.projectName}</span>
+                        <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-sm text-gray-400 italic text-center py-8">No project details available</p>
@@ -491,14 +659,16 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
 
         {/* Footer */}
         <div className="px-5 pb-5 pt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => { onChangeAssignment(beneficiary); onClose() }}
-            disabled={!canManage('livelihood')}
-            className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Change Assignment
-          </button>
+          {canChange && (
+            <button
+              type="button"
+              onClick={() => { onChangeAssignment(beneficiary); onClose() }}
+              disabled={!canManage('livelihood')}
+              className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Change Assignment
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -515,19 +685,19 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
 // ─── Table ────────────────────────────────────────────────────────────────────
 
 type BeneficiaryTableProps = {
-  beneficiaries: LivelihoodBeneficiary[]
+  beneficiaries: SLPApplicant[]
   projects: SLPProject[]
   totalCount: number
   isFiltered: boolean
   activeFilters: string[]
-  onView: (b: LivelihoodBeneficiary) => void
-  onEdit: (b: LivelihoodBeneficiary) => void
-  onRemove: (id: number) => void
-  onAssignProject: (b: LivelihoodBeneficiary) => void
-  onViewAssignedProject: (b: LivelihoodBeneficiary) => void
+  onView: (b: SLPApplicant) => void
+  onEdit: (b: SLPApplicant) => void
+  onRemove: (id: number, name: string) => void
+  onAssignProject: (b: SLPApplicant) => void
+  onViewAssignedProject: (b: SLPApplicant) => void
 }
 
-function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -553,21 +723,6 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
   function closeMenu() { setOpenMenuId(null) }
 
   const menuBeneficiary = beneficiaries.find(b => b.id === openMenuId) ?? null
-
-  async function handleConfirmRemove(id: number, name: string) {
-    closeMenu()
-    const result = await Swal.fire({
-      title: 'Remove Beneficiary?',
-      text: `This will permanently remove ${name} from the list.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, remove',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-    })
-    if (!result.isConfirmed) return
-    onRemove(id)
-  }
 
   return (
     <div className="overflow-x-auto">
@@ -601,19 +756,19 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
                   ) : (
                     <>
                       <p className="text-base font-medium text-gray-500">No SLP beneficiaries yet</p>
-                      <p className="text-sm">Click "Add Beneficiary" to get started.</p>
+                      <p className="text-sm">Click "Add Profile" to get started.</p>
                     </>
                   )}
                 </div>
               </td>
             </tr>
           ) : (
-            paginated.map((b, idx) => (
+            paginated.map(b => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
-                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
-                {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus ?? '—'}</td>}
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{formatTableName(b)}</td>
+                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex || '—'}</td>}
+                {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.civilStatus || '—'}</td>}
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay || '-'}</td>
                 <td className="px-4 py-3">
                   {b.projectName ? (() => {
                     const proj = projects.find(p => p.id === b.assignedSlpProjectId)
@@ -643,7 +798,7 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button
                     onClick={e => handleToggleMenu(e, b.id)}
-                    aria-label={`Actions for ${b.name}`}
+                    aria-label={`Actions for ${formatDisplayName(b)}`}
                     className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <MoreHorizontal size={16} />
@@ -694,7 +849,7 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
               ? <button onClick={() => { onViewAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
               : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
             }
-            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
+            <button onClick={() => onRemove(menuBeneficiary.id, formatDisplayName(menuBeneficiary))} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
           </div>
         </>
       )}
@@ -705,80 +860,92 @@ function BeneficiaryTable({ beneficiaries, projects, totalCount, isFiltered, act
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SLPTab() {
-  const [beneficiaries, setBeneficiaries] = useState<LivelihoodBeneficiary[]>(loadBeneficiaries)
-  const [slpProjects, setSlpProjects] = useState<SLPProject[]>(loadSLPProjects)
-
-  // On mount: sync project statuses and auto-set beneficiaries Inactive when project is Completed.
-  useEffect(() => {
-    const freshProjects = loadSLPProjects()
-    setSlpProjects(freshProjects)
-
-    setBeneficiaries(prev => {
-      let changed = false
-      const updated = prev.map(b => {
-        if (!b.assignedSlpProjectId) return b
-        const proj = freshProjects.find(p => p.id === b.assignedSlpProjectId)
-        if (proj?.status === 'Completed' && b.status === 'Active') {
-          changed = true
-          return { ...b, status: 'Inactive' as LivelihoodStatus }
-        }
-        return b
-      })
-      if (changed) {
-        try { localStorage.setItem(LS_KEY, JSON.stringify(updated)) } catch { /* quota */ }
-      }
-      return changed ? updated : prev
-    })
-  }, [])
+  const { applicants, projects, refreshProfiles, refreshProjects } = useSLP()
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
-  const [viewingBeneficiary, setViewingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [editingBeneficiary, setEditingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [assigningBeneficiary, setAssigningBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [viewingAssignedProject, setViewingAssignedProject] = useState<LivelihoodBeneficiary | null>(null)
+  const [viewingBeneficiary, setViewingBeneficiary] = useState<SLPApplicant | null>(null)
+  const [editingBeneficiary, setEditingBeneficiary] = useState<SLPApplicant | null>(null)
+  const [assigningBeneficiary, setAssigningBeneficiary] = useState<SLPApplicant | null>(null)
+  const [viewingAssignedProject, setViewingAssignedProject] = useState<SLPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
-const availableFilters: FilterOption[] = useMemo(() => [
-    { id: 'status', label: 'Status', options: STATUS_OPTIONS },
+  const availableFilters: FilterOption[] = useMemo(() => [
+    { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed'] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
-    { id: 'civilStatus', label: 'Civil Status', options: ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] },
+    { id: 'civilStatus', label: 'Civil Status', options: ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'] },
   ], [])
 
-  function persist(next: LivelihoodBeneficiary[]) {
-    setBeneficiaries(next)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* quota */ }
+  async function handleAddBeneficiary(data: Record<string, unknown>) {
+    try {
+      await slpService.createProfile(data)
+      await refreshProfiles()
+      setIsAddOpen(false)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been added successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleAddBeneficiary(data: Omit<LivelihoodBeneficiary, 'id'>) {
-    const newRecord: LivelihoodBeneficiary = { id: Date.now(), ...data }
-    persist([...beneficiaries, newRecord])
-  }
-
-  function handleEditSave(data: Omit<LivelihoodBeneficiary, 'id'>) {
+  async function handleEditSave(data: Record<string, unknown>) {
     if (!editingBeneficiary) return
-    persist(beneficiaries.map(b => b.id === editingBeneficiary.id ? { ...b, ...data } : b))
+    try {
+      await slpService.updateProfile(editingBeneficiary.id, data)
+      await refreshProfiles()
+      setEditingBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleRemoveBeneficiary(id: number) {
-    persist(beneficiaries.filter(b => b.id !== id))
+  async function handleConfirmRemove(id: number, name: string) {
+    const result = await Swal.fire({
+      title: 'Remove Beneficiary?',
+      text: `This will move ${name} to the recycle bin.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, remove',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+    })
+    if (!result.isConfirmed) return
+    try {
+      await slpService.deleteProfile(id)
+      await refreshProfiles()
+      Swal.fire({ icon: 'success', title: 'Removed', text: `${name} moved to the recycle bin.`, timer: 1500, showConfirmButton: false })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove beneficiary.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleAssignProject(beneficiary: LivelihoodBeneficiary, projectName: string, projectId: number) {
-    persist(beneficiaries.map(b =>
-      b.id === beneficiary.id ? { ...b, projectName, assignedSlpProjectId: projectId, status: 'Active' } : b
-    ))
+  async function handleAssignProject(beneficiary: SLPApplicant, projectId: number) {
+    try {
+      await slpService.assignProject(beneficiary.id, projectId)
+      await refreshProfiles()
+      await refreshProjects()
+      setAssigningBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary assigned successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign project.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleUnassignSLPProject() {
+  async function handleUnassignProject() {
     if (!assigningBeneficiary) return
-    persist(beneficiaries.map(b =>
-      b.id === assigningBeneficiary.id ? { ...b, projectName: '', assignedSlpProjectId: null, status: 'Inactive' } : b
-    ))
-    setAssigningBeneficiary(null)
+    try {
+      await slpService.unassignProject(assigningBeneficiary.id)
+      await refreshProfiles()
+      await refreshProjects()
+      setAssigningBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned project has been removed.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   function handleAddFilter(id: string) {
@@ -795,12 +962,12 @@ const availableFilters: FilterOption[] = useMemo(() => [
   }
 
   const filtered = useMemo(() => {
-    let result = beneficiaries
+    let result = applicants
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(b =>
-        b.name.toLowerCase().includes(q) ||
+        formatDisplayName(b).toLowerCase().includes(q) ||
         (b.barangay ?? '').toLowerCase().includes(q) ||
         (b.slpTrack ?? '').toLowerCase().includes(q)
       )
@@ -815,15 +982,14 @@ const availableFilters: FilterOption[] = useMemo(() => [
     }
 
     return result
-  }, [beneficiaries, searchQuery, activeFilters, filterValues])
+  }, [applicants, searchQuery, activeFilters, filterValues])
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOrder === 'dateApplied_newest') return (b.dateApplied || '').localeCompare(a.dateApplied || '')
     if (sortOrder === 'dateApplied_oldest') return (a.dateApplied || '').localeCompare(b.dateApplied || '')
     if (!sortOrder) return 0
-    const parts = (n: string) => n.trim().split(/\s+/)
-    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
-    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
+    const keyA = (sortOrder.startsWith('firstName') ? a.firstName : a.lastName).toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? b.firstName : b.lastName).toLowerCase()
     return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
   })
 
@@ -831,12 +997,10 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
   function buildExportRows() {
     return filtered.map(b => ({
-      'Name': b.name,
+      'Name': formatDisplayName(b),
       'Contact Number': b.contactNumber ?? '',
       'Barangay': b.barangay ?? '',
-      'Date Enrolled': b.dateEnrolled ?? '',
       'SLP Track': b.slpTrack ?? '',
-      'Grant Amount': b.livelihoodGrantAmount ?? '',
       'Status': b.status,
     }))
   }
@@ -865,7 +1029,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
       <SLPProfileForm
         mode="add"
         initial={{ ...EMPTY_SLP_RECORD }}
-        onSave={data => { handleAddBeneficiary(data); setIsAddOpen(false) }}
+        onSave={data => handleAddBeneficiary(data)}
         onClose={() => setIsAddOpen(false)}
       />
     )
@@ -876,7 +1040,7 @@ const availableFilters: FilterOption[] = useMemo(() => [
       <SLPProfileForm
         key={viewingBeneficiary.id}
         mode="view"
-        initial={viewingBeneficiary}
+        initial={toFormRecord(viewingBeneficiary)}
         onSave={() => {}}
         onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
         onClose={() => setViewingBeneficiary(null)}
@@ -889,8 +1053,8 @@ const availableFilters: FilterOption[] = useMemo(() => [
       <SLPProfileForm
         key={editingBeneficiary.id}
         mode="edit"
-        initial={editingBeneficiary}
-        onSave={data => { handleEditSave(data); setEditingBeneficiary(null) }}
+        initial={toFormRecord(editingBeneficiary)}
+        onSave={data => handleEditSave(data)}
         onClose={() => setEditingBeneficiary(null)}
       />
     )
@@ -901,9 +1065,9 @@ const availableFilters: FilterOption[] = useMemo(() => [
       {assigningBeneficiary && (
         <AssignProjectModal
           beneficiary={assigningBeneficiary}
-          projects={slpProjects}
-          onAssign={(projectName, projectId) => { handleAssignProject(assigningBeneficiary, projectName, projectId); setAssigningBeneficiary(null) }}
-          onUnassign={handleUnassignSLPProject}
+          projects={projects}
+          onAssign={projectId => handleAssignProject(assigningBeneficiary, projectId)}
+          onUnassign={handleUnassignProject}
           onClose={() => setAssigningBeneficiary(null)}
         />
       )}
@@ -911,9 +1075,16 @@ const availableFilters: FilterOption[] = useMemo(() => [
       {viewingAssignedProject && (
         <ViewAssignedProjectModal
           beneficiary={viewingAssignedProject}
-          projects={slpProjects}
+          projects={projects}
           onChangeAssignment={b => { setViewingAssignedProject(null); setAssigningBeneficiary(b) }}
           onClose={() => setViewingAssignedProject(null)}
+        />
+      )}
+
+      {isImportOpen && (
+        <SLPImportModal
+          onClose={() => setIsImportOpen(false)}
+          onImported={refreshProfiles}
         />
       )}
 
@@ -933,7 +1104,11 @@ const availableFilters: FilterOption[] = useMemo(() => [
           Add Profile
         </button>
 
-        <button disabled={!canManage('livelihood')} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+        <button
+          onClick={() => setIsImportOpen(true)}
+          disabled={!canManage('livelihood')}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+        >
           <Upload size={16} />
           Import
         </button>
@@ -995,13 +1170,13 @@ const availableFilters: FilterOption[] = useMemo(() => [
 
         <BeneficiaryTable
           beneficiaries={sorted}
-          projects={slpProjects}
+          projects={projects}
           totalCount={sorted.length}
           isFiltered={isFiltered}
           activeFilters={activeFilters}
           onView={setViewingBeneficiary}
           onEdit={setEditingBeneficiary}
-          onRemove={handleRemoveBeneficiary}
+          onRemove={handleConfirmRemove}
           onAssignProject={setAssigningBeneficiary}
           onViewAssignedProject={setViewingAssignedProject}
         />

@@ -1,8 +1,27 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, Users, Upload, FileText, Eye, Trash2 } from 'lucide-react'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+
+// Display-only comma formatting for the Total Household Monthly Income input
+// -- the underlying value stays a plain numeric string (no commas), matching
+// what the backend expects.
+function formatAmountDisplay(raw: string): string {
+  if (!raw) return ''
+  const [intPart, decPart] = raw.split('.')
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas
+}
+function sanitizeAmountInput(v: string): string {
+  let s = v.replace(/,/g, '').replace(/[^\d.]/g, '')
+  const firstDot = s.indexOf('.')
+  if (firstDot !== -1) s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '')
+  return s
+}
 
 function formatFileSize(bytes: number) {
   if (bytes <= 0) return '0 Bytes'
@@ -11,9 +30,18 @@ function formatFileSize(bytes: number) {
   return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-function AttachedDocsEditor({ docs, onChange }: { docs: LivelihoodSavedDocument[]; onChange: (docs: LivelihoodSavedDocument[]) => void }) {
-  const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
+type AttachedDocsEditorProps = {
+  docs: LivelihoodSavedDocument[]
+  onChange: (docs: LivelihoodSavedDocument[]) => void
+  onPreview: (doc: LivelihoodSavedDocument) => void
+}
 
+// previewDoc lives in the parent (SLPProfileForm) and renders as a sibling of
+// the whole form, not nested inside this component -- a `fixed inset-0`
+// modal nested inside an ancestor with `opacity`/`filter`/`transform` (the
+// view-mode-dimmed fieldset) stops being positioned relative to the
+// viewport and gets squashed into that ancestor's box instead.
+function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -63,8 +91,8 @@ function AttachedDocsEditor({ docs, onChange }: { docs: LivelihoodSavedDocument[
                 className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
               >
                 <div
-                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                  onClick={() => setPreviewDoc(doc)}
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer pointer-events-auto"
+                  onClick={() => onPreview(doc)}
                 >
                   <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
                     <FileText size={20} className="text-brand-blue" />
@@ -77,8 +105,8 @@ function AttachedDocsEditor({ docs, onChange }: { docs: LivelihoodSavedDocument[
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setPreviewDoc(doc)}
-                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                    onClick={() => onPreview(doc)}
+                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors pointer-events-auto"
                     title="Preview document"
                   >
                     <Eye size={18} />
@@ -98,73 +126,81 @@ function AttachedDocsEditor({ docs, onChange }: { docs: LivelihoodSavedDocument[
         </div>
       )}
 
-      {previewDoc && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <p className="text-sm text-gray-500 truncate">{previewDoc.fileName}</p>
-              <button
-                type="button"
-                onClick={() => setPreviewDoc(null)}
-                aria-label="Close preview"
-                className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4 bg-gray-50">
-              {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
-                <div className="flex items-center justify-center h-full">
-                  <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-                </div>
-              ) : /\.pdf$/i.test(previewDoc.fileName) ? (
-                <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  <FileText size={64} className="mb-4 text-gray-400" />
-                  <p className="text-lg font-medium mb-2">Preview not available</p>
-                  <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
-                </div>
-              )}
-            </div>
-          </div>
+    </div>
+  )
+}
+
+// Rendered as a sibling outside the (possibly view-mode-dimmed) form fieldset
+// -- see the comment on AttachedDocsEditor for why this can't be nested
+// inside it.
+function DocPreviewModal({ doc, onClose }: { doc: LivelihoodSavedDocument; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close preview"
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+          >
+            <X size={20} />
+          </button>
         </div>
-      )}
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
+            <div className="flex items-center justify-center h-full">
+              <img src={doc.dataUrl || doc.url} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+            </div>
+          ) : /\.pdf$/i.test(doc.fileName) ? (
+            <iframe src={doc.dataUrl || doc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FileText size={64} className="mb-4 text-gray-400" />
+              <p className="text-lg font-medium mb-2">Preview not available</p>
+              <a href={doc.dataUrl || doc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled'] as const
+export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'] as const
 
-const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Disaster-affected', 'Area-Based Convergence', 'Walk-in', 'Referral'] as const
+export const ELIGIBILITY_TYPE_OPTIONS = ['Regular', 'Disaster-Affected', 'Area-Based Convergence', 'Walk-In', 'Referral'] as const
 
-const SLP_TRACK_OPTIONS = [
+export const SLP_TRACK_OPTIONS = [
   'Enterprise - Individual',
   'Enterprise - Association',
   'Employment',
 ] as const
 
-const VULNERABILITY_SEVERITY_OPTIONS = ['Low', 'Medium', 'High'] as const
+export const VULNERABILITY_SEVERITY_OPTIONS = ['Low', 'Medium', 'High'] as const
 
-const ASSESSMENT_RESULT_OPTIONS = ['Qualified', 'Not Qualified'] as const
+export const ASSESSMENT_RESULT_OPTIONS = ['Qualified', 'Not Qualified'] as const
 
-const EDUCATIONAL_ATTAINMENT_OPTIONS = [
-  'Post Graduate',
-  'College Graduate',
-  'College Level',
-  'Vocational/Technical',
-  'High School Graduate (Senior High/K-12)',
-  'High School Graduate (Junior High-4 Years)',
-  'High School Level',
-  'Elementary Graduate',
+export const EDUCATIONAL_ATTAINMENT_OPTIONS = [
+  'No Formal Education',
   'Elementary Level',
-  'ALS Graduate',
-  'No grade completed',
+  'Elementary Graduate',
+  'Junior High School Level',
+  'Junior High School Graduate',
+  'Senior High School Level',
+  'Senior High School Graduate',
+  'Vocational Graduate',
+  'College Level',
+  'College Graduate',
+  "Master's Degree",
+  'Doctorate Degree',
+  'Post Graduate',
 ] as const
 
-const SECTOR_OPTIONS = [
+export const SECTOR_OPTIONS = [
   'Indigenous People (IP)',
   'Senior Citizen',
   'Solo Parent',
@@ -218,8 +254,9 @@ export const EMPTY_SLP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   email: '',
   streetPurok: '',
   barangay: '',
-  cityMunicipality: 'Tangub City',
-  province: 'Misamis Occidental',
+  barangayId: 0,
+  cityMunicipality: '',
+  province: '',
   is4PsBeneficiary: false,
   slpParticipantIdNumber: '',
   eligibilityType: 'Regular',
@@ -258,7 +295,19 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     ...EMPTY_SLP_RECORD,
     ...initial,
   })
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
   const isViewMode = mode === 'view'
+  const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -291,12 +340,63 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     if (currentStep > 1) setCurrentStep(step => step - 1)
   }
 
+  // Focuses a field on Step 2 -- switches step first (fields on other steps
+  // aren't mounted/visible until then), then focuses once the step's render
+  // has actually happened.
+  function focusOnStep(step: number, run: () => void) {
+    setCurrentStep(step)
+    setTimeout(run, 50)
+  }
+
   function handleSubmit(event?: React.FormEvent) {
     event?.preventDefault()
-    if (!formData.lastName || !formData.firstName) {
-      alert('Last name and first name are required.')
-      return
+    const lastName = (formData.lastName ?? '').trim()
+    const firstName = (formData.firstName ?? '').trim()
+    const middleName = (formData.middleName ?? '').trim()
+    const errors: ValidationError[] = []
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => focusOnStep(2, () => lastNameRef.current?.focus()) })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: () => focusOnStep(2, () => lastNameRef.current?.focus()) })
     }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => focusOnStep(2, () => firstNameRef.current?.focus()) })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: () => focusOnStep(2, () => firstNameRef.current?.focus()) })
+    }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: () => focusOnStep(2, () => middleNameRef.current?.focus()) })
+    }
+
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: () => focusOnStep(2, () => sexRef.current?.focus()) })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => focusOnStep(2, () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })),
+      })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: () => focusOnStep(2, () => civilStatusRef.current?.focus()) })
+    }
+
+    if (!formData.barangayId) {
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Section III. Address).',
+        focus: () => focusOnStep(3, () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })),
+      })
+    }
+
+    if (runValidation(errors)) return
+
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
     onSave({ ...formData, name: fullName })
@@ -390,36 +490,40 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               Last Name <span className="text-red-500">*</span>
             </label>
             <input
+              ref={lastNameRef}
               id="slp-lastName"
-              className={inputClass}
+              className={`${inputClass} ${errCls('lastName')}`}
               placeholder="Enter last name"
               value={formData.lastName ?? ''}
-              onChange={e => updateField({ lastName: e.target.value })}
-              required
+              onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }}
             />
+            {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
           </div>
           <div>
             <label htmlFor="slp-firstName" className={labelClass}>
               First Name <span className="text-red-500">*</span>
             </label>
             <input
+              ref={firstNameRef}
               id="slp-firstName"
-              className={inputClass}
+              className={`${inputClass} ${errCls('firstName')}`}
               placeholder="Enter first name"
               value={formData.firstName ?? ''}
-              onChange={e => updateField({ firstName: e.target.value })}
-              required
+              onChange={e => { updateField({ firstName: e.target.value }); clearFieldError('firstName') }}
             />
+            {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
           </div>
           <div>
             <label htmlFor="slp-middleName" className={labelClass}>Middle Name</label>
             <input
+              ref={middleNameRef}
               id="slp-middleName"
-              className={inputClass}
+              className={`${inputClass} ${errCls('middleName')}`}
               placeholder="Enter middle name"
               value={formData.middleName ?? ''}
-              onChange={e => updateField({ middleName: e.target.value })}
+              onChange={e => { updateField({ middleName: e.target.value }); clearFieldError('middleName') }}
             />
+            {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
           </div>
           <div>
             <label htmlFor="slp-nameExtension" className={labelClass}>Extension Name</label>
@@ -434,17 +538,17 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
         </div>
 
         <div className="grid grid-cols-5 gap-4">
-          <div>
+          <div ref={birthdateWrapRef}>
             <label htmlFor="slp-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
             <DatePicker
               id="slp-birthdate"
-              className={inputClass}
+              className={`${inputClass} ${errCls('birthdate')}`}
               value={formData.birthdate ?? ''}
-              onChange={handleBirthdate}
-              required
+              onChange={value => { handleBirthdate(value); clearFieldError('birthdate') }}
             />
+            {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
           </div>
           <div>
             <label htmlFor="slp-age" className={labelClass}>Age</label>
@@ -462,28 +566,33 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               Sex <span className="text-red-500">*</span>
             </label>
             <select
+              ref={sexRef}
               id="slp-sex"
-              className={selectClass}
+              className={`${selectClass} ${errCls('sex')}`}
               value={formData.sex ?? ''}
-              onChange={e => updateField({ sex: e.target.value })}
-              required
+              onChange={e => { updateField({ sex: e.target.value }); clearFieldError('sex') }}
             >
               <option value="">Select</option>
               <option>Male</option>
               <option>Female</option>
             </select>
+            {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
           </div>
           <div>
-            <label htmlFor="slp-civilStatus" className={labelClass}>Civil Status</label>
+            <label htmlFor="slp-civilStatus" className={labelClass}>
+              Civil Status <span className="text-red-500">*</span>
+            </label>
             <select
+              ref={civilStatusRef}
               id="slp-civilStatus"
-              className={selectClass}
+              className={`${selectClass} ${errCls('civilStatus')}`}
               value={formData.civilStatus ?? ''}
-              onChange={e => updateField({ civilStatus: e.target.value })}
+              onChange={e => { updateField({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}
             >
               <option value="">Select</option>
               {CIVIL_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
             </select>
+            {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
           </div>
           <div>
             <label htmlFor="slp-contactNumber" className={labelClass}>Contact Number</label>
@@ -530,35 +639,48 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label htmlFor="slp-barangay" className={labelClass}>
+            <label className={labelClass}>Province</label>
+            <SearchableSelect
+              value={formData.province ?? ''}
+              placeholder="Search province..."
+              disabled={isViewMode}
+              fetchOptions={s => searchProvinces(s)}
+              onSelect={opt => {
+                setProvinceId(opt.id)
+                setCityId(null)
+                updateField({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Municipality / City</label>
+            <SearchableSelect
+              value={formData.cityMunicipality ?? ''}
+              placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+              disabled={isViewMode || !provinceId}
+              refetchKey={provinceId ?? ''}
+              fetchOptions={s => searchCities(provinceId ?? 0, s)}
+              onSelect={opt => {
+                setCityId(opt.id)
+                updateField({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+              }}
+            />
+          </div>
+          <div ref={barangayWrapRef}>
+            <label className={labelClass}>
               Barangay <span className="text-red-500">*</span>
             </label>
-            <input
-              id="slp-barangay"
-              className={inputClass}
-              placeholder="Enter barangay"
-              value={formData.barangay ?? ''}
-              onChange={e => updateField({ barangay: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="slp-city" className={labelClass}>Municipality / City</label>
-            <input
-              id="slp-city"
-              className={inputClass}
-              value={formData.cityMunicipality ?? ''}
-              onChange={e => updateField({ cityMunicipality: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="slp-province" className={labelClass}>Province</label>
-            <input
-              id="slp-province"
-              className={inputClass}
-              value={formData.province ?? ''}
-              onChange={e => updateField({ province: e.target.value })}
-            />
+            <div className={`rounded-lg ${fieldErrors.barangay ? 'ring-2 ring-red-200' : ''}`}>
+              <SearchableSelect
+                value={formData.barangay ?? ''}
+                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                disabled={isViewMode || !cityId}
+                refetchKey={cityId ?? ''}
+                fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+                onSelect={opt => { updateField({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+              />
+            </div>
+            {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
           </div>
         </div>
       </div>
@@ -659,12 +781,12 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             </span>
             <input
               id="slp-totalHouseholdIncome"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="decimal"
               className={inputClass + ' pl-7'}
               placeholder="0.00"
-              value={formData.totalHouseholdMonthlyIncome ?? ''}
-              onChange={e => updateField({ totalHouseholdMonthlyIncome: e.target.value })}
+              value={formatAmountDisplay(formData.totalHouseholdMonthlyIncome ?? '')}
+              onChange={e => updateField({ totalHouseholdMonthlyIncome: sanitizeAmountInput(e.target.value) })}
             />
           </div>
         </div>
@@ -755,6 +877,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           <AttachedDocsEditor
             docs={formData.attachedDocuments ?? []}
             onChange={attachedDocuments => updateField({ attachedDocuments })}
+            onPreview={setPreviewDoc}
           />
         </div>
 
@@ -807,6 +930,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-md flex">
 
       {/* Left sidebar — section stepper */}
@@ -850,7 +974,11 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6">
-          <fieldset disabled={isViewMode} className="border-0 p-0 m-0 min-w-0">
+          {/* CSS-based disabling instead of the native fieldset `disabled`
+              attribute -- that cascades to every button inside it, including
+              the document preview button, which should stay clickable even
+              in view mode (it only opens the preview, it isn't an edit). */}
+          <fieldset className={`border-0 p-0 m-0 min-w-0 ${isViewMode ? 'opacity-60 pointer-events-none' : ''}`}>
             {renderCurrentStep()}
           </fieldset>
         </form>
@@ -932,5 +1060,8 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
 
       </div>
     </div>
+
+    {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    </>
   )
 }

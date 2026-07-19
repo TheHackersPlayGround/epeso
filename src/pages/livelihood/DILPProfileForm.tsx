@@ -88,9 +88,18 @@ function formatFileSize(bytes: number) {
   return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onChange: (docs: DILPSavedDocument[]) => void }) {
-  const [previewDoc, setPreviewDoc] = useState<DILPSavedDocument | null>(null)
+type AttachedDocsEditorProps = {
+  docs: DILPSavedDocument[]
+  onChange: (docs: DILPSavedDocument[]) => void
+  onPreview: (doc: DILPSavedDocument) => void
+}
 
+// previewDoc lives in the parent (DILPProfileForm) and renders as a sibling
+// of the whole form, not nested inside this component -- a `fixed inset-0`
+// modal nested inside an ancestor with `opacity`/`filter`/`transform` (the
+// view-mode-dimmed fieldset) stops being positioned relative to the
+// viewport and gets squashed into that ancestor's box instead.
+function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -142,8 +151,8 @@ function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onC
                 className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
               >
                 <div
-                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                  onClick={() => setPreviewDoc(doc)}
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer pointer-events-auto"
+                  onClick={() => onPreview(doc)}
                 >
                   <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
                     <FileText size={20} className="text-brand-blue" />
@@ -156,8 +165,8 @@ function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onC
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setPreviewDoc(doc)}
-                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                    onClick={() => onPreview(doc)}
+                    className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors pointer-events-auto"
                     title="Preview document"
                   >
                     <Eye size={18} />
@@ -177,38 +186,44 @@ function AttachedDocsEditor({ docs, onChange }: { docs: DILPSavedDocument[]; onC
         </div>
       )}
 
-      {previewDoc && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <p className="text-sm text-gray-500 truncate">{previewDoc.customName || previewDoc.fileName}</p>
-              <button
-                type="button"
-                onClick={() => setPreviewDoc(null)}
-                aria-label="Close preview"
-                className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4 bg-gray-50">
-              {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
-                <div className="flex items-center justify-center h-full">
-                  <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-                </div>
-              ) : /\.pdf$/i.test(previewDoc.fileName) ? (
-                <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  <FileText size={64} className="mb-4 text-gray-400" />
-                  <p className="text-lg font-medium mb-2">Preview not available</p>
-                  <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
-                </div>
-              )}
-            </div>
-          </div>
+    </div>
+  )
+}
+
+// Rendered as a sibling outside the (possibly view-mode-dimmed) form fieldset
+// -- see the comment on AttachedDocsEditor for why this can't be nested
+// inside it.
+function DocPreviewModal({ doc, onClose }: { doc: DILPSavedDocument; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500 truncate">{doc.customName || doc.fileName}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close preview"
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+          >
+            <X size={20} />
+          </button>
         </div>
-      )}
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
+            <div className="flex items-center justify-center h-full">
+              <img src={doc.dataUrl || doc.url} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+            </div>
+          ) : /\.pdf$/i.test(doc.fileName) ? (
+            <iframe src={doc.dataUrl || doc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FileText size={64} className="mb-4 text-gray-400" />
+              <p className="text-lg font-medium mb-2">Preview not available</p>
+              <a href={doc.dataUrl || doc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -223,6 +238,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<DILPSavedDocument | null>(null)
 
   const isViewMode = mode === 'view'
 
@@ -554,6 +570,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
           <AttachedDocsEditor
             docs={formData.attachedDocuments ?? []}
             onChange={attachedDocuments => updateField({ attachedDocuments })}
+            onPreview={setPreviewDoc}
           />
         </div>
 
@@ -612,6 +629,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-md flex">
 
       {/* Left sidebar — section stepper */}
@@ -667,8 +685,11 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6">
-          {/* fieldset disabled={isViewMode} disables all inputs in view mode */}
-          <fieldset disabled={isViewMode} className="border-0 p-0 m-0 min-w-0">
+          {/* CSS-based disabling instead of the native fieldset `disabled`
+              attribute -- that cascades to every button inside it, including
+              the document preview button, which should stay clickable even
+              in view mode (it only opens the preview, it isn't an edit). */}
+          <fieldset className={`border-0 p-0 m-0 min-w-0 ${isViewMode ? 'opacity-60 pointer-events-none' : ''}`}>
             {renderCurrentStep()}
           </fieldset>
         </form>
@@ -740,5 +761,8 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
 
       </div>
     </div>
+
+    {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    </>
   )
 }

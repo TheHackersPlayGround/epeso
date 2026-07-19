@@ -4,14 +4,134 @@ import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, C
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
-import type { LivelihoodBeneficiary, CLPEPIntervention } from '../../contexts/LivelihoodContext'
-import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
+import * as clpepService from '../../services/clpepService'
+import { useCLPEP } from '../../contexts/CLPEPContext'
+import type { CLPEPApplicant, CLPEPIntervention } from '../../contexts/CLPEPContext'
+import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 import CLPEPProfileForm, { EMPTY_CLPEP_RECORD } from './CLPEPProfileForm'
+import { downloadImportTemplate, importClpepApplicants, type ImportResult } from './clpepImport'
+
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+function CLPEPImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importClpepApplicants(file, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import CLPEP Applicants</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <button onClick={() => { void downloadImportTemplate() }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const LS_KEY = 'lp_clpep_v8'
-const LS_INTERVENTIONS_KEY = 'lp_clpep_interventions_v1'
 
 const INTERVENTION_STATUS_COLORS: Record<string, string> = {
   Ongoing:   'bg-green-100 text-green-700 border border-green-200',
@@ -19,36 +139,43 @@ const INTERVENTION_STATUS_COLORS: Record<string, string> = {
   Completed: 'bg-blue-100 text-blue-600 border border-blue-200',
 }
 
-function loadInterventions(): CLPEPIntervention[] {
-  try {
-    const raw = localStorage.getItem(LS_INTERVENTIONS_KEY)
-    const parsed = raw ? (JSON.parse(raw) as CLPEPIntervention[]) : []
-    if (parsed.length > 0) return parsed
-    try { localStorage.setItem(LS_INTERVENTIONS_KEY, JSON.stringify(CLPEP_INTERVENTIONS_SEED)) } catch { /* quota */ }
-    return CLPEP_INTERVENTIONS_SEED
-  } catch {
-    return CLPEP_INTERVENTIONS_SEED
+const STATUS_COLORS: Record<string, string> = {
+  Active:    'bg-green-100 text-green-700',
+  Completed: 'bg-blue-100 text-blue-700',
+  Inactive:  'bg-gray-200 text-gray-400',
+}
+
+function errMsg(e: unknown, fallback: string) {
+  return (e as { message?: string })?.message ?? fallback
+}
+
+function formatDisplayName(b: { lastName: string; firstName: string; middleName?: string; nameExtension?: string }): string {
+  const given = [b.firstName, b.middleName, b.nameExtension].filter(Boolean).join(' ')
+  return `${b.lastName}, ${given}`
+}
+
+function formatTableName(b: { lastName: string; firstName: string; middleName?: string; nameExtension?: string }): string {
+  const middleInitial = b.middleName?.trim() ? `${b.middleName.trim().charAt(0)}.` : ''
+  const given = [b.firstName, middleInitial, b.nameExtension].filter(Boolean).join(' ')
+  return `${b.lastName}, ${given}`
+}
+
+// Adapts a CLPEPApplicant (context/API shape) into the generic
+// LivelihoodBeneficiary shape CLPEPProfileForm expects -- field names match
+// almost 1:1 by design, this just adds the display `name`/`service`.
+function toFormRecord(a: CLPEPApplicant): Omit<LivelihoodBeneficiary, 'id'> {
+  return {
+    ...a,
+    name: formatDisplayName(a),
+    service: 'CLPEP',
+    status: a.status,
+    currentlyWorking: a.currentlyWorking ?? undefined,
   }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterOption = { id: string; label: string; options: string[] }
-
-// ─── Data helpers ─────────────────────────────────────────────────────────────
-
-function loadBeneficiaries(): LivelihoodBeneficiary[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY)
-    const parsed = raw ? (JSON.parse(raw) as LivelihoodBeneficiary[]) : []
-    if (parsed.length > 0) return parsed
-    const seed = LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
-    try { localStorage.setItem(LS_KEY, JSON.stringify(seed)) } catch { /* quota */ }
-    return seed
-  } catch {
-    return LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
-  }
-}
 
 // ─── Search Bar ───────────────────────────────────────────────────────────────
 
@@ -214,15 +341,16 @@ function FilterBadges({
 // ─── Assign Intervention Modal ────────────────────────────────────────────────
 
 type AssignInterventionModalProps = {
-  beneficiary: LivelihoodBeneficiary
+  beneficiary: CLPEPApplicant
   interventions: CLPEPIntervention[]
-  onAssign: (title: string, id: number) => void
+  onAssign: (id: number) => void
   onUnassign: () => void
   onClose: () => void
 }
 
 function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose }: AssignInterventionModalProps) {
   const [search, setSearch] = useState('')
+  const [confirmIntervention, setConfirmIntervention] = useState<CLPEPIntervention | null>(null)
 
   const currentIntervention = beneficiary.assignedInterventionId
     ? interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
@@ -232,19 +360,21 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
     const active = interventions.filter(i => i.status === 'Planned')
     if (!search.trim()) return active
     const q = search.toLowerCase()
-    return active.filter(i => i.title.toLowerCase().includes(q))
+    return active.filter(i => i.interventionName.toLowerCase().includes(q))
   }, [interventions, search])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
-        <div className="bg-brand-blue px-6 pt-5 pb-4">
+        <div className="bg-brand-blue px-6 pt-5 pb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-bold text-white">Assign Intervention</h2>
-              <p className="text-blue-200 text-sm mt-0.5">{beneficiary.name}</p>
+              <h2 className="text-lg font-bold text-white">
+                {confirmIntervention ? 'Confirm Assignment' : 'Assign Intervention'}
+              </h2>
+              <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
               <X size={20} />
@@ -252,100 +382,165 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
           </div>
         </div>
 
-        <div className="px-6 pt-5">
-          {/* Currently Assigned card */}
-          {currentIntervention && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">Currently Assigned</p>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-brand-blue">{currentIntervention.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{currentIntervention.type} &bull; {currentIntervention.location}</p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[currentIntervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {currentIntervention.status}
-                    </span>
+        {confirmIntervention ? (
+          <>
+            {/* Step 2: confirm details before assigning */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-bold text-gray-900">{confirmIntervention.interventionName}</p>
+                  <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[confirmIntervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {confirmIntervention.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div>
+                    <span className="text-gray-400">Category:</span>{' '}
+                    {confirmIntervention.interventionCategory === 'Other' ? (confirmIntervention.interventionCategoryOther || 'Other') : confirmIntervention.interventionCategory}
+                  </div>
+                  <div><span className="text-gray-400">Date:</span> {confirmIntervention.date || '—'}</div>
+                  <div><span className="text-gray-400">Location:</span> {confirmIntervention.location || '—'}</div>
+                  <div><span className="text-gray-400">Implementing Officer:</span> {confirmIntervention.implementingOfficer || '—'}</div>
+                  <div>
+                    <span className="text-gray-400">Partner Agency:</span>{' '}
+                    {confirmIntervention.partnerAgency === 'Other' ? (confirmIntervention.partnerAgencyOther || 'Other') : (confirmIntervention.partnerAgency || '—')}
+                  </div>
+                  {confirmIntervention.targetBeneficiaries !== '' && (
+                    <div><span className="text-gray-400">Target Beneficiaries:</span> {confirmIntervention.assignedCount}/{confirmIntervention.targetBeneficiaries}</div>
+                  )}
+                  {confirmIntervention.description && (
+                    <div className="col-span-2"><span className="text-gray-400">Description:</span> {confirmIntervention.description}</div>
+                  )}
+                </div>
+              </div>
+              {currentIntervention && currentIntervention.id !== confirmIntervention.id && (
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                  This applicant is currently assigned to "{currentIntervention.interventionName}". Assigning will replace the current assignment.
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setConfirmIntervention(null)}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => { onAssign(confirmIntervention.id); onClose() }}
+                disabled={!canManage('livelihood')}
+                className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-sm font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Assign
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="px-6 pt-5 flex-shrink-0">
+              {/* Currently Assigned card */}
+              {currentIntervention && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">Currently Assigned</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-brand-blue">{currentIntervention.interventionName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{currentIntervention.interventionCategory} &bull; {currentIntervention.location}</p>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[currentIntervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {currentIntervention.status}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { onUnassign(); onClose() }}
+                      disabled={!canManage('livelihood')}
+                      className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Unassign
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { onUnassign(); onClose() }}
-                  disabled={!canManage('livelihood')}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Unassign
-                </button>
+              )}
+
+              {/* Search */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search interventions..."
+                  aria-label="Search CLPEP interventions"
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+                />
               </div>
+              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                <Info size={12} className="flex-shrink-0" />
+                Only CLPEP interventions with <span className="font-semibold">Planned</span> status are shown
+              </p>
             </div>
-          )}
 
-          {/* Search */}
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search interventions..."
-              aria-label="Search CLPEP interventions"
-              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
-            />
-          </div>
-          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-            <Info size={12} className="flex-shrink-0" />
-            Only CLPEP interventions with <span className="font-semibold">Planned</span> status are shown
-          </p>
-        </div>
-
-        {/* Intervention list */}
-        <div className="px-6 py-2 mt-2 max-h-72 overflow-y-auto divide-y divide-gray-100">
-          {filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 italic text-center py-8">No interventions found</p>
-          ) : (
-            filtered.map(intervention => {
-              const isCurrent = intervention.id === beneficiary.assignedInterventionId
-              return (
-                <button
-                  key={intervention.id}
-                  type="button"
-                  onClick={() => { onAssign(intervention.title, intervention.id); onClose() }}
-                  className="w-full text-left py-3.5 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-gray-900">{intervention.title}</p>
-                        {isCurrent && (
-                          <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-600 rounded-full">Current</span>
-                        )}
+            {/* Intervention list */}
+            <div className="flex-1 px-6 py-2 mt-2 overflow-y-auto divide-y divide-gray-100">
+              {filtered.length === 0 ? (
+                <p className="text-sm text-gray-400 italic text-center py-8">No interventions found</p>
+              ) : (
+                filtered.map(intervention => {
+                  const isCurrent = intervention.id === beneficiary.assignedInterventionId
+                  const isFull = intervention.targetBeneficiaries !== '' && intervention.assignedCount >= Number(intervention.targetBeneficiaries) && !isCurrent
+                  return (
+                    <button
+                      key={intervention.id}
+                      type="button"
+                      disabled={isFull}
+                      onClick={() => { if (!isFull) setConfirmIntervention(intervention) }}
+                      className="w-full text-left py-3.5 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold text-gray-900">{intervention.interventionName}</p>
+                            {isCurrent && (
+                              <span className="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-600 rounded-full">Current</span>
+                            )}
+                            {isFull && (
+                              <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-600 rounded-full">Full</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {intervention.interventionCategory === 'Other' ? (intervention.interventionCategoryOther || 'Other') : intervention.interventionCategory} &bull; {intervention.location}
+                            {intervention.targetBeneficiaries !== '' && ` • ${intervention.assignedCount}/${intervention.targetBeneficiaries}`}
+                          </p>
+                          {intervention.description && (
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">{intervention.description}</p>
+                          )}
+                        </div>
+                        <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {intervention.status}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {intervention.type === 'Other' ? (intervention.typeOther || 'Other') : intervention.type} &bull; {intervention.location}
-                      </p>
-                      {intervention.description && (
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{intervention.description}</p>
-                      )}
-                    </div>
-                    <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {intervention.status}
-                    </span>
-                  </div>
-                </button>
-              )
-            })
-          )}
-        </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
 
-        {/* Footer */}
-        <div className="px-6 pb-5 pt-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+            {/* Footer */}
+            <div className="px-6 pb-5 pt-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -354,14 +549,15 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
 // ─── View Assigned Intervention Modal ─────────────────────────────────────────
 
 type ViewAssignedInterventionModalProps = {
-  beneficiary: LivelihoodBeneficiary
+  beneficiary: CLPEPApplicant
   interventions: CLPEPIntervention[]
-  onChangeAssignment: (b: LivelihoodBeneficiary) => void
+  onChangeAssignment: (b: CLPEPApplicant) => void
   onClose: () => void
 }
 
 function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAssignment, onClose }: ViewAssignedInterventionModalProps) {
   const intervention = interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
+  const canChange = intervention?.status === 'Planned'
 
   function Row({ label, value }: { label: string; value?: string | number | null }) {
     return (
@@ -381,7 +577,7 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold text-white">Assigned Intervention</h2>
-              <p className="text-blue-200 text-sm mt-0.5">{beneficiary.name}</p>
+              <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
               <X size={20} />
@@ -396,9 +592,9 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
               {/* Title + type + status */}
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <p className="font-bold text-gray-900 text-base">{intervention.title}</p>
+                  <p className="font-bold text-gray-900 text-base">{intervention.interventionName}</p>
                   <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">
-                    {intervention.type === 'Other' ? (intervention.typeOther || 'Other') : intervention.type}
+                    {intervention.interventionCategory === 'Other' ? (intervention.interventionCategoryOther || 'Other') : intervention.interventionCategory}
                   </span>
                 </div>
                 <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -419,18 +615,34 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
           ) : (
             <p className="text-xs text-gray-400 italic text-center py-8">No intervention details available</p>
           )}
+
+          {beneficiary.assignmentHistory.length > 1 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
+              <div className="space-y-2">
+                {beneficiary.assignmentHistory.map((h, i) => (
+                  <div key={`${h.interventionId}-${i}`} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-700">{h.interventionName}</span>
+                    <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-6 pb-6 pt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => { onChangeAssignment(beneficiary); onClose() }}
-            disabled={!canManage('livelihood')}
-            className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Change Assignment
-          </button>
+          {canChange && (
+            <button
+              type="button"
+              onClick={() => { onChangeAssignment(beneficiary); onClose() }}
+              disabled={!canManage('livelihood')}
+              className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Change Assignment
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -447,19 +659,18 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
 // ─── Table ────────────────────────────────────────────────────────────────────
 
 type BeneficiaryTableProps = {
-  beneficiaries: LivelihoodBeneficiary[]
-  interventions: CLPEPIntervention[]
+  beneficiaries: CLPEPApplicant[]
   totalCount: number
   isFiltered: boolean
   activeFilters: string[]
-  onView: (b: LivelihoodBeneficiary) => void
-  onEdit: (b: LivelihoodBeneficiary) => void
-  onRemove: (id: number) => void
-  onAssignIntervention: (b: LivelihoodBeneficiary) => void
-  onViewAssignedIntervention: (b: LivelihoodBeneficiary) => void
+  onView: (b: CLPEPApplicant) => void
+  onEdit: (b: CLPEPApplicant) => void
+  onRemove: (id: number, name: string) => void
+  onAssignIntervention: (b: CLPEPApplicant) => void
+  onViewAssignedIntervention: (b: CLPEPApplicant) => void
 }
 
-function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignIntervention, onViewAssignedIntervention }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -485,21 +696,6 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
   function closeMenu() { setOpenMenuId(null) }
 
   const menuBeneficiary = beneficiaries.find(b => b.id === openMenuId) ?? null
-
-  async function handleConfirmRemove(id: number, name: string) {
-    closeMenu()
-    const result = await Swal.fire({
-      title: 'Remove Beneficiary?',
-      text: `This will permanently remove ${name} from the list.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, remove',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-    })
-    if (!result.isConfirmed) return
-    onRemove(id)
-  }
 
   return (
     <div className="overflow-x-auto">
@@ -538,23 +734,18 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
               </td>
             </tr>
           ) : (
-            paginated.map((b, idx) => (
+            paginated.map(b => (
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{b.name}</td>
-                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex ?? '—'}</td>}
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{formatTableName(b)}</td>
+                {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex || '—'}</td>}
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay || '-'}</td>
                 <td className="px-4 py-3">
-                  {b.cooperativeName ? (
+                  {b.assignedInterventionName ? (
                     <div>
-                      <p className="text-gray-800 text-sm font-medium">{b.cooperativeName}</p>
-                      {(() => {
-                        const iv = interventions.find(i => i.id === b.assignedInterventionId)
-                        return iv ? (
-                          <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[iv.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                            {iv.status}
-                          </span>
-                        ) : null
-                      })()}
+                      <p className="text-gray-800 text-sm font-medium">{b.assignedInterventionName}</p>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[b.assignedInterventionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {b.assignedInterventionStatus}
+                      </span>
                     </div>
                   ) : (
                     <span className="text-gray-400 italic text-sm">Not assigned</span>
@@ -562,20 +753,14 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
                 </td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.dateApplied)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  {(() => {
-                    const iv = interventions.find(i => i.id === b.assignedInterventionId)
-                    const isActive = !!b.cooperativeName && !!iv && iv.status !== 'Completed'
-                    return (
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
-                        {isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    )
-                  })()}
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {b.status}
+                  </span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button
                     onClick={e => handleToggleMenu(e, b.id)}
-                    aria-label={`Actions for ${b.name}`}
+                    aria-label={`Actions for ${formatDisplayName(b)}`}
                     className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     <MoreHorizontal size={16} />
@@ -622,11 +807,11 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
           >
             <button onClick={() => { onView(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-            {menuBeneficiary.cooperativeName
+            {menuBeneficiary.assignedInterventionId
               ? <button onClick={() => { onViewAssignedIntervention(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Intervention</button>
               : <button onClick={() => { onAssignIntervention(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Intervention</button>
             }
-            <button onClick={() => handleConfirmRemove(menuBeneficiary.id, menuBeneficiary.name)} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
+            <button onClick={() => onRemove(menuBeneficiary.id, formatDisplayName(menuBeneficiary))} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
           </div>
         </>
       )}
@@ -637,55 +822,90 @@ function BeneficiaryTable({ beneficiaries, interventions, totalCount, isFiltered
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CLPEPTab() {
-  const [beneficiaries, setBeneficiaries] = useState<LivelihoodBeneficiary[]>(loadBeneficiaries)
-  const [interventions] = useState<CLPEPIntervention[]>(loadInterventions)
+  const { applicants, interventions, refreshProfiles, refreshInterventions } = useCLPEP()
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
-  const [viewingBeneficiary, setViewingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [editingBeneficiary, setEditingBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [assigningBeneficiary, setAssigningBeneficiary] = useState<LivelihoodBeneficiary | null>(null)
-  const [viewingAssignedIntervention, setViewingAssignedIntervention] = useState<LivelihoodBeneficiary | null>(null)
+  const [viewingBeneficiary, setViewingBeneficiary] = useState<CLPEPApplicant | null>(null)
+  const [editingBeneficiary, setEditingBeneficiary] = useState<CLPEPApplicant | null>(null)
+  const [assigningBeneficiary, setAssigningBeneficiary] = useState<CLPEPApplicant | null>(null)
+  const [viewingAssignedIntervention, setViewingAssignedIntervention] = useState<CLPEPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   const availableFilters: FilterOption[] = useMemo(() => [
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
   ], [])
 
-  function persist(next: LivelihoodBeneficiary[]) {
-    setBeneficiaries(next)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(next)) } catch { /* quota */ }
+  async function handleAddBeneficiary(data: Record<string, unknown>) {
+    try {
+      await clpepService.createProfile(data)
+      await refreshProfiles()
+      setIsAddOpen(false)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been added successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleAddBeneficiary(data: Omit<LivelihoodBeneficiary, 'id'>) {
-    const newRecord: LivelihoodBeneficiary = { id: Date.now(), ...data }
-    persist([...beneficiaries, newRecord])
-  }
-
-  function handleEditSave(data: Omit<LivelihoodBeneficiary, 'id'>) {
+  async function handleEditSave(data: Record<string, unknown>) {
     if (!editingBeneficiary) return
-    persist(beneficiaries.map(b => b.id === editingBeneficiary.id ? { ...b, ...data } : b))
+    try {
+      await clpepService.updateProfile(editingBeneficiary.id, data)
+      await refreshProfiles()
+      setEditingBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleRemoveBeneficiary(id: number) {
-    persist(beneficiaries.filter(b => b.id !== id))
+  async function handleConfirmRemove(id: number, name: string) {
+    const result = await Swal.fire({
+      title: 'Remove Beneficiary?',
+      text: `This will move ${name} to the recycle bin.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, remove',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+    })
+    if (!result.isConfirmed) return
+    try {
+      await clpepService.deleteProfile(id)
+      await refreshProfiles()
+      Swal.fire({ icon: 'success', title: 'Removed', text: `${name} moved to the recycle bin.`, timer: 1500, showConfirmButton: false })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove beneficiary.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleAssignIntervention(beneficiary: LivelihoodBeneficiary, title: string, id: number) {
-    persist(beneficiaries.map(b =>
-      b.id === beneficiary.id ? { ...b, cooperativeName: title, assignedInterventionId: id, status: 'Active' as const } : b
-    ))
+  async function handleAssignIntervention(beneficiary: CLPEPApplicant, interventionId: number) {
+    try {
+      await clpepService.assignIntervention(beneficiary.id, interventionId)
+      await refreshProfiles()
+      await refreshInterventions()
+      setAssigningBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary assigned successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign intervention.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  function handleUnassignIntervention() {
+  async function handleUnassignIntervention() {
     if (!assigningBeneficiary) return
-    persist(beneficiaries.map(b =>
-      b.id === assigningBeneficiary.id ? { ...b, cooperativeName: '', assignedInterventionId: null, status: 'Inactive' as const } : b
-    ))
-    setAssigningBeneficiary(null)
+    try {
+      await clpepService.unassignIntervention(assigningBeneficiary.id)
+      await refreshProfiles()
+      await refreshInterventions()
+      setAssigningBeneficiary(null)
+      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned intervention has been removed.', confirmButtonColor: '#0077BE' })
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   function handleAddFilter(id: string) { setActiveFilters(prev => [...prev, id]) }
@@ -698,11 +918,11 @@ export default function CLPEPTab() {
   }
 
   const filtered = useMemo(() => {
-    let result = beneficiaries
+    let result = applicants
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(b =>
-        b.name.toLowerCase().includes(q) ||
+        formatDisplayName(b).toLowerCase().includes(q) ||
         (b.barangay ?? '').toLowerCase().includes(q)
       )
     }
@@ -712,15 +932,14 @@ export default function CLPEPTab() {
       if (filterId === 'sex') result = result.filter(b => b.sex === value)
     }
     return result
-  }, [beneficiaries, searchQuery, activeFilters, filterValues])
+  }, [applicants, searchQuery, activeFilters, filterValues])
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOrder === 'dateApplied_newest') return (b.dateApplied || '').localeCompare(a.dateApplied || '')
     if (sortOrder === 'dateApplied_oldest') return (a.dateApplied || '').localeCompare(b.dateApplied || '')
     if (!sortOrder) return 0
-    const parts = (n: string) => n.trim().split(/\s+/)
-    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
-    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
+    const keyA = (sortOrder.startsWith('firstName') ? a.firstName : a.lastName).toLowerCase()
+    const keyB = (sortOrder.startsWith('firstName') ? b.firstName : b.lastName).toLowerCase()
     return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
   })
 
@@ -728,10 +947,10 @@ export default function CLPEPTab() {
 
   function buildExportRows() {
     return filtered.map(b => ({
-      'Name': b.name,
+      'Name': formatDisplayName(b),
       'Sex': b.sex ?? '',
       'Barangay': b.barangay ?? '',
-      'Assigned Intervention': b.cooperativeName ?? '',
+      'Assigned Intervention': b.assignedInterventionName ?? '',
       'Date Applied': b.dateApplied ?? '',
       'Status': b.status,
     }))
@@ -761,7 +980,7 @@ export default function CLPEPTab() {
       <CLPEPProfileForm
         mode="add"
         initial={{ ...EMPTY_CLPEP_RECORD }}
-        onSave={data => { handleAddBeneficiary(data); setIsAddOpen(false) }}
+        onSave={data => handleAddBeneficiary(data)}
         onClose={() => setIsAddOpen(false)}
       />
     )
@@ -772,7 +991,7 @@ export default function CLPEPTab() {
       <CLPEPProfileForm
         key={viewingBeneficiary.id}
         mode="view"
-        initial={viewingBeneficiary}
+        initial={toFormRecord(viewingBeneficiary)}
         onSave={() => {}}
         onEdit={() => { setEditingBeneficiary(viewingBeneficiary); setViewingBeneficiary(null) }}
         onClose={() => setViewingBeneficiary(null)}
@@ -785,8 +1004,8 @@ export default function CLPEPTab() {
       <CLPEPProfileForm
         key={editingBeneficiary.id}
         mode="edit"
-        initial={editingBeneficiary}
-        onSave={data => { handleEditSave(data); setEditingBeneficiary(null) }}
+        initial={toFormRecord(editingBeneficiary)}
+        onSave={data => handleEditSave(data)}
         onClose={() => setEditingBeneficiary(null)}
       />
     )
@@ -798,7 +1017,7 @@ export default function CLPEPTab() {
         <AssignInterventionModal
           beneficiary={assigningBeneficiary}
           interventions={interventions}
-          onAssign={(title, id) => { handleAssignIntervention(assigningBeneficiary, title, id); setAssigningBeneficiary(null) }}
+          onAssign={interventionId => handleAssignIntervention(assigningBeneficiary, interventionId)}
           onUnassign={handleUnassignIntervention}
           onClose={() => setAssigningBeneficiary(null)}
         />
@@ -810,6 +1029,13 @@ export default function CLPEPTab() {
           interventions={interventions}
           onChangeAssignment={b => { setViewingAssignedIntervention(null); setAssigningBeneficiary(b) }}
           onClose={() => setViewingAssignedIntervention(null)}
+        />
+      )}
+
+      {isImportOpen && (
+        <CLPEPImportModal
+          onClose={() => setIsImportOpen(false)}
+          onImported={refreshProfiles}
         />
       )}
 
@@ -828,7 +1054,11 @@ export default function CLPEPTab() {
           <Plus size={16} />
           Add Profile
         </button>
-        <button disabled={!canManage('livelihood')} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+        <button
+          onClick={() => setIsImportOpen(true)}
+          disabled={!canManage('livelihood')}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+        >
           <Upload size={16} />
           Import
         </button>
@@ -879,13 +1109,12 @@ export default function CLPEPTab() {
 
         <BeneficiaryTable
           beneficiaries={sorted}
-          interventions={interventions}
           totalCount={sorted.length}
           isFiltered={isFiltered}
           activeFilters={activeFilters}
           onView={setViewingBeneficiary}
           onEdit={setEditingBeneficiary}
-          onRemove={handleRemoveBeneficiary}
+          onRemove={handleConfirmRemove}
           onAssignIntervention={setAssigningBeneficiary}
           onViewAssignedIntervention={setViewingAssignedIntervention}
         />

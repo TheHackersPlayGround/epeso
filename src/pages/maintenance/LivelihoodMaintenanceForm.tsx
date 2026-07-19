@@ -9,12 +9,14 @@ import {
 import { canManage } from '../../utils/permissions'
 import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
-import { LIVELIHOOD_SEED, CLPEP_INTERVENTIONS_SEED } from '../../contexts/LivelihoodContext'
-import type { LivelihoodBeneficiary, CLPEPIntervention } from '../../contexts/LivelihoodContext'
 import { useDILP } from '../../contexts/DILPContext'
 import * as dilpService from '../../services/dilpService'
 import { useTUPAD } from '../../contexts/TUPADContext'
 import * as tupadService from '../../services/tupadService'
+import { useSLP } from '../../contexts/SLPContext'
+import * as slpService from '../../services/slpService'
+import { useCLPEP } from '../../contexts/CLPEPContext'
+import * as clpepService from '../../services/clpepService'
 import DILPForm from './DILPForm'
 import type { DILPFormData, AttachmentItem } from './DILPForm'
 import TUPADForm from './TUPADForm'
@@ -24,14 +26,22 @@ import type { SLPFormData } from './SLPForm'
 import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
 
-// DILP/TUPAD projects now live in their own backend-persisted tables (see
-// DILPContext/TUPADContext), not ProgramActivitiesContext's localStorage blob.
-// For this shared "all Livelihood projects" table, they're converted into
-// ProgramActivity-shaped rows with an ID offset — same trick already used
-// below for CLPEP interventions (id + 900000) — so the existing table/filter/
-// pagination code doesn't need a parallel implementation.
+// DILP/TUPAD/SLP/CLPEP projects now all live in their own backend-persisted
+// tables (see DILPContext/TUPADContext/SLPContext/CLPEPContext), not
+// ProgramActivitiesContext's localStorage blob. For this shared "all
+// Livelihood projects" table, they're converted into ProgramActivity-shaped
+// rows with an ID offset so the existing table/filter/pagination code
+// doesn't need a parallel implementation.
 const DILP_ID_OFFSET = 700000
 const TUPAD_ID_OFFSET = 800000
+const CLPEP_ID_OFFSET = 900000
+const SLP_ID_OFFSET = 600000
+
+// Today's date as YYYY-MM-DD, comparable lexicographically against the ISO
+// date strings DatePicker fields already use.
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,22 +51,6 @@ const DEFAULT_SERVICES = [
   'SLP',
   'CLPEP',
 ]
-
-// ─── CLPEP localStorage helpers ───────────────────────────────────────────────
-
-const CLPEP_INTERVENTIONS_LS_KEY = 'lp_clpep_interventions_v1'
-const SLP_BENEFICIARIES_LS_KEY = 'lp_slp_v7'
-const CLPEP_BENEFICIARIES_LS_KEY = 'lp_clpep_v8'
-
-function loadCLPEPInterventions(): CLPEPIntervention[] {
-  try {
-    const raw = localStorage.getItem(CLPEP_INTERVENTIONS_LS_KEY)
-    const parsed = raw ? (JSON.parse(raw) as CLPEPIntervention[]) : []
-    return parsed.length > 0 ? parsed : CLPEP_INTERVENTIONS_SEED
-  } catch {
-    return CLPEP_INTERVENTIONS_SEED
-  }
-}
 
 const SERVICE_TABS = [
   { label: 'All Services', value: 'All' },
@@ -209,28 +203,14 @@ const blankDilpForm: DILPFormData = {
   status: 'Planned',
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function loadSlpBeneficiaries(): LivelihoodBeneficiary[] {
-  try {
-    const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
-function loadClpepBeneficiaries(): LivelihoodBeneficiary[] {
-  try {
-    const raw = localStorage.getItem(CLPEP_BENEFICIARIES_LS_KEY)
-    return raw ? JSON.parse(raw) : LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP')
-  } catch { return [] }
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function LivelihoodMaintenanceForm() {
   const { activities, setActivities } = useProgramActivities()
   const dilp = useDILP()
   const tupad = useTUPAD()
+  const slp = useSLP()
+  const clpep = useCLPEP()
 
   // Navigation
   const [action, setAction] = useState<Action>('')
@@ -260,8 +240,6 @@ export default function LivelihoodMaintenanceForm() {
   const [participantPage, setParticipantPage] = useState(1)
   const [participantPerPage, setParticipantPerPage] = useState(10)
 
-  // CLPEP interventions from CLPEPTab localStorage (settable so new adds appear immediately)
-  const [clpepInterventions, setClpepInterventions] = useState<CLPEPIntervention[]>(loadCLPEPInterventions)
   const [clpepFormData, setClpepFormData] = useState<CLPEPFormData>(blankClpepForm)
   const [clpepAttachments, setClpepAttachments] = useState<AttachmentItem[]>([])
 
@@ -279,22 +257,41 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  // CLPEP interventions converted to ProgramActivity shape for display (ID offset 900000)
-  const clpepAsActivities: ProgramActivity[] = clpepInterventions.map(i => ({
-    id: i.id + 900000,
+  // CLPEP interventions converted to ProgramActivity shape for display (ID
+  // offset 900000) — the real data lives in CLPEPContext, backed by
+  // clpep_interventions, not this localStorage context.
+  const clpepAsActivities: ProgramActivity[] = clpep.interventions.map(i => ({
+    id: i.id + CLPEP_ID_OFFSET,
     program: 'Livelihood',
     service: 'CLPEP',
-    title: i.title,
+    title: i.interventionName,
     date: i.date ?? '',
     location: i.location,
     description: i.description,
-    participants: i.targetBeneficiaries,
+    participants: i.targetBeneficiaries ? parseInt(i.targetBeneficiaries) : undefined,
     status: i.status as ProjectStatus,
     facilitator: i.implementingOfficer,
-    typeOfProject: i.type,
+    typeOfProject: i.interventionCategory,
     partnerAgency: i.partnerAgency,
     partnerAgencyOther: i.partnerAgencyOther,
-    interventionCategoryOther: i.typeOther,
+    interventionCategoryOther: i.interventionCategoryOther,
+  }))
+
+  // SLP projects converted to ProgramActivity shape for display (ID offset
+  // 600000) — the real data lives in SLPContext, backed by slp_projects.
+  const slpAsActivities: ProgramActivity[] = slp.projects.map(p => ({
+    id: p.id + SLP_ID_OFFSET,
+    program: 'Livelihood',
+    service: 'SLP',
+    title: p.projectName,
+    date: p.dateStarted,
+    location: p.location,
+    description: p.description,
+    facilitator: p.facilitator,
+    status: p.status as ProjectStatus,
+    assistanceAmount: p.assistanceAmount,
+    dateReleased: p.dateReleased,
+    slpTrack: p.slpTrack,
   }))
 
   // DILP/TUPAD projects converted to ProgramActivity shape for display (ID
@@ -327,10 +324,12 @@ export default function LivelihoodMaintenanceForm() {
     dateReleased: p.dateReleased,
   }))
 
+  const BACKEND_SERVICES = ['DILEEP (DILP)', 'DILEEP (TUPAD)', 'SLP', 'CLPEP']
   const livelihoodProjects = [
-    ...activities.filter(a => a.program === 'Livelihood' && a.service !== 'DILEEP (DILP)' && a.service !== 'DILEEP (TUPAD)'),
+    ...activities.filter(a => a.program === 'Livelihood' && !BACKEND_SERVICES.includes(a.service)),
     ...dilpAsActivities,
     ...tupadAsActivities,
+    ...slpAsActivities,
     ...clpepAsActivities,
   ]
 
@@ -415,30 +414,34 @@ export default function LivelihoodMaintenanceForm() {
         dateReleased:     p?.dateReleased      ?? '',
       })
     } else if (a.service === 'CLPEP') {
+      const i = clpep.interventions.find(x => x.id === a.id - CLPEP_ID_OFFSET)
+      setClpepAttachments((i?.documents ?? []).map(d => ({ name: d.name, url: d.url, fileType: d.fileType, id: d.id })))
       setClpepFormData({
-        interventionName:     a.title,
-        description:          a.description          ?? '',
-        interventionCategory: a.typeOfProject         ?? '',
-        interventionCategoryOther: a.interventionCategoryOther ?? '',
-        targetBeneficiaries:  a.participants != null ? String(a.participants) : '',
-        date:                 a.date                  ?? '',
-        implementingOfficer:  a.facilitator           ?? '',
-        partnerAgency:        a.partnerAgency         ?? '',
-        partnerAgencyOther:   a.partnerAgencyOther    ?? '',
-        location:             a.location              ?? '',
-        status:               a.status as CLPEPFormData['status'],
+        interventionName:     i?.interventionName          ?? a.title,
+        description:          i?.description               ?? '',
+        interventionCategory: i?.interventionCategory       ?? '',
+        interventionCategoryOther: i?.interventionCategoryOther ?? '',
+        targetBeneficiaries:  i?.targetBeneficiaries         ?? '',
+        date:                 i?.date                       ?? '',
+        implementingOfficer:  i?.implementingOfficer         ?? '',
+        partnerAgency:        i?.partnerAgency               ?? '',
+        partnerAgencyOther:   i?.partnerAgencyOther          ?? '',
+        location:             i?.location                    ?? '',
+        status:               (i?.status ?? a.status) as CLPEPFormData['status'],
       })
     } else if (a.service === 'SLP') {
+      const p = slp.projects.find(x => x.id === a.id - SLP_ID_OFFSET)
+      setSlpAttachments((p?.documents ?? []).map(d => ({ name: d.name, url: d.url, fileType: d.fileType, id: d.id })))
       setSlpFormData({
-        projectName:      a.projectName      ?? a.title,
-        description:      a.description      ?? '',
-        slpTrack:         a.slpTrack         ?? '',
-        dateStarted:      a.date             ?? '',
-        location:         a.location         ?? '',
-        facilitator:      a.facilitator      ?? '',
-        status:           a.status as SLPFormData['status'],
-        assistanceAmount: a.assistanceAmount  ?? '',
-        dateReleased:     a.dateReleased      ?? '',
+        projectName:      p?.projectName      ?? a.title,
+        description:      p?.description      ?? '',
+        slpTrack:         p?.slpTrack         ?? '',
+        dateStarted:      p?.dateStarted      ?? '',
+        location:         p?.location         ?? '',
+        facilitator:      p?.facilitator      ?? '',
+        status:           (p?.status ?? a.status) as SLPFormData['status'],
+        assistanceAmount: p?.assistanceAmount  ?? '',
+        dateReleased:     p?.dateReleased      ?? '',
       })
     } else {
       setFormData({
@@ -518,85 +521,108 @@ export default function LivelihoodMaintenanceForm() {
     }
   }
 
+  const handleSaveClpepIntervention = async () => {
+    if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
+    if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
+    if (!clpepFormData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Date.', confirmButtonColor: '#0077BE' }); return }
+    if (!clpepFormData.implementingOfficer.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Implementing Officer.', confirmButtonColor: '#0077BE' }); return }
+
+    const realId = editingId !== null ? editingId - CLPEP_ID_OFFSET : null
+    const payload = {
+      interventionName:          clpepFormData.interventionName.trim(),
+      description:               clpepFormData.description,
+      interventionCategory:      clpepFormData.interventionCategory,
+      interventionCategoryOther: clpepFormData.interventionCategoryOther,
+      targetBeneficiaries:       clpepFormData.targetBeneficiaries,
+      date:                      clpepFormData.date,
+      implementingOfficer:       clpepFormData.implementingOfficer,
+      partnerAgency:             clpepFormData.partnerAgency,
+      partnerAgencyOther:        clpepFormData.partnerAgencyOther,
+      location:                 clpepFormData.location,
+      status:                   clpepFormData.status,
+      documents:                 clpepAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
+    }
+    try {
+      if (realId !== null) await clpepService.updateIntervention(realId, payload)
+      else await clpepService.createIntervention(payload)
+      await clpep.refreshInterventions()
+      Swal.fire({ icon: 'success', title: realId !== null ? 'Intervention Updated' : 'Intervention Added', text: realId !== null ? 'The intervention has been updated.' : 'New CLPEP intervention has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      goToList()
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save intervention.', confirmButtonColor: '#0077BE' })
+    }
+  }
+
+  const handleSaveSlpProject = async () => {
+    if (!slpFormData.projectName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project Name.', confirmButtonColor: '#0077BE' }); return }
+    if (!slpFormData.dateStarted) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter the Date Started.', confirmButtonColor: '#0077BE' }); return }
+    if (!slpFormData.facilitator.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Facilitator / Person In Charge.', confirmButtonColor: '#0077BE' }); return }
+
+    // Status is a manual staff judgment call, not derived -- this is a soft
+    // nudge (not a block) for the case where Ongoing/Completed is picked
+    // before the project's own Date Started has actually arrived yet.
+    if ((slpFormData.status === 'Ongoing' || slpFormData.status === 'Completed') && slpFormData.dateStarted > todayIso()) {
+      const confirm = await Swal.fire({
+        icon: 'warning',
+        title: 'Date Started is in the future',
+        text: `This project's Date Started (${slpFormData.dateStarted}) hasn't happened yet. Mark it as ${slpFormData.status} anyway?`,
+        showCancelButton: true,
+        confirmButtonText: `Yes, mark as ${slpFormData.status}`,
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#0077BE',
+      })
+      if (!confirm.isConfirmed) return
+    }
+
+    const realId = editingId !== null ? editingId - SLP_ID_OFFSET : null
+    const payload = {
+      projectName:      slpFormData.projectName.trim(),
+      description:      slpFormData.description.trim(),
+      slpTrack:         slpFormData.slpTrack,
+      dateStarted:      slpFormData.dateStarted,
+      location:         slpFormData.location,
+      facilitator:      slpFormData.facilitator,
+      status:           slpFormData.status,
+      assistanceAmount: slpFormData.assistanceAmount,
+      dateReleased:     slpFormData.dateReleased,
+      documents:        slpAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
+    }
+    try {
+      if (realId !== null) await slpService.updateProject(realId, payload)
+      else await slpService.createProject(payload)
+      await slp.refreshProjects()
+      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New SLP project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      goToList()
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    }
+  }
+
   const handleSave = () => {
     if (!selectedService) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a service type.', confirmButtonColor: '#0077BE' }); return }
 
     if (selectedService === 'DILEEP (DILP)') { handleSaveDilpProject(); return }
     if (selectedService === 'DILEEP (TUPAD)') { handleSaveTupadProject(); return }
+    if (selectedService === 'CLPEP') { handleSaveClpepIntervention(); return }
+    if (selectedService === 'SLP') { handleSaveSlpProject(); return }
 
-    let payload: ProgramActivity
+    if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a project title.', confirmButtonColor: '#0077BE' }); return }
 
-    if (selectedService === 'CLPEP') {
-      if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
-      if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
-      if (!clpepFormData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Date.', confirmButtonColor: '#0077BE' }); return }
-      if (!clpepFormData.implementingOfficer.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Implementing Officer.', confirmButtonColor: '#0077BE' }); return }
-
-      // CLPEP interventions are stored in shared localStorage so CLPEPTab stays in sync
-      const realId = editingId !== null ? editingId - 900000 : null
-      const existing = loadCLPEPInterventions()
-      const intervention: CLPEPIntervention = {
-        id:                   realId ?? Math.max(0, ...existing.map(i => i.id)) + 1,
-        title:                clpepFormData.interventionName.trim(),
-        type:                 clpepFormData.interventionCategory,
-        status:               clpepFormData.status,
-        location:             clpepFormData.location,
-        description:          clpepFormData.description,
-        targetBeneficiaries:  parseInt(clpepFormData.targetBeneficiaries) || undefined,
-        date:                 clpepFormData.date       || undefined,
-        implementingOfficer:  clpepFormData.implementingOfficer || undefined,
-        partnerAgency:        clpepFormData.partnerAgency       || undefined,
-        partnerAgencyOther:   clpepFormData.partnerAgency === 'Other' ? clpepFormData.partnerAgencyOther || undefined : undefined,
-        typeOther:            clpepFormData.interventionCategory === 'Other' ? clpepFormData.interventionCategoryOther || undefined : undefined,
-      }
-      const updatedInterventions = realId !== null
-        ? existing.map(i => i.id === realId ? intervention : i)
-        : [...existing, intervention]
-      localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updatedInterventions))
-      setClpepInterventions(updatedInterventions)
-
-      Swal.fire({ icon: 'success', title: realId !== null ? 'Intervention Updated' : 'Intervention Added', text: realId !== null ? 'The intervention has been updated.' : 'New CLPEP intervention has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-      goToList()
-      return
-    } else if (selectedService === 'SLP') {
-      if (!slpFormData.projectName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Project Name.', confirmButtonColor: '#0077BE' }); return }
-      if (!slpFormData.dateStarted) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter the Date Started.', confirmButtonColor: '#0077BE' }); return }
-      if (!slpFormData.facilitator.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Facilitator / Person In Charge.', confirmButtonColor: '#0077BE' }); return }
-
-      payload = {
-        id:               editingId ?? Date.now(),
-        program:          'Livelihood',
-        service:          'SLP',
-        title:            slpFormData.projectName.trim(),
-        description:      slpFormData.description.trim()    || undefined,
-        date:             slpFormData.dateStarted,
-        location:         slpFormData.location,
-        facilitator:      slpFormData.facilitator            || undefined,
-        status:           slpFormData.status,
-        assistanceAmount: slpFormData.assistanceAmount       || undefined,
-        dateReleased:     slpFormData.dateReleased           || undefined,
-        projectName:      slpFormData.projectName,
-        slpTrack:         slpFormData.slpTrack               || undefined,
-      }
-    } else {
-      if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a project title.', confirmButtonColor: '#0077BE' }); return }
-
-      payload = {
-        id:              editingId ?? Date.now(),
-        program:         'Livelihood',
-        service:         selectedService,
-        title:           formData.title.trim(),
-        description:     formData.description.trim()   || undefined,
-        date:            formData.date,
-        location:        formData.location,
-        facilitator:     formData.facilitator           || undefined,
-        counselor:       formData.counselor             || undefined,
-        sessionDuration: formData.sessionDuration       || undefined,
-        participants:    parseInt(formData.participants) || undefined,
-        startDate:       formData.startDate             || undefined,
-        endDate:         formData.endDate               || undefined,
-        status:          formData.status,
-      }
+    payload = {
+      id:              editingId ?? Date.now(),
+      program:         'Livelihood',
+      service:         selectedService,
+      title:           formData.title.trim(),
+      description:     formData.description.trim()   || undefined,
+      date:            formData.date,
+      location:        formData.location,
+      facilitator:     formData.facilitator           || undefined,
+      counselor:       formData.counselor             || undefined,
+      sessionDuration: formData.sessionDuration       || undefined,
+      participants:    parseInt(formData.participants) || undefined,
+      startDate:       formData.startDate             || undefined,
+      endDate:         formData.endDate               || undefined,
+      status:          formData.status,
     }
 
     if (editingId !== null) {
@@ -610,112 +636,67 @@ export default function LivelihoodMaintenanceForm() {
     goToList()
   }
 
-  const handleSaveDraft = () => {
-    if (!clpepFormData.interventionName.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' })
-      return
-    }
-    const existing = loadCLPEPInterventions()
-    const newId = Math.max(0, ...existing.map(i => i.id)) + 1
-    const draft: CLPEPIntervention = {
-      id:                  newId,
-      title:               clpepFormData.interventionName.trim(),
-      type:                clpepFormData.interventionCategory || 'Draft',
-      status:              'Planned',
-      location:            clpepFormData.location,
-      description:         clpepFormData.description,
-      targetBeneficiaries: parseInt(clpepFormData.targetBeneficiaries) || undefined,
-      date:                clpepFormData.date                || undefined,
-      implementingOfficer: clpepFormData.implementingOfficer || undefined,
-      partnerAgency:       clpepFormData.partnerAgency       || undefined,
-      partnerAgencyOther:  clpepFormData.partnerAgency === 'Other' ? clpepFormData.partnerAgencyOther || undefined : undefined,
-      typeOther:           clpepFormData.interventionCategory === 'Other' ? clpepFormData.interventionCategoryOther || undefined : undefined,
-    }
-    const updated = [...existing, draft]
-    localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
-    setClpepInterventions(updated)
-    Swal.fire({ icon: 'success', title: 'Draft Saved', text: 'CLPEP intervention saved as draft.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-    goToList()
-  }
+  // The backend has no separate draft state for interventions, so "Save
+  // Draft" now saves the same way "Save Intervention" does.
+  const handleSaveDraft = () => { handleSaveClpepIntervention() }
 
+  // Offsets checked largest-first: CLPEP (900000) > TUPAD (800000) > DILP
+  // (700000) > SLP (600000) — checking TUPAD before CLPEP would misroute
+  // every CLPEP id (which is always >= 800000 too) to the TUPAD endpoint.
   const handleDelete = async () => {
     if (deleteConfirm === null) return
-    if (deleteConfirm >= TUPAD_ID_OFFSET) {
-      try {
+    try {
+      if (deleteConfirm >= CLPEP_ID_OFFSET) {
+        await clpepService.deleteIntervention(deleteConfirm - CLPEP_ID_OFFSET)
+        await clpep.refreshInterventions()
+      } else if (deleteConfirm >= TUPAD_ID_OFFSET) {
         await tupadService.deleteProject(deleteConfirm - TUPAD_ID_OFFSET)
         await tupad.refreshProjects()
-      } catch (e: unknown) {
-        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
-      }
-    } else if (deleteConfirm >= DILP_ID_OFFSET) {
-      try {
+      } else if (deleteConfirm >= DILP_ID_OFFSET) {
         await dilpService.deleteProject(deleteConfirm - DILP_ID_OFFSET)
         await dilp.refreshProjects()
-      } catch (e: unknown) {
-        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
+      } else if (deleteConfirm >= SLP_ID_OFFSET) {
+        await slpService.deleteProject(deleteConfirm - SLP_ID_OFFSET)
+        await slp.refreshProjects()
+      } else {
+        setActivities(prev => prev.filter(a => a.id !== deleteConfirm))
       }
-    } else if (deleteConfirm >= 900000) {
-      const realId = deleteConfirm - 900000
-      const updated = clpepInterventions.filter(i => i.id !== realId)
-      localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
-      setClpepInterventions(updated)
-    } else {
-      setActivities(prev => prev.filter(a => a.id !== deleteConfirm))
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
     }
     setDeleteConfirm(null)
   }
 
-  // DILP/TUPAD beneficiary status is derived server-side from the assigned
-  // project's own status — no client-side cascade write needed here anymore
-  // (unlike SLP, which still tracks status locally in localStorage).
+  // DILP/TUPAD/SLP/CLPEP beneficiary status is all derived server-side from
+  // the assigned project/intervention's own status now — no client-side
+  // cascade write needed here for any of them.
   const handleStatusChange = async () => {
     if (!statusConfirm) return
     const { project, nextStatus } = statusConfirm
-    if (project.id >= TUPAD_ID_OFFSET) {
-      try {
+    try {
+      if (project.id >= CLPEP_ID_OFFSET) {
+        await clpepService.updateInterventionStatus(project.id - CLPEP_ID_OFFSET, nextStatus)
+        await clpep.refreshInterventions()
+        await clpep.refreshProfiles()
+      } else if (project.id >= TUPAD_ID_OFFSET) {
         await tupadService.updateProjectStatus(project.id - TUPAD_ID_OFFSET, nextStatus)
         await tupad.refreshProjects()
         await tupad.refreshProfiles()
-      } catch (e: unknown) {
-        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
-        setStatusConfirm(null)
-        return
-      }
-    } else if (project.id >= DILP_ID_OFFSET) {
-      try {
+      } else if (project.id >= DILP_ID_OFFSET) {
         await dilpService.updateProjectStatus(project.id - DILP_ID_OFFSET, nextStatus)
         await dilp.refreshProjects()
         await dilp.refreshProfiles()
-      } catch (e: unknown) {
-        Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
-        setStatusConfirm(null)
-        return
+      } else if (project.id >= SLP_ID_OFFSET) {
+        await slpService.updateProjectStatus(project.id - SLP_ID_OFFSET, nextStatus)
+        await slp.refreshProjects()
+        await slp.refreshProfiles()
+      } else {
+        setActivities(prev => prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a))
       }
-    } else if (project.id >= 900000) {
-      const realId = project.id - 900000
-      const updated = clpepInterventions.map(i => i.id === realId ? { ...i, status: nextStatus as 'Planned' | 'Ongoing' | 'Completed' } : i)
-      localStorage.setItem(CLPEP_INTERVENTIONS_LS_KEY, JSON.stringify(updated))
-      setClpepInterventions(updated)
-    } else {
-      setActivities(prev =>
-        prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a)
-      )
-      if (nextStatus === 'Completed' && project.service === 'SLP') {
-        // Auto-Inactive SLP beneficiaries (stored separately) — SLP hasn't
-        // been migrated to a derived-status backend model yet.
-        try {
-          const raw = localStorage.getItem(SLP_BENEFICIARIES_LS_KEY)
-          if (raw) {
-            const slpBeneficiaries: LivelihoodBeneficiary[] = JSON.parse(raw)
-            const updatedSlp = slpBeneficiaries.map(b =>
-              b.assignedSlpProjectId === project.id && b.status === 'Active'
-                ? { ...b, status: 'Inactive' as const }
-                : b
-            )
-            localStorage.setItem(SLP_BENEFICIARIES_LS_KEY, JSON.stringify(updatedSlp))
-          }
-        } catch { /* storage unavailable */ }
-      }
+    } catch (e: unknown) {
+      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
+      setStatusConfirm(null)
+      return
     }
     Swal.fire({ icon: 'success', title: 'Status Updated', text: `Project is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
     setStatusConfirm(null)
@@ -1015,41 +996,24 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── Participant count helpers (read from localStorage on each render) ────────
 
-  const slpBeneficiaryCountMap = (() => {
-    const map: Record<number, number> = {}
-    loadSlpBeneficiaries().forEach(b => {
-      if (b.assignedSlpProjectId != null)
-        map[b.assignedSlpProjectId] = (map[b.assignedSlpProjectId] ?? 0) + 1
-    })
-    return map
-  })()
-
-  const clpepBeneficiaryCountMap = (() => {
-    const map: Record<number, number> = {}
-    loadClpepBeneficiaries().forEach(b => {
-      if (b.assignedInterventionId != null)
-        map[b.assignedInterventionId] = (map[b.assignedInterventionId] ?? 0) + 1
-    })
-    return map
-  })()
-
   const getParticipantCount = (a: ProgramActivity): number | undefined => {
     if (a.service === 'DILEEP (DILP)')
       return dilp.projects.find(p => p.id === a.id - DILP_ID_OFFSET)?.assignedCount
     if (a.service === 'DILEEP (TUPAD)')
       return tupad.projects.find(p => p.id === a.id - TUPAD_ID_OFFSET)?.assignedCount
     if (a.service === 'SLP')
-      return slpBeneficiaryCountMap[a.id]
-    if (a.id >= 900000)
-      return clpepBeneficiaryCountMap[a.id - 900000]
+      return slp.projects.find(p => p.id === a.id - SLP_ID_OFFSET)?.assignedCount
+    if (a.service === 'CLPEP')
+      return clpep.interventions.find(i => i.id === a.id - CLPEP_ID_OFFSET)?.assignedCount
     return undefined
   }
 
-  // TUPAD's "Number of Participants" is a target headcount the backend now
-  // enforces as a cap — show "assigned/target" there instead of a bare count.
+  // TUPAD's "Number of Participants" and CLPEP's "Target Beneficiaries" are
+  // both target headcounts the backend enforces as a cap — show
+  // "assigned/target" for those instead of a bare count.
   const getParticipantLabel = (a: ProgramActivity): string => {
     const count = getParticipantCount(a)
-    if (a.service === 'DILEEP (TUPAD)' && a.participants != null) {
+    if ((a.service === 'DILEEP (TUPAD)' || a.service === 'CLPEP') && a.participants != null) {
       return `${count ?? 0}/${a.participants}`
     }
     return count != null ? String(count) : '—'
@@ -1220,7 +1184,7 @@ export default function LivelihoodMaintenanceForm() {
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Date</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location</th>
-                  <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Members</th>
+                  <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Beneficiaries</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                 </tr>
@@ -1293,14 +1257,21 @@ export default function LivelihoodMaintenanceForm() {
 
   const renderViewParticipants = () => {
     if (!selectedProject) return null
-    const isCLPEP = selectedProject.id >= 900000
+    const isCLPEP = selectedProject.id >= CLPEP_ID_OFFSET
     type ParticipantRow = { id: number; name: string; service: string; barangay?: string; contactNumber?: string; status: string }
     let participants: ParticipantRow[]
     if (isCLPEP) {
-      const realId = selectedProject.id - 900000
-      participants = loadClpepBeneficiaries().filter(b => b.assignedInterventionId === realId)
+      // CLPEP allows reassignment (like TUPAD), so a completed intervention
+      // keeps showing everyone who was ever part of it via assignmentHistory.
+      const realId = selectedProject.id - CLPEP_ID_OFFSET
+      participants = clpep.applicants
+        .filter(b => b.assignmentHistory.some(h => h.interventionId === realId))
+        .map(b => ({ id: b.id, name: `${b.lastName}, ${b.firstName}`, service: 'CLPEP', barangay: b.barangay, status: b.status }))
     } else if (selectedProject.service === 'SLP') {
-      participants = loadSlpBeneficiaries().filter(b => b.assignedSlpProjectId === selectedProject.id)
+      const realId = selectedProject.id - SLP_ID_OFFSET
+      participants = slp.applicants
+        .filter(b => b.assignmentHistory.some(h => h.projectId === realId))
+        .map(b => ({ id: b.id, name: `${b.lastName}, ${b.firstName}`, service: 'SLP', barangay: b.barangay, contactNumber: b.contactNumber, status: b.status }))
     } else if (selectedProject.service === 'DILEEP (DILP)') {
       const realId = selectedProject.id - DILP_ID_OFFSET
       participants = dilp.applicants

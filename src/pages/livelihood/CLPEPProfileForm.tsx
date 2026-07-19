@@ -1,19 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Users, Upload, FileText, Eye, Trash2, ChevronDown } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CHILD_LABOR_STATUS_OPTIONS = [
+export const CHILD_LABOR_STATUS_OPTIONS = [
   'Child Laborer',
   'At Risk of Child Labor',
   'Former Child Laborer',
   'Not Yet Assessed',
 ] as const
 
-const SCHOOL_STATUS_OPTIONS = [
+export const SCHOOL_STATUS_OPTIONS = [
   'Currently Enrolled',
   'Out of School',
   'ALS Learner',
@@ -21,7 +23,7 @@ const SCHOOL_STATUS_OPTIONS = [
   'Graduated',
 ] as const
 
-const RELATIONSHIP_OPTIONS = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Relative', 'Others'] as const
+export const RELATIONSHIP_OPTIONS = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Relative', 'Others'] as const
 
 const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V'] as const
 
@@ -156,8 +158,9 @@ export const EMPTY_CLPEP_RECORD: Omit<LivelihoodBeneficiary, 'id'> = {
   age: 0,
   streetPurok: '',
   barangay: '',
-  cityMunicipality: 'Tangub City',
-  province: 'Misamis Occidental',
+  barangayId: 0,
+  cityMunicipality: '',
+  province: '',
   childLaborStatus: '',
   schoolStatus: '',
   natureOfWork: '',
@@ -196,6 +199,8 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     ...initial,
   })
   const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
 
   const isViewMode = mode === 'view'
 
@@ -225,6 +230,16 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     event?.preventDefault()
     if (!formData.lastName || !formData.firstName) {
       alert('Last name and first name are required.')
+      return
+    }
+    if (!formData.sex || !formData.birthdate) {
+      alert('Sex and birthdate are required.')
+      setCurrentStep(1)
+      return
+    }
+    if (!formData.barangayId) {
+      alert('Barangay is required.')
+      setCurrentStep(2)
       return
     }
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
@@ -373,33 +388,44 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label htmlFor="clpep-province" className={labelClass}>Province</label>
-            <input
-              id="clpep-province"
-              className={inputClass}
+            <label className={labelClass}>Province</label>
+            <SearchableSelect
               value={formData.province ?? ''}
-              onChange={e => updateField({ province: e.target.value })}
+              placeholder="Search province..."
+              disabled={isViewMode}
+              fetchOptions={s => searchProvinces(s)}
+              onSelect={opt => {
+                setProvinceId(opt.id)
+                setCityId(null)
+                updateField({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+              }}
             />
           </div>
           <div>
-            <label htmlFor="clpep-city" className={labelClass}>Municipality / City</label>
-            <input
-              id="clpep-city"
-              className={inputClass}
+            <label className={labelClass}>Municipality / City</label>
+            <SearchableSelect
               value={formData.cityMunicipality ?? ''}
-              onChange={e => updateField({ cityMunicipality: e.target.value })}
+              placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+              disabled={isViewMode || !provinceId}
+              refetchKey={provinceId ?? ''}
+              fetchOptions={s => searchCities(provinceId ?? 0, s)}
+              onSelect={opt => {
+                setCityId(opt.id)
+                updateField({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+              }}
             />
           </div>
           <div>
-            <label htmlFor="clpep-barangay" className={labelClass}>
+            <label className={labelClass}>
               Barangay <span className="text-red-500">*</span>
             </label>
-            <input
-              id="clpep-barangay"
-              className={inputClass}
-              placeholder="Enter barangay"
+            <SearchableSelect
               value={formData.barangay ?? ''}
-              onChange={e => updateField({ barangay: e.target.value })}
+              placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+              disabled={isViewMode || !cityId}
+              refetchKey={cityId ?? ''}
+              fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+              onSelect={opt => updateField({ barangay: opt.name, barangayId: opt.id })}
             />
           </div>
         </div>
@@ -603,7 +629,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                     className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
                   >
                     <div
-                      className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                      className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer pointer-events-auto"
                       onClick={() => setPreviewDoc(doc)}
                     >
                       <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -618,7 +644,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                       <button
                         type="button"
                         onClick={() => setPreviewDoc(doc)}
-                        className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
+                        className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors pointer-events-auto"
                         title="Preview document"
                       >
                         <Eye size={18} />
@@ -741,7 +767,11 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6">
-          <fieldset disabled={isViewMode} className="border-0 p-0 m-0 min-w-0">
+          {/* CSS-based disabling instead of the native fieldset `disabled`
+              attribute -- that cascades to every button inside it, including
+              the document preview button, which should stay clickable even
+              in view mode (it only opens the preview, it isn't an edit). */}
+          <fieldset className={`border-0 p-0 m-0 min-w-0 ${isViewMode ? 'opacity-60 pointer-events-none' : ''}`}>
             {renderCurrentStep()}
           </fieldset>
         </form>

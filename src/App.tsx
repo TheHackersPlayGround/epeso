@@ -27,6 +27,8 @@ import { DocumentsProvider } from './contexts/DocumentsContext'
 import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import { DILPProvider } from './contexts/DILPContext'
 import { TUPADProvider } from './contexts/TUPADContext'
+import { SLPProvider } from './contexts/SLPContext'
+import { CLPEPProvider } from './contexts/CLPEPContext'
 import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED, CLPEP_INTERVENTIONS_SEED } from './contexts/LivelihoodContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import './styles/App.css'
@@ -343,7 +345,11 @@ export default function App() {
               <ProgramActivitiesProvider>
                 <DILPProvider>
                   <TUPADProvider>
-                    <AppContent onLogout={handleLogout} />
+                    <SLPProvider>
+                      <CLPEPProvider>
+                        <AppContent onLogout={handleLogout} />
+                      </CLPEPProvider>
+                    </SLPProvider>
                   </TUPADProvider>
                 </DILPProvider>
               </ProgramActivitiesProvider>

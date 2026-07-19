@@ -119,6 +119,7 @@ export type LivelihoodBeneficiary = {
   // ── Address
   streetPurok?: string
   barangay?: string
+  barangayId?: number
   cityMunicipality?: string
   province?: string
   address?: string          // legacy combined address string

@@ -10,6 +10,8 @@ import { useCDSP } from '../../contexts/CDSPContext'
 import { useSPES } from '../../contexts/SPESContext'
 import { useDILP } from '../../contexts/DILPContext'
 import { useTUPAD } from '../../contexts/TUPADContext'
+import { useSLP } from '../../contexts/SLPContext'
+import { useCLPEP } from '../../contexts/CLPEPContext'
 
 interface ActivityLog {
   id: number
@@ -62,7 +64,7 @@ function getDaysRemaining(deletedAt: string): number {
 const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
 const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
 const logStatuses = ['All', 'Success', 'Failed']
-const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants', 'DILP Beneficiaries', 'TUPAD Beneficiaries']
+const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants', 'DILP Beneficiaries', 'TUPAD Beneficiaries', 'SLP Beneficiaries', 'CLPEP Beneficiaries']
 
 export default function ActivityLogsTab() {
   const { refreshProfiles: refreshGipProfiles } = useGIP()
@@ -70,6 +72,8 @@ export default function ActivityLogsTab() {
   const { refreshProfiles: refreshSpesProfiles } = useSPES()
   const { refreshProfiles: refreshDilpProfiles } = useDILP()
   const { refreshProfiles: refreshTupadProfiles } = useTUPAD()
+  const { refreshProfiles: refreshSlpProfiles } = useSLP()
+  const { refreshProfiles: refreshClpepProfiles } = useCLPEP()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logSearch,       setLogSearch]       = useState('')
@@ -150,6 +154,8 @@ export default function ActivityLogsTab() {
     if (recordType === 'spesApplicant') await refreshSpesProfiles()
     if (recordType === 'dilpApplicant') await refreshDilpProfiles()
     if (recordType === 'tupadApplicant') await refreshTupadProfiles()
+    if (recordType === 'slpApplicant') await refreshSlpProfiles()
+    if (recordType === 'clpepApplicant') await refreshClpepProfiles()
   }
 
   const handleRestoreItem = (item: RecycleBinItem) => {

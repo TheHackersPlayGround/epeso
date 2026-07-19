@@ -66,7 +66,7 @@ const SECTION_ADDRESS: TemplateSection = {
   optionalArgb: 'FFFDF1C1',
   columns: [
     { header: 'Province', width: 22, example: 'Misamis Occidental', required: true },
-    { header: 'Municipality/City', width: 20, example: 'Tangub City', required: true },
+    { header: 'Municipality / City', width: 20, example: 'Tangub City', required: true },
     { header: 'Barangay', width: 18, example: 'Poblacion', required: true },
     { header: 'Street / Purok / Zone', width: 18, example: 'Purok 1' },
   ],
@@ -89,7 +89,7 @@ const SECTION_CHILD_LABOR: TemplateSection = {
 }
 
 const SECTION_GUARDIAN: TemplateSection = {
-  label: 'IV. PARENT / GUARDIAN',
+  label: 'IV. PARENT / GUARDIAN INFORMATION',
   fillArgb: 'FFF1C40F',
   requiredArgb: 'FFF5D478',
   optionalArgb: 'FFFDF1C1',
@@ -317,7 +317,7 @@ async function resolveAddress(
 ): Promise<{ barangayId: number }> {
   const missing: string[] = []
   if (!provinceName) missing.push('Province')
-  if (!cityName) missing.push('Municipality/City')
+  if (!cityName) missing.push('Municipality / City')
   if (!barangayName) missing.push('Barangay')
   if (missing.length) throw new Error(`Address is incomplete — missing: ${missing.join(', ')}.`)
 
@@ -351,7 +351,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
 
   const address = await resolveAddress(
     get(row, 'Province'),
-    get(row, 'Municipality/City'),
+    get(row, 'Municipality / City'),
     get(row, 'Barangay'),
     caches,
   )

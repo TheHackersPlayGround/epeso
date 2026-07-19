@@ -1,12 +1,18 @@
-// Bulk applicant import for GIP.
+// Bulk applicant import for TUPAD.
 //
 // Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the GIP Profile
-//      form section by section, matching the CDSP importer's look.
+//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the TUPAD Profile
+//      form section by section, matching the look of the CDSP/SLP/CLPEP/Skills
+//      Training/DILP import templates: a merged, colored section-label header
+//      row (row 1) above the individual field headers (row 2), with enum
+//      fields rendered as in-cell dropdowns.
 //   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (province -> city -> barangay, required for GIP since
+//      locationService (cascade: province -> city -> barangay, required since
 //      beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      gipService.createProfile.
+//      tupadService.createProfile.
+//
+// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
+// ExcelJS -- same split as the other modules' importers.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -16,15 +22,10 @@ import {
   searchBarangaysByCity,
   type LocationOption,
 } from '../../services/locationService'
-import { createProfile } from '../../services/gipService'
-import {
-  CLASSIFICATION_OPTIONS,
-  CIVIL_STATUS_OPTIONS,
-  EDUCATION_OPTIONS,
-  educationFieldFlags,
-} from './GIPProfileForm'
+import { createProfile } from '../../services/tupadService'
 
 const SEX_OPTIONS = ['Male', 'Female']
+const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
 
 // ─── Template definition (grouped by form section) ───────────────────────────
 
@@ -53,16 +54,16 @@ const SECTION_PERSONAL: TemplateSection = {
     { header: 'Last Name', width: 18, example: 'Dela Cruz', required: true },
     { header: 'First Name', width: 18, example: 'Juan', required: true },
     { header: 'Middle Name', width: 16, example: 'Santos' },
+    { header: 'Extension Name', width: 14, example: '' },
     { header: 'Sex', width: 10, example: 'Male', required: true, options: SEX_OPTIONS },
-    { header: 'Birthdate (MM/DD/YYYY)', width: 20, example: '05/20/2002', required: true },
+    { header: 'Birthdate (MM/DD/YYYY)', width: 20, example: '05/20/1996', required: true },
     { header: 'Civil Status', width: 14, example: 'Single', required: true, options: CIVIL_STATUS_OPTIONS },
     { header: 'Contact Number', width: 16, example: '09171234567' },
-    { header: 'Email', width: 22, example: 'juan@example.com' },
   ],
 }
 
 const SECTION_ADDRESS: TemplateSection = {
-  label: 'II. ADDRESS',
+  label: 'II. ADDRESS INFORMATION',
   fillArgb: 'FFF1C40F',
   requiredArgb: 'FFF5D478',
   optionalArgb: 'FFFDF1C1',
@@ -70,38 +71,12 @@ const SECTION_ADDRESS: TemplateSection = {
     { header: 'Province', width: 22, example: 'Misamis Occidental', required: true },
     { header: 'City / Municipality', width: 20, example: 'Tangub City', required: true },
     { header: 'Barangay', width: 18, example: 'Santo Niño', required: true },
-    { header: 'Street / Purok #', width: 18, example: 'Purok 3' },
-  ],
-}
-
-const SECTION_CLASSIFICATION: TemplateSection = {
-  label: 'III. CLASSIFICATION',
-  fillArgb: 'FF2980B9',
-  requiredArgb: 'FF5B9BD5',
-  optionalArgb: 'FF9DC3E6',
-  columns: [
-    { header: 'Classification (comma-separated)', width: 40, example: 'Fresh Graduate' },
-    { header: 'Classification, if Other', width: 24, example: '' },
-  ],
-}
-
-const SECTION_EDUCATION: TemplateSection = {
-  label: 'IV. EDUCATIONAL BACKGROUND',
-  fillArgb: 'FFF1C40F',
-  requiredArgb: 'FFF5D478',
-  optionalArgb: 'FFFDF1C1',
-  columns: [
-    { header: 'Highest Educational Attainment', width: 28, example: 'College Graduate', options: EDUCATION_OPTIONS },
-    { header: 'School / University', width: 24, example: 'Tangub City College' },
-    { header: 'Strand', width: 18, example: '' },
-    { header: 'Course / Degree', width: 22, example: 'BS Public Administration' },
-    { header: 'Year Level', width: 16, example: '' },
-    { header: 'Year Graduated', width: 16, example: '2024' },
+    { header: 'Street / Purok', width: 18, example: 'Purok 3' },
   ],
 }
 
 const SECTION_OFFICE: TemplateSection = {
-  label: 'V. FOR PESO OFFICE ONLY',
+  label: 'III. PESO OFFICE ONLY',
   fillArgb: 'FF64748B',
   requiredArgb: 'FF94A3B8',
   optionalArgb: 'FFCBD5E1',
@@ -112,12 +87,11 @@ const SECTION_OFFICE: TemplateSection = {
   ],
 }
 
-function buildSections(): TemplateSection[] {
-  return [SECTION_PERSONAL, SECTION_ADDRESS, SECTION_CLASSIFICATION, SECTION_EDUCATION, SECTION_OFFICE]
-}
+const SECTIONS: TemplateSection[] = [SECTION_PERSONAL, SECTION_ADDRESS, SECTION_OFFICE]
+const COLUMNS = SECTIONS.flatMap((s) => s.columns)
 
 const TEMPLATE_VALIDATION_ROWS = 200
-const FIRST_DATA_ROW = 3 // row 1 = section labels, row 2 = field headers.
+const FIRST_DATA_ROW = 3
 
 const MAX_VALIDATION_ERROR_LEN = 200
 function validationErrorMessage(options: string[]): string {
@@ -126,13 +100,10 @@ function validationErrorMessage(options: string[]): string {
 }
 
 export async function downloadImportTemplate(): Promise<void> {
-  const sections = buildSections()
-  const columns = sections.flatMap((s) => s.columns)
-
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Applicants')
 
-  ws.columns = columns.map((c) => ({ width: c.width, style: { numFmt: '@' } }))
+  ws.columns = COLUMNS.map((c) => ({ width: c.width, style: { numFmt: '@' } }))
 
   const border = {
     top: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
@@ -142,7 +113,7 @@ export async function downloadImportTemplate(): Promise<void> {
   }
 
   let startCol = 1
-  for (const section of sections) {
+  for (const section of SECTIONS) {
     const endCol = startCol + section.columns.length - 1
     for (let c = startCol; c <= endCol; c++) {
       const cell = ws.getCell(1, c)
@@ -158,7 +129,7 @@ export async function downloadImportTemplate(): Promise<void> {
   ws.getRow(1).height = 26
 
   let colIdx2 = 0
-  for (const section of sections) {
+  for (const section of SECTIONS) {
     for (const col of section.columns) {
       const cell = ws.getCell(2, colIdx2 + 1)
       cell.value = col.required ? `${col.header} *` : col.header
@@ -171,27 +142,25 @@ export async function downloadImportTemplate(): Promise<void> {
   }
   ws.getRow(2).height = 32
 
-  const exampleRow = ws.addRow(columns.map((c) => c.example))
+  const exampleRow = ws.addRow(COLUMNS.map((c) => c.example))
   exampleRow.eachCell((cell) => {
     cell.font = { italic: true, color: { argb: 'FF94A3B8' } }
   })
 
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   const lastRow = FIRST_DATA_ROW + TEMPLATE_VALIDATION_ROWS - 1
-  const optionColumns = columns.filter((c) => c.options && c.options.length > 0)
+  const optionColumns = COLUMNS.filter((c) => c.options && c.options.length > 0)
   const listSheet = optionColumns.length > 0 ? wb.addWorksheet('Lists', { state: 'veryHidden' }) : null
 
-  columns.forEach((col, idx) => {
+  COLUMNS.forEach((col, idx) => {
     if (!col.options || col.options.length === 0 || !listSheet) return
     const letter = ws.getColumn(idx + 1).letter
-
     const listColIdx = optionColumns.indexOf(col) + 1
     const listColLetter = listSheet.getColumn(listColIdx).letter
     col.options.forEach((opt, i) => {
       listSheet.getCell(i + 1, listColIdx).value = opt
     })
     const formulae = [`'Lists'!$${listColLetter}$1:$${listColLetter}$${col.options.length}`]
-
     for (let r = FIRST_DATA_ROW; r <= lastRow; r++) {
       ws.getCell(`${letter}${r}`).dataValidation = {
         type: 'list',
@@ -212,7 +181,7 @@ export async function downloadImportTemplate(): Promise<void> {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = 'GIP_Applicants_Template.xlsx'
+  link.download = 'TUPAD_Beneficiaries_Template.xlsx'
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -228,9 +197,6 @@ function pickEnum(value: string, options: string[]): string {
   return options.find((o) => norm(o) === n) ?? ''
 }
 
-// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
-// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
-// rather than letting the Date constructor silently roll it over.
 function toIsoDate(v: string): string {
   const s = v.trim()
   if (!s) return ''
@@ -258,7 +224,7 @@ function get(row: Row, header: string): string {
   return (row[norm(header)] ?? '').trim()
 }
 
-// ─── Address resolution (required for GIP: beneficiaries.barangay_id is NOT NULL) ─
+// ─── Address resolution (required: beneficiaries.barangay_id is NOT NULL) ────
 
 type ResolveCaches = {
   province: Map<string, LocationOption | null>
@@ -337,31 +303,11 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
   const birthdateRaw = get(row, 'Birthdate (MM/DD/YYYY)')
   if (!birthdateRaw) throw new Error('Birthdate is required.')
   const birthdate = toIsoDate(birthdateRaw)
-  if (!birthdate) throw new Error(`Birthdate "${birthdateRaw}" is not a valid date — use MM/DD/YYYY format (e.g. 05/20/2002).`)
+  if (!birthdate) throw new Error(`Birthdate "${birthdateRaw}" is not a valid date — use MM/DD/YYYY format (e.g. 05/20/1996).`)
 
   const civilStatusRaw = get(row, 'Civil Status')
   const civilStatus = pickEnum(civilStatusRaw, CIVIL_STATUS_OPTIONS)
   if (!civilStatus) throw new Error(`Civil Status is required and must be one of: ${CIVIL_STATUS_OPTIONS.join(', ')}.`)
-
-  const highestEducation = pickEnum(get(row, 'Highest Educational Attainment'), EDUCATION_OPTIONS)
-
-  const strand = get(row, 'Strand')
-  const course = get(row, 'Course / Degree')
-  const yearLevel = get(row, 'Year Level')
-  const yearGraduated = get(row, 'Year Graduated')
-  const eduFlags = educationFieldFlags(highestEducation)
-  if (strand && !eduFlags.showStrand) {
-    throw new Error(`Strand only applies to Senior High School (Level or Graduate) — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
-  if (course && !eduFlags.showCourse) {
-    throw new Error(`Course / Degree only applies to College, Master's, or Doctoral entries — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
-  if (yearLevel && !eduFlags.showYearLevel) {
-    throw new Error(`Year Level doesn't apply to "${highestEducation}" — remove it, or change Highest Educational Attainment to an Elementary/High School/Senior High School/College Level.`)
-  }
-  if (yearGraduated && !eduFlags.showYearGraduated) {
-    throw new Error(`Year Graduated only applies to a "Graduate" attainment (or Vocational / Technical) — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
 
   const address = await resolveAddress(
     get(row, 'Province'),
@@ -370,31 +316,18 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     caches,
   )
 
-  const classification = get(row, 'Classification (comma-separated)')
-    .split(',')
-    .map((c) => pickEnum(c, CLASSIFICATION_OPTIONS))
-    .filter(Boolean)
-
   return {
     firstName,
     lastName,
     middleName: get(row, 'Middle Name'),
+    nameExtension: get(row, 'Extension Name'),
     sex,
     birthdate,
     civilStatus,
     contactNumber: get(row, 'Contact Number'),
-    email: get(row, 'Email'),
-    streetPurok: get(row, 'Street / Purok #'),
+    streetPurok: get(row, 'Street / Purok'),
     barangayId: address.barangayId,
-    classification,
-    classificationOther: get(row, 'Classification, if Other'),
-    highestEducation,
-    schoolName: get(row, 'School / University'),
-    strand,
-    course,
-    yearLevel,
-    yearGraduated,
-    dateApplicationReceived: toIsoDate(get(row, 'Date Applied (MM/DD/YYYY)')),
+    dateApplied: toIsoDate(get(row, 'Date Applied (MM/DD/YYYY)')),
     receivedBy: get(row, 'Received By'),
     remarks: get(row, 'Remarks'),
   }
@@ -416,7 +349,7 @@ function isExampleRow(row: Row): boolean {
   return norm(get(row, 'Last Name')) === EXAMPLE_SURNAME && norm(get(row, 'First Name')) === EXAMPLE_FIRST
 }
 
-export async function importGipApplicants(
+export async function importTupadApplicants(
   file: File,
   onProgress?: (done: number, total: number) => void,
 ): Promise<ImportResult> {

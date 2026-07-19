@@ -3,32 +3,160 @@ import { fmtDate } from '../../utils/formatDate'
 import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
-  Upload, Download, AlertCircle, MoreHorizontal, Users,
+  Download, Upload, AlertCircle, MoreHorizontal, Users,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import Swal from 'sweetalert2'
 import { canManage } from '../../utils/permissions'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { SkillsTrainingProfile } from '../../contexts/SkillsTrainingContext'
+import type { SkillsTrainingProfile, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
+import * as skillsTrainingService from '../../services/skillsTrainingService'
+import { downloadImportTemplate, importSkillsTrainingApplicants, type ImportResult } from './skillsTrainingImport'
 import ConfirmModal from '../shared/ConfirmModal'
 import SkillsTrainingProfileForm, {
-  ViewProfilePanel, emptyForm, BRAND,
-  BATCH_OPTIONS, CLASSIFICATION_OPTIONS, QUALIFICATION_OPTIONS,
-  PURPOSE_OPTIONS, CIVIL_STATUS_OPTIONS, StatusBadge,
+  ViewProfilePanel, BRAND,
+  CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, StatusBadge,
 } from './SkillsTrainingProfileForm'
 
 interface SkillsTrainingViewProps {
   onBack: () => void
 }
 
-export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
-  const { activities } = useProgramActivities()
-  const skillsTrainings = activities.filter((a): a is ProgramActivity => a.program === 'Skills Training')
-  const plannedTrainings = skillsTrainings.filter(t => t.status === 'Planned')
+function errMsg(e: unknown, fallback: string) {
+  return (e as { message?: string })?.message ?? fallback
+}
 
-  const { profiles, setProfiles } = useSkillsTraining()
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+function SkillsTrainingImportModal({
+  qualifications, purposes, onClose, onImported,
+}: {
+  qualifications: string[]
+  purposes: string[]
+  onClose: () => void
+  onImported: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = await importSkillsTrainingApplicants(file, qualifications, purposes, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import Skills Training Profiles</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <ImportResultView result={result} />
+          ) : (
+            <>
+              <button onClick={() => { void downloadImportTemplate(qualifications, purposes) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ImportResultView({ result }: { result: ImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
+  const { profiles, activities, batches, qualifications, purposes, refreshProfiles, refreshActivities } = useSkillsTraining()
+  const plannedTrainings = activities.filter(t => t.status === 'Planned')
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<SkillsTrainingProfile | null>(null)
@@ -37,8 +165,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [assigningProfile, setAssigningProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assignSearch, setAssignSearch] = useState('')
   const [assignStep, setAssignStep] = useState<1 | 2>(1)
-  const [selectedTraining, setSelectedTraining] = useState<ProgramActivity | null>(null)
+  const [selectedTraining, setSelectedTraining] = useState<SkillsTrainingActivity | null>(null)
   const [assignViewOnly, setAssignViewOnly] = useState(false)
+  const [isAssigning, setIsAssigning] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -50,9 +179,6 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<{ lastName: string; firstName: string; batchNo: string; status: string; valid: boolean }[]>([])
-  const [importAllRows, setImportAllRows] = useState<Record<string, string>[]>([])
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
@@ -60,15 +186,18 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
+  const qualificationOptions = qualifications.filter(q => q.name !== 'Other').map(q => q.name)
+  const purposeOptions = purposes.filter(p => p.name !== 'Other').map(p => p.name)
+
   const availableFilters = [
-    { id: 'classification',     label: 'Classification',       options: [...CLASSIFICATION_OPTIONS, 'Others'] },
-    { id: 'desiredQualification', label: 'Desired Qualification', options: [...QUALIFICATION_OPTIONS, 'Others'] },
-    { id: 'purposeOfTraining',  label: 'Purpose of Training',  options: [...PURPOSE_OPTIONS, 'Others'] },
-    { id: 'status',             label: 'Status',               options: ['Accepted', 'Waitlisted'] },
-    { id: 'batchNo',            label: 'Training Batch No.',   options: BATCH_OPTIONS },
-    { id: 'sex',                label: 'Sex',                  options: ['Male', 'Female'] },
-    { id: 'age',                label: 'Age',                  options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
-    { id: 'civilStatus',        label: 'Civil Status',         options: CIVIL_STATUS_OPTIONS },
+    { id: 'classification',      label: 'Classification',       options: [...CLASSIFICATION_OPTIONS, 'Others'] },
+    { id: 'desiredQualification', label: 'Desired Qualification', options: [...qualificationOptions, 'Others'] },
+    { id: 'purposeOfTraining',   label: 'Purpose of Training',  options: [...purposeOptions, 'Others'] },
+    { id: 'status',              label: 'Status',               options: ['Accepted', 'Waitlisted'] },
+    { id: 'batch',               label: 'Training Batch',       options: batches.map(b => b.batchName) },
+    { id: 'sex',                 label: 'Sex',                  options: ['Male', 'Female'] },
+    { id: 'age',                 label: 'Age',                  options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
+    { id: 'civilStatus',         label: 'Civil Status',         options: CIVIL_STATUS_OPTIONS },
   ]
 
   const handleAddFilter = (filterId: string) => {
@@ -85,23 +214,29 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     setCurrentPage(1)
   }
 
+  const batchNameForProfile = (p: SkillsTrainingProfile): string => {
+    if (!p.assignedTrainingId) return ''
+    const activity = activities.find(a => a.id === p.assignedTrainingId)
+    return activity?.service ?? ''
+  }
+
   const filteredProfiles = profiles.filter(p => {
     const fullName = `${p.firstName} ${p.lastName} ${p.middleName}`.toLowerCase()
     const matchesSearch = searchQuery === '' ||
       fullName.includes(searchQuery.toLowerCase()) ||
       p.classification.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.desiredQualification.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.trainingBatchNo.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.assignedTrainingTitle ?? '').toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesFilters = activeFilters.every(filterId => {
       const val = filterValues[filterId]
       if (!val) return true
       switch (filterId) {
         case 'classification': return p.classification.includes(val) || (val === 'Others' && p.classificationOther.filter(Boolean).length > 0)
-        case 'desiredQualification': return p.desiredQualification.includes(val) || (val === 'Others' && p.qualificationOther.length > 0)
-        case 'purposeOfTraining': return p.purposeOfTraining.includes(val) || (val === 'Others' && p.purposeOther.length > 0)
+        case 'desiredQualification': return p.desiredQualification.includes(val) || (val === 'Others' && p.qualificationOther.filter(Boolean).length > 0)
+        case 'purposeOfTraining': return p.purposeOfTraining.includes(val) || (val === 'Others' && p.purposeOther.filter(Boolean).length > 0)
         case 'status': return p.status === val
-        case 'batchNo': return p.trainingBatchNo === val
+        case 'batch': return batchNameForProfile(p) === val
         case 'sex': return p.sex === val
         case 'civilStatus': return p.civilStatus === val
         case 'age': {
@@ -134,27 +269,19 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const recordStart = sortedProfiles.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, sortedProfiles.length)
 
-  const getTrainingName = (id: number | null): string => {
-    if (!id) return '—'
-    return skillsTrainings.find(a => a.id === id)?.title ?? '—'
-  }
-  const getTrainingStatus = (id: number | null): string | null => {
-    if (!id) return null
-    return skillsTrainings.find(a => a.id === id)?.status ?? null
-  }
   const trainingStatusBadge = (s: string) =>
-    s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+    s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : s === 'Completed' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-600'
 
   const exportRows = (rows: SkillsTrainingProfile[]) => rows.map(p => ({
     'Last Name': p.lastName, 'First Name': p.firstName, 'Middle Name': p.middleName,
     'Birthdate': p.birthdate, 'Age': p.age, 'Sex': p.sex, 'Civil Status': p.civilStatus,
-    'Address': p.address, 'Contact #': p.contactNumber,
+    'Address': [p.streetPurok, p.barangay, p.cityMunicipality, p.province].filter(Boolean).join(', '),
+    'Contact #': p.contactNumber,
     'Classification': p.classification.join(', '),
     'Desired Qualification': p.desiredQualification.join(', '),
     'Purpose of Training': p.purposeOfTraining.join(', '),
-    'Batch No.': p.trainingBatchNo, 'Status': p.status,
-    'Assessment Result': p.assessmentResult,
-    'Date Applied': p.dateApplicationReceived, 'Remarks': p.remarks,
+    'Assigned Training': p.assignedTrainingTitle, 'Status': p.status,
+    'Date Applied': p.dateApplicationReceived,
   }))
 
   const exportToExcel = () => {
@@ -173,90 +300,84 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     setIsExportDropdownOpen(false)
   }
 
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target?.result, { type: 'binary' })
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]) as Record<string, string>[]
-        setImportAllRows(rows)
-        setImportPreview(rows.slice(0, 5).map(r => ({
-          lastName: r['Last Name'] || '',
-          firstName: r['First Name'] || '',
-          batchNo: r['Batch No.'] || '',
-          status: r['Status'] || '',
-          valid: !!(r['Last Name'] && r['First Name']),
-        })))
-      } catch { alert('Error reading file. Please use the correct format.') }
-    }
-    reader.readAsBinaryString(file)
-  }
-
-  const closeImportModal = () => {
-    setIsImportModalOpen(false); setUploadedFile(null); setImportPreview([]); setImportAllRows([])
-  }
-
-  const handleImport = () => {
-    const valid = importAllRows.filter(r => r['Last Name'] && r['First Name'])
-    const newProfiles: SkillsTrainingProfile[] = valid.map((r, i) => ({
-      ...emptyForm, id: Date.now() + i,
-      lastName: r['Last Name'] || '', firstName: r['First Name'] || '',
-      middleName: r['Middle Name'] || '', address: r['Address'] || '',
-      contactNumber: r['Contact #'] || '', trainingBatchNo: r['Batch No.'] || '',
-      status: (['Accepted', 'Waitlisted'].includes(r['Status']) ? r['Status'] : 'Waitlisted') as SkillsTrainingProfile['status'],
-      dateApplicationReceived: r['Date Applied'] || '',
-      assessmentResult: r['Assessment Result'] || '', remarks: r['Remarks'] || '',
-    }))
-    setProfiles(prev => [...newProfiles, ...prev])
-    closeImportModal()
-    setSuccessModal({ open: true, message: `Successfully imported ${newProfiles.length} profile(s)!` })
-  }
-
   const closeAssignModal = () => {
     setAssigningProfile(null); setAssignSearch(''); setAssignStep(1); setSelectedTraining(null); setAssignViewOnly(false)
   }
 
-  const handleAssignTraining = (trainingId: number) => {
-    if (!assigningProfile) return
-    setProfiles(prev => prev.map(p => p.id === assigningProfile.id ? { ...p, assignedTrainingId: trainingId } : p))
-    closeAssignModal()
-    setSuccessModal({ open: true, message: 'Training activity assigned successfully.' })
+  const handleAssignTraining = async (trainingId: number) => {
+    if (!assigningProfile || isAssigning) return
+    setIsAssigning(true)
+    try {
+      await skillsTrainingService.addParticipant({ activityId: trainingId, beneficiaryServiceId: assigningProfile.beneficiaryServiceId })
+      closeAssignModal()
+      await Promise.all([refreshProfiles(), refreshActivities()])
+      setSuccessModal({ open: true, message: 'Training activity assigned successfully.' })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign training.'), confirmButtonColor: BRAND })
+    } finally {
+      setIsAssigning(false)
+    }
   }
-  const handleUnassignTraining = () => {
-    if (!assigningProfile) return
-    setProfiles(prev => prev.map(p => p.id === assigningProfile.id ? { ...p, assignedTrainingId: null } : p))
-    closeAssignModal()
-    setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
+  const handleUnassignTraining = async () => {
+    if (!assigningProfile || !assigningProfile.assignedTrainingId || isAssigning) return
+    setIsAssigning(true)
+    try {
+      await skillsTrainingService.removeParticipant({ activityId: assigningProfile.assignedTrainingId, beneficiaryServiceId: assigningProfile.beneficiaryServiceId })
+      closeAssignModal()
+      await Promise.all([refreshProfiles(), refreshActivities()])
+      setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: BRAND })
+    } finally {
+      setIsAssigning(false)
+    }
   }
 
-  const handleDelete = (id: number) => {
-    setProfiles(prev => prev.filter(p => p.id !== id))
-    setDeleteConfirm({ open: false, id: null })
-    setSuccessModal({ open: true, message: 'Profile has been deleted.' })
+  const handleDelete = async (id: number) => {
+    try {
+      await skillsTrainingService.deleteProfile(id)
+      setDeleteConfirm({ open: false, id: null })
+      await refreshProfiles()
+      setSuccessModal({ open: true, message: 'Profile has been deleted.' })
+    } catch (e) {
+      setDeleteConfirm({ open: false, id: null })
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: BRAND })
+    }
   }
 
   if (isFormOpen) {
     return (
       <SkillsTrainingProfileForm
+        qualifications={qualifications}
+        purposes={purposes}
         onClose={() => setIsFormOpen(false)}
-        onSave={data => {
-          setProfiles(prev => [{ ...data, id: Date.now() }, ...prev])
-          setIsFormOpen(false)
-          setSuccessModal({ open: true, message: 'Profile added successfully!' })
+        onSave={async data => {
+          try {
+            await skillsTrainingService.createProfile(data)
+            setIsFormOpen(false)
+            await refreshProfiles()
+            setSuccessModal({ open: true, message: 'Profile added successfully!' })
+          } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: BRAND })
+          }
         }}
       />
     )
   }
   if (editingProfile) {
-    const { id: _id, ...rest } = editingProfile
+    const { id, ...rest } = editingProfile
     return (
-      <SkillsTrainingProfileForm mode="edit" initialData={rest}
+      <SkillsTrainingProfileForm mode="edit" initialData={rest} qualifications={qualifications} purposes={purposes}
         onClose={() => setEditingProfile(null)}
-        onSave={data => {
-          setProfiles(prev => prev.map(p => p.id === editingProfile.id ? { ...data, id: editingProfile.id } : p))
-          setEditingProfile(null)
-          setSuccessModal({ open: true, message: 'Profile updated successfully!' })
+        onSave={async data => {
+          try {
+            await skillsTrainingService.updateProfile(id, data)
+            setEditingProfile(null)
+            await refreshProfiles()
+            setSuccessModal({ open: true, message: 'Profile updated successfully!' })
+          } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: BRAND })
+          }
         }}
       />
     )
@@ -283,11 +404,19 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
 
+      {isImportModalOpen && (
+        <SkillsTrainingImportModal
+          qualifications={qualificationOptions}
+          purposes={purposeOptions}
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={() => { refreshProfiles(); }}
+        />
+      )}
+
       {/* Assign Training Modal */}
       {assigningProfile && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <div>
                 <h3 className="text-gray-800 font-semibold">
@@ -305,7 +434,6 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               </div>
             </div>
 
-            {/* Step 1 — pick a training */}
             {assignStep === 1 && (
               <>
                 {assigningProfile.status !== 'Accepted' && (
@@ -320,9 +448,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
-                      type="text"
-                      placeholder="Search trainings..."
-                      value={assignSearch}
+                      type="text" placeholder="Search trainings..." value={assignSearch}
                       onChange={e => setAssignSearch(e.target.value)}
                       className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue"
                     />
@@ -350,9 +476,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                               {isAssigned && <span className="text-xs px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full">Currently assigned</span>}
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">{training.service}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {training.location}{training.startDate && training.endDate ? ` · ${training.startDate} – ${training.endDate}` : training.date ? ` · ${training.date}` : ''}
-                            </p>
+                            <p className="text-xs text-gray-500 mt-1">{training.location}{training.date ? ` · ${training.date}` : ''}</p>
                           </div>
                           <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold bg-yellow-100 text-yellow-700">Planned</span>
                         </div>
@@ -362,14 +486,13 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex flex-col gap-2">
                   {assigningProfile.assignedTrainingId && (
-                    <button onClick={handleUnassignTraining} disabled={!canManage('skills')} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Remove Assigned Activity</button>
+                    <button onClick={handleUnassignTraining} disabled={!canManage('skills') || isAssigning} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Remove Assigned Activity</button>
                   )}
                   <button onClick={closeAssignModal} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
                 </div>
               </>
             )}
 
-            {/* Step 2 — confirm */}
             {assignStep === 2 && selectedTraining && (
               <>
                 <div className="flex-1 overflow-y-auto p-6">
@@ -385,11 +508,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                       {selectedTraining.location && <div className="col-span-2"><span className="text-gray-400">Location: </span>{selectedTraining.location}</div>}
-                      {selectedTraining.startDate && <div><span className="text-gray-400">Start: </span>{selectedTraining.startDate}</div>}
-                      {selectedTraining.endDate && <div><span className="text-gray-400">End: </span>{selectedTraining.endDate}</div>}
-                      {!selectedTraining.startDate && selectedTraining.date && <div><span className="text-gray-400">Date: </span>{selectedTraining.date}</div>}
-                      {selectedTraining.participants && <div><span className="text-gray-400">Slots: </span>{selectedTraining.participants}</div>}
-                      {selectedTraining.allowance && <div><span className="text-gray-400">Allowance: </span>₱{selectedTraining.allowance}/mo</div>}
+                      {selectedTraining.date && <div><span className="text-gray-400">Date: </span>{selectedTraining.date}</div>}
+                      {selectedTraining.participants != null && <div><span className="text-gray-400">Slots: </span>{selectedTraining.assignedCount}/{selectedTraining.participants}</div>}
                       {selectedTraining.facilitator && <div className="col-span-2"><span className="text-gray-400">Facilitator: </span>{selectedTraining.facilitator}</div>}
                       {selectedTraining.description && <div className="col-span-2"><span className="text-gray-400">Description: </span>{selectedTraining.description}</div>}
                     </div>
@@ -408,7 +528,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       <button onClick={() => { setAssignStep(1); setSelectedTraining(null) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
                       <button
                         onClick={() => handleAssignTraining(selectedTraining.id)}
-                        disabled={!canManage('skills')}
+                        disabled={!canManage('skills') || isAssigning}
                         className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                       >
                         {assigningProfile.assignedTrainingId ? 'Re-assign' : 'Assign'}
@@ -418,48 +538,6 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 </div>
               </>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <p className="text-gray-800 font-semibold">Import Skills Training Profiles</p>
-              <button onClick={closeImportModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <label className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-[#8B5CF6] hover:bg-purple-50 transition-colors"
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}>
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600">{uploadedFile ? uploadedFile.name : 'Click to upload or drag and drop'}</p>
-                <p className="text-xs text-gray-400 mt-1">.xlsx or .csv files</p>
-                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
-              </label>
-              {importPreview.length > 0 && (
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Preview ({importPreview.length} records found):</p>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                    {importPreview.map((row, i) => (
-                      <div key={i} className={`px-3 py-2 flex items-center justify-between text-xs ${row.valid ? '' : 'bg-red-50'}`}>
-                        <span className="text-gray-700">{row.firstName} {row.lastName}</span>
-                        <span className="text-gray-500">{row.batchNo || '—'}</span>
-                        {!row.valid && <span className="text-red-500 ml-2">Invalid</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
-              <button onClick={closeImportModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">Cancel</button>
-              <button onClick={handleImport} disabled={importPreview.filter(r => r.valid).length === 0 || !canManage('skills')} className="flex-1 py-2 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: BRAND }}>
-                Import {importPreview.filter(r => r.valid).length > 0 ? `(${importPreview.filter(r => r.valid).length})` : ''}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -509,7 +587,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
-                  placeholder="Search by name, classification, batch, or qualification..."
+                  placeholder="Search by name, classification, or qualification..."
                   value={searchQuery}
                   onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
                   className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
@@ -522,7 +600,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
                 >
                   <option value="" disabled>Sort By</option>
-          <option value="firstName_asc">First Name ASC</option>
+                  <option value="firstName_asc">First Name ASC</option>
                   <option value="firstName_desc">First Name DSC</option>
                   <option value="lastName_asc">Last Name ASC</option>
                   <option value="lastName_desc">Last Name DSC</option>
@@ -629,9 +707,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       <td className="px-4 py-3">
                         {profile.assignedTrainingId ? (
                           <div>
-                            <p className="text-gray-800 line-clamp-1">{getTrainingName(profile.assignedTrainingId)}</p>
+                            <p className="text-gray-800 line-clamp-1">{profile.assignedTrainingTitle || '—'}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              {(() => { const ts = getTrainingStatus(profile.assignedTrainingId); return ts ? <span className={`px-2 py-0.5 rounded-full text-xs ${trainingStatusBadge(ts)}`}>{ts}</span> : null })()}
+                              {profile.assignedTrainingStatus && <span className={`px-2 py-0.5 rounded-full text-xs ${trainingStatusBadge(profile.assignedTrainingStatus)}`}>{profile.assignedTrainingStatus}</span>}
                             </div>
                           </div>
                         ) : (
@@ -701,7 +779,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               {(() => {
                 const hasActive = !!profile.assignedTrainingId
                 if (hasActive) {
-                  const current = skillsTrainings.find(t => t.id === profile.assignedTrainingId) ?? null
+                  const current = activities.find(t => t.id === profile.assignedTrainingId) ?? null
                   return (
                     <button onClick={() => { setAssigningProfile(profile); setSelectedTraining(current); setAssignStep(2); setAssignViewOnly(true); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50">View Assigned Training</button>
                   )

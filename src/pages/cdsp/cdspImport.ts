@@ -72,7 +72,7 @@ const SECTION_ADDRESS: TemplateSection = {
   optionalArgb: 'FFFDF1C1',
   columns: [
     { header: 'Province', width: 22, example: 'Misamis Occidental', required: true },
-    { header: 'Municipality/City', width: 20, example: 'Tangub City', required: true },
+    { header: 'City / Municipality', width: 20, example: 'Tangub City', required: true },
     { header: 'Barangay', width: 18, example: 'Santo Niño', required: true },
     { header: 'Street / Purok #', width: 18, example: 'Purok 3' },
   ],
@@ -85,6 +85,7 @@ const SECTION_CLASSIFICATION: TemplateSection = {
   optionalArgb: 'FF9DC3E6',
   columns: [
     { header: 'Classification (comma-separated)', width: 40, example: 'Fresh Graduate' },
+    { header: 'Classification, if Other', width: 24, example: '' },
   ],
 }
 
@@ -95,6 +96,7 @@ const SECTION_EDUCATION: TemplateSection = {
   optionalArgb: 'FFFDF1C1',
   columns: [
     { header: 'Highest Educational Attainment', width: 28, example: 'College Graduate', required: true, options: EDUCATION_OPTIONS },
+    { header: 'School / University', width: 24, example: '' },
     { header: 'Year Level', width: 16, example: '' },
     { header: 'Strand', width: 18, example: '' },
     { header: 'Course / Program', width: 22, example: 'BS Information Technology' },
@@ -384,7 +386,7 @@ async function resolveAddress(
 ): Promise<{ barangayId: number }> {
   const missing: string[] = []
   if (!provinceName) missing.push('Province')
-  if (!cityName) missing.push('Municipality/City')
+  if (!cityName) missing.push('City / Municipality')
   if (!barangayName) missing.push('Barangay')
   if (missing.length) throw new Error(`Address is incomplete — missing: ${missing.join(', ')}.`)
 
@@ -449,7 +451,7 @@ async function rowToPayload(row: Row, services: string[], caches: ResolveCaches)
 
   const address = await resolveAddress(
     get(row, 'Province'),
-    get(row, 'Municipality/City'),
+    get(row, 'City / Municipality'),
     get(row, 'Barangay'),
     caches,
   )
@@ -471,7 +473,9 @@ async function rowToPayload(row: Row, services: string[], caches: ResolveCaches)
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,
     classification,
+    classificationOther: get(row, 'Classification, if Other'),
     highestEducation,
+    schoolName: get(row, 'School / University'),
     course,
     strand,
     yearLevel,

@@ -12,6 +12,7 @@ import { useDILP } from '../../contexts/DILPContext'
 import { useTUPAD } from '../../contexts/TUPADContext'
 import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
+import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 
 interface ActivityLog {
   id: number
@@ -74,6 +75,7 @@ export default function ActivityLogsTab() {
   const { refreshProfiles: refreshTupadProfiles } = useTUPAD()
   const { refreshProfiles: refreshSlpProfiles } = useSLP()
   const { refreshProfiles: refreshClpepProfiles } = useCLPEP()
+  const { refreshProfiles: refreshSkillsTrainingProfiles } = useSkillsTraining()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logSearch,       setLogSearch]       = useState('')
@@ -156,6 +158,7 @@ export default function ActivityLogsTab() {
     if (recordType === 'tupadApplicant') await refreshTupadProfiles()
     if (recordType === 'slpApplicant') await refreshSlpProfiles()
     if (recordType === 'clpepApplicant') await refreshClpepProfiles()
+    if (recordType === 'skillsTrainingApplicant') await refreshSkillsTrainingProfiles()
   }
 
   const handleRestoreItem = (item: RecycleBinItem) => {

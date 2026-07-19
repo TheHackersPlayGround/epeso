@@ -15,6 +15,8 @@ import type { TUPADApplicant, TUPADProject } from '../../contexts/TUPADContext'
 import * as tupadService from '../../services/tupadService'
 import DILPProfileForm, { EMPTY_DILP_RECORD } from './DILPProfileForm'
 import TUPADProfileForm, { EMPTY_TUPAD_RECORD } from './TUPADProfileForm'
+import { downloadImportTemplate as downloadDilpTemplate, importDilpApplicants, type ImportResult as DilpImportResult } from './dilpImport'
+import { downloadImportTemplate as downloadTupadTemplate, importTupadApplicants, type ImportResult as TupadImportResult } from './tupadImport'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,137 @@ function projectStatusClass(status: string) {
   if (status === 'Planned') return 'bg-yellow-100 text-yellow-700'
   if (status === 'Completed') return 'bg-blue-100 text-blue-700'
   return 'bg-gray-100 text-gray-500'
+}
+
+// ─── Import modal ──────────────────────────────────────────────────────────────
+
+type DileepImportResult = DilpImportResult | TupadImportResult
+
+function DileepImportModal({
+  isDILP, onClose, onImported,
+}: {
+  isDILP: boolean
+  onClose: () => void
+  onImported: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<DileepImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const programLabel = isDILP ? 'DILP' : 'TUPAD'
+
+  function pickFile(f: File | null) {
+    setFile(f)
+    setResult(null)
+    setError(null)
+  }
+
+  async function handleImport() {
+    if (!file || isImporting) return
+    setIsImporting(true)
+    setError(null)
+    setResult(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const res = isDILP
+        ? await importDilpApplicants(file, (done, total) => setProgress({ done, total }))
+        : await importTupadApplicants(file, (done, total) => setProgress({ done, total }))
+      setResult(res)
+      if (res.succeeded > 0) onImported()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
+    } finally {
+      setIsImporting(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import {programLabel} Beneficiaries</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          {result ? (
+            <DileepImportResultView result={result} />
+          ) : (
+            <>
+              <button onClick={() => { void (isDILP ? downloadDilpTemplate() : downloadTupadTemplate()) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
+                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={isImporting}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              {isImporting && progress && (
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {result ? (
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
+                {isImporting ? 'Importing…' : 'Import'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DileepImportResultView({ result }: { result: DileepImportResult }) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3">
+        <div className="flex-1 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-green-700">{result.succeeded}</p>
+          <p className="text-xs text-green-700">Imported</p>
+        </div>
+        <div className="flex-1 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-center">
+          <p className="text-2xl font-semibold text-red-700">{result.failed.length}</p>
+          <p className="text-xs text-red-700">Failed</p>
+        </div>
+      </div>
+
+      {result.total === 0 ? (
+        <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
+      ) : result.failed.length === 0 ? (
+        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+      ) : (
+        <div className="mt-1">
+          <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
+            {result.failed.map((f) => (
+              <li key={f.row} className="rounded border border-red-100 bg-red-50 px-2 py-1.5">
+                <span className="font-medium text-gray-700">Row {f.row} — {f.name}:</span>{' '}
+                <span className="text-red-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Assign Project Modal ─────────────────────────────────────────────────────
@@ -451,6 +584,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [perPage, setPerPage] = useState(10)
@@ -722,6 +856,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   }
 
   return (
+    <>
     <div className="flex flex-col gap-4">
       {/* Card 1 — Action buttons */}
       <div className="bg-white rounded-xl shadow-sm px-5 py-4 flex items-center gap-3">
@@ -735,6 +870,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
         </button>
 
         <button
+          onClick={() => setIsImportOpen(true)}
           disabled={!canManage('livelihood')}
           className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
         >
@@ -1089,6 +1225,14 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       })()}
 
     </div>
+    {isImportOpen && (
+      <DileepImportModal
+        isDILP={isDILP}
+        onClose={() => setIsImportOpen(false)}
+        onImported={() => { refreshProfiles(); }}
+      />
+    )}
+    </>
   )
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
 import {
@@ -8,15 +8,14 @@ import {
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
-import type { SkillsTrainingBatch } from '../../contexts/SkillsTrainingContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
+import type { SkillsTrainingBatch, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
+import * as skillsTrainingService from '../../services/skillsTrainingService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BRAND_BLUE = '#0077BE'
 
-const ACTIVITY_STATUS_COLORS: Record<ProgramActivity['status'], string> = {
+const ACTIVITY_STATUS_COLORS: Record<SkillsTrainingActivity['status'], string> = {
   Planned:   'bg-yellow-100 text-yellow-700',
   Ongoing:   'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
@@ -26,6 +25,22 @@ const ACTIVITY_STATUS_COLORS: Record<ProgramActivity['status'], string> = {
 const PARTICIPANT_STATUS_COLORS: Record<string, string> = {
   Accepted:   'bg-green-100 text-green-700',
   Waitlisted: 'bg-yellow-100 text-yellow-700',
+}
+
+function errMsg(e: unknown, fallback: string) {
+  return (e as { message?: string })?.message ?? fallback
+}
+
+interface ParticipantRecord {
+  id: number
+  beneficiaryServiceId: number
+  lastName: string
+  firstName: string
+  middleName: string
+  sex: string
+  contactNumber: string
+  status: string
+  attended: boolean | null
 }
 
 type STAction = '' | 'add_training' | 'add_batch' | 'view_trainings' | 'view_batches'
@@ -74,6 +89,7 @@ function TrainingForm({
 }) {
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
+  const selectedBatchName = batches.find(b => String(b.id) === form.selectedBatch)?.batchName ?? ''
 
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -89,7 +105,7 @@ function TrainingForm({
           <label className={labelCls}>Training Batch <span className="text-red-500">*</span></label>
           {isView ? (
             <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">
-              {form.selectedBatch || '—'}
+              {selectedBatchName || '—'}
             </div>
           ) : (
             <>
@@ -100,7 +116,7 @@ function TrainingForm({
               >
                 <option value="">Select Training Batch</option>
                 {batches.map(b => (
-                  <option key={b.id} value={b.batchName}>{b.batchName}</option>
+                  <option key={b.id} value={String(b.id)}>{b.batchName}</option>
                 ))}
               </select>
               {errors.selectedBatch && <p className="text-red-500 text-xs mt-1">{errors.selectedBatch}</p>}
@@ -208,7 +224,7 @@ function TrainingForm({
                 {isView ? 'Close' : 'Cancel'}
               </button>
               {!isView && onSave && (
-                <button onClick={onSave} disabled={!canManage('maintenance')}
+                <button onClick={onSave} disabled={!canManage('skills')}
                   className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                   {mode === 'add' ? 'Save Activity' : 'Save Changes'}
                 </button>
@@ -224,18 +240,19 @@ function TrainingForm({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SkillsTrainingMaintenanceForm() {
-  const { skillsTrainingBatches, setSkillsTrainingBatches, profiles } = useSkillsTraining()
-  const { activities, addActivity, updateActivity, deleteActivity } = useProgramActivities()
+  const { batches, activities, refreshBatches, refreshActivities } = useSkillsTraining()
 
   const [action, setAction] = useState<STAction>('')
 
   // — batch management
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<number | null>(null)
   const [newBatchName, setNewBatchName]         = useState('')
+  const [isSavingBatch, setIsSavingBatch]       = useState(false)
 
   // — add training form
   const [addForm, setAddForm]   = useState(blank)
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
+  const [isSaving, setIsSaving] = useState(false)
 
   // — view trainings
   const [trainingSearch, setTrainingSearch]             = useState('')
@@ -250,19 +267,19 @@ export default function SkillsTrainingMaintenanceForm() {
   const [trainingMenuId, setTrainingMenuId]             = useState<number | null>(null)
   const [trainingMenuPos, setTrainingMenuPos]           = useState<{ top: number; left: number } | null>(null)
   const [trainingSubView, setTrainingSubView]           = useState<TrainingSubView>('')
-  const [selectedTraining, setSelectedTraining]         = useState<ProgramActivity | null>(null)
+  const [selectedTraining, setSelectedTraining]         = useState<SkillsTrainingActivity | null>(null)
   const [editForm, setEditForm]                         = useState(blank)
+  const [activityParticipants, setActivityParticipants] = useState<ParticipantRecord[]>([])
+  const [loadingParticipants, setLoadingParticipants]   = useState(false)
   const [trainingStatusConfirm, setTrainingStatusConfirm] = useState<{
-    activity: ProgramActivity; nextStatus: TrainingStatus; label: string
+    activity: SkillsTrainingActivity; nextStatus: TrainingStatus; label: string
   } | null>(null)
   const [trainingDeleteConfirm, setTrainingDeleteConfirm] = useState<number | null>(null)
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const stActivities = activities.filter((a): a is ProgramActivity => a.program === 'Skills Training')
-
-  const statusRank = (s: string) => ({ Planned: 0, Open: 0, Ongoing: 1, Active: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
-  const filteredTrainings = stActivities.filter(a => {
+  const statusRank = (s: string) => ({ Planned: 0, Ongoing: 1, Completed: 2, Cancelled: 3 }[s] ?? 1)
+  const filteredTrainings = activities.filter(a => {
     const matchSearch = !trainingSearch ||
       a.title.toLowerCase().includes(trainingSearch.toLowerCase()) ||
       (a.service || '').toLowerCase().includes(trainingSearch.toLowerCase())
@@ -276,13 +293,37 @@ export default function SkillsTrainingMaintenanceForm() {
   const recordStart = filteredTrainings.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredTrainings.length)
 
-  const batchTotalPages = Math.max(1, Math.ceil(skillsTrainingBatches.length / batchPerPage))
+  const batchTotalPages = Math.max(1, Math.ceil(batches.length / batchPerPage))
   const batchSafePage = Math.min(batchPage, batchTotalPages)
-  const paginatedBatches = skillsTrainingBatches.slice((batchSafePage - 1) * batchPerPage, batchSafePage * batchPerPage)
-  const batchRecordStart = skillsTrainingBatches.length === 0 ? 0 : (batchSafePage - 1) * batchPerPage + 1
-  const batchRecordEnd = Math.min(batchSafePage * batchPerPage, skillsTrainingBatches.length)
+  const paginatedBatches = batches.slice((batchSafePage - 1) * batchPerPage, batchSafePage * batchPerPage)
+  const batchRecordStart = batches.length === 0 ? 0 : (batchSafePage - 1) * batchPerPage + 1
+  const batchRecordEnd = Math.min(batchSafePage * batchPerPage, batches.length)
 
-  const isBatchName = (s: string) => skillsTrainingBatches.some(b => b.batchName === s)
+  const isBatchName = (s: string) => batches.some(b => b.batchName === s)
+
+  // Load participants (with attendance) whenever the participants sub-view opens.
+  useEffect(() => {
+    if (action === 'view_trainings' && trainingSubView === 'view_participants' && selectedTraining) {
+      setLoadingParticipants(true)
+      skillsTrainingService.listActivityParticipants(selectedTraining.id)
+        .then(res => setActivityParticipants(res.data ?? []))
+        .catch(() => setActivityParticipants([]))
+        .finally(() => setLoadingParticipants(false))
+    } else {
+      setActivityParticipants([])
+    }
+  }, [action, trainingSubView, selectedTraining])
+
+  const handleAttendance = async (beneficiaryServiceId: number, activityId: number, value: boolean) => {
+    try {
+      await skillsTrainingService.updateAttendance({ activityId, beneficiaryServiceId, attended: value })
+      setActivityParticipants(prev => prev.map(p =>
+        p.beneficiaryServiceId === beneficiaryServiceId ? { ...p, attended: value } : p
+      ))
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update attendance.', confirmButtonColor: BRAND_BLUE })
+    }
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -302,53 +343,63 @@ export default function SkillsTrainingMaintenanceForm() {
     return Object.keys(errs).length === 0
   }
 
-  const handleSaveAdd = () => {
-    if (!validateAdd()) return
-    const newActivity: ProgramActivity = {
-      id:           Date.now(),
-      program:      'Skills Training',
-      service:      addForm.selectedBatch,
-      title:        addForm.title.trim(),
-      description:  addForm.description.trim(),
-      date:         addForm.date,
-      location:     addForm.location.trim(),
-      facilitator:  addForm.facilitator.trim(),
-      participants: addForm.participants ? Number(addForm.participants) : 0,
-      status:       addForm.status,
+  const handleSaveAdd = async () => {
+    if (!validateAdd() || isSaving) return
+    setIsSaving(true)
+    try {
+      await skillsTrainingService.createActivity({
+        batchId: Number(addForm.selectedBatch),
+        title: addForm.title.trim(),
+        description: addForm.description.trim(),
+        date: addForm.date,
+        location: addForm.location.trim(),
+        facilitator: addForm.facilitator.trim(),
+        participants: addForm.participants ? Number(addForm.participants) : 0,
+      })
+      await refreshActivities()
+      resetAdd()
+      setAction('')
+      Swal.fire({ icon: 'success', title: 'Training Saved', text: `"${addForm.title.trim()}" has been added.`, confirmButtonColor: BRAND_BLUE })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save training.'), confirmButtonColor: BRAND_BLUE })
+    } finally {
+      setIsSaving(false)
     }
-    addActivity(newActivity)
-    resetAdd()
-    setAction('')
-    Swal.fire({ icon: 'success', title: 'Training Saved', text: `"${newActivity.title}" has been added.`, confirmButtonColor: BRAND_BLUE })
   }
 
-  const handleSaveEdit = () => {
-    if (!selectedTraining) return
+  const handleSaveEdit = async () => {
+    if (!selectedTraining || isSaving) return
     if (!editForm.title.trim()) {
       Swal.fire({ icon: 'warning', title: 'Required', text: 'Title is required.', confirmButtonColor: BRAND_BLUE })
       return
     }
-    const updated: ProgramActivity = {
-      ...selectedTraining,
-      service:      editForm.selectedBatch || selectedTraining.service,
-      title:        editForm.title.trim(),
-      description:  editForm.description.trim(),
-      date:         editForm.date,
-      location:     editForm.location.trim(),
-      facilitator:  editForm.facilitator.trim(),
-      participants: editForm.participants ? Number(editForm.participants) : 0,
-      status:       editForm.status,
+    setIsSaving(true)
+    try {
+      const res = await skillsTrainingService.updateActivity(selectedTraining.id, {
+        batchId: Number(editForm.selectedBatch) || selectedTraining.batchId,
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        date: editForm.date,
+        location: editForm.location.trim(),
+        facilitator: editForm.facilitator.trim(),
+        participants: editForm.participants ? Number(editForm.participants) : 0,
+        status: editForm.status,
+      })
+      await refreshActivities()
+      setSelectedTraining(res.data)
+      setTrainingSubView('')
+      Swal.fire({ icon: 'success', title: 'Training Updated', text: 'Changes saved successfully.', confirmButtonColor: BRAND_BLUE })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update training.'), confirmButtonColor: BRAND_BLUE })
+    } finally {
+      setIsSaving(false)
     }
-    updateActivity(updated.id, updated)
-    setSelectedTraining(updated)
-    setTrainingSubView('')
-    Swal.fire({ icon: 'success', title: 'Training Updated', text: 'Changes saved successfully.', confirmButtonColor: BRAND_BLUE })
   }
 
-  const openEdit = (a: ProgramActivity) => {
+  const openEdit = (a: SkillsTrainingActivity) => {
     setSelectedTraining(a)
     setEditForm({
-      selectedBatch: a.service && isBatchName(a.service) ? a.service : '',
+      selectedBatch: String(a.batchId),
       title:        a.title,
       description:  a.description ?? '',
       date:         a.date,
@@ -370,17 +421,95 @@ export default function SkillsTrainingMaintenanceForm() {
     setTrainingMenuId(trainingMenuId === id ? null : id)
   }
 
-  const nextStatusLabel = (status: ProgramActivity['status']): { next: TrainingStatus; label: string } | null => {
+  const nextStatusLabel = (status: SkillsTrainingActivity['status']): { next: TrainingStatus; label: string } | null => {
     if (status === 'Planned')   return { next: 'Ongoing',   label: 'Mark as Ongoing' }
     if (status === 'Ongoing')   return { next: 'Completed', label: 'Mark as Completed' }
     if (status === 'Completed') return { next: 'Planned',   label: 'Reopen Training' }
     return null
   }
 
+  const handleAddBatch = async () => {
+    const name = newBatchName.trim()
+    if (!name) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a batch name.', confirmButtonColor: BRAND_BLUE }); return }
+    if (isSavingBatch) return
+    setIsSavingBatch(true)
+    try {
+      await skillsTrainingService.createBatch({ batchName: name })
+      await refreshBatches()
+      setNewBatchName('')
+      Swal.fire({ icon: 'success', title: 'Batch Added', text: `${name} has been added.`, confirmButtonColor: BRAND_BLUE })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to add batch.'), confirmButtonColor: BRAND_BLUE })
+    } finally {
+      setIsSavingBatch(false)
+    }
+  }
+
+  const handleDeleteBatch = async () => {
+    if (batchDeleteConfirm === null) return
+    try {
+      await skillsTrainingService.deleteBatch(batchDeleteConfirm)
+      setBatchDeleteConfirm(null)
+      await refreshBatches()
+    } catch (e) {
+      setBatchDeleteConfirm(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete batch.'), confirmButtonColor: BRAND_BLUE })
+    }
+  }
+
+  const handleDeleteTraining = async () => {
+    if (trainingDeleteConfirm === null) return
+    try {
+      await skillsTrainingService.deleteActivity(trainingDeleteConfirm)
+      setTrainingDeleteConfirm(null)
+      await refreshActivities()
+    } catch (e) {
+      setTrainingDeleteConfirm(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete training.'), confirmButtonColor: BRAND_BLUE })
+    }
+  }
+
+  const handleConfirmStatusChange = async () => {
+    if (!trainingStatusConfirm) return
+    const { activity, nextStatus } = trainingStatusConfirm
+
+    if (nextStatus === 'Completed') {
+      try {
+        const res = await skillsTrainingService.listActivityParticipants(activity.id)
+        const participants: ParticipantRecord[] = res.data ?? []
+        const unmarked = participants.filter(p => p.attended === null).length
+        if (unmarked > 0) {
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Attendance Incomplete',
+            html: `<b>${unmarked} participant${unmarked !== 1 ? 's have' : ' has'}</b> not been marked present or absent yet.<br><br>Please mark attendance for all participants before completing this training.`,
+            confirmButtonText: 'Go to Attendance',
+            confirmButtonColor: BRAND_BLUE,
+          })
+          setTrainingStatusConfirm(null)
+          setSelectedTraining(activity)
+          setAction('view_trainings')
+          setTrainingSubView('view_participants')
+          return
+        }
+      } catch { /* proceed if participants can't be fetched */ }
+    }
+
+    try {
+      await skillsTrainingService.updateActivityStatus(activity.id, nextStatus)
+      await refreshActivities()
+      setTrainingStatusConfirm(null)
+      Swal.fire({ icon: 'success', title: 'Status Updated', text: `Status changed to ${nextStatus}.`, confirmButtonColor: BRAND_BLUE })
+    } catch (e) {
+      setTrainingStatusConfirm(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: BRAND_BLUE })
+    }
+  }
+
   // ── Sub-view: participants ─────────────────────────────────────────────────
 
   if (action === 'view_trainings' && trainingSubView === 'view_participants' && selectedTraining) {
-    const participants = profiles.filter(p => p.assignedTrainingId === selectedTraining.id)
+    const participants = activityParticipants
     const ptotal = Math.max(1, Math.ceil(participants.length / participantPerPage))
     const psafe = Math.min(participantPage, ptotal)
     const paginatedPts = participants.slice((psafe - 1) * participantPerPage, psafe * participantPerPage)
@@ -396,7 +525,7 @@ export default function SkillsTrainingMaintenanceForm() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
-                disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+                disabled={card.label.startsWith('Add') && !canManage('skills')}
                 className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
                 }`}>
@@ -422,31 +551,53 @@ export default function SkillsTrainingMaintenanceForm() {
               <Users size={16} />
               <span><span className="font-semibold">{participants.length}</span> participant{participants.length !== 1 ? 's' : ''} assigned to this training</span>
             </div>
-            {participants.length === 0 ? (
+            {loadingParticipants ? (
+              <div className="text-center py-12 text-gray-400">Loading participants…</div>
+            ) : participants.length === 0 ? (
               <div className="text-center py-12 text-gray-400">No participants assigned to this training yet.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-brand-blue">
                     <tr>
-                      {['Full Name', 'Gender', 'Contact Number', 'Batch No.', 'Status'].map(h => (
+                      {['Full Name', 'Gender', 'Contact Number', 'Batch No.', 'Status', 'Attendance'].map(h => (
                         <th key={h} className="px-5 py-3 text-left text-white text-sm font-medium">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedPts.map(p => (
-                      <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={p.beneficiaryServiceId} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-5 py-3.5 text-gray-800 font-medium text-sm">
                           {p.lastName}, {p.firstName} {p.middleName}
                         </td>
                         <td className="px-5 py-3.5 text-gray-600 text-sm">{p.sex}</td>
                         <td className="px-5 py-3.5 text-gray-600 text-sm">{p.contactNumber}</td>
-                        <td className="px-5 py-3.5 text-gray-600 text-sm">{p.trainingBatchNo || '—'}</td>
+                        <td className="px-5 py-3.5 text-gray-600 text-sm">{selectedTraining.service || '—'}</td>
                         <td className="px-5 py-3.5">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${PARTICIPANT_STATUS_COLORS[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
                             {p.status}
                           </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {selectedTraining.status === 'Planned' ? (
+                            <span className="text-gray-400 text-sm">—</span>
+                          ) : selectedTraining.status === 'Completed' ? (
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${p.attended === true ? 'bg-green-100 text-green-700' : p.attended === false ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                              {p.attended === true ? 'Present' : p.attended === false ? 'Absent' : '—'}
+                            </span>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleAttendance(p.beneficiaryServiceId, selectedTraining.id, true)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${p.attended === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'}`}
+                              >Present</button>
+                              <button
+                                onClick={() => handleAttendance(p.beneficiaryServiceId, selectedTraining.id, false)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${p.attended === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-700'}`}
+                              >Absent</button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -481,7 +632,7 @@ export default function SkillsTrainingMaintenanceForm() {
 
   if (action === 'view_trainings' && (trainingSubView === 'view_details' || trainingSubView === 'edit') && selectedTraining) {
     const formToUse = trainingSubView === 'edit' ? editForm : {
-      selectedBatch: selectedTraining.service && isBatchName(selectedTraining.service) ? selectedTraining.service : '',
+      selectedBatch: String(selectedTraining.batchId),
       title:        selectedTraining.title,
       description:  selectedTraining.description ?? '',
       date:         selectedTraining.date,
@@ -501,7 +652,7 @@ export default function SkillsTrainingMaintenanceForm() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
-                disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+                disabled={card.label.startsWith('Add') && !canManage('skills')}
                 className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
                 }`}>
@@ -520,7 +671,7 @@ export default function SkillsTrainingMaintenanceForm() {
         <TrainingForm
           mode={trainingSubView === 'edit' ? 'edit' : 'view'}
           form={formToUse}
-          batches={skillsTrainingBatches}
+          batches={batches}
           onChange={setEdit}
           onSave={handleSaveEdit}
           onCancel={() => setTrainingSubView('')}
@@ -541,7 +692,7 @@ export default function SkillsTrainingMaintenanceForm() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
           {ACTION_CARDS.map(card => (
             <button key={card.key} onClick={() => { setAction(card.key); resetAdd(); setTrainingSubView('') }}
-              disabled={card.label.startsWith('Add') && !canManage('maintenance')}
+              disabled={card.label.startsWith('Add') && !canManage('skills')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
               }`}>
@@ -569,7 +720,7 @@ export default function SkillsTrainingMaintenanceForm() {
           mode="add"
           form={addForm}
           errors={addErrors}
-          batches={skillsTrainingBatches}
+          batches={batches}
           onChange={setAdd}
           onSave={handleSaveAdd}
           onCancel={() => { resetAdd(); setAction('') }}
@@ -585,7 +736,7 @@ export default function SkillsTrainingMaintenanceForm() {
               <select value={trainingBatchFilter} onChange={e => { setTrainingBatchFilter(e.target.value); setCurrentPage(1) }}
                 className={inputCls + ' bg-white'}>
                 <option value="All">All Batches</option>
-                {skillsTrainingBatches.map(b => <option key={b.id} value={b.batchName}>{b.batchName}</option>)}
+                {batches.map(b => <option key={b.id} value={b.batchName}>{b.batchName}</option>)}
               </select>
               <select value={trainingStatusFilter} onChange={e => { setTrainingStatusFilter(e.target.value); setCurrentPage(1) }}
                 className={inputCls + ' bg-white'}>
@@ -608,7 +759,7 @@ export default function SkillsTrainingMaintenanceForm() {
               <div>
                 <h3 className="text-white m-0">Skills Training Trainings</h3>
               </div>
-              <button onClick={() => setAction('add_training')} disabled={!canManage('maintenance')}
+              <button onClick={() => setAction('add_training')} disabled={!canManage('skills')}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
                 <Plus size={16} /> Add Training
               </button>
@@ -618,7 +769,7 @@ export default function SkillsTrainingMaintenanceForm() {
               <div className="text-center py-16">
                 <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
                 <p className="text-gray-500">No trainings found.</p>
-                <button onClick={() => setAction('add_training')} disabled={!canManage('maintenance')}
+                <button onClick={() => setAction('add_training')} disabled={!canManage('skills')}
                   className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                   Add First Training
                 </button>
@@ -660,7 +811,7 @@ export default function SkillsTrainingMaintenanceForm() {
                           <span className="line-clamp-1">{a.location || '—'}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 text-center">
-                          {a.participants ?? '—'}
+                          {a.assignedCount}{a.participants != null ? `/${a.participants}` : ''}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${ACTIVITY_STATUS_COLORS[a.status]}`}>
@@ -699,7 +850,7 @@ export default function SkillsTrainingMaintenanceForm() {
 
           {/* Training action menu */}
           {trainingMenuId !== null && trainingMenuPos && (() => {
-            const a = stActivities.find(x => x.id === trainingMenuId)
+            const a = activities.find(x => x.id === trainingMenuId)
             if (!a) return null
             const ns = nextStatusLabel(a.status)
             return (
@@ -716,12 +867,12 @@ export default function SkillsTrainingMaintenanceForm() {
                     <Users size={15} className="text-gray-500" /> View Participants
                   </button>
                   <div className="my-1 border-t border-gray-100" />
-                  <button onClick={() => { openEdit(a); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                  <button onClick={() => { openEdit(a); setTrainingMenuId(null) }} disabled={!canManage('skills')}
                     className="w-full px-4 py-2.5 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Edit2 size={15} className="text-blue-500" /> Edit
                   </button>
                   {ns && (
-                    <button onClick={() => { setTrainingStatusConfirm({ activity: a, nextStatus: ns.next, label: ns.label }); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                    <button onClick={() => { setTrainingStatusConfirm({ activity: a, nextStatus: ns.next, label: ns.label }); setTrainingMenuId(null) }} disabled={!canManage('skills')}
                       className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent ${ns.next === 'Planned' ? 'text-brand-blue hover:bg-blue-50' : 'text-green-600 hover:bg-green-50'}`}>
                       {ns.next === 'Ongoing'   && <PlayCircle  size={15} className="text-green-600" />}
                       {ns.next === 'Completed' && <CheckCircle size={15} className="text-green-600" />}
@@ -730,7 +881,7 @@ export default function SkillsTrainingMaintenanceForm() {
                     </button>
                   )}
                   <div className="my-1 border-t border-gray-100" />
-                  <button onClick={() => { setTrainingDeleteConfirm(a.id); setTrainingMenuId(null) }} disabled={!canManage('maintenance')}
+                  <button onClick={() => { setTrainingDeleteConfirm(a.id); setTrainingMenuId(null) }} disabled={!canManage('skills')}
                     className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Trash2 size={15} className="text-red-500" /> Delete
                   </button>
@@ -758,30 +909,24 @@ export default function SkillsTrainingMaintenanceForm() {
                 <label className={labelCls}>Batch Name <span className="text-red-500">*</span></label>
                 <div className="flex gap-3">
                   <input type="text" value={newBatchName} onChange={e => setNewBatchName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && document.getElementById('st-add-batch-btn')?.click()}
+                    onKeyDown={e => e.key === 'Enter' && handleAddBatch()}
                     placeholder="e.g. BATCH-004, BATCH-005..."
                     className={`${inputCls} flex-1`} />
-                  <button id="st-add-batch-btn"
-                    onClick={() => {
-                      const name = newBatchName.trim()
-                      if (!name) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a batch name.', confirmButtonColor: BRAND_BLUE }); return }
-                      if (skillsTrainingBatches.some(b => b.batchName === name)) { Swal.fire({ icon: 'warning', title: 'Duplicate', text: 'This batch already exists.', confirmButtonColor: BRAND_BLUE }); return }
-                      setSkillsTrainingBatches(prev => [...prev, { id: Date.now(), batchName: name, status: 'Planned' }])
-                      setNewBatchName('')
-                      Swal.fire({ icon: 'success', title: 'Batch Added', text: `${name} has been added.`, confirmButtonColor: BRAND_BLUE })
-                    }}
-                    className="px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm whitespace-nowrap">
+                  <button
+                    onClick={handleAddBatch}
+                    disabled={isSavingBatch}
+                    className="px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
                     <Plus size={16} /> Add Batch
                   </button>
                 </div>
                 <p className="text-gray-400 text-sm mt-2">Press Enter or click "Add Batch" to save.</p>
               </div>
 
-              {skillsTrainingBatches.length > 0 && (
+              {batches.length > 0 && (
                 <div className="pt-2">
                   <p className="text-sm font-semibold text-gray-700 mb-3">Current Batches in Skills Training</p>
                   <div className="flex flex-wrap gap-2">
-                    {skillsTrainingBatches.map(b => (
+                    {batches.map(b => (
                       <span key={b.id} className="px-3 py-1.5 border border-brand-blue text-brand-blue rounded-full text-sm">
                         {b.batchName}
                       </span>
@@ -801,17 +946,17 @@ export default function SkillsTrainingMaintenanceForm() {
             <div>
               <h3 className="text-white m-0">Skills Training Batches</h3>
             </div>
-            <button onClick={() => setAction('add_batch')} disabled={!canManage('maintenance')}
+            <button onClick={() => setAction('add_batch')} disabled={!canManage('skills')}
               className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
               <Plus size={15} /> Add Batch
             </button>
           </div>
 
-          {skillsTrainingBatches.length === 0 ? (
+          {batches.length === 0 ? (
             <div className="text-center py-16">
               <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
               <p className="text-gray-500">No batches yet.</p>
-              <button onClick={() => setAction('add_batch')} disabled={!canManage('maintenance')}
+              <button onClick={() => setAction('add_batch')} disabled={!canManage('skills')}
                 className="mt-4 px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 Add First Batch
               </button>
@@ -822,40 +967,37 @@ export default function SkillsTrainingMaintenanceForm() {
                 <thead className="border-b-2 border-gray-200">
                   <tr>
                     <th className="px-8 py-5 text-left text-gray-800 font-bold">Batch Number</th>
-                    <th className="px-8 py-5 text-left text-gray-800 font-bold">Projects Count</th>
+                    <th className="px-8 py-5 text-left text-gray-800 font-bold">Trainings Count</th>
                     <th className="px-8 py-5 text-right text-gray-800 font-bold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedBatches.map(b => {
-                    const count = stActivities.filter(a => a.service === b.batchName).length
-                    return (
-                      <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-3">
-                            <span className="w-2.5 h-2.5 rounded-full bg-brand-blue flex-shrink-0" />
-                            <span className="text-gray-800 font-semibold">{b.batchName}</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-6">
-                          {count > 0
-                            ? <span className="px-4 py-2 bg-blue-50 text-brand-blue rounded-full text-sm font-medium">{count} project{count !== 1 ? 's' : ''}</span>
-                            : <span className="text-gray-400 text-sm">None</span>}
-                        </td>
-                        <td className="px-8 py-6 text-right">
-                          <button onClick={() => setBatchDeleteConfirm(b.id)}
-                            className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {paginatedBatches.map(b => (
+                    <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2.5 h-2.5 rounded-full bg-brand-blue flex-shrink-0" />
+                          <span className="text-gray-800 font-semibold">{b.batchName}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        {b.trainingCount > 0
+                          ? <span className="px-4 py-2 bg-blue-50 text-brand-blue rounded-full text-sm font-medium">{b.trainingCount} training{b.trainingCount !== 1 ? 's' : ''}</span>
+                          : <span className="text-gray-400 text-sm">None</span>}
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <button onClick={() => setBatchDeleteConfirm(b.id)}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
-          {skillsTrainingBatches.length > 0 && (
+          {batches.length > 0 && (
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rows per page:</span>
@@ -864,7 +1006,7 @@ export default function SkillsTrainingMaintenanceForm() {
                 </select>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{batchRecordStart}–{batchRecordEnd} of {skillsTrainingBatches.length} records</span>
+                <span className="text-sm text-gray-500">{batchRecordStart}–{batchRecordEnd} of {batches.length} records</span>
                 <div className="flex gap-1">
                   <button onClick={() => setBatchPage(p => Math.max(1, p - 1))} disabled={batchSafePage === 1} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={16} /></button>
                   <button onClick={() => setBatchPage(p => Math.min(batchTotalPages, p + 1))} disabled={batchSafePage === batchTotalPages} className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight size={16} /></button>
@@ -928,12 +1070,7 @@ export default function SkillsTrainingMaintenanceForm() {
               <button onClick={() => setTrainingStatusConfirm(null)}
                 className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium">Cancel</button>
               <button
-                onClick={() => {
-                  const updated = { ...trainingStatusConfirm.activity, status: trainingStatusConfirm.nextStatus }
-                  updateActivity(updated.id, updated)
-                  setTrainingStatusConfirm(null)
-                  Swal.fire({ icon: 'success', title: 'Status Updated', text: `Status changed to ${trainingStatusConfirm.nextStatus}.`, confirmButtonColor: BRAND_BLUE })
-                }}
+                onClick={handleConfirmStatusChange}
                 className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white"
                 style={{ backgroundColor: trainingStatusConfirm.nextStatus === 'Completed' ? '#16a34a' : BRAND_BLUE }}>
                 {trainingStatusConfirm.label}
@@ -954,7 +1091,7 @@ export default function SkillsTrainingMaintenanceForm() {
             <p className="text-gray-600 mb-6 text-sm">Are you sure? This action cannot be undone.</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setBatchDeleteConfirm(null)} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-              <button onClick={() => { setSkillsTrainingBatches(prev => prev.filter(b => b.id !== batchDeleteConfirm)); setBatchDeleteConfirm(null) }}
+              <button onClick={handleDeleteBatch}
                 className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Delete</button>
             </div>
           </div>
@@ -972,7 +1109,7 @@ export default function SkillsTrainingMaintenanceForm() {
             <p className="text-gray-600 mb-6 text-sm">Are you sure? This action cannot be undone.</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setTrainingDeleteConfirm(null)} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-              <button onClick={() => { deleteActivity(trainingDeleteConfirm!); setTrainingDeleteConfirm(null) }}
+              <button onClick={handleDeleteTraining}
                 className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Delete</button>
             </div>
           </div>

@@ -51,7 +51,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: cdspApplicants, activities: cdspActivities, services: cdspServices, programInfo: cdspProgramInfo } = useCDSP()
   const { applicants: gipApplicants, gipBatches } = useGIP()
   const { applicants: spesApplicants, spesBatches } = useSPES()
-  const { profiles: skillsProfiles } = useSkillsTraining()
+  const { profiles: skillsProfiles, activities: skillsActivities } = useSkillsTraining()
   const { activities } = useProgramActivities()
   const { profiles: ofwProfiles } = useOFW()
 
@@ -264,12 +264,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
       case 'skills-training':
         return skillsProfiles.map(p => {
-          const activity = activities.find(a => a.id === p.assignedTrainingId)
+          const activity = skillsActivities.find(a => a.id === p.assignedTrainingId)
           return {
             'Participant Name': `${p.firstName} ${p.lastName}`,
             'Training Title': activity?.title || p.desiredQualification[0] || '-',
             'Trainer': activity?.facilitator || '-',
-            'Duration': p.trainingBatchNo || '-',
+            'Batch': activity?.service || '-',
             'Completion Status': p.status,
           }
         })
@@ -302,7 +302,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           { 'Program / Service': 'CDSP', 'Activities Conducted': activities.filter(a => a.program === 'CDSP' || CDSP_SERVICES.includes(a.service)).length, 'Participants': cdspApplicants.length, 'Beneficiaries': cdspApplicants.length, 'Placements': 0, 'Status': 'Active' },
           { 'Program / Service': 'GIP', 'Activities Conducted': gipBatches.length, 'Participants': gipApplicants.length, 'Beneficiaries': gipApplicants.length, 'Placements': gipApplicants.length, 'Status': 'Active' },
           { 'Program / Service': 'SPES', 'Activities Conducted': spesBatches.length, 'Participants': spesApplicants.length, 'Beneficiaries': spesApplicants.length, 'Placements': spesApplicants.length, 'Status': 'Active' },
-          { 'Program / Service': 'Skills Training', 'Activities Conducted': activities.filter(a => a.program === 'Skills Training').length, 'Participants': skillsProfiles.length, 'Beneficiaries': skillsProfiles.length, 'Placements': 0, 'Status': 'Active' },
+          { 'Program / Service': 'Skills Training', 'Activities Conducted': skillsActivities.length, 'Participants': skillsProfiles.length, 'Beneficiaries': skillsProfiles.length, 'Placements': 0, 'Status': 'Active' },
           { 'Program / Service': 'Livelihood', 'Activities Conducted': readLS('lp_slp_projects_v2').length + readLS('lp_clpep_interventions_v1').length, 'Participants': lhAll.length, 'Beneficiaries': lhAll.length, 'Placements': 0, 'Status': 'Active' },
           { 'Program / Service': 'OFW Services', 'Activities Conducted': ofwProfiles.length, 'Participants': ofwProfiles.length, 'Beneficiaries': ofwProfiles.length, 'Placements': 0, 'Status': 'Active' },
         ]

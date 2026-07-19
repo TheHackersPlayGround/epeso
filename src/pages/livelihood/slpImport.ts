@@ -75,7 +75,7 @@ const SECTION_PERSONAL: TemplateSection = {
     { header: 'Birthdate (MM/DD/YYYY)', width: 20, example: '05/20/1996', required: true },
     { header: 'Civil Status', width: 14, example: 'Single', required: true, options: [...CIVIL_STATUS_OPTIONS] },
     { header: 'Contact Number', width: 16, example: '09171234567' },
-    { header: 'Email', width: 22, example: 'juan@example.com' },
+    { header: 'Email Address', width: 22, example: 'juan@example.com' },
   ],
 }
 
@@ -86,9 +86,9 @@ const SECTION_ADDRESS: TemplateSection = {
   optionalArgb: 'FF9DC3E6',
   columns: [
     { header: 'Province', width: 22, example: 'Misamis Occidental', required: true },
-    { header: 'Municipality/City', width: 20, example: 'Tangub City', required: true },
+    { header: 'Municipality / City', width: 20, example: 'Tangub City', required: true },
     { header: 'Barangay', width: 18, example: 'Santo Niño', required: true },
-    { header: 'Street / Purok #', width: 18, example: 'Purok 3' },
+    { header: 'Street / Purok / Zone', width: 18, example: 'Purok 3' },
   ],
 }
 
@@ -338,7 +338,7 @@ async function resolveAddress(
 ): Promise<{ barangayId: number }> {
   const missing: string[] = []
   if (!provinceName) missing.push('Province')
-  if (!cityName) missing.push('Municipality/City')
+  if (!cityName) missing.push('Municipality / City')
   if (!barangayName) missing.push('Barangay')
   if (missing.length) throw new Error(`Address is incomplete — missing: ${missing.join(', ')}.`)
 
@@ -390,7 +390,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
 
   const address = await resolveAddress(
     get(row, 'Province'),
-    get(row, 'Municipality/City'),
+    get(row, 'Municipality / City'),
     get(row, 'Barangay'),
     caches,
   )
@@ -452,8 +452,8 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     birthdate,
     civilStatus,
     contactNumber: get(row, 'Contact Number'),
-    email: get(row, 'Email'),
-    streetPurok: get(row, 'Street / Purok #'),
+    email: get(row, 'Email Address'),
+    streetPurok: get(row, 'Street / Purok / Zone'),
     barangayId: address.barangayId,
     is4PsBeneficiary: participantType === '4Ps',
     slpParticipantIdNumber: get(row, 'SLP Participant ID Number'),

@@ -1,28 +1,151 @@
-import { useState } from 'react'
-import { X, Users, Upload } from 'lucide-react'
-import type { SkillsTrainingProfile } from '../../contexts/SkillsTrainingContext'
+import { useRef, useState } from 'react'
+import { X, Users, Upload, FileText, Eye, Trash2 } from 'lucide-react'
+import type { SkillsTrainingProfile, SkillsTrainingSavedDocument, SkillsTrainingLookup } from '../../contexts/SkillsTrainingContext'
 import DatePicker from '../../components/DatePicker'
+import SearchableSelect from '../../components/SearchableSelect'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+
+function formatFileSize(bytes: number) {
+  if (bytes <= 0) return '0 Bytes'
+  const units = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
+}
+
+type AttachedDocsEditorProps = {
+  docs: SkillsTrainingSavedDocument[]
+  onChange: (docs: SkillsTrainingSavedDocument[]) => void
+  onPreview: (doc: SkillsTrainingSavedDocument) => void
+}
+
+// previewDoc lives in the parent (SkillsTrainingProfileForm) and renders as a
+// sibling of the whole form, not nested inside this component -- a
+// `fixed inset-0` modal nested inside an ancestor with opacity/filter/transform
+// (a view-mode-dimmed fieldset) stops being positioned relative to the
+// viewport and gets squashed into that ancestor's box instead.
+function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      onChange([...docs, {
+        id: Date.now().toString() + Math.random().toString(36),
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        url: '',
+        dataUrl: reader.result as string,
+      }])
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  function handleRemoveFile(index: number) {
+    onChange(docs.filter((_, i) => i !== index))
+  }
+
+  return (
+    <div>
+      <input
+        type="file" id="skills-document-upload" className="hidden"
+        onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png"
+      />
+      <label
+        htmlFor="skills-document-upload"
+        className="flex items-center justify-center gap-2 w-full px-4 py-2 border border-dashed border-brand-blue bg-blue-50 text-brand-blue rounded-lg cursor-pointer hover:bg-blue-100 transition-colors text-sm"
+      >
+        <Upload size={16} />
+        <span className="font-medium">Upload Document</span>
+      </label>
+      <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG</p>
+
+      {docs.length > 0 && (
+        <div className="space-y-3 pt-4 mt-4 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-gray-700">Uploaded Documents</h4>
+          <div className="space-y-2">
+            {docs.map((doc, index) => (
+              <div key={doc.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer pointer-events-auto" onClick={() => onPreview(doc)}>
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <FileText size={20} className="text-brand-blue" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
+                    <p className="text-xs text-gray-500">{doc.fileSize}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => onPreview(doc)} className="flex-shrink-0 p-2 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors pointer-events-auto" title="Preview document">
+                    <Eye size={18} />
+                  </button>
+                  <button type="button" onClick={() => handleRemoveFile(index)} className="flex-shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete document">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Rendered as a sibling outside the (possibly view-mode-dimmed) form fieldset
+// -- see the comment on AttachedDocsEditor for why this can't be nested inside it.
+function DocPreviewModal({ doc, onClose }: { doc: SkillsTrainingSavedDocument; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+          <button type="button" onClick={onClose} aria-label="Close preview" className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
+            <div className="flex items-center justify-center h-full">
+              <img src={doc.dataUrl || doc.url} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+            </div>
+          ) : /\.pdf$/i.test(doc.fileName) ? (
+            <iframe src={doc.dataUrl || doc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FileText size={64} className="mb-4 text-gray-400" />
+              <p className="text-lg font-medium mb-2">Preview not available</p>
+              <a href={doc.dataUrl || doc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
 export const BRAND = '#0077BE'
 
-export const BATCH_OPTIONS = ['BATCH-001', 'BATCH-002', 'BATCH-003']
 export const CLASSIFICATION_OPTIONS = ['Student', 'Out of School Youth', 'Women', 'PWD', 'Employed', 'Unemployed']
-export const QUALIFICATION_OPTIONS = ['EIM/ELECTRICAL', 'COOKERY', 'FORKLIFT', 'BREAD AND PASTRY']
-export const PURPOSE_OPTIONS = ['For employment', 'For local or overseas work', 'To start a livelihood / business', 'To enhance existing skills']
-export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated']
+export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
+export const SEX_OPTIONS = ['Male', 'Female']
+export const STATUS_OPTIONS = ['Waitlisted', 'Accepted']
 
 export const emptyForm: Omit<SkillsTrainingProfile, 'id'> = {
+  beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '', birthdate: '', age: 0,
-  sex: '', civilStatus: '', address: '', contactNumber: '',
+  sex: '', civilStatus: '', contactNumber: '',
+  streetPurok: '', barangay: '', barangayId: 0, cityMunicipality: '', province: '', region: '',
   classification: [], classificationOther: [],
   desiredQualification: [], qualificationOther: [],
   purposeOfTraining: [], purposeOther: [],
-  attachedDocuments: [], applicantSignature: '', dateSignature: '',
-  dateApplicationReceived: '', receivedBy: '', trainingBatchNo: '',
-  assignedTrainingId: null,
-  status: 'Waitlisted', assessmentResult: '', remarks: '',
+  assignedTrainingId: null, assignedTrainingTitle: '', assignedTrainingStatus: null,
+  attachedDocuments: [],
+  dateApplicationReceived: '', receivedBy: '',
+  status: 'Waitlisted',
 }
 
 // ─── Exported badge ────────────────────────────────────────────────────────────
@@ -75,9 +198,7 @@ function CheckItem({ label, checked, onChange }: { label: string; checked: boole
 }
 
 function OtherSpecifyField({
-  values,
-  placeholder,
-  onUpdate,
+  values, placeholder, onUpdate,
 }: {
   values: string[]
   placeholder: string
@@ -110,6 +231,8 @@ function OtherSpecifyField({
 
 export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTrainingProfile; onClose: () => void }) {
   const fullName = `${profile.lastName}, ${profile.firstName}${profile.middleName ? ' ' + profile.middleName : ''}`.trim()
+  const [previewDoc, setPreviewDoc] = useState<SkillsTrainingSavedDocument | null>(null)
+  const address = [profile.streetPurok, profile.barangay, profile.cityMunicipality, profile.province].filter(Boolean).join(', ')
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
@@ -143,7 +266,7 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
             <Field label="Contact #" value={profile.contactNumber} />
           </div>
           <div className="grid grid-cols-1 gap-5 mt-5">
-            <Field label="Address" value={profile.address} />
+            <Field label="Address" value={address} />
           </div>
 
           <SectionDivider numeral="II" title="Classification" />
@@ -161,27 +284,28 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
 
           <SectionDivider numeral="III" title="Desired Qualification" />
           <div className="flex flex-wrap gap-2">
-            {QUALIFICATION_OPTIONS.map(opt => (
-              <span key={opt} className={`px-3 py-1 rounded-full text-xs border ${profile.desiredQualification.includes(opt) ? 'bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-300'}`}
-                style={profile.desiredQualification.includes(opt) ? { borderColor: BRAND } : {}}>
-                {opt}
-              </span>
+            {profile.desiredQualification.map(opt => (
+              <span key={opt} className="px-3 py-1 rounded-full text-xs border bg-purple-50 text-purple-700" style={{ borderColor: BRAND }}>{opt}</span>
             ))}
             {profile.qualificationOther.filter(Boolean).map((v, i) => (
               <span key={i} className="px-3 py-1 rounded-full text-xs bg-purple-50 text-purple-700 border" style={{ borderColor: BRAND }}>Others: {v}</span>
             ))}
+            {profile.desiredQualification.length === 0 && profile.qualificationOther.filter(Boolean).length === 0 && (
+              <span className="text-gray-400 text-sm">—</span>
+            )}
           </div>
 
           <SectionDivider numeral="IV" title="Purpose of Training" />
           <div className="flex flex-wrap gap-2">
-            {PURPOSE_OPTIONS.map(opt => (
-              <span key={opt} className={`px-3 py-1 rounded-full text-xs border ${profile.purposeOfTraining.includes(opt) ? 'bg-green-100 text-green-700 border-green-300' : 'border-gray-200 text-gray-300'}`}>
-                {opt}
-              </span>
+            {profile.purposeOfTraining.map(opt => (
+              <span key={opt} className="px-3 py-1 rounded-full text-xs border bg-green-100 text-green-700 border-green-300">{opt}</span>
             ))}
             {profile.purposeOther.filter(Boolean).map((v, i) => (
               <span key={i} className="px-3 py-1 rounded-full text-xs bg-green-100 text-green-700 border border-green-300">Others: {v}</span>
             ))}
+            {profile.purposeOfTraining.length === 0 && profile.purposeOther.filter(Boolean).length === 0 && (
+              <span className="text-gray-400 text-sm">—</span>
+            )}
           </div>
 
           <SectionDivider numeral="V" title="For PESO Office Only" gray />
@@ -190,8 +314,31 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
             <Field label="Received By" value={profile.receivedBy} />
             <Field label="Status" value={profile.status} />
           </div>
+
+          {profile.attachedDocuments.length > 0 && (
+            <>
+              <SectionDivider numeral="VI" title="Attached Documents" gray />
+              <div className="space-y-2">
+                {profile.attachedDocuments.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:shadow-md transition-shadow" onClick={() => setPreviewDoc(doc)}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <FileText size={20} className="text-brand-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
+                        <p className="text-xs text-gray-500">{doc.fileSize}</p>
+                      </div>
+                    </div>
+                    <Eye size={18} className="text-brand-blue flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
+      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }
@@ -199,23 +346,37 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
 // ─── Default export: form ──────────────────────────────────────────────────────
 
 export default function SkillsTrainingProfileForm({
-  onClose,
-  onSave,
-  initialData,
-  mode = 'add',
+  onClose, onSave, initialData, mode = 'add', qualifications, purposes,
 }: {
   onClose: () => void
   onSave: (data: Omit<SkillsTrainingProfile, 'id'>) => void
   initialData?: Omit<SkillsTrainingProfile, 'id'>
   mode?: 'add' | 'edit'
+  qualifications: SkillsTrainingLookup[]
+  purposes: SkillsTrainingLookup[]
 }) {
   const [formData, setFormData] = useState<Omit<SkillsTrainingProfile, 'id'>>(initialData ?? emptyForm)
   const set = (updates: Partial<Omit<SkillsTrainingProfile, 'id'>>) => setFormData(prev => ({ ...prev, ...updates }))
+  const [provinceId, setProvinceId] = useState<number | null>(null)
+  const [cityId, setCityId] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<SkillsTrainingSavedDocument | null>(null)
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const qualificationOptions = qualifications.filter(q => q.name !== 'Other').map(q => q.name)
+  const purposeOptions = purposes.filter(p => p.name !== 'Other').map(p => p.name)
 
   const toggleArr = (field: 'classification' | 'desiredQualification' | 'purposeOfTraining', value: string) => {
     const arr = formData[field] as string[]
     set({ [field]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value] })
   }
+
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const sexWrapRef = useRef<HTMLDivElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   const handleBirthdate = (date: string) => {
     let age = 0
@@ -229,10 +390,63 @@ export default function SkillsTrainingProfileForm({
       if (!hadBirthdayThisYear) age--
     }
     set({ birthdate: date, age })
+    clearFieldError('birthdate')
   }
 
+  // Sex, birthdate, civil status, and barangay are required by the underlying
+  // beneficiaries table (NOT NULL columns); name fields additionally reject
+  // digits/symbols.
   const handleSave = () => {
-    if (!formData.lastName || !formData.firstName) { alert('Please fill in Last Name and First Name.'); return }
+    const lastName = formData.lastName.trim()
+    const firstName = formData.firstName.trim()
+    const middleName = formData.middleName.trim()
+    const errors: ValidationError[] = []
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => lastNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: () => lastNameRef.current?.focus() })
+    }
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => firstNameRef.current?.focus() })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: () => firstNameRef.current?.focus() })
+    }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: () => middleNameRef.current?.focus() })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: () => civilStatusRef.current?.focus() })
+    }
+
+    if (!formData.sex) {
+      errors.push({
+        field: 'sex',
+        message: 'Sex is required.',
+        focus: () => sexWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (!formData.barangayId) {
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Address section).',
+        focus: () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      })
+    }
+
+    if (runValidation(errors)) return
     onSave(formData)
   }
 
@@ -257,54 +471,107 @@ export default function SkillsTrainingProfileForm({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
-              <input className={inpFocus} value={formData.lastName} onChange={e => set({ lastName: e.target.value })} placeholder="Dela Cruz" />
+              <input ref={lastNameRef} className={`${inpFocus} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Dela Cruz" />
+              {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
             </div>
             <div>
               <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-              <input className={inpFocus} value={formData.firstName} onChange={e => set({ firstName: e.target.value })} placeholder="Juan" />
+              <input ref={firstNameRef} className={`${inpFocus} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Juan" />
+              {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
             </div>
             <div>
               <label className={lbl}>Middle Name</label>
-              <input className={inpFocus} value={formData.middleName} onChange={e => set({ middleName: e.target.value })} placeholder="M." />
+              <input ref={middleNameRef} className={`${inpFocus} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="M." />
+              {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className={lbl}>Birthdate</label>
-              <DatePicker className={inpFocus} value={formData.birthdate} onChange={handleBirthdate} />
+            <div ref={birthdateWrapRef}>
+              <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
+                <DatePicker className={inpFocus} value={formData.birthdate} onChange={handleBirthdate} />
+              </div>
+              {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
               <input type="number" className={inpFocus} value={formData.age || ''} onChange={e => set({ age: parseInt(e.target.value) || 0 })} placeholder="0" min={0} />
             </div>
             <div>
-              <label className={lbl}>Civil Status</label>
-              <select className={`${inpFocus} bg-white`} value={formData.civilStatus} onChange={e => set({ civilStatus: e.target.value })}>
+              <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
+              <select ref={civilStatusRef} className={`${inpFocus} bg-white ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={e => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
                 <option value="">Select</option>
                 {CIVIL_STATUS_OPTIONS.map(cs => <option key={cs}>{cs}</option>)}
               </select>
+              {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={lbl}>Sex</label>
-              <div className="flex gap-6 mt-2">
+            <div ref={sexWrapRef}>
+              <label className={lbl}>Sex <span className="text-red-500">*</span></label>
+              <div className={`flex gap-6 mt-2 rounded-lg ${fieldMessage('sex') ? 'ring-2 ring-red-200 p-2' : ''}`}>
                 {['Male', 'Female'].map(s => (
                   <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="radio" name="form-sex" value={s} checked={formData.sex === s} onChange={() => set({ sex: s })} className="accent-[#8B5CF6]" />
+                    <input type="radio" name="form-sex" value={s} checked={formData.sex === s} onChange={() => { set({ sex: s as 'Male' | 'Female' }); clearFieldError('sex') }} className="accent-[#8B5CF6]" />
                     {s}
                   </label>
                 ))}
               </div>
+              {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
             </div>
             <div>
               <label className={lbl}>Contact #</label>
               <input className={inpFocus} value={formData.contactNumber} onChange={e => set({ contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
             </div>
           </div>
-          <div>
-            <label className={lbl}>Address</label>
-            <input className={inpFocus} value={formData.address} onChange={e => set({ address: e.target.value })} placeholder="House No., Street, Barangay, Municipality/City, Province" />
+
+          <p className="text-xs font-bold text-gray-900 uppercase tracking-wide mt-6 mb-6">Address</p>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={lbl}>Province</label>
+              <SearchableSelect
+                value={formData.province}
+                placeholder="Search province..."
+                fetchOptions={(s) => searchProvinces(s)}
+                onSelect={(opt) => {
+                  setProvinceId(opt.id)
+                  setCityId(null)
+                  set({ province: opt.name, cityMunicipality: '', barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div>
+              <label className={lbl}>City / Municipality</label>
+              <SearchableSelect
+                value={formData.cityMunicipality}
+                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                disabled={!provinceId}
+                refetchKey={provinceId ?? ''}
+                fetchOptions={(s) => searchCities(provinceId ?? 0, s)}
+                onSelect={(opt) => {
+                  setCityId(opt.id)
+                  set({ cityMunicipality: opt.name, barangay: '', barangayId: 0 })
+                }}
+              />
+            </div>
+            <div ref={barangayWrapRef}>
+              <label className={lbl}>Barangay <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldMessage('barangay') ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                  disabled={!cityId}
+                  refetchKey={cityId ?? ''}
+                  fetchOptions={(s) => searchBarangaysByCity(cityId ?? 0, s)}
+                  onSelect={(opt) => { set({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+                />
+              </div>
+              {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
+            </div>
+            <div>
+              <label className={lbl}>Street / Purok #</label>
+              <input className={inp} value={formData.streetPurok} onChange={e => set({ streetPurok: e.target.value })} placeholder="Enter street or purok" />
+            </div>
           </div>
 
           <SectionDivider numeral="II" title="Classification" />
@@ -319,7 +586,7 @@ export default function SkillsTrainingProfileForm({
           <SectionDivider numeral="III" title="Desired Qualification" />
           <p className="text-xs text-gray-400 -mt-1 mb-3 italic">Select the qualification(s) you wish to train for.</p>
           <div className="grid grid-cols-2 gap-3">
-            {QUALIFICATION_OPTIONS.map(opt => (
+            {qualificationOptions.map(opt => (
               <CheckItem key={opt} label={opt} checked={formData.desiredQualification.includes(opt)} onChange={() => toggleArr('desiredQualification', opt)} />
             ))}
           </div>
@@ -328,7 +595,7 @@ export default function SkillsTrainingProfileForm({
           <SectionDivider numeral="IV" title="Purpose of Training" />
           <p className="text-xs text-gray-400 -mt-1 mb-3 italic">Select all purposes that apply to your training application.</p>
           <div className="space-y-3">
-            {PURPOSE_OPTIONS.map(opt => (
+            {purposeOptions.map(opt => (
               <CheckItem key={opt} label={opt} checked={formData.purposeOfTraining.includes(opt)} onChange={() => toggleArr('purposeOfTraining', opt)} />
             ))}
           </div>
@@ -352,45 +619,15 @@ export default function SkillsTrainingProfileForm({
               </select>
             </div>
           </div>
+
           <div className="mt-6">
             <label className={lbl}>Attached Documents</label>
             <p className="text-xs text-gray-400 mb-3">Attach supporting documents (optional / if applicable).</p>
-            <div className="flex gap-2">
-              <input
-                className={`${inpFocus} flex-1`}
-                placeholder="Document name (e.g. Birth Certificate, Certificate of Residency...)"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const val = (e.currentTarget.value || '').trim()
-                    if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); e.currentTarget.value = '' }
-                    e.preventDefault()
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={e => {
-                  const inputEl = e.currentTarget.previousSibling as HTMLInputElement
-                  const val = inputEl?.value?.trim()
-                  if (val) { set({ attachedDocuments: [...formData.attachedDocuments, val] }); inputEl.value = '' }
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 whitespace-nowrap text-sm flex-shrink-0"
-                style={{ backgroundColor: BRAND }}
-              >
-                <Upload size={15} /> Attach File
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 mt-1.5">Supported: PDF, images (JPG, PNG), Word documents.</p>
-            {formData.attachedDocuments.length > 0 && (
-              <ul className="mt-3 space-y-1.5">
-                {formData.attachedDocuments.map((doc, i) => (
-                  <li key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-                    {doc}
-                    <button type="button" onClick={() => set({ attachedDocuments: formData.attachedDocuments.filter((_, j) => j !== i) })} className="text-gray-400 hover:text-red-500"><X size={14} /></button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <AttachedDocsEditor
+              docs={formData.attachedDocuments}
+              onChange={docs => set({ attachedDocuments: docs })}
+              onPreview={doc => setPreviewDoc(doc)}
+            />
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
@@ -401,6 +638,7 @@ export default function SkillsTrainingProfileForm({
           </div>
         </div>
       </div>
+      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }

@@ -1,12 +1,18 @@
-// Bulk applicant import for GIP.
+// Bulk applicant import for Skills Training.
 //
 // Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the GIP Profile
-//      form section by section, matching the CDSP importer's look.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (province -> city -> barangay, required for GIP since
-//      beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      gipService.createProfile.
+//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the Skills
+//      Training Profile form section by section, matching the look of the
+//      CDSP/GIP/SPES/SLP import templates: a merged, colored section-label
+//      header row (row 1) above the individual field headers (row 2), with
+//      enum fields rendered as in-cell dropdowns.
+//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs
+//      via locationService (cascade: province -> city -> barangay, required
+//      since beneficiaries.barangay_id is NOT NULL), and POST each row through
+//      skillsTrainingService.createProfile.
+//
+// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
+// ExcelJS -- same split as the other modules' importers.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -16,24 +22,22 @@ import {
   searchBarangaysByCity,
   type LocationOption,
 } from '../../services/locationService'
-import { createProfile } from '../../services/gipService'
+import { createProfile } from '../../services/skillsTrainingService'
 import {
   CLASSIFICATION_OPTIONS,
   CIVIL_STATUS_OPTIONS,
-  EDUCATION_OPTIONS,
-  educationFieldFlags,
-} from './GIPProfileForm'
-
-const SEX_OPTIONS = ['Male', 'Female']
+  SEX_OPTIONS,
+  STATUS_OPTIONS,
+} from './SkillsTrainingProfileForm'
 
 // ─── Template definition (grouped by form section) ───────────────────────────
 
 type TemplateColumn = {
-  header: string
+  header: string // base header (no "*"); required columns get a "*" appended on write
   width: number
   example: string
   required?: boolean
-  options?: string[]
+  options?: string[] // renders an in-cell dropdown (data validation)
 }
 
 type TemplateSection = {
@@ -44,6 +48,10 @@ type TemplateSection = {
   columns: TemplateColumn[]
 }
 
+// Address has no numeral of its own on-screen (SkillsTrainingProfileForm.tsx
+// renders it as a plain sub-heading inside Section I, not its own
+// SectionDivider) -- folded into Section I here too rather than inventing a
+// section the real form doesn't have.
 const SECTION_PERSONAL: TemplateSection = {
   label: 'I. PERSONAL INFORMATION',
   fillArgb: 'FF2980B9',
@@ -54,19 +62,9 @@ const SECTION_PERSONAL: TemplateSection = {
     { header: 'First Name', width: 18, example: 'Juan', required: true },
     { header: 'Middle Name', width: 16, example: 'Santos' },
     { header: 'Sex', width: 10, example: 'Male', required: true, options: SEX_OPTIONS },
-    { header: 'Birthdate (MM/DD/YYYY)', width: 20, example: '05/20/2002', required: true },
+    { header: 'Birthdate (MM/DD/YYYY)', width: 20, example: '05/20/1996', required: true },
     { header: 'Civil Status', width: 14, example: 'Single', required: true, options: CIVIL_STATUS_OPTIONS },
     { header: 'Contact Number', width: 16, example: '09171234567' },
-    { header: 'Email', width: 22, example: 'juan@example.com' },
-  ],
-}
-
-const SECTION_ADDRESS: TemplateSection = {
-  label: 'II. ADDRESS',
-  fillArgb: 'FFF1C40F',
-  requiredArgb: 'FFF5D478',
-  optionalArgb: 'FFFDF1C1',
-  columns: [
     { header: 'Province', width: 22, example: 'Misamis Occidental', required: true },
     { header: 'City / Municipality', width: 20, example: 'Tangub City', required: true },
     { header: 'Barangay', width: 18, example: 'Santo Niño', required: true },
@@ -75,29 +73,41 @@ const SECTION_ADDRESS: TemplateSection = {
 }
 
 const SECTION_CLASSIFICATION: TemplateSection = {
-  label: 'III. CLASSIFICATION',
-  fillArgb: 'FF2980B9',
-  requiredArgb: 'FF5B9BD5',
-  optionalArgb: 'FF9DC3E6',
-  columns: [
-    { header: 'Classification (comma-separated)', width: 40, example: 'Fresh Graduate' },
-    { header: 'Classification, if Other', width: 24, example: '' },
-  ],
-}
-
-const SECTION_EDUCATION: TemplateSection = {
-  label: 'IV. EDUCATIONAL BACKGROUND',
+  label: 'II. CLASSIFICATION',
   fillArgb: 'FFF1C40F',
   requiredArgb: 'FFF5D478',
   optionalArgb: 'FFFDF1C1',
   columns: [
-    { header: 'Highest Educational Attainment', width: 28, example: 'College Graduate', options: EDUCATION_OPTIONS },
-    { header: 'School / University', width: 24, example: 'Tangub City College' },
-    { header: 'Strand', width: 18, example: '' },
-    { header: 'Course / Degree', width: 22, example: 'BS Public Administration' },
-    { header: 'Year Level', width: 16, example: '' },
-    { header: 'Year Graduated', width: 16, example: '2024' },
+    { header: 'Classification (comma-separated)', width: 40, example: 'Student' },
   ],
+}
+
+// Section III — Desired Qualification. The option list is fetched live (new
+// qualifications can be added over time), so the dropdown options are
+// injected by the caller rather than hardcoded here.
+function makeQualificationSection(qualifications: string[]): TemplateSection {
+  return {
+    label: 'III. DESIRED QUALIFICATION',
+    fillArgb: 'FF2980B9',
+    requiredArgb: 'FF5B9BD5',
+    optionalArgb: 'FF9DC3E6',
+    columns: [
+      { header: 'Desired Qualification (comma-separated)', width: 40, example: qualifications[0] ?? '' },
+    ],
+  }
+}
+
+// Section IV — Purpose of Training. Same reasoning as Desired Qualification.
+function makePurposeSection(purposes: string[]): TemplateSection {
+  return {
+    label: 'IV. PURPOSE OF TRAINING',
+    fillArgb: 'FFF1C40F',
+    requiredArgb: 'FFF5D478',
+    optionalArgb: 'FFFDF1C1',
+    columns: [
+      { header: 'Purpose of Training (comma-separated)', width: 40, example: purposes[0] ?? '' },
+    ],
+  }
 }
 
 const SECTION_OFFICE: TemplateSection = {
@@ -108,30 +118,46 @@ const SECTION_OFFICE: TemplateSection = {
   columns: [
     { header: 'Date Applied (MM/DD/YYYY)', width: 20, example: '' },
     { header: 'Received By', width: 20, example: '' },
-    { header: 'Remarks', width: 24, example: '' },
+    { header: 'Status', width: 14, example: 'Waitlisted', options: STATUS_OPTIONS },
   ],
 }
 
-function buildSections(): TemplateSection[] {
-  return [SECTION_PERSONAL, SECTION_ADDRESS, SECTION_CLASSIFICATION, SECTION_EDUCATION, SECTION_OFFICE]
+function buildSections(qualifications: string[], purposes: string[]): TemplateSection[] {
+  return [
+    SECTION_PERSONAL,
+    SECTION_CLASSIFICATION,
+    makeQualificationSection(qualifications),
+    makePurposeSection(purposes),
+    SECTION_OFFICE,
+  ]
 }
 
+// Rows (beyond the two header rows) that receive dropdown validation, so users
+// have plenty of pre-formatted rows to fill in.
 const TEMPLATE_VALIDATION_ROWS = 200
 const FIRST_DATA_ROW = 3 // row 1 = section labels, row 2 = field headers.
 
+// Excel silently caps a data-validation error message at ~225 characters (and
+// truncating/exceeding it is exactly what triggers the "we found a problem
+// with some content" repair prompt on open). Long option lists blow past that
+// when fully enumerated, so fall back to a generic message rather than risk
+// corrupting the workbook.
 const MAX_VALIDATION_ERROR_LEN = 200
 function validationErrorMessage(options: string[]): string {
   const enumerated = `Please choose one of: ${options.join(', ')}`
   return enumerated.length <= MAX_VALIDATION_ERROR_LEN ? enumerated : 'Please choose a value from the dropdown list.'
 }
 
-export async function downloadImportTemplate(): Promise<void> {
-  const sections = buildSections()
+export async function downloadImportTemplate(qualifications: string[], purposes: string[]): Promise<void> {
+  const sections = buildSections(qualifications, purposes)
   const columns = sections.flatMap((s) => s.columns)
 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Applicants')
 
+  // Format every column as Text ("@") so Excel preserves leading zeros (e.g. the
+  // "0" in a contact number) and doesn't auto-convert dates/long numbers. The
+  // parser reads every cell as a string anyway, so text format is ideal.
   ws.columns = columns.map((c) => ({ width: c.width, style: { numFmt: '@' } }))
 
   const border = {
@@ -141,6 +167,7 @@ export async function downloadImportTemplate(): Promise<void> {
     right: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
   }
 
+  // Row 1: section-label band, one merged cell per section.
   let startCol = 1
   for (const section of sections) {
     const endCol = startCol + section.columns.length - 1
@@ -157,6 +184,7 @@ export async function downloadImportTemplate(): Promise<void> {
   }
   ws.getRow(1).height = 26
 
+  // Row 2: field headers colored per section (blue/yellow/gray shades), black text.
   let colIdx2 = 0
   for (const section of sections) {
     for (const col of section.columns) {
@@ -171,11 +199,18 @@ export async function downloadImportTemplate(): Promise<void> {
   }
   ws.getRow(2).height = 32
 
+  // Row 3: one greyed, italic example row.
   const exampleRow = ws.addRow(columns.map((c) => c.example))
   exampleRow.eachCell((cell) => {
     cell.font = { italic: true, color: { argb: 'FF94A3B8' } }
   })
 
+  // Freeze both header rows, then apply dropdown validation to the enum columns.
+  // Longer option lists can exceed Excel's ~255-character limit on an inline
+  // list formula ("a,b,c"), which corrupts the workbook (Excel prompts to
+  // "repair" it on open). To avoid that entirely, every dropdown's values are
+  // written to a hidden helper sheet and referenced by cell range instead of
+  // as a literal string.
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   const lastRow = FIRST_DATA_ROW + TEMPLATE_VALIDATION_ROWS - 1
   const optionColumns = columns.filter((c) => c.options && c.options.length > 0)
@@ -212,17 +247,20 @@ export async function downloadImportTemplate(): Promise<void> {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = 'GIP_Applicants_Template.xlsx'
+  link.download = 'SkillsTraining_Applicants_Template.xlsx'
   link.click()
   URL.revokeObjectURL(url)
 }
 
 // ─── Parsing helpers ─────────────────────────────────────────────────────────
 
+// Normalize a header or cell value for comparison: trim, collapse whitespace,
+// strip the "*" required marker, lowercase.
 function norm(v: unknown): string {
   return String(v ?? '').replace(/\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
+// Return the canonical option matching `value` (case-insensitively), or "".
 function pickEnum(value: string, options: string[]): string {
   const n = norm(value)
   return options.find((o) => norm(o) === n) ?? ''
@@ -252,13 +290,14 @@ function toIsoDate(v: string): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
+// A single parsed row, keyed by normalized header.
 type Row = Record<string, string>
 
 function get(row: Row, header: string): string {
   return (row[norm(header)] ?? '').trim()
 }
 
-// ─── Address resolution (required for GIP: beneficiaries.barangay_id is NOT NULL) ─
+// ─── Address resolution (required: beneficiaries.barangay_id is NOT NULL) ────
 
 type ResolveCaches = {
   province: Map<string, LocationOption | null>
@@ -325,7 +364,7 @@ async function resolveAddress(
 
 // ─── Row -> create-profile payload ───────────────────────────────────────────
 
-async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<string, unknown>> {
+async function rowToPayload(row: Row, qualifications: string[], purposes: string[], caches: ResolveCaches): Promise<Record<string, unknown>> {
   const lastName = get(row, 'Last Name')
   const firstName = get(row, 'First Name')
   if (!lastName) throw new Error('Last Name is required.')
@@ -337,31 +376,11 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
   const birthdateRaw = get(row, 'Birthdate (MM/DD/YYYY)')
   if (!birthdateRaw) throw new Error('Birthdate is required.')
   const birthdate = toIsoDate(birthdateRaw)
-  if (!birthdate) throw new Error(`Birthdate "${birthdateRaw}" is not a valid date — use MM/DD/YYYY format (e.g. 05/20/2002).`)
+  if (!birthdate) throw new Error(`Birthdate "${birthdateRaw}" is not a valid date — use MM/DD/YYYY format (e.g. 05/20/1996).`)
 
   const civilStatusRaw = get(row, 'Civil Status')
   const civilStatus = pickEnum(civilStatusRaw, CIVIL_STATUS_OPTIONS)
   if (!civilStatus) throw new Error(`Civil Status is required and must be one of: ${CIVIL_STATUS_OPTIONS.join(', ')}.`)
-
-  const highestEducation = pickEnum(get(row, 'Highest Educational Attainment'), EDUCATION_OPTIONS)
-
-  const strand = get(row, 'Strand')
-  const course = get(row, 'Course / Degree')
-  const yearLevel = get(row, 'Year Level')
-  const yearGraduated = get(row, 'Year Graduated')
-  const eduFlags = educationFieldFlags(highestEducation)
-  if (strand && !eduFlags.showStrand) {
-    throw new Error(`Strand only applies to Senior High School (Level or Graduate) — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
-  if (course && !eduFlags.showCourse) {
-    throw new Error(`Course / Degree only applies to College, Master's, or Doctoral entries — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
-  if (yearLevel && !eduFlags.showYearLevel) {
-    throw new Error(`Year Level doesn't apply to "${highestEducation}" — remove it, or change Highest Educational Attainment to an Elementary/High School/Senior High School/College Level.`)
-  }
-  if (yearGraduated && !eduFlags.showYearGraduated) {
-    throw new Error(`Year Graduated only applies to a "Graduate" attainment (or Vocational / Technical) — it doesn't apply to "${highestEducation}". Remove it or fix Highest Educational Attainment.`)
-  }
 
   const address = await resolveAddress(
     get(row, 'Province'),
@@ -375,6 +394,18 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     .map((c) => pickEnum(c, CLASSIFICATION_OPTIONS))
     .filter(Boolean)
 
+  const desiredQualification = get(row, 'Desired Qualification (comma-separated)')
+    .split(',')
+    .map((q) => pickEnum(q, qualifications))
+    .filter(Boolean)
+
+  const purposeOfTraining = get(row, 'Purpose of Training (comma-separated)')
+    .split(',')
+    .map((p) => pickEnum(p, purposes))
+    .filter(Boolean)
+
+  const status = pickEnum(get(row, 'Status'), STATUS_OPTIONS) || 'Waitlisted'
+
   return {
     firstName,
     lastName,
@@ -383,20 +414,17 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     birthdate,
     civilStatus,
     contactNumber: get(row, 'Contact Number'),
-    email: get(row, 'Email'),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,
     classification,
-    classificationOther: get(row, 'Classification, if Other'),
-    highestEducation,
-    schoolName: get(row, 'School / University'),
-    strand,
-    course,
-    yearLevel,
-    yearGraduated,
+    classificationOther: [],
+    desiredQualification,
+    qualificationOther: [],
+    purposeOfTraining,
+    purposeOther: [],
     dateApplicationReceived: toIsoDate(get(row, 'Date Applied (MM/DD/YYYY)')),
     receivedBy: get(row, 'Received By'),
-    remarks: get(row, 'Remarks'),
+    status,
   }
 }
 
@@ -405,6 +433,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
 export type ImportRowError = { row: number; name: string; error: string }
 export type ImportResult = { total: number; succeeded: number; failed: ImportRowError[] }
 
+// Example-row values we skip so the sample doesn't get imported.
 const EXAMPLE_SURNAME = 'dela cruz'
 const EXAMPLE_FIRST = 'juan'
 
@@ -416,8 +445,10 @@ function isExampleRow(row: Row): boolean {
   return norm(get(row, 'Last Name')) === EXAMPLE_SURNAME && norm(get(row, 'First Name')) === EXAMPLE_FIRST
 }
 
-export async function importGipApplicants(
+export async function importSkillsTrainingApplicants(
   file: File,
+  qualifications: string[],
+  purposes: string[],
   onProgress?: (done: number, total: number) => void,
 ): Promise<ImportResult> {
   const buf = await file.arrayBuffer()
@@ -425,6 +456,9 @@ export async function importGipApplicants(
   const sheet = wb.Sheets[wb.SheetNames[0]]
   if (!sheet) throw new Error('The file has no worksheets.')
 
+  // range:1 -> treat the SECOND row (the field headers) as the header row, so
+  // the merged section-label band in row 1 is ignored. raw:false -> formatted
+  // strings (preserves leading zeros, formats dates).
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: '',
     raw: false,
@@ -447,7 +481,7 @@ export async function importGipApplicants(
     const { sheetRow, data } = dataRows[i]
     const name = [get(data, 'First Name'), get(data, 'Last Name')].filter(Boolean).join(' ') || '(unnamed)'
     try {
-      const payload = await rowToPayload(data, caches)
+      const payload = await rowToPayload(data, qualifications, purposes, caches)
       await createProfile(payload)
       succeeded++
     } catch (err) {

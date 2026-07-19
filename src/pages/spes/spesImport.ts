@@ -17,7 +17,7 @@ import {
   type LocationOption,
 } from '../../services/locationService'
 import { createProfile } from '../../services/spesService'
-import { CIVIL_STATUS_OPTIONS, SCHOOL_TYPE_OPTIONS, gradeYearLevelOptionsFor } from './SPESProfileForm'
+import { CIVIL_STATUS_OPTIONS, SCHOOL_TYPE_OPTIONS, gradeYearLevelOptionsFor, CLASSIFICATION_OPTIONS } from './SPESProfileForm'
 
 const SEX_OPTIONS = ['Male', 'Female']
 
@@ -69,11 +69,22 @@ const SECTION_ADDRESS: TemplateSection = {
   ],
 }
 
-const SECTION_EDUCATION: TemplateSection = {
-  label: 'III. EDUCATIONAL INFORMATION',
+const SECTION_CLASSIFICATION: TemplateSection = {
+  label: 'III. CLASSIFICATION',
   fillArgb: 'FF2980B9',
   requiredArgb: 'FF5B9BD5',
   optionalArgb: 'FF9DC3E6',
+  columns: [
+    { header: 'Classification (comma-separated)', width: 40, example: 'Student' },
+    { header: 'Classification, if Other', width: 24, example: '' },
+  ],
+}
+
+const SECTION_EDUCATION: TemplateSection = {
+  label: 'IV. EDUCATIONAL INFORMATION',
+  fillArgb: 'FFF1C40F',
+  requiredArgb: 'FFF5D478',
+  optionalArgb: 'FFFDF1C1',
   columns: [
     { header: 'School Name', width: 24, example: 'Tangub City College' },
     { header: 'School Type', width: 22, example: 'College', options: SCHOOL_TYPE_OPTIONS },
@@ -83,10 +94,10 @@ const SECTION_EDUCATION: TemplateSection = {
 }
 
 const SECTION_FAMILY: TemplateSection = {
-  label: 'IV. FAMILY / ECONOMIC INFORMATION',
-  fillArgb: 'FFF1C40F',
-  requiredArgb: 'FFF5D478',
-  optionalArgb: 'FFFDF1C1',
+  label: 'V. FAMILY / ECONOMIC INFORMATION',
+  fillArgb: 'FF2980B9',
+  requiredArgb: 'FF5B9BD5',
+  optionalArgb: 'FF9DC3E6',
   columns: [
     { header: 'Annual Family Income', width: 20, example: '80000' },
     { header: 'Number of Dependents', width: 20, example: '4' },
@@ -94,7 +105,7 @@ const SECTION_FAMILY: TemplateSection = {
 }
 
 const SECTION_OFFICE: TemplateSection = {
-  label: 'V. FOR PESO OFFICE ONLY',
+  label: 'VI. FOR PESO OFFICE ONLY',
   fillArgb: 'FF64748B',
   requiredArgb: 'FF94A3B8',
   optionalArgb: 'FFCBD5E1',
@@ -106,7 +117,7 @@ const SECTION_OFFICE: TemplateSection = {
 }
 
 function buildSections(): TemplateSection[] {
-  return [SECTION_PERSONAL, SECTION_ADDRESS, SECTION_EDUCATION, SECTION_FAMILY, SECTION_OFFICE]
+  return [SECTION_PERSONAL, SECTION_ADDRESS, SECTION_CLASSIFICATION, SECTION_EDUCATION, SECTION_FAMILY, SECTION_OFFICE]
 }
 
 const TEMPLATE_VALIDATION_ROWS = 200
@@ -357,6 +368,11 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     caches,
   )
 
+  const classification = get(row, 'Classification (comma-separated)')
+    .split(',')
+    .map((c) => pickEnum(c, CLASSIFICATION_OPTIONS))
+    .filter(Boolean)
+
   const dependentsRaw = get(row, 'Number of Dependents')
   const numberOfDependents = dependentsRaw && /^\d+$/.test(dependentsRaw) ? parseInt(dependentsRaw, 10) : 0
 
@@ -371,6 +387,8 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     email: get(row, 'Email'),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,
+    classification,
+    classificationOther: get(row, 'Classification, if Other'),
     schoolName: get(row, 'School Name'),
     schoolType,
     gradeYearLevel,

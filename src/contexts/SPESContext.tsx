@@ -79,7 +79,6 @@ export interface SPESBatch {
   fundingSourceOther: string
   status: 'Planned' | 'Ongoing' | 'Completed'
   documents: SPESSavedDocument[]
-  isDraft?: boolean
 }
 
 interface SPESContextValue {

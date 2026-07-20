@@ -586,6 +586,16 @@ export default function CDSPMaintenanceForm() {
     <>
       <div className="bg-white rounded-xl shadow-md p-5 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="relative col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search by title or service..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+              className={inputCls + ' pl-9'}
+            />
+          </div>
           <select
             value={filterService}
             onChange={e => { setFilterService(e.target.value); setCurrentPage(1) }}
@@ -604,16 +614,6 @@ export default function CDSPMaintenanceForm() {
             <option value="Ongoing">Ongoing</option>
             <option value="Completed">Completed</option>
           </select>
-          <div className="relative col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search by title or service..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
-              className={inputCls + ' pl-9'}
-            />
-          </div>
         </div>
       </div>
 

@@ -61,7 +61,6 @@ export interface GIPBatch {
   description: string
   assignedOffice: string
   deploymentLocation: string
-  coordinator: string
   supervisor: string
   slots: string
   assignedCount: number
@@ -72,7 +71,6 @@ export interface GIPBatch {
   allowance: string
   status: 'Planned' | 'Ongoing' | 'Completed'
   documents: GIPSavedDocument[]
-  isDraft?: boolean
 }
 
 interface GIPContextValue {

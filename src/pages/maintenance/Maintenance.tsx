@@ -97,6 +97,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [gipStatusFilter, setGipStatusFilter] = useState('All')
   const [gipBatchPage, setGipBatchPage] = useState(1)
   const [gipBatchPerPage, setGipBatchPerPage] = useState(10)
+  const [spesSearch, setSpesSearch] = useState('')
+  const [spesStatusFilter, setSpesStatusFilter] = useState('All')
   const [spesBatchPage, setSpesBatchPage] = useState(1)
   const [spesBatchPerPage, setSpesBatchPerPage] = useState(10)
   const [spesParticipantPage, setSpesParticipantPage] = useState(1)
@@ -126,15 +128,15 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
   // ── SPES handlers ──────────────────────────────────────────────────────────
 
-  const handleAddBatch = async (data: Omit<SPESBatch, 'id'>, isDraft?: boolean) => {
+  const handleAddBatch = async (data: Omit<SPESBatch, 'id'>) => {
     try {
       await spesApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshSpesBatches()
       setSpesAction('')
       Swal.fire({
         icon: 'success',
-        title: isDraft ? 'Draft Saved' : 'Batch Added',
-        text: isDraft ? 'Draft saved successfully.' : 'New SPES batch has been added successfully.',
+        title: 'Batch Added',
+        text: 'New SPES batch has been added successfully.',
         confirmButtonText: 'OK',
         confirmButtonColor: '#0077BE',
       })
@@ -188,15 +190,15 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
     ?? (e as { message?: string })?.message ?? fallback
 
-  const handleAddGipBatch = async (data: Omit<GIPBatch, 'id'>, isDraft?: boolean) => {
+  const handleAddGipBatch = async (data: Omit<GIPBatch, 'id'>) => {
     try {
       await gipApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshGipBatches()
       setGipAction('')
       Swal.fire({
         icon: 'success',
-        title: isDraft ? 'Draft Saved' : 'Batch Added',
-        text: isDraft ? 'Draft saved successfully.' : 'New GIP batch has been added successfully.',
+        title: 'Batch Added',
+        text: 'New GIP batch has been added successfully.',
         confirmButtonText: 'OK',
         confirmButtonColor: GIP_CONFIRM_COLOR,
       })
@@ -261,7 +263,13 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const gipBatchRecordStart = filteredGipBatches.length === 0 ? 0 : (gipBatchSafePage - 1) * gipBatchPerPage + 1
   const gipBatchRecordEnd = Math.min(gipBatchSafePage * gipBatchPerPage, filteredGipBatches.length)
 
-  const sortedSpesBatches = [...spesBatches].sort((a, b) => statusRank(a.status) - statusRank(b.status))
+  const sortedSpesBatches = spesBatches.filter(b => {
+    const matchSearch = !spesSearch ||
+      b.batchName.toLowerCase().includes(spesSearch.toLowerCase()) ||
+      b.employer.toLowerCase().includes(spesSearch.toLowerCase())
+    const matchStatus = spesStatusFilter === 'All' || b.status === spesStatusFilter
+    return matchSearch && matchStatus
+  }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
   const spesBatchTotalPages = Math.max(1, Math.ceil(sortedSpesBatches.length / spesBatchPerPage))
   const spesBatchSafePage = Math.min(spesBatchPage, spesBatchTotalPages)
   const paginatedSpesBatches = sortedSpesBatches.slice((spesBatchSafePage - 1) * spesBatchPerPage, spesBatchSafePage * spesBatchPerPage)
@@ -547,7 +555,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <p className="text-gray-500 mb-5">
               Select an action for <span className="font-medium" style={{ color: GIP_CONFIRM_COLOR }}>GIP</span>
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 gap-5">
               {[
                 { key: 'add_batch' as GIPAction, label: 'Add Batch', icon: <PlusCircle size={32} />, desc: 'Create a new GIP deployment batch' },
                 { key: 'view_batches' as GIPAction, label: 'View Batches', icon: <FolderOpen size={32} />, desc: 'Browse all GIP batches' },
@@ -586,7 +594,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FolderOpen size={32} style={{ color: GIP_CONFIRM_COLOR }} />
               </div>
-              <h3 className="text-gray-700 mb-2">GIP Program Maintenance</h3>
+              <h3 className="text-gray-700 mb-2 text-center">GIP Program Maintenance</h3>
               <p className="text-gray-400 text-center px-8">
                 Select an action above to manage batches for the Government Internship Program.
               </p>
@@ -606,27 +614,29 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           {gipAction === 'view_batches' && (
             <>
               {/* Search + filter bar */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <div className="relative flex-1">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={gipSearch}
-                    onChange={e => setGipSearch(e.target.value)}
-                    placeholder="Search by batch name, code, or office..."
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
-                  />
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={gipSearch}
+                      onChange={e => setGipSearch(e.target.value)}
+                      placeholder="Search by batch name, code, or office..."
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                    />
+                  </div>
+                  <select
+                    value={gipStatusFilter}
+                    onChange={e => setGipStatusFilter(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                  >
+                    <option value="All">All Status</option>
+                    <option value="Planned">Planned</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Completed">Completed</option>
+                  </select>
                 </div>
-                <select
-                  value={gipStatusFilter}
-                  onChange={e => setGipStatusFilter(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
-                >
-                  <option value="All">All Status</option>
-                  <option value="Planned">Planned</option>
-                  <option value="Ongoing">Ongoing</option>
-                  <option value="Completed">Completed</option>
-                </select>
               </div>
 
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -677,9 +687,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                             <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="px-6 py-4">
                                 <span className="text-gray-800 font-medium">{b.batchName}</span>
-                                {b.isDraft && (
-                                  <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">Draft</span>
-                                )}
                                 {b.description && (
                                   <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
                                 )}
@@ -861,7 +868,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <p className="text-gray-500 mb-5">
               Select an action for <span className="text-brand-blue font-medium">SPES</span>
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 gap-5">
               {[
                 { key: 'add_batch' as SPESAction, label: 'Add Batch', icon: <PlusCircle size={32} />, desc: 'Create a new SPES deployment batch' },
                 { key: 'view_batches' as SPESAction, label: 'View Batches', icon: <FolderOpen size={32} />, desc: 'Browse all batches' },
@@ -894,7 +901,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FolderOpen size={32} className="text-brand-blue" />
               </div>
-              <h3 className="text-gray-700 mb-2">SPES Program Maintenance</h3>
+              <h3 className="text-gray-700 mb-2 text-center">SPES Program Maintenance</h3>
               <p className="text-gray-400 text-center px-8">
                 Select an action above to manage projects and services for the SPES program.
               </p>
@@ -913,6 +920,32 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           {/* View Batches table */}
           {spesAction === 'view_batches' && (
             <>
+              {/* Search + filter bar */}
+              <div className="bg-white rounded-xl shadow-md p-5 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={spesSearch}
+                      onChange={e => setSpesSearch(e.target.value)}
+                      placeholder="Search by batch name or employer..."
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                    />
+                  </div>
+                  <select
+                    value={spesStatusFilter}
+                    onChange={e => setSpesStatusFilter(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                  >
+                    <option value="All">All Status</option>
+                    <option value="Planned">Planned</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
                   <div>
@@ -927,7 +960,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   </button>
                 </div>
 
-                {spesBatches.length === 0 ? (
+                {sortedSpesBatches.length === 0 ? (
                   <div className="text-center py-16">
                     <FolderOpen size={48} className="mx-auto text-gray-300 mb-3" />
                     <p className="text-gray-500">No SPES batches found.</p>
@@ -958,9 +991,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                           <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <span className="text-gray-800 font-medium">{b.batchName}</span>
-                              {b.isDraft && (
-                                <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">Draft</span>
-                              )}
                               {b.description && (
                                 <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
                               )}

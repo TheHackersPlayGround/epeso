@@ -27,7 +27,6 @@ function emptyBatch(): Omit<GIPBatch, 'id'> {
     description: '',
     assignedOffice: '',
     deploymentLocation: '',
-    coordinator: '',
     supervisor: '',
     slots: '',
     assignedCount: 0,
@@ -38,7 +37,6 @@ function emptyBatch(): Omit<GIPBatch, 'id'> {
     allowance: '',
     status: 'Planned',
     documents: [],
-    isDraft: false,
   }
 }
 
@@ -117,7 +115,7 @@ function Field({
 interface GIPMaintenanceFormProps {
   mode: 'batch' | 'batch-view' | 'batch-edit'
   initialBatch?: GIPBatch
-  onSaveBatch: (data: Omit<GIPBatch, 'id'>, isDraft?: boolean) => void
+  onSaveBatch: (data: Omit<GIPBatch, 'id'>) => void
   onUpdateBatch?: (batch: GIPBatch) => void
   onCancel: () => void
 }
@@ -223,12 +221,12 @@ export default function GIPMaintenanceForm({
 
   // ── Submit ───────────────────────────────────────────────────────────────────
 
-  const handleSave = (isDraft = false) => {
-    if (!isDraft && !validate()) return
+  const handleSave = () => {
+    if (!validate()) return
     if (isEdit && initialBatch && onUpdateBatch) {
       onUpdateBatch({ ...form, id: initialBatch.id } as GIPBatch)
     } else {
-      onSaveBatch(form, isDraft)
+      onSaveBatch(form)
     }
   }
 
@@ -446,17 +444,8 @@ export default function GIPMaintenanceForm({
             >
               Cancel
             </button>
-            {isAdd && (
-              <button
-                onClick={() => handleSave(true)}
-                disabled={!canManage('gip')}
-                className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-              >
-                Save as Draft
-              </button>
-            )}
             <button
-              onClick={() => handleSave(false)}
+              onClick={handleSave}
               disabled={!canManage('gip')}
               className="px-6 py-2.5 text-white bg-brand-blue hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
             >

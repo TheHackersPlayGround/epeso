@@ -9,7 +9,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 // ─── Exported constants ────────────────────────────────────────────────────────
 
 export const CLASSIFICATION_OPTIONS = [
-  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
+  'Student', 'Fresh Graduate',
   'Out of School Youth', 'Person with Disability', 'Solo Parent',
   'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]

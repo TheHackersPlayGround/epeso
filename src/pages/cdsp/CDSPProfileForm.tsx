@@ -10,7 +10,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const CLASSIFICATION_OPTIONS = [
-  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
+  'Student', 'Fresh Graduate',
   'Out of School Youth', 'Person with Disability', 'Solo Parent',
   'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]
@@ -37,13 +37,9 @@ export const emptyForm: Omit<CDSPApplicant, 'id'> = {
   streetPurok: '', barangay: '', cityMunicipality: '', province: '', region: '',
   classification: [], classificationOther: '',
   highestEducation: '', schoolName: '', course: '', strand: '', yearLevel: '', yearGraduated: '',
-  employmentStatus: '', currentOccupation: '', employerName: '', employmentType: '', monthlyIncome: '',
+  employmentStatus: '', currentOccupation: '',
   serviceAvailed: '', assignedActivity: '', assignmentHistory: [],
-  careerGoal: '', coachingType: '', careerAssessmentResult: '',
-  targetJob: '', industriesOfInterest: [], preEmploymentRequirements: [],
-  school: '', courseProgram: '', expectedGraduation: '',
-  applicantSignature: '', dateSignature: '',
-  dateApplicationReceived: '', receivedBy: '', counselorName: '',
+  dateApplicationReceived: '', receivedBy: '',
   status: 'Active', remarks: '',
   attachedDocuments: [],
 }
@@ -338,10 +334,12 @@ export default function CDSPProfileForm({
   const [cityId, setCityId] = useState<number | null>(null)
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
-  const toggleArr = (field: 'classification' | 'industriesOfInterest' | 'preEmploymentRequirements', value: string) => {
-    const arr = formData[field] as string[]
-    set({ [field]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] })
-  }
+  const toggleClassification = (value: string) =>
+    set({
+      classification: formData.classification.includes(value)
+        ? formData.classification.filter((v) => v !== value)
+        : [...formData.classification, value],
+    })
 
   const handleBirthdate = (date: string) => {
     let age = 0
@@ -589,9 +587,9 @@ export default function CDSPProfileForm({
           <SectionDivider numeral="III" title="Classification" />
           <div className="grid grid-cols-2 gap-3">
             {CLASSIFICATION_OPTIONS.filter((o) => o !== 'Other').map((opt) => (
-              <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleArr('classification', opt)} />
+              <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleClassification(opt)} />
             ))}
-            <CheckItem label="Other" checked={formData.classification.includes('Other')} onChange={() => toggleArr('classification', 'Other')} />
+            <CheckItem label="Other" checked={formData.classification.includes('Other')} onChange={() => toggleClassification('Other')} />
           </div>
           {formData.classification.includes('Other') && (
             <div className="mt-3">

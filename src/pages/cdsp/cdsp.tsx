@@ -358,8 +358,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     'Highest Education': a.highestEducation, 'Course': a.course,
     'Employment Status': a.employmentStatus, 'Occupation': a.currentOccupation,
     'Service Availed': a.serviceAvailed, 'Assigned Activity': a.assignedActivity,
-    'Career Goal': a.careerGoal, 'Target Job': a.targetJob,
-    'Counselor': a.counselorName, 'Status': a.status, 'Remarks': a.remarks,
+    'Status': a.status, 'Remarks': a.remarks,
     'Date Received': a.dateApplicationReceived, 'Received By': a.receivedBy,
   }))
 

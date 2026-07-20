@@ -47,28 +47,13 @@ export interface CDSPApplicant {
   yearGraduated: string
   employmentStatus: string
   currentOccupation: string
-  employerName: string
-  employmentType: string
-  monthlyIncome: string
   serviceAvailed: string
   assignedActivity: string
   assignedActivityId: number | null
   assignmentHistory: CDSPAssignment[]
-  careerGoal: string
-  coachingType: string
-  careerAssessmentResult: string
-  targetJob: string
-  industriesOfInterest: string[]
-  preEmploymentRequirements: string[]
-  school: string
-  courseProgram: string
   yearLevel: string
-  expectedGraduation: string
-  applicantSignature: string
-  dateSignature: string
   dateApplicationReceived: string
   receivedBy: string
-  counselorName: string
   status: 'Active' | 'Inactive'
   remarks: string
   attachedDocuments: CDSPSavedDocument[]
@@ -78,7 +63,6 @@ export interface CdspActivity {
   id: number
   serviceId: number
   service: string
-  program: string
   title: string
   description: string
   date: string

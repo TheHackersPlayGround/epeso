@@ -10,7 +10,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 interface SPESMaintenanceFormProps {
   mode: 'batch' | 'batch-view' | 'batch-edit'
   initialBatch?: SPESBatch
-  onSaveBatch: (batch: Omit<SPESBatch, 'id'>, isDraft?: boolean) => void
+  onSaveBatch: (batch: Omit<SPESBatch, 'id'>) => void
   onUpdateBatch?: (batch: SPESBatch) => void
   onCancel: () => void
 }
@@ -542,15 +542,6 @@ export default function SPESMaintenanceForm({
             </button>
             {!isView && (
               <>
-                {isAdd && (
-                  <button
-                    type="button"
-                    onClick={() => onSaveBatch({ ...form, isDraft: true }, true)}
-                    className="px-5 py-2.5 text-sm text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    Save Draft
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={handleSave}

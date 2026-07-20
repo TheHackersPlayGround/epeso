@@ -19,7 +19,7 @@ export const SCHOOL_TYPE_OPTIONS = [
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated']
 
 export const CLASSIFICATION_OPTIONS = [
-  'Student', 'Fresh Graduate', 'Employed', 'Underemployed', 'Unemployed',
+  'Student', 'Fresh Graduate',
   'Out of School Youth', 'Person with Disability', 'Solo Parent',
   'Women', 'Senior Citizen', 'Returning OFW', 'Other', 'Indigenous People',
 ]

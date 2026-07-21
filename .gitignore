@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Client test bundle (built locally, not part of source)
+client-bundle/
+.env.bundle
+EPESO-ClientTest/
+*.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

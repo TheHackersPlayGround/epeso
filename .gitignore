@@ -15,7 +15,7 @@ dist-ssr
 # Client test bundle (built locally, not part of source)
 client-bundle/
 .env.bundle
-EPESO-ClientTest/
+EPESO-ClientTest*/
 *.zip
 
 # Editor directories and files

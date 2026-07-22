@@ -321,10 +321,11 @@ export default function CDSPMaintenanceForm() {
       await cdspService.deleteActivity(deleteConfirm)
       await refreshActivities()
       await refreshProfiles()
-      setDeleteConfirm(null)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete activity.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    } finally {
+      setDeleteConfirm(null)
     }
   }
 
@@ -358,10 +359,11 @@ export default function CDSPMaintenanceForm() {
       await refreshActivities()
       await refreshProfiles()
       Swal.fire({ icon: 'success', title: 'Status Updated', text: `Activity is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-      setStatusConfirm(null)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? `Failed to ${label.toLowerCase()}.`
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    } finally {
+      setStatusConfirm(null)
     }
   }
 

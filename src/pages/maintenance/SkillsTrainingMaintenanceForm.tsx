@@ -240,7 +240,7 @@ function TrainingForm({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SkillsTrainingMaintenanceForm() {
-  const { batches, activities, refreshBatches, refreshActivities } = useSkillsTraining()
+  const { batches, activities, refreshBatches, refreshActivities, refreshProfiles } = useSkillsTraining()
 
   const [action, setAction] = useState<STAction>('')
 
@@ -385,7 +385,7 @@ export default function SkillsTrainingMaintenanceForm() {
         participants: editForm.participants ? Number(editForm.participants) : 0,
         status: editForm.status,
       })
-      await refreshActivities()
+      await Promise.all([refreshActivities(), refreshProfiles()])
       setSelectedTraining(res.data)
       setTrainingSubView('')
       Swal.fire({ icon: 'success', title: 'Training Updated', text: 'Changes saved successfully.', confirmButtonColor: BRAND_BLUE })
@@ -497,7 +497,7 @@ export default function SkillsTrainingMaintenanceForm() {
 
     try {
       await skillsTrainingService.updateActivityStatus(activity.id, nextStatus)
-      await refreshActivities()
+      await Promise.all([refreshActivities(), refreshProfiles()])
       setTrainingStatusConfirm(null)
       Swal.fire({ icon: 'success', title: 'Status Updated', text: `Status changed to ${nextStatus}.`, confirmButtonColor: BRAND_BLUE })
     } catch (e) {

@@ -1,17 +1,42 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import Swal from 'sweetalert2'
-import { ArrowLeft, Plus, Upload, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import * as XLSX from 'xlsx'
-import type { OFWProfile } from '../../contexts/OFWContext'
+import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
-import AddOFWRequestForm from './AddOFWRequestForm'
+import * as ofwService from '../../services/ofwService'
+import AddOFWRequestForm, { EMPLOYMENT_STATUS_OPTIONS, REQUEST_TYPES } from './AddOFWRequestForm'
 import OFWProfileModal from './OFWProfileModal'
 
 interface OFWViewProps {
   onBack: () => void
+}
+
+function errMsg(e: unknown, fallback: string) {
+  return (e as { message?: string })?.message ?? fallback
+}
+
+// Backend stores the OWWA/ELPOR attachments as named document slots rather
+// than the display-shaped owwaWelfareFile/elporFiles fields on OFWProfile --
+// this converts the form's shape into that wire format. Including every
+// currently-set slot (not just freshly-uploaded ones) matters: the backend
+// treats an entirely absent key as "remove this slot", so an unchanged,
+// already-saved attachment must still be sent (with no dataUrl) to survive.
+function buildNamedAttachments(elporFiles?: Record<string, OFWSavedAttachment>, owwaWelfareFile?: OFWSavedAttachment | null) {
+  const named: Record<string, { fileName: string; dataUrl?: string }> = {}
+  if (owwaWelfareFile) named['OWWA Welfare Case Form'] = { fileName: owwaWelfareFile.fileName, dataUrl: owwaWelfareFile.dataUrl }
+  for (const [type, att] of Object.entries(elporFiles ?? {})) {
+    named[type] = { fileName: att.fileName, dataUrl: att.dataUrl }
+  }
+  return named
+}
+
+function toApiPayload(data: Omit<OFWProfile, 'id'>) {
+  const { elporFiles, owwaWelfareFile, ...rest } = data
+  return { ...rest, namedAttachments: buildNamedAttachments(elporFiles, owwaWelfareFile) }
 }
 
 type FilterKey = 'referenceNo' | 'dateFiled' | 'status' | 'employmentStatus' | 'address' | 'typeOfRequest'
@@ -19,28 +44,10 @@ type FilterKey = 'referenceNo' | 'dateFiled' | 'status' | 'employmentStatus' | '
 const FILTER_DEFS: { key: FilterKey; label: string; type: 'text' | 'date' | 'select'; options?: string[] }[] = [
   { key: 'referenceNo',      label: 'Reference No.',      type: 'text' },
   { key: 'dateFiled',        label: 'Date Filed',          type: 'date' },
-  { key: 'status',           label: 'Status',              type: 'select', options: ['Pending', 'Ongoing', 'Approved', 'Completed', 'Rejected'] },
-  { key: 'employmentStatus', label: 'Employment Status',   type: 'select', options: ['employed', 'self-employed', 'unemployed', 'underemployed'] },
+  { key: 'status',           label: 'Status',              type: 'select', options: ['Pending', 'Approved', 'Ongoing', 'Completed', 'Rejected'] },
+  { key: 'employmentStatus', label: 'Employment Status',   type: 'select', options: EMPLOYMENT_STATUS_OPTIONS },
   { key: 'address',          label: 'Address',             type: 'text' },
-  { key: 'typeOfRequest',    label: 'Type of Request',     type: 'select', options: [
-    'employment referral',
-    'skills training',
-    'on-line services',
-    'registration',
-    'accreditation',
-    'annual report repatriation',
-    'OWWA Scholarship – ODSP/EDSP',
-    'OWWA Benefits',
-    'OWWA Welfare Case',
-    'inquiry (pls specify)',
-    'application letter and resume-making',
-    're-integration program for OFWs',
-    'free clearance for 1st-time jobseekers',
-    'labor Market Information (LMI)',
-    'livelihood',
-    'Job Vacancy for posting',
-    'other DOLE program (please specify)',
-  ]},
+  { key: 'typeOfRequest',    label: 'Type of Request',     type: 'select', options: REQUEST_TYPES },
 ]
 
 function StatusBadge({ status }: { status: OFWProfile['status'] }) {
@@ -101,9 +108,9 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
           Edit
         </button>
         {profile.status === 'Pending' && (
-          <button onClick={() => { onChangeStatus('Ongoing'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-            <PlayCircle className="w-4 h-4 text-blue-500" />
-            Start Processing
+          <button onClick={() => { onChangeStatus('Approved'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+            <CheckCircle className="w-4 h-4 text-blue-500" />
+            Approve
           </button>
         )}
         {profile.status === 'Pending' && (
@@ -112,13 +119,13 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
             Reject
           </button>
         )}
-        {profile.status === 'Ongoing' && (
-          <button onClick={() => { onChangeStatus('Approved'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-            <CheckCircle className="w-4 h-4 text-blue-500" />
-            Mark as Approved
+        {profile.status === 'Approved' && (
+          <button onClick={() => { onChangeStatus('Ongoing'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+            <PlayCircle className="w-4 h-4 text-blue-500" />
+            Start Processing
           </button>
         )}
-        {profile.status === 'Approved' && (
+        {profile.status === 'Ongoing' && (
           <button onClick={() => { onChangeStatus('Completed'); onClose() }} disabled={!canManage('ofw')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
             <CheckCircle className="w-4 h-4 text-green-500" />
             Mark as Completed
@@ -136,7 +143,7 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
 }
 
 export default function OFWView({ onBack }: OFWViewProps) {
-  const { profiles, setProfiles } = useOFW()
+  const { profiles, refreshProfiles } = useOFW()
 
   // View / edit / delete modals
   const [showAddForm, setShowAddForm] = useState(false)
@@ -167,12 +174,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
   // Export dropdown
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
 
-  // Import modal
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<{ refNo: string; name: string; employment: string; status: string; valid: boolean }[]>([])
-  const [importAllRows, setImportAllRows] = useState<Record<string, string>[]>([])
-
   const closeMenu = useCallback(() => setOpenMenuId(null), [])
 
   useEffect(() => {
@@ -194,7 +195,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const addFilter = (key: FilterKey) => {
     if (!activeFilters.includes(key)) {
       setActiveFilters(prev => [...prev, key])
-      const def = FILTER_DEFS.find(f => f.key === key)!
       setFilterValues(prev => ({ ...prev, [key]: '' }))
       setCurrentPage(1)
     }
@@ -216,39 +216,63 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const nextRefNumber = `OFW-2026-${String(profiles.length + 1).padStart(5, '0')}`
 
   // ── Profile handlers ──────────────────────────────────────────
-  const handleAddProfile = (data: Omit<OFWProfile, 'id'>) => {
-    setProfiles(prev => [{ id: Date.now(), ...data }, ...prev])
-    setShowAddForm(false)
+  const handleAddProfile = async (data: Omit<OFWProfile, 'id'>) => {
+    try {
+      await ofwService.createProfile(toApiPayload(data))
+      await refreshProfiles()
+      setShowAddForm(false)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'OFW profile has been added successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleUpdateProfile = (updated: OFWProfile) => {
-    setProfiles(prev => prev.map(p => p.id === updated.id ? updated : p))
-    setEditProfile(null)
-    setViewProfile(null)
+  const handleUpdateProfile = async (updated: OFWProfile) => {
+    try {
+      await ofwService.updateProfile(updated.id, toApiPayload(updated))
+      await refreshProfiles()
+      setEditProfile(null)
+      setViewProfile(null)
+      Swal.fire({ icon: 'success', title: 'Success', text: 'OFW profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
-  const handleDeleteProfile = (id: number) => {
-    setProfiles(prev => prev.filter(p => p.id !== id))
-    setDeleteTarget(null)
+  const handleDeleteProfile = async (id: number) => {
+    try {
+      await ofwService.deleteProfile(id)
+      await refreshProfiles()
+      setDeleteTarget(null)
+    } catch (e) {
+      setDeleteTarget(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   const handleStatusChange = (profile: OFWProfile, newStatus: OFWProfile['status'], label: string) => {
     setPendingStatusChange({ profile, newStatus, label })
   }
 
-  const confirmStatusChange = () => {
+  const confirmStatusChange = async () => {
     if (!pendingStatusChange) return
     const { profile, newStatus } = pendingStatusChange
-    setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, status: newStatus } : p))
-    setPendingStatusChange(null)
-    Swal.fire({
-      icon: newStatus === 'Rejected' ? 'error' : 'success',
-      title: 'Status Updated',
-      text: `${profile.name}'s request is now ${newStatus}.`,
-      confirmButtonColor: '#0077BE',
-      timer: 2000,
-      timerProgressBar: true,
-    })
+    try {
+      await ofwService.updateStatus(profile.id, newStatus)
+      await refreshProfiles()
+      setPendingStatusChange(null)
+      Swal.fire({
+        icon: newStatus === 'Rejected' ? 'error' : 'success',
+        title: 'Status Updated',
+        text: `${profile.name}'s request is now ${newStatus}.`,
+        confirmButtonColor: '#0077BE',
+        timer: 2000,
+        timerProgressBar: true,
+      })
+    } catch (e) {
+      setPendingStatusChange(null)
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: '#0077BE' })
+    }
   }
 
   // ── Filtering ─────────────────────────────────────────────────
@@ -275,7 +299,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
   })
 
   const STATUS_ORDER: Record<string, number> = {
-    Pending: 0, Ongoing: 1, Approved: 2, Completed: 3, Rejected: 4,
+    Pending: 0, Approved: 1, Ongoing: 2, Completed: 3, Rejected: 4,
   }
 
   const sorted = [...filtered].sort((a, b) => {
@@ -338,57 +362,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
     setIsExportDropdownOpen(false)
   }
 
-  // ── Import ────────────────────────────────────────────────────
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file)
-    const reader = new FileReader()
-    reader.onload = e => {
-      const data = e.target?.result
-      const wb = XLSX.read(data, { type: 'binary' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(ws) as Record<string, string>[]
-      setImportAllRows(rows)
-      setImportPreview(rows.slice(0, 5).map(r => ({
-        refNo: r['Reference #'] || '',
-        name: r['Name'] || '',
-        employment: r['Employment Status'] || '',
-        status: r['Status'] || '',
-        valid: !!(r['Name']),
-      })))
-    }
-    reader.readAsBinaryString(file)
-  }
-
-  const closeImportModal = () => {
-    setIsImportModalOpen(false)
-    setUploadedFile(null)
-    setImportPreview([])
-    setImportAllRows([])
-  }
-
-  const handleImport = () => {
-    const newProfiles: OFWProfile[] = importAllRows
-      .filter(r => r['Name'])
-      .map((r, i) => ({
-        id: Date.now() + i,
-        referenceNumber: r['Reference #'] || `OFW-2026-${String(profiles.length + i + 1).padStart(5, '0')}`,
-        name: r['Name'] || '',
-        contactNumber: r['Contact Number'] || '',
-        email: r['Email'] || '',
-        address: r['Address'] || '',
-        barangay: r['Barangay'] || '',
-        municipality: r['Municipality'] || 'Tangub City',
-        province: r['Province'] || 'Misamis Occidental',
-        dateFiled: r['Date Filed'] || new Date().toISOString().split('T')[0],
-        employmentStatus: r['Employment Status'] || '',
-        typeOfRequest: r['Type of Request'] ? r['Type of Request'].split(', ') : [],
-        status: (r['Status'] as OFWProfile['status']) || 'Pending',
-        remarks: r['Remarks'] || '',
-      }))
-    setProfiles(prev => [...newProfiles, ...prev])
-    closeImportModal()
-  }
-
   // ── Early returns ─────────────────────────────────────────────
   if (showAddForm) {
     return (
@@ -442,13 +415,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
             >
               <Plus size={16} /><span>Add Profile</span>
             </button>
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              disabled={!canManage('ofw')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-            >
-              <Upload size={16} /><span>Import</span>
-            </button>
             <div className="relative">
               <button
                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
@@ -491,7 +457,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
               className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer"
             >
               <option value="" disabled>Sort By</option>
-        <option value="firstName_asc">First Name ASC</option>
+              <option value="firstName_asc">First Name ASC</option>
               <option value="firstName_desc">First Name DSC</option>
               <option value="lastName_asc">Last Name ASC</option>
               <option value="lastName_desc">Last Name DSC</option>
@@ -683,7 +649,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
         const isCompleted = newStatus === 'Completed'
         const steps: OFWProfile['status'][] = isRejected
           ? ['Pending', 'Rejected']
-          : ['Pending', 'Ongoing', 'Approved', 'Completed']
+          : ['Pending', 'Approved', 'Ongoing', 'Completed']
         const curIdx  = steps.indexOf(profile.status)
         const nextIdx = steps.indexOf(newStatus)
         return (
@@ -755,77 +721,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
           </div>
         )
       })()}
-
-      {/* ── Import modal ────────────────────────────────────────── */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-gray-800 font-semibold">Import OFW Profiles</h3>
-              <button onClick={closeImportModal} className="text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div
-                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-blue hover:bg-blue-50 transition-colors"
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}
-                onClick={() => document.getElementById('ofw-file-input')?.click()}
-              >
-                <Upload size={32} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600">Drop your Excel or CSV file here</p>
-                <p className="text-xs text-gray-400 mt-1">or click to browse</p>
-                <input
-                  id="ofw-file-input"
-                  type="file"
-                  accept=".xlsx,.csv"
-                  className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
-                />
-              </div>
-              {uploadedFile && importPreview.length > 0 && (
-                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden text-xs">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-600">Reference #</th>
-                        <th className="px-3 py-2 text-left text-gray-600">Name</th>
-                        <th className="px-3 py-2 text-left text-gray-600">Employment</th>
-                        <th className="px-3 py-2 text-left text-gray-600">Valid</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreview.map((r, i) => (
-                        <tr key={i} className="border-t border-gray-100">
-                          <td className="px-3 py-2 text-gray-700">{r.refNo || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">{r.name}</td>
-                          <td className="px-3 py-2 text-gray-700">{r.employment || '—'}</td>
-                          <td className="px-3 py-2">{r.valid ? <span className="text-green-600">✓</span> : <span className="text-red-500">✗</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {uploadedFile && <p className="px-3 py-2 text-gray-400 border-t border-gray-100">Showing first 5 rows · {uploadedFile.name}</p>}
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button onClick={closeImportModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                disabled={!uploadedFile || !canManage('ofw')}
-                onClick={handleImport}
-                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-40 transition-colors"
-              >
-                Import
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
-

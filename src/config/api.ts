@@ -205,4 +205,16 @@ export const ENDPOINTS = {
     restoreRecord:            '/skills_training/restoreRecord',
     purgeRecord:              '/skills_training/purgeRecord',
   },
+  ofw: {
+    listRequestTypes: '/ofw/listRequestTypes',
+    listProfiles:     '/ofw/listProfiles',
+    getProfile:       '/ofw/getProfile',
+    createProfile:    '/ofw/createProfile',
+    updateProfile:    '/ofw/updateProfile',
+    updateStatus:     '/ofw/updateStatus',
+    deleteProfile:    '/ofw/deleteProfile',
+    listDeleted:      '/ofw/listDeleted',
+    restoreRecord:    '/ofw/restoreRecord',
+    purgeRecord:      '/ofw/purgeRecord',
+  },
 } as const

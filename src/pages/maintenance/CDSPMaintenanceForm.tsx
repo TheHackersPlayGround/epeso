@@ -4,7 +4,7 @@ import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, AlertCircle, ChevronLeft, ChevronRight, X,
+  Search, Users, Plus, ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -65,45 +65,6 @@ function StatusBadge({ status }: { status: ActivityStatus }) {
   )
 }
 
-// ─── Confirm modal ────────────────────────────────────────────────────────────
-
-interface ConfirmModalProps {
-  open: boolean
-  title: string
-  message: string
-  confirmLabel?: string
-  destructive?: boolean
-  onConfirm: () => void
-  onCancel: () => void
-}
-
-function ConfirmModal({ open, title, message, confirmLabel = 'Confirm', destructive, onConfirm, onCancel }: ConfirmModalProps) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex justify-center mb-4">
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center ${destructive ? 'bg-red-100' : 'bg-blue-100'}`}>
-            <AlertCircle size={28} className={destructive ? 'text-red-500' : 'text-brand-blue'} />
-          </div>
-        </div>
-        <h3 className="text-center text-gray-800 mb-2">{title}</h3>
-        <p className="text-center text-gray-500 text-sm mb-6 whitespace-pre-line">{message}</p>
-        <div className="flex gap-3 justify-center">
-          <button onClick={onCancel} className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-5 py-2 text-white rounded-lg transition-colors text-sm ${destructive ? 'bg-red-500 hover:bg-red-600' : 'bg-brand-blue hover:bg-brand-blue-dark'}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Participant record ───────────────────────────────────────────────────────
 
@@ -167,7 +128,6 @@ export default function CDSPMaintenanceForm() {
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   // Confirm modals
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [statusConfirm, setStatusConfirm] = useState<{
     activity: CdspActivity
     nextStatus: ActivityStatus
@@ -315,18 +275,32 @@ export default function CDSPMaintenanceForm() {
     }
   }
 
-  const handleDelete = async () => {
-    if (deleteConfirm === null) return
+  const handleDelete = async (id: number) => {
     try {
-      await cdspService.deleteActivity(deleteConfirm)
+      await cdspService.deleteActivity(id)
       await refreshActivities()
       await refreshProfiles()
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The activity has been deleted.', confirmButtonColor: '#0077BE', timer: 1500, showConfirmButton: false })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete activity.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
-    } finally {
-      setDeleteConfirm(null)
     }
+  }
+
+  const confirmDelete = async (a: CdspActivity) => {
+    setOpenMenuId(null)
+    const result = await Swal.fire({
+      title: 'Delete Activity?',
+      text: `Are you sure you want to delete "${a.title}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    await handleDelete(a.id)
   }
 
   const handleStatusChange = async () => {
@@ -698,7 +672,7 @@ export default function CDSPMaintenanceForm() {
                 )}
                 <div className="my-1 border-t border-gray-100" />
                 <button
-                  onClick={() => { setDeleteConfirm(a.id); setOpenMenuId(null) }}
+                  onClick={() => confirmDelete(a)}
                   disabled={!canManage('maintenance')}
                   className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
@@ -953,15 +927,6 @@ export default function CDSPMaintenanceForm() {
       {action === 'view_activities' && renderViewActivities()}
       {action === 'view_participants' && renderViewParticipants()}
 
-      <ConfirmModal
-        open={deleteConfirm !== null}
-        title="Delete Activity"
-        message="Are you sure you want to delete this activity? This action cannot be undone."
-        confirmLabel="Delete"
-        destructive
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteConfirm(null)}
-      />
 
       {statusConfirm !== null && (() => {
         const { activity, nextStatus, label } = statusConfirm

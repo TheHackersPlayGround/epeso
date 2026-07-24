@@ -4,6 +4,7 @@ import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,36 @@ export default function DILPForm({
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const projectIdRef = useRef<HTMLInputElement>(null)
+  const projectNameRef = useRef<HTMLInputElement>(null)
+  const typeOfProjectRef = useRef<HTMLSelectElement>(null)
+  const programComponentRef = useRef<HTMLSelectElement>(null)
+  const wayOfImplementationRef = useRef<HTMLSelectElement>(null)
+
+  function handleSaveClick() {
+    const errors: ValidationError[] = []
+
+    if (!formData.projectIdNumber.trim()) {
+      errors.push({ field: 'projectIdNumber', message: 'Project ID Number is required.', focus: () => projectIdRef.current?.focus() })
+    }
+    if (!formData.projectName.trim()) {
+      errors.push({ field: 'projectName', message: 'Project Name is required.', focus: () => projectNameRef.current?.focus() })
+    }
+    if (!formData.typeOfProject) {
+      errors.push({ field: 'typeOfProject', message: 'Project Type is required.', focus: () => typeOfProjectRef.current?.focus() })
+    }
+    if (!formData.programComponent) {
+      errors.push({ field: 'programComponent', message: 'Program Component is required.', focus: () => programComponentRef.current?.focus() })
+    }
+    if (!formData.wayOfImplementation) {
+      errors.push({ field: 'wayOfImplementation', message: 'Implementation Type is required.', focus: () => wayOfImplementationRef.current?.focus() })
+    }
+
+    if (runValidation(errors)) return
+    onSave()
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -99,46 +130,51 @@ export default function DILPForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className={labelCls}>Project ID Number <span className="text-red-500">*</span></label>
-            <input type="text" value={formData.projectIdNumber} readOnly={isView}
-              onChange={e => onChange({ ...formData, projectIdNumber: e.target.value })}
-              className={inputCls} placeholder="Enter project ID number" />
+            <input ref={projectIdRef} type="text" value={formData.projectIdNumber} readOnly={isView}
+              onChange={e => { onChange({ ...formData, projectIdNumber: e.target.value }); clearFieldError('projectIdNumber') }}
+              className={`${inputCls} ${errCls('projectIdNumber')}`} placeholder="Enter project ID number" />
+            {fieldMessage('projectIdNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('projectIdNumber')}</p>}
           </div>
           <div className="col-span-2">
             <label className={labelCls}>Project Name <span className="text-red-500">*</span></label>
-            <input type="text" value={formData.projectName} readOnly={isView}
-              onChange={e => onChange({ ...formData, projectName: e.target.value })}
-              className={inputCls} placeholder="Enter project name" />
+            <input ref={projectNameRef} type="text" value={formData.projectName} readOnly={isView}
+              onChange={e => { onChange({ ...formData, projectName: e.target.value }); clearFieldError('projectName') }}
+              className={`${inputCls} ${errCls('projectName')}`} placeholder="Enter project name" />
+            {fieldMessage('projectName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('projectName')}</p>}
           </div>
           <div>
             <label className={labelCls}>Project Type <span className="text-red-500">*</span></label>
-            <select value={formData.typeOfProject} disabled={isView}
-              onChange={e => onChange({ ...formData, typeOfProject: e.target.value })}
-              className={inputCls}>
+            <select ref={typeOfProjectRef} value={formData.typeOfProject} disabled={isView}
+              onChange={e => { onChange({ ...formData, typeOfProject: e.target.value }); clearFieldError('typeOfProject') }}
+              className={`${inputCls} ${errCls('typeOfProject')}`}>
               <option value="">Select Project Type</option>
               <option value="Individual">Individual</option>
               <option value="Group">Group</option>
             </select>
+            {fieldMessage('typeOfProject') && <p className="text-red-500 text-xs mt-1">{fieldMessage('typeOfProject')}</p>}
           </div>
           <div>
             <label className={labelCls}>Program Component <span className="text-red-500">*</span></label>
-            <select value={formData.programComponent} disabled={isView}
-              onChange={e => onChange({ ...formData, programComponent: e.target.value })}
-              className={inputCls}>
+            <select ref={programComponentRef} value={formData.programComponent} disabled={isView}
+              onChange={e => { onChange({ ...formData, programComponent: e.target.value }); clearFieldError('programComponent') }}
+              className={`${inputCls} ${errCls('programComponent')}`}>
               <option value="">Select Component</option>
               <option value="Formation">Formation</option>
               <option value="Restoration">Restoration</option>
               <option value="Enhancement">Enhancement</option>
             </select>
+            {fieldMessage('programComponent') && <p className="text-red-500 text-xs mt-1">{fieldMessage('programComponent')}</p>}
           </div>
           <div className="col-span-2">
             <label className={labelCls}>Implementation Type <span className="text-red-500">*</span></label>
-            <select value={formData.wayOfImplementation} disabled={isView}
-              onChange={e => onChange({ ...formData, wayOfImplementation: e.target.value })}
-              className={inputCls}>
+            <select ref={wayOfImplementationRef} value={formData.wayOfImplementation} disabled={isView}
+              onChange={e => { onChange({ ...formData, wayOfImplementation: e.target.value }); clearFieldError('wayOfImplementation') }}
+              className={`${inputCls} ${errCls('wayOfImplementation')}`}>
               <option value="">Select Implementation Type</option>
               <option value="ACP">ACP</option>
               <option value="Direct Admin">Direct Admin</option>
             </select>
+            {fieldMessage('wayOfImplementation') && <p className="text-red-500 text-xs mt-1">{fieldMessage('wayOfImplementation')}</p>}
           </div>
         </div>
       </div>
@@ -308,7 +344,7 @@ export default function DILPForm({
           </button>
         )}
         {mode !== 'view' && (
-          <button onClick={onSave} disabled={!canManage('maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
+          <button onClick={handleSaveClick} disabled={!canManage('maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
             {mode === 'edit' ? 'Update Project' : 'Save Project'}
           </button>
         )}

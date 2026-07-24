@@ -3,6 +3,7 @@ import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,9 +56,28 @@ export default function TUPADForm({
   const isAdd  = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const titleRef = useRef<HTMLInputElement>(null)
+  const facilitatorRef = useRef<HTMLInputElement>(null)
 
   function field<K extends keyof TUPADFormData>(key: K, value: TUPADFormData[K]) {
     onChange({ ...formData, [key]: value })
+  }
+
+  function handleSaveClick() {
+    const errors: ValidationError[] = []
+    const facilitator = formData.facilitator.trim()
+
+    if (!formData.title.trim()) {
+      errors.push({ field: 'title', message: 'Title / Name is required.', focus: () => titleRef.current?.focus() })
+    }
+    if (facilitator && !NAME_REGEX.test(facilitator)) {
+      errors.push({ field: 'facilitator', message: 'Person In Charge / Facilitator must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
+    }
+
+    if (runValidation(errors)) return
+    onSave()
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -88,14 +108,16 @@ export default function TUPADForm({
             Title / Name <span className="text-red-500">*</span>
           </label>
           <input
+            ref={titleRef}
             id="tupad-title"
             type="text"
             value={formData.title}
             readOnly={isView}
-            onChange={e => field('title', e.target.value)}
-            className={inputCls}
+            onChange={e => { field('title', e.target.value); clearFieldError('title') }}
+            className={`${inputCls} ${errCls('title')}`}
             placeholder="Enter activity title"
           />
+          {fieldMessage('title') && <p className="text-red-500 text-xs mt-1">{fieldMessage('title')}</p>}
         </div>
 
         <div className="mb-4">
@@ -145,14 +167,16 @@ export default function TUPADForm({
           <div>
             <label htmlFor="tupad-facilitator" className={labelCls}>Person In Charge / Facilitator</label>
             <input
+              ref={facilitatorRef}
               id="tupad-facilitator"
               type="text"
               value={formData.facilitator}
               readOnly={isView}
-              onChange={e => field('facilitator', e.target.value)}
-              className={inputCls}
+              onChange={e => { field('facilitator', e.target.value); clearFieldError('facilitator') }}
+              className={`${inputCls} ${errCls('facilitator')}`}
               placeholder="Enter person in charge"
             />
+            {fieldMessage('facilitator') && <p className="text-red-500 text-xs mt-1">{fieldMessage('facilitator')}</p>}
           </div>
           <div>
             <label htmlFor="tupad-participants" className={labelCls}>Number of Participants / Beneficiaries</label>
@@ -315,7 +339,7 @@ export default function TUPADForm({
         {mode !== 'view' && (
           <button
             type="button"
-            onClick={onSave}
+            onClick={handleSaveClick}
             disabled={!canManage('maintenance')}
             className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
           >

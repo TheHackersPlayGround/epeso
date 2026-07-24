@@ -81,7 +81,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [statusConfirm, setStatusConfirm] = useState<{
     batch: SPESBatch; nextStatus: SPESBatch['status']; action: string
   } | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   // ── GIP state ──────────────────────────────────────────────────────────────
   const [gipAction, setGipAction] = useState<GIPAction>('')
@@ -92,7 +91,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [gipStatusConfirm, setGipStatusConfirm] = useState<{
     batch: GIPBatch; nextStatus: GIPBatch['status']; action: string
   } | null>(null)
-  const [gipDeleteConfirm, setGipDeleteConfirm] = useState<number | null>(null)
   const [gipSearch, setGipSearch] = useState('')
   const [gipStatusFilter, setGipStatusFilter] = useState('All')
   const [gipBatchPage, setGipBatchPage] = useState(1)
@@ -164,13 +162,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     }
   }
 
-  const confirmDelete = async () => {
-    if (deleteConfirm === null) return
-    const batchId = deleteConfirm
+  const handleDeleteSpesBatch = async (batchId: number) => {
     try {
       await spesApiService.deleteBatch(batchId)
       await refreshSpesBatches()
-      setDeleteConfirm(null)
       Swal.fire({
         icon: 'success',
         title: 'Batch Deleted',
@@ -179,9 +174,24 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         confirmButtonColor: '#0077BE',
       })
     } catch (e: unknown) {
-      setDeleteConfirm(null)
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: '#0077BE' })
     }
+  }
+
+  const confirmDeleteSpesBatch = async (b: { id: number; batchName: string }) => {
+    setOpenMenuId(null)
+    const result = await Swal.fire({
+      title: 'Delete SPES Batch?',
+      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    await handleDeleteSpesBatch(b.id)
   }
 
   // ── GIP handlers ───────────────────────────────────────────────────────────
@@ -226,13 +236,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     }
   }
 
-  const confirmGipDelete = async () => {
-    if (gipDeleteConfirm === null) return
-    const batchId = gipDeleteConfirm
+  const handleDeleteGipBatch = async (batchId: number) => {
     try {
       await gipApiService.deleteBatch(batchId)
       await refreshGipBatches()
-      setGipDeleteConfirm(null)
       Swal.fire({
         icon: 'success',
         title: 'Batch Deleted',
@@ -241,9 +248,24 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         confirmButtonColor: GIP_CONFIRM_COLOR,
       })
     } catch (e: unknown) {
-      setGipDeleteConfirm(null)
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
     }
+  }
+
+  const confirmDeleteGipBatch = async (b: { id: number; batchName: string }) => {
+    setGipOpenMenuId(null)
+    const result = await Swal.fire({
+      title: 'Delete GIP Batch?',
+      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    await handleDeleteGipBatch(b.id)
   }
 
   // ── GIP filtered batches ────────────────────────────────────────────────────
@@ -844,7 +866,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       )}
                       <div className="my-1 border-t border-gray-100" />
                       <button
-                        onClick={() => { setGipDeleteConfirm(b.id); setGipOpenMenuId(null) }}
+                        onClick={() => confirmDeleteGipBatch(b)}
                         disabled={!canManage('gip')}
                         className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
@@ -1155,7 +1177,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       )}
                       <div className="my-1 border-t border-gray-100" />
                       <button
-                        onClick={() => { setDeleteConfirm(b.id); setOpenMenuId(null) }}
+                        onClick={() => confirmDeleteSpesBatch(b)}
                         disabled={!canManage('maintenance')}
                         className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       >
@@ -1387,67 +1409,6 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         )
       })()}
 
-      {/* ── SPES delete modal ─────────────────────────────────────────────────── */}
-      {deleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} className="text-red-500" />
-              </div>
-              <h3 className="text-gray-800 mb-2">Delete SPES Batch</h3>
-              <p className="text-gray-600 mb-6 text-sm">
-                Are you sure you want to delete this batch? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── GIP delete modal ─────────────────────────────────────────────────── */}
-      {gipDeleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} className="text-red-500" />
-              </div>
-              <h3 className="text-gray-800 mb-2">Delete GIP Batch</h3>
-              <p className="text-gray-600 mb-6 text-sm">
-                Are you sure you want to delete this batch? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => setGipDeleteConfirm(null)}
-                  className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmGipDelete}
-                  className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

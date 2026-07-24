@@ -245,7 +245,6 @@ export default function SkillsTrainingMaintenanceForm() {
   const [action, setAction] = useState<STAction>('')
 
   // — batch management
-  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<number | null>(null)
   const [newBatchName, setNewBatchName]         = useState('')
   const [isSavingBatch, setIsSavingBatch]       = useState(false)
 
@@ -356,7 +355,7 @@ export default function SkillsTrainingMaintenanceForm() {
         facilitator: addForm.facilitator.trim(),
         participants: addForm.participants ? Number(addForm.participants) : 0,
       })
-      await refreshActivities()
+      await Promise.all([refreshActivities(), refreshBatches()])
       resetAdd()
       setAction('')
       Swal.fire({ icon: 'success', title: 'Training Saved', text: `"${addForm.title.trim()}" has been added.`, confirmButtonColor: BRAND_BLUE })
@@ -385,7 +384,7 @@ export default function SkillsTrainingMaintenanceForm() {
         participants: editForm.participants ? Number(editForm.participants) : 0,
         status: editForm.status,
       })
-      await Promise.all([refreshActivities(), refreshProfiles()])
+      await Promise.all([refreshActivities(), refreshProfiles(), refreshBatches()])
       setSelectedTraining(res.data)
       setTrainingSubView('')
       Swal.fire({ icon: 'success', title: 'Training Updated', text: 'Changes saved successfully.', confirmButtonColor: BRAND_BLUE })
@@ -445,16 +444,29 @@ export default function SkillsTrainingMaintenanceForm() {
     }
   }
 
-  const handleDeleteBatch = async () => {
-    if (batchDeleteConfirm === null) return
+  const handleDeleteBatch = async (id: number) => {
     try {
-      await skillsTrainingService.deleteBatch(batchDeleteConfirm)
-      setBatchDeleteConfirm(null)
+      await skillsTrainingService.deleteBatch(id)
       await refreshBatches()
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The batch has been deleted.', confirmButtonColor: BRAND_BLUE, timer: 1500, showConfirmButton: false })
     } catch (e) {
-      setBatchDeleteConfirm(null)
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete batch.'), confirmButtonColor: BRAND_BLUE })
     }
+  }
+
+  const confirmDeleteBatch = async (b: SkillsTrainingBatch) => {
+    const result = await Swal.fire({
+      title: 'Delete Batch?',
+      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
+    await handleDeleteBatch(b.id)
   }
 
   const handleDeleteTraining = async () => {
@@ -462,7 +474,7 @@ export default function SkillsTrainingMaintenanceForm() {
     try {
       await skillsTrainingService.deleteActivity(trainingDeleteConfirm)
       setTrainingDeleteConfirm(null)
-      await refreshActivities()
+      await Promise.all([refreshActivities(), refreshBatches()])
     } catch (e) {
       setTrainingDeleteConfirm(null)
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete training.'), confirmButtonColor: BRAND_BLUE })
@@ -785,7 +797,7 @@ export default function SkillsTrainingMaintenanceForm() {
                       <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location / Venue</th>
                       <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Participants</th>
                       <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
-                      <th className="px-6 py-4 w-16" />
+                      <th className="px-6 py-4 w-16 text-right text-sm text-gray-700 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -818,7 +830,7 @@ export default function SkillsTrainingMaintenanceForm() {
                             {a.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
                           <button onClick={e => openMenuForTraining(e, a.id)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
                             <MoreHorizontal size={16} />
@@ -986,7 +998,7 @@ export default function SkillsTrainingMaintenanceForm() {
                           : <span className="text-gray-400 text-sm">None</span>}
                       </td>
                       <td className="px-8 py-6 text-right">
-                        <button onClick={() => setBatchDeleteConfirm(b.id)}
+                        <button onClick={() => confirmDeleteBatch(b)}
                           className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
                           <Trash2 size={18} />
                         </button>
@@ -1075,24 +1087,6 @@ export default function SkillsTrainingMaintenanceForm() {
                 style={{ backgroundColor: trainingStatusConfirm.nextStatus === 'Completed' ? '#16a34a' : BRAND_BLUE }}>
                 {trainingStatusConfirm.label}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Batch delete modal ── */}
-      {batchDeleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-gray-800 mb-2">Delete Batch</h3>
-            <p className="text-gray-600 mb-6 text-sm">Are you sure? This action cannot be undone.</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => setBatchDeleteConfirm(null)} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-              <button onClick={handleDeleteBatch}
-                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Delete</button>
             </div>
           </div>
         </div>

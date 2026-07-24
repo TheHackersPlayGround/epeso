@@ -410,13 +410,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
     // Validation: Check if document type is selected
     if (!currentDocType) {
-      alert('Please select a document type first');
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a document type first.', confirmButtonColor: '#0077BE' });
       return;
     }
 
     // Validation: If "Others" is selected, check if custom name is provided
     if (currentDocType === 'Others (Specify)' && !currentCustomName.trim()) {
-      alert('Please specify the document name for "Others"');
+      Swal.fire({ icon: 'warning', title: 'Required', text: 'Please specify the document name for "Others".', confirmButtonColor: '#0077BE' });
       return;
     }
 
@@ -434,7 +434,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     ];
     const allowedExt = /\.(pdf|jpe?g|png|docx?|xlsx?)$/i;
     if (!allowedTypes.includes(file.type) && !allowedExt.test(file.name)) {
-      alert('Only PDF, Word, Excel, JPG, and PNG files are allowed');
+      Swal.fire({ icon: 'warning', title: 'Invalid File Type', text: 'Only PDF, Word, Excel, JPG, and PNG files are allowed.', confirmButtonColor: '#0077BE' });
       return;
     }
 
@@ -2136,7 +2136,12 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   onClick={(e) => {
                     if (!currentDocType || (currentDocType === 'Others (Specify)' && !currentCustomName.trim())) {
                       e.preventDefault();
-                      alert('Please select a document type' + (currentDocType === 'Others (Specify)' ? ' and specify the document name' : '') + ' first');
+                      Swal.fire({
+                        icon: 'warning',
+                        title: 'Required',
+                        text: 'Please select a document type' + (currentDocType === 'Others (Specify)' ? ' and specify the document name' : '') + ' first.',
+                        confirmButtonColor: '#0077BE',
+                      });
                     }
                   }}
                 >

@@ -3,6 +3,7 @@ import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,9 +83,38 @@ export default function SLPForm({
   const isAdd = mode === 'add'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const projectNameRef = useRef<HTMLInputElement>(null)
+  const slpTrackRef = useRef<HTMLSelectElement>(null)
+  const dateStartedWrapRef = useRef<HTMLDivElement>(null)
+  const facilitatorRef = useRef<HTMLInputElement>(null)
 
   function field<K extends keyof SLPFormData>(key: K, value: SLPFormData[K]) {
     onChange({ ...formData, [key]: value })
+  }
+
+  function handleSaveClick() {
+    const errors: ValidationError[] = []
+    const facilitator = formData.facilitator.trim()
+
+    if (!formData.projectName.trim()) {
+      errors.push({ field: 'projectName', message: 'Project Name is required.', focus: () => projectNameRef.current?.focus() })
+    }
+    if (!formData.slpTrack) {
+      errors.push({ field: 'slpTrack', message: 'SLP Track is required.', focus: () => slpTrackRef.current?.focus() })
+    }
+    if (!formData.dateStarted) {
+      errors.push({ field: 'dateStarted', message: 'Date Started is required.', focus: () => dateStartedWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+    if (!facilitator) {
+      errors.push({ field: 'facilitator', message: 'Facilitator / Person In Charge is required.', focus: () => facilitatorRef.current?.focus() })
+    } else if (!NAME_REGEX.test(facilitator)) {
+      errors.push({ field: 'facilitator', message: 'Facilitator / Person In Charge must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
+    }
+
+    if (runValidation(errors)) return
+    onSave()
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -115,14 +145,16 @@ export default function SLPForm({
             Project Name <span className="text-red-500">*</span>
           </label>
           <input
+            ref={projectNameRef}
             id="slp-projectName"
             type="text"
             value={formData.projectName}
             readOnly={isView}
-            onChange={e => field('projectName', e.target.value)}
-            className={inputCls}
+            onChange={e => { field('projectName', e.target.value); clearFieldError('projectName') }}
+            className={`${inputCls} ${errCls('projectName')}`}
             placeholder="Enter project name"
           />
+          {fieldMessage('projectName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('projectName')}</p>}
         </div>
 
         <div className="mb-4">
@@ -143,17 +175,19 @@ export default function SLPForm({
             SLP Track <span className="text-red-500">*</span>
           </label>
           <select
+            ref={slpTrackRef}
             id="slp-slpTrack"
             value={formData.slpTrack}
             disabled={isView}
-            onChange={e => field('slpTrack', e.target.value)}
-            className={inputCls + ' bg-white'}
+            onChange={e => { field('slpTrack', e.target.value); clearFieldError('slpTrack') }}
+            className={`${inputCls} bg-white ${errCls('slpTrack')}`}
           >
             <option value="">Select SLP Track</option>
             {SLP_TRACKS.map(track => (
               <option key={track} value={track}>{track}</option>
             ))}
           </select>
+          {fieldMessage('slpTrack') && <p className="text-red-500 text-xs mt-1">{fieldMessage('slpTrack')}</p>}
         </div>
       </div>
 
@@ -162,17 +196,20 @@ export default function SLPForm({
         <p className={sectionHeadingCls}>Implementation Details</p>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
+          <div ref={dateStartedWrapRef}>
             <label htmlFor="slp-dateStarted" className={labelCls}>
               Date Started <span className="text-red-500">*</span>
             </label>
-            <DatePicker
-              id="slp-dateStarted"
-              className={inputCls}
-              value={formData.dateStarted}
-              readOnly={isView}
-              onChange={value => field('dateStarted', value)}
-            />
+            <div className={`rounded-lg ${fieldMessage('dateStarted') ? 'ring-2 ring-red-200' : ''}`}>
+              <DatePicker
+                id="slp-dateStarted"
+                className={inputCls}
+                value={formData.dateStarted}
+                readOnly={isView}
+                onChange={value => { field('dateStarted', value); clearFieldError('dateStarted') }}
+              />
+            </div>
+            {fieldMessage('dateStarted') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateStarted')}</p>}
           </div>
           <div>
             <label htmlFor="slp-location" className={labelCls}>Location / Venue</label>
@@ -194,14 +231,16 @@ export default function SLPForm({
               Facilitator / Person In Charge <span className="text-red-500">*</span>
             </label>
             <input
+              ref={facilitatorRef}
               id="slp-facilitator"
               type="text"
               value={formData.facilitator}
               readOnly={isView}
-              onChange={e => field('facilitator', e.target.value)}
-              className={inputCls}
+              onChange={e => { field('facilitator', e.target.value); clearFieldError('facilitator') }}
+              className={`${inputCls} ${errCls('facilitator')}`}
               placeholder="Enter facilitator name"
             />
+            {fieldMessage('facilitator') && <p className="text-red-500 text-xs mt-1">{fieldMessage('facilitator')}</p>}
           </div>
 
           <div>
@@ -349,7 +388,7 @@ export default function SLPForm({
         {mode !== 'view' && (
           <button
             type="button"
-            onClick={onSave}
+            onClick={handleSaveClick}
             disabled={!canManage('maintenance')}
             className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
           >

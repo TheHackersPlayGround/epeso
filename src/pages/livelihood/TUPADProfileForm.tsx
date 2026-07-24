@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, Upload, Users, FileText, Eye, Trash2 } from 'lucide-react'
 import type { TUPADApplicant, TUPADSavedDocument } from '../../contexts/TUPADContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
+import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -227,6 +228,15 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const [previewDoc, setPreviewDoc] = useState<TUPADSavedDocument | null>(null)
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const middleNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const civilStatusRef = useRef<HTMLSelectElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   const isViewMode = mode === 'view'
   const isLastStep = currentStep === STEPS.length
@@ -247,20 +257,48 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   function handlePrevious() { if (currentStep > 1) setCurrentStep(s => s - 1) }
 
   function handleSubmit() {
-    if (!formData.lastName || !formData.firstName) {
-      alert('Last name and first name are required.')
-      return
+    const lastName = (formData.lastName ?? '').trim()
+    const firstName = (formData.firstName ?? '').trim()
+    const middleName = (formData.middleName ?? '').trim()
+    const errors: ValidationError[] = []
+
+    const focusStep1 = (fn: () => void) => () => { setCurrentStep(1); setTimeout(fn, 0) }
+    const focusStep2 = (fn: () => void) => () => { setCurrentStep(2); setTimeout(fn, 0) }
+
+    if (!lastName) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: focusStep1(() => lastNameRef.current?.focus()) })
+    } else if (!NAME_REGEX.test(lastName)) {
+      errors.push({ field: 'lastName', message: 'Last Name must contain letters only (no numbers or symbols).', focus: focusStep1(() => lastNameRef.current?.focus()) })
     }
-    if (!formData.sex || !formData.birthdate || !formData.civilStatus) {
-      alert('Sex, birthdate, and civil status are required.')
-      setCurrentStep(1)
-      return
+
+    if (!firstName) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: focusStep1(() => firstNameRef.current?.focus()) })
+    } else if (!NAME_REGEX.test(firstName)) {
+      errors.push({ field: 'firstName', message: 'First Name must contain letters only (no numbers or symbols).', focus: focusStep1(() => firstNameRef.current?.focus()) })
     }
+
+    if (middleName && !NAME_REGEX.test(middleName)) {
+      errors.push({ field: 'middleName', message: 'Middle Name must contain letters only (no numbers or symbols).', focus: focusStep1(() => middleNameRef.current?.focus()) })
+    }
+
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: focusStep1(() => sexRef.current?.focus()) })
+    }
+
+    if (!formData.birthdate) {
+      errors.push({ field: 'birthdate', message: 'Birthdate is required.', focus: focusStep1(() => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) })
+    }
+
+    if (!formData.civilStatus) {
+      errors.push({ field: 'civilStatus', message: 'Civil Status is required.', focus: focusStep1(() => civilStatusRef.current?.focus()) })
+    }
+
     if (!formData.barangayId) {
-      alert('Barangay is required.')
-      setCurrentStep(2)
-      return
+      errors.push({ field: 'barangay', message: 'Barangay is required.', focus: focusStep2(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) })
     }
+
+    if (runValidation(errors)) return
+
     onSave(formData)
   }
 
@@ -282,15 +320,18 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-4 gap-4">
           <div>
             <label className={labelClass}>Last Name <span className="text-red-500">*</span></label>
-            <input className={inputClass} placeholder="Dela Cruz" value={formData.lastName ?? ''} onChange={e => updateField({ lastName: e.target.value })} />
+            <input ref={lastNameRef} className={`${inputClass} ${errCls('lastName')}`} placeholder="Dela Cruz" value={formData.lastName ?? ''} onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }} />
+            {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
           </div>
           <div>
             <label className={labelClass}>First Name <span className="text-red-500">*</span></label>
-            <input className={inputClass} placeholder="Juan" value={formData.firstName ?? ''} onChange={e => updateField({ firstName: e.target.value })} />
+            <input ref={firstNameRef} className={`${inputClass} ${errCls('firstName')}`} placeholder="Juan" value={formData.firstName ?? ''} onChange={e => { updateField({ firstName: e.target.value }); clearFieldError('firstName') }} />
+            {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
           </div>
           <div>
             <label className={labelClass}>Middle Name</label>
-            <input className={inputClass} placeholder="M." value={formData.middleName ?? ''} onChange={e => updateField({ middleName: e.target.value })} />
+            <input ref={middleNameRef} className={`${inputClass} ${errCls('middleName')}`} placeholder="M." value={formData.middleName ?? ''} onChange={e => { updateField({ middleName: e.target.value }); clearFieldError('middleName') }} />
+            {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
           </div>
           <div>
             <label className={labelClass}>Extension Name</label>
@@ -301,15 +342,19 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-5 gap-4">
           <div>
             <label className={labelClass}>Sex <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.sex ?? ''} onChange={e => updateField({ sex: e.target.value as TUPADApplicant['sex'] })}>
+            <select ref={sexRef} className={`${selectClass} ${errCls('sex')}`} value={formData.sex ?? ''} onChange={e => { updateField({ sex: e.target.value as TUPADApplicant['sex'] }); clearFieldError('sex') }}>
               <option value=""></option>
               <option>Male</option>
               <option>Female</option>
             </select>
+            {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
           </div>
-          <div>
+          <div ref={birthdateWrapRef}>
             <label className={labelClass}>Birthdate <span className="text-red-500">*</span></label>
-            <DatePicker className={inputClass} value={formData.birthdate ?? ''} onChange={handleBirthdateChange} />
+            <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
+              <DatePicker className={inputClass} value={formData.birthdate ?? ''} onChange={value => { handleBirthdateChange(value); clearFieldError('birthdate') }} />
+            </div>
+            {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
           </div>
           <div>
             <label className={labelClass}>Age</label>
@@ -317,10 +362,11 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           </div>
           <div>
             <label className={labelClass}>Civil Status <span className="text-red-500">*</span></label>
-            <select className={selectClass} value={formData.civilStatus ?? ''} onChange={e => updateField({ civilStatus: e.target.value })}>
+            <select ref={civilStatusRef} className={`${selectClass} ${errCls('civilStatus')}`} value={formData.civilStatus ?? ''} onChange={e => { updateField({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
               <option value=""></option>
               {CIVIL_STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
+            {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
           </div>
           <div>
             <label className={labelClass}>Contact Number</label>
@@ -365,16 +411,19 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
               }}
             />
           </div>
-          <div>
+          <div ref={barangayWrapRef}>
             <label className={labelClass}>Barangay <span className="text-red-500">*</span></label>
-            <SearchableSelect
-              value={formData.barangay}
-              placeholder={cityId ? 'Search barangay...' : 'Select city first'}
-              disabled={isViewMode || !cityId}
-              refetchKey={cityId ?? ''}
-              fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
-              onSelect={opt => updateField({ barangay: opt.name, barangayId: opt.id })}
-            />
+            <div className={`rounded-lg ${fieldMessage('barangay') ? 'ring-2 ring-red-200' : ''}`}>
+              <SearchableSelect
+                value={formData.barangay}
+                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                disabled={isViewMode || !cityId}
+                refetchKey={cityId ?? ''}
+                fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+                onSelect={opt => { updateField({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+              />
+            </div>
+            {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
           </div>
           <div>
             <label className={labelClass}>Street / Purok</label>

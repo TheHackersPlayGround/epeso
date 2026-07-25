@@ -359,7 +359,7 @@ export default function CDSPMaintenanceForm() {
             <button
               key={card.key}
               onClick={() => setAction(card.key)}
-              disabled={card.editorOnly && !canManage('maintenance')}
+              disabled={card.editorOnly && !canManage('cdsp-maintenance')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -538,7 +538,7 @@ export default function CDSPMaintenanceForm() {
                 {!isView && (
                   <button
                     onClick={handleSave}
-                    disabled={!canManage('maintenance')}
+                    disabled={!canManage('cdsp-maintenance')}
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                   >
                     {mode === 'edit' ? 'Update Activity' : 'Save Activity'}
@@ -600,7 +600,7 @@ export default function CDSPMaintenanceForm() {
           </div>
           <button
             onClick={() => { resetForm(); setAction('add_activity') }}
-            disabled={!canManage('maintenance')}
+            disabled={!canManage('cdsp-maintenance')}
             className="flex items-center gap-2 px-4 py-2 bg-white text-brand-blue rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             <Plus size={15} /> Add Activity
@@ -634,7 +634,7 @@ export default function CDSPMaintenanceForm() {
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { fillFormFromActivity(a); setEditingId(a.id); setAction('edit_activity'); setOpenMenuId(null) }}
-                  disabled={!canManage('maintenance')}
+                  disabled={!canManage('cdsp-maintenance')}
                   className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Edit2 size={14} className="text-blue-500" />
@@ -643,7 +643,7 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Planned' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Ongoing', label: 'Mark as Ongoing' }); setOpenMenuId(null) }}
-                    disabled={!canManage('maintenance')}
+                    disabled={!canManage('cdsp-maintenance')}
                     className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <PlayCircle size={14} className="text-blue-500" />
@@ -653,7 +653,7 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Ongoing' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Completed', label: 'Mark as Completed' }); setOpenMenuId(null) }}
-                    disabled={!canManage('maintenance')}
+                    disabled={!canManage('cdsp-maintenance')}
                     className="w-full px-4 py-2.5 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <CheckCircle size={14} className="text-green-600" />
@@ -663,7 +663,7 @@ export default function CDSPMaintenanceForm() {
                 {a.status === 'Completed' && (
                   <button
                     onClick={() => { setStatusConfirm({ activity: a, nextStatus: 'Planned', label: 'Reopen Activity' }); setOpenMenuId(null) }}
-                    disabled={!canManage('maintenance')}
+                    disabled={!canManage('cdsp-maintenance')}
                     className="w-full px-4 py-2.5 text-left text-sm text-brand-blue hover:bg-blue-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   >
                     <RefreshCw size={14} className="text-blue-500" />
@@ -673,7 +673,7 @@ export default function CDSPMaintenanceForm() {
                 <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => confirmDelete(a)}
-                  disabled={!canManage('maintenance')}
+                  disabled={!canManage('cdsp-maintenance')}
                   className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
                   <Trash2 size={14} className="text-red-500" />
@@ -690,7 +690,7 @@ export default function CDSPMaintenanceForm() {
             <p className="text-gray-500 mb-4">No CDSP activities found.</p>
             <button
               onClick={() => { resetForm(); setAction('add_activity') }}
-              disabled={!canManage('maintenance')}
+              disabled={!canManage('cdsp-maintenance')}
               className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add First Activity

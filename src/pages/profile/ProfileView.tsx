@@ -43,27 +43,65 @@ function getCurrentUser(): ProfileUser {
 
 const PHOTO_LS_KEY = 'peso_profile_photo'
 
-const PERMISSION_GROUPS = [
-  { title: 'EMPLOYMENT FACILITATION', viewPerm: 'view-employment',  editorPerms: ['manage-employment'] },
-  { title: 'CDSP',                    viewPerm: 'view-cdsp',        editorPerms: ['manage-cdsp'] },
-  { title: 'GIP',                     viewPerm: 'view-gip',         editorPerms: ['manage-gip'] },
-  { title: 'SPES',                    viewPerm: 'view-spes',        editorPerms: ['manage-spes'] },
-  { title: 'LIVELIHOOD',              viewPerm: 'view-livelihood',  editorPerms: ['manage-livelihood'] },
-  { title: 'SKILLS TRAINING',         viewPerm: 'view-skills',      editorPerms: ['manage-skills'] },
-  { title: 'OFW',                     viewPerm: 'view-ofw',         editorPerms: ['manage-ofw'] },
-  { title: 'DOCUMENTS',               viewPerm: 'view-documents',   editorPerms: ['manage-documents'] },
-  { title: 'MAINTENANCE',             viewPerm: 'view-maintenance', editorPerms: ['manage-maintenance'] },
-  { title: 'SECURITY',                viewPerm: 'view-security',    editorPerms: ['manage-security'] },
-  { title: 'REPORT',                  viewPerm: 'view-report',      editorPerms: ['manage-report'] },
+interface PermissionSection {
+  label: string | null
+  viewPerm: string
+  editorPerms: string[]
+}
+interface PermissionGroupDef {
+  title: string
+  sections: PermissionSection[]
+}
+
+// Programs with their own "Maintenance" screen (batches/activities/projects)
+// show two independent sections -- Records (applicant/profile access) and
+// Maintenance (batch/activity/project management) -- matching the Add/Edit
+// User screen in Security. Everything else keeps a single section.
+const PERMISSION_GROUPS: PermissionGroupDef[] = [
+  { title: 'EMPLOYMENT FACILITATION', sections: [
+    { label: null, viewPerm: 'view-employment', editorPerms: ['manage-employment'] },
+  ] },
+  { title: 'CDSP', sections: [
+    { label: 'Records',     viewPerm: 'view-cdsp',               editorPerms: ['manage-cdsp'] },
+    { label: 'Maintenance', viewPerm: 'view-cdsp-maintenance',   editorPerms: ['manage-cdsp-maintenance'] },
+  ] },
+  { title: 'GIP', sections: [
+    { label: 'Records',     viewPerm: 'view-gip',                editorPerms: ['manage-gip'] },
+    { label: 'Maintenance', viewPerm: 'view-gip-maintenance',    editorPerms: ['manage-gip-maintenance'] },
+  ] },
+  { title: 'SPES', sections: [
+    { label: 'Records',     viewPerm: 'view-spes',               editorPerms: ['manage-spes'] },
+    { label: 'Maintenance', viewPerm: 'view-spes-maintenance',   editorPerms: ['manage-spes-maintenance'] },
+  ] },
+  { title: 'LIVELIHOOD', sections: [
+    { label: 'Records',     viewPerm: 'view-livelihood',             editorPerms: ['manage-livelihood'] },
+    { label: 'Maintenance', viewPerm: 'view-livelihood-maintenance', editorPerms: ['manage-livelihood-maintenance'] },
+  ] },
+  { title: 'SKILLS TRAINING', sections: [
+    { label: 'Records',     viewPerm: 'view-skills',             editorPerms: ['manage-skills'] },
+    { label: 'Maintenance', viewPerm: 'view-skills-maintenance', editorPerms: ['manage-skills-maintenance'] },
+  ] },
+  { title: 'OFW', sections: [
+    { label: null, viewPerm: 'view-ofw', editorPerms: ['manage-ofw'] },
+  ] },
+  { title: 'DOCUMENTS', sections: [
+    { label: null, viewPerm: 'view-documents', editorPerms: ['manage-documents'] },
+  ] },
+  { title: 'SECURITY', sections: [
+    { label: null, viewPerm: 'view-security', editorPerms: ['manage-security'] },
+  ] },
+  { title: 'REPORT', sections: [
+    { label: null, viewPerm: 'view-report', editorPerms: ['manage-report'] },
+  ] },
 ]
 
 type AccessLevel = 'Full Access' | 'Editor' | 'Viewer' | 'No Access'
 
-function getAccessLevel(perms: string[], group: (typeof PERMISSION_GROUPS)[0], isAdmin: boolean): AccessLevel {
+function getAccessLevel(perms: string[], section: PermissionSection, isAdmin: boolean): AccessLevel {
   if (isAdmin) return 'Full Access'
   const list = perms ?? []
-  if (group.editorPerms.some((p) => list.includes(p))) return 'Editor'
-  if (list.includes(group.viewPerm)) return 'Viewer'
+  if (section.editorPerms.some((p) => list.includes(p))) return 'Editor'
+  if (list.includes(section.viewPerm)) return 'Viewer'
   return 'No Access'
 }
 
@@ -340,16 +378,20 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
                 Access Control &amp; Permissions
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-x-8">
-              {PERMISSION_GROUPS.map((group) => {
-                const level = getAccessLevel(user.permissions, group, isAdmin)
-                return (
-                  <div key={group.title} className="flex items-center justify-between py-3 border-b border-gray-50">
-                    <p className="text-xs font-semibold text-gray-500 tracking-wide">{group.title}</p>
-                    <AccessBadge level={level} />
+            <div className="divide-y divide-gray-50">
+              {PERMISSION_GROUPS.map((group) => (
+                <div key={group.title} className="flex items-center justify-between py-3">
+                  <p className="text-xs font-semibold text-gray-500 tracking-wide">{group.title}</p>
+                  <div className="flex items-center gap-4">
+                    {group.sections.map((section) => (
+                      <div key={section.label ?? '_'} className="flex items-center gap-2">
+                        {section.label && <span className="text-xs text-gray-400">{section.label}</span>}
+                        <AccessBadge level={getAccessLevel(user.permissions, section, isAdmin)} />
+                      </div>
+                    ))}
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           </div>
 

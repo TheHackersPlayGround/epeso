@@ -344,7 +344,7 @@ export default function DILPForm({
           </button>
         )}
         {mode !== 'view' && (
-          <button onClick={handleSaveClick} disabled={!canManage('maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
+          <button onClick={handleSaveClick} disabled={!canManage('livelihood-maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
             {mode === 'edit' ? 'Update Project' : 'Save Project'}
           </button>
         )}

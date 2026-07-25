@@ -22,6 +22,8 @@ function currentUser(): StoredUser {
 export type ModuleKey =
   | 'employment' | 'cdsp' | 'gip' | 'spes' | 'livelihood'
   | 'skills' | 'ofw' | 'documents' | 'maintenance' | 'security' | 'report'
+  | 'cdsp-maintenance' | 'spes-maintenance' | 'gip-maintenance'
+  | 'livelihood-maintenance' | 'skills-maintenance'
 
 // True if the current user may add/edit/delete in this module (Editor or Administrator).
 export function canManage(module: ModuleKey): boolean {

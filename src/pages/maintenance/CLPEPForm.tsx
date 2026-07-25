@@ -380,7 +380,7 @@ export default function CLPEPForm({
               <button
                 type="button"
                 onClick={onSaveDraft}
-                disabled={!canManage('maintenance')}
+                disabled={!canManage('livelihood-maintenance')}
                 className="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-200"
               >
                 Save Draft
@@ -389,7 +389,7 @@ export default function CLPEPForm({
             <button
               type="button"
               onClick={onSave}
-              disabled={!canManage('maintenance')}
+              disabled={!canManage('livelihood-maintenance')}
               className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
             >
               {mode === 'edit' ? 'Update Intervention' : 'Save Intervention'}

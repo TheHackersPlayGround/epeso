@@ -1,5 +1,5 @@
 import { useState, useRef, type RefObject } from 'react'
-import { ArrowLeft, Upload, X, FileText } from 'lucide-react'
+import { ArrowLeft, Upload, X, FileText, Eye } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
@@ -119,12 +119,47 @@ function formatFileSize(bytes: number) {
   return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
+// Rendered as a sibling of the whole form, not nested inside it -- a
+// `fixed inset-0` modal nested inside an ancestor with opacity/filter/
+// transform stops being positioned relative to the viewport.
+function DocPreviewModal({ doc, onClose }: { doc: SPESSavedDocument; onClose: () => void }) {
+  const src = doc.dataUrl || doc.url
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+          <button type="button" onClick={onClose} aria-label="Close preview" className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
+            <div className="flex items-center justify-center h-full">
+              <img src={src} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+            </div>
+          ) : /\.pdf$/i.test(doc.fileName) ? (
+            <iframe src={src} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FileText size={64} className="mb-4 text-gray-400" />
+              <p className="text-lg font-medium mb-2">Preview not available</p>
+              <a href={src} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DocumentUpload({
-  docs, onChange, readOnly,
+  docs, onChange, readOnly, onPreview,
 }: {
   docs: SPESSavedDocument[]
   onChange: (d: SPESSavedDocument[]) => void
   readOnly?: boolean
+  onPreview: (doc: SPESSavedDocument) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -169,8 +204,14 @@ function DocumentUpload({
                   <X size={11} />
                 </button>
               )}
-              {d.url && (
-                <a href={d.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline px-2 py-1 truncate border-t border-gray-100 block text-center">View</a>
+              {(d.url || d.dataUrl) && (
+                <button
+                  type="button"
+                  onClick={() => onPreview(d)}
+                  className="flex items-center justify-center gap-1 w-full text-xs text-brand-blue hover:bg-blue-50 px-2 py-1 border-t border-gray-100"
+                >
+                  <Eye size={13} /> Preview
+                </button>
               )}
             </div>
           ))}
@@ -251,6 +292,7 @@ export default function SPESMaintenanceForm({
   }
 
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+  const [previewDoc, setPreviewDoc] = useState<SPESSavedDocument | null>(null)
   const batchNameRef = useRef<HTMLDivElement>(null)
   const programStartDateRef = useRef<HTMLDivElement>(null)
   const programEndDateRef = useRef<HTMLDivElement>(null)
@@ -528,6 +570,7 @@ export default function SPESMaintenanceForm({
               docs={form.documents}
               onChange={d => set('documents', d)}
               readOnly={isView}
+              onPreview={setPreviewDoc}
             />
           </div>
 
@@ -545,7 +588,7 @@ export default function SPESMaintenanceForm({
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={!canManage('maintenance')}
+                  disabled={!canManage('spes-maintenance')}
                   className="px-6 py-2.5 text-sm bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                 >
                   {isEdit ? 'Update Batch' : 'Save Batch'}
@@ -556,6 +599,7 @@ export default function SPESMaintenanceForm({
 
         </div>
       </div>
+      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }

@@ -50,18 +50,56 @@ export const mockUsers: User[] = [
   { id: 20, firstName: 'Rodel',    lastName: 'Cañete',        username: 'staff018',     email: 'staff018@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-05-05 03:30 PM', permissions: [] },
 ]
 
-export const permissionGroups = [
-  { title: 'EMPLOYMENT FACILITATION', editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-employment',   label: 'View Employment Facilitation' }, { id: 'manage-employment',   label: 'Manage Employment Facilitation' }] },
-  { title: 'CDSP',                    editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-cdsp',         label: 'View CDSP' },                    { id: 'manage-cdsp',         label: 'Manage CDSP' }] },
-  { title: 'GIP',                     editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-gip',          label: 'View GIP' },                     { id: 'manage-gip',          label: 'Manage GIP' }] },
-  { title: 'SPES',                    editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-spes',         label: 'View SPES' },                    { id: 'manage-spes',         label: 'Manage SPES' }] },
-  { title: 'LIVELIHOOD',              editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-livelihood',   label: 'View Livelihood' },              { id: 'manage-livelihood',   label: 'Manage Livelihood' }] },
-  { title: 'SKILLS TRAINING',         editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-skills',       label: 'View Skills Training' },         { id: 'manage-skills',       label: 'Manage Skills Training' }] },
-  { title: 'OFW',                     editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-ofw',          label: 'View OFW' },                     { id: 'manage-ofw',          label: 'Manage OFW' }] },
-  { title: 'DOCUMENTS',               editorDescription: 'View, Upload, Rename & Delete', permissions: [{ id: 'view-documents',    label: 'View Documents' },               { id: 'manage-documents',    label: 'Manage Documents' }] },
-  { title: 'MAINTENANCE',             editorDescription: 'View, Add, Edit & Delete',      permissions: [{ id: 'view-maintenance',  label: 'View Maintenance' },             { id: 'manage-maintenance',  label: 'Manage Maintenance' }] },
-  { title: 'SECURITY',                editorDescription: 'Manage Users, Logs & Data',     permissions: [{ id: 'view-security',     label: 'View Security' },                { id: 'manage-security',     label: 'Manage Security' }] },
-  { title: 'REPORT',                  editorDescription: 'View, Generate & Export',       permissions: [{ id: 'view-report',       label: 'View Report' },                  { id: 'manage-report',       label: 'Manage Report' }] },
+export interface PermissionSection {
+  label: string | null
+  editorDescription: string
+  permissions: { id: string; label: string }[]
+}
+export interface PermissionGroup {
+  title: string
+  sections: PermissionSection[]
+}
+
+// Programs with their own "Maintenance" screen (batches/activities/projects)
+// get two independent sections -- Records (applicant/profile access) and
+// Maintenance (batch/activity/project management) -- so an admin can grant
+// either, or both, per staff member. Everything else keeps a single section.
+export const permissionGroups: PermissionGroup[] = [
+  { title: 'EMPLOYMENT FACILITATION', sections: [
+    { label: null, editorDescription: 'View, Add, Edit & Delete', permissions: [{ id: 'view-employment', label: 'View Employment Facilitation' }, { id: 'manage-employment', label: 'Manage Employment Facilitation' }] },
+  ] },
+  { title: 'CDSP', sections: [
+    { label: 'Records',     editorDescription: 'View, Add, Edit & Delete Applicant Records',        permissions: [{ id: 'view-cdsp',               label: 'View CDSP Records' },     { id: 'manage-cdsp',               label: 'Manage CDSP Records' }] },
+    { label: 'Maintenance', editorDescription: 'View, Add, Edit & Delete Services/Activities',       permissions: [{ id: 'view-cdsp-maintenance',   label: 'View CDSP Maintenance' },  { id: 'manage-cdsp-maintenance',   label: 'Manage CDSP Maintenance' }] },
+  ] },
+  { title: 'GIP', sections: [
+    { label: 'Records',     editorDescription: 'View, Add, Edit & Delete Applicant Records',        permissions: [{ id: 'view-gip',                label: 'View GIP Records' },      { id: 'manage-gip',                label: 'Manage GIP Records' }] },
+    { label: 'Maintenance', editorDescription: 'View, Add, Edit & Delete Batches',                  permissions: [{ id: 'view-gip-maintenance',    label: 'View GIP Maintenance' },   { id: 'manage-gip-maintenance',    label: 'Manage GIP Maintenance' }] },
+  ] },
+  { title: 'SPES', sections: [
+    { label: 'Records',     editorDescription: 'View, Add, Edit & Delete Applicant Records',        permissions: [{ id: 'view-spes',               label: 'View SPES Records' },     { id: 'manage-spes',               label: 'Manage SPES Records' }] },
+    { label: 'Maintenance', editorDescription: 'View, Add, Edit & Delete Batches',                  permissions: [{ id: 'view-spes-maintenance',   label: 'View SPES Maintenance' },  { id: 'manage-spes-maintenance',   label: 'Manage SPES Maintenance' }] },
+  ] },
+  { title: 'LIVELIHOOD', sections: [
+    { label: 'Records',     editorDescription: 'View, Add, Edit & Delete Applicant Records',        permissions: [{ id: 'view-livelihood',             label: 'View Livelihood Records' },     { id: 'manage-livelihood',             label: 'Manage Livelihood Records' }] },
+    { label: 'Maintenance', editorDescription: 'View, Add, Edit & Delete Projects/Interventions',   permissions: [{ id: 'view-livelihood-maintenance', label: 'View Livelihood Maintenance' },  { id: 'manage-livelihood-maintenance', label: 'Manage Livelihood Maintenance' }] },
+  ] },
+  { title: 'SKILLS TRAINING', sections: [
+    { label: 'Records',     editorDescription: 'View, Add, Edit & Delete Applicant Records',        permissions: [{ id: 'view-skills',             label: 'View Skills Training Records' },    { id: 'manage-skills',             label: 'Manage Skills Training Records' }] },
+    { label: 'Maintenance', editorDescription: 'View, Add, Edit & Delete Batches/Activities',        permissions: [{ id: 'view-skills-maintenance', label: 'View Skills Training Maintenance' }, { id: 'manage-skills-maintenance', label: 'Manage Skills Training Maintenance' }] },
+  ] },
+  { title: 'OFW', sections: [
+    { label: null, editorDescription: 'View, Add, Edit & Delete', permissions: [{ id: 'view-ofw', label: 'View OFW' }, { id: 'manage-ofw', label: 'Manage OFW' }] },
+  ] },
+  { title: 'DOCUMENTS', sections: [
+    { label: null, editorDescription: 'View, Upload, Rename & Delete', permissions: [{ id: 'view-documents', label: 'View Documents' }, { id: 'manage-documents', label: 'Manage Documents' }] },
+  ] },
+  { title: 'SECURITY', sections: [
+    { label: null, editorDescription: 'Manage Users, Logs & Data', permissions: [{ id: 'view-security', label: 'View Security' }, { id: 'manage-security', label: 'Manage Security' }] },
+  ] },
+  { title: 'REPORT', sections: [
+    { label: null, editorDescription: 'View, Generate & Export', permissions: [{ id: 'view-report', label: 'View Report' }, { id: 'manage-report', label: 'Manage Report' }] },
+  ] },
 ]
 
 type GroupAccessLevel = 'viewer' | 'editor'
@@ -270,16 +308,23 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
                 return (
                   <div key={group.title} className="flex items-center justify-between px-4 py-3">
                     <span className="text-xs text-[#0077BE] font-medium">{group.title}</span>
-                    {securityForStaff ? (
-                      <span className="text-xs text-gray-400 italic px-3 py-1.5">Administrator only</span>
-                    ) : (
-                      <AccessLevelDropdown
-                        value={getGroupAccessLevel(group.permissions)}
-                        onChange={lvl => onSetGroupAccess(group.permissions, lvl)}
-                        editorDescription={group.editorDescription}
-                        disabled={isAdmin}
-                      />
-                    )}
+                    <div className="flex items-center gap-4">
+                      {securityForStaff ? (
+                        <span className="text-xs text-gray-400 italic px-3 py-1.5">Administrator only</span>
+                      ) : (
+                        group.sections.map(section => (
+                          <div key={section.label ?? '_'} className="flex items-center gap-2">
+                            {section.label && <span className="text-xs text-gray-400">{section.label}</span>}
+                            <AccessLevelDropdown
+                              value={getGroupAccessLevel(section.permissions)}
+                              onChange={lvl => onSetGroupAccess(section.permissions, lvl)}
+                              editorDescription={section.editorDescription}
+                              disabled={isAdmin}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -331,10 +376,10 @@ export default function SystemUsersTab() {
   const [formData, setFormData] = useState({ firstName: '', lastName: '', username: '', email: '', password: '', role: 'Staff', status: 'Active' })
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
 
-  const totalPermissionsCount = permissionGroups.flatMap(g => g.permissions).length
+  const totalPermissionsCount = permissionGroups.flatMap(g => g.sections.flatMap(s => s.permissions)).length
   // Security is administrator-only, so Staff never start with (or can be given) it.
   const staffGroups = permissionGroups.filter(g => g.title !== 'SECURITY')
-  const defaultViewerPermissions = staffGroups.map(g => g.permissions[0].id)
+  const defaultViewerPermissions = staffGroups.flatMap(g => g.sections.map(s => s.permissions[0].id))
 
   const resetForm = () => {
     setFormData({ firstName: '', lastName: '', username: '', email: '', password: '', role: 'Staff', status: 'Active' })
@@ -343,8 +388,8 @@ export default function SystemUsersTab() {
 
   const handleRoleChange = (newRole: string) => {
     setFormData(prev => ({ ...prev, role: newRole }))
-    if (newRole === 'Administrator') setSelectedPermissions(permissionGroups.flatMap(g => g.permissions.map(p => p.id)))
-    else setSelectedPermissions(staffGroups.map(g => g.permissions[0].id))
+    if (newRole === 'Administrator') setSelectedPermissions(permissionGroups.flatMap(g => g.sections.flatMap(s => s.permissions.map(p => p.id))))
+    else setSelectedPermissions(defaultViewerPermissions)
   }
 
   const handleSetGroupAccess = (groupPermissions: { id: string; label: string }[], level: GroupAccessLevel) => {

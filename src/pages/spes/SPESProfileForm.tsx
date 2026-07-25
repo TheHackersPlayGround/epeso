@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Users, Upload, FileText } from 'lucide-react'
+import { X, Users, Upload, FileText, Eye } from 'lucide-react'
 import type { SPESApplicant, SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
@@ -105,7 +105,41 @@ function formatFileSize(bytes: number) {
   return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-function AttachedDocsEditor({ docs, onChange }: { docs: SPESSavedDocument[]; onChange: (docs: SPESSavedDocument[]) => void }) {
+// Rendered as a sibling of the whole form, not nested inside it -- a
+// `fixed inset-0` modal nested inside an ancestor with opacity/filter/
+// transform stops being positioned relative to the viewport.
+function DocPreviewModal({ doc, onClose }: { doc: SPESSavedDocument; onClose: () => void }) {
+  const src = doc.dataUrl || doc.url
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500 truncate">{doc.customName || doc.fileName}</p>
+          <button type="button" onClick={onClose} aria-label="Close preview" className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
+            <div className="flex items-center justify-center h-full">
+              <img src={src} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+            </div>
+          ) : /\.pdf$/i.test(doc.fileName) ? (
+            <iframe src={src} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FileText size={64} className="mb-4 text-gray-400" />
+              <p className="text-lg font-medium mb-2">Preview not available</p>
+              <a href={src} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AttachedDocsEditor({ docs, onChange, onPreview }: { docs: SPESSavedDocument[]; onChange: (docs: SPESSavedDocument[]) => void; onPreview: (doc: SPESSavedDocument) => void }) {
   const [pendingName, setPendingName] = useState('')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,7 +184,11 @@ function AttachedDocsEditor({ docs, onChange }: { docs: SPESSavedDocument[]; onC
                 <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
                 <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
               </div>
-              {(doc.url || doc.dataUrl) && <a href={doc.url || doc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+              {(doc.url || doc.dataUrl) && (
+                <button type="button" onClick={() => onPreview(doc)} className="p-1.5 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0" title="Preview">
+                  <Eye size={16} />
+                </button>
+              )}
               <button onClick={() => removeDoc(i)} className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"><X size={14} /></button>
             </div>
           ))}
@@ -185,6 +223,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
   applicant: SPESApplicant
   onClose: () => void
 }) {
+  const [previewDoc, setPreviewDoc] = useState<SPESSavedDocument | null>(null)
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
     <div>
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">{label}</p>
@@ -276,7 +315,11 @@ export function ViewApplicantPanel({ applicant, onClose }: {
                     <p className="text-sm text-gray-800 truncate">{doc.customName || doc.fileName}</p>
                     <p className="text-xs text-gray-400 truncate">{doc.fileName} · {doc.fileSize}</p>
                   </div>
-                  {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-brand-blue hover:underline flex-shrink-0">View</a>}
+                  {(doc.url || doc.dataUrl) && (
+                    <button type="button" onClick={() => setPreviewDoc(doc)} className="p-1.5 text-brand-blue hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0" title="Preview">
+                      <Eye size={16} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -285,6 +328,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           )}
         </div>
       </div>
+      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }
@@ -307,6 +351,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
     })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<SPESSavedDocument | null>(null)
 
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
   const lastNameRef = useRef<HTMLInputElement>(null)
@@ -610,6 +655,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             <AttachedDocsEditor
               docs={formData.attachedDocuments}
               onChange={docs => set({ attachedDocuments: docs })}
+              onPreview={setPreviewDoc}
             />
           </div>
 
@@ -622,6 +668,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
 
         </div>
       </div>
+      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }

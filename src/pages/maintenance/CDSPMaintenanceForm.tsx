@@ -4,7 +4,7 @@ import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, ChevronLeft, ChevronRight, X,
+  Search, Users, Plus, ChevronLeft, ChevronRight, X, Loader2,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -105,6 +105,7 @@ export default function CDSPMaintenanceForm() {
   const [action, setAction] = useState<Action>('')
   const [selectedActivity, setSelectedActivity] = useState<CdspActivity | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Activity form
   const [selectedService, setSelectedService] = useState('')
@@ -224,6 +225,7 @@ export default function CDSPMaintenanceForm() {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
+    if (isSaving) return
     const facilitator = formData.facilitator.trim()
     const counselor = formData.counselor.trim()
     const errors: ValidationError[] = []
@@ -258,6 +260,7 @@ export default function CDSPMaintenanceForm() {
       status:          formData.status,
     }
 
+    setIsSaving(true)
     try {
       if (editingId !== null) {
         await cdspService.updateActivity(editingId, payload)
@@ -272,6 +275,8 @@ export default function CDSPMaintenanceForm() {
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save activity.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -538,10 +543,11 @@ export default function CDSPMaintenanceForm() {
                 {!isView && (
                   <button
                     onClick={handleSave}
-                    disabled={!canManage('cdsp-maintenance')}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+                    disabled={!canManage('cdsp-maintenance') || isSaving}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
                   >
-                    {mode === 'edit' ? 'Update Activity' : 'Save Activity'}
+                    {isSaving && <Loader2 size={16} className="animate-spin" />}
+                    {isSaving ? 'Saving…' : (mode === 'edit' ? 'Update Activity' : 'Save Activity')}
                   </button>
                 )}
               </div>

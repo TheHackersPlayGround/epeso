@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
@@ -92,22 +91,6 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
   )
 }
 
-// ─── Blank form data ──────────────────────────────────────────────────────────
-
-const blankForm = {
-  title: '',
-  description: '',
-  date: '',
-  location: '',
-  facilitator: '',
-  counselor: '',
-  sessionDuration: '',
-  participants: '',
-  startDate: '',
-  endDate: '',
-  status: 'Planned' as ProjectStatus,
-}
-
 const blankTupadForm: TUPADFormData = {
   title: '',
   description: '',
@@ -176,6 +159,9 @@ export default function LivelihoodMaintenanceForm() {
   const [action, setAction] = useState<Action>('')
   const [selectedProject, setSelectedProject] = useState<ProgramActivity | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  // Shared across DILP/TUPAD/SLP/CLPEP -- only one of their forms is ever open
+  // at a time, so one flag is enough to cover whichever save is in flight.
+  const [isSaving, setIsSaving] = useState(false)
 
   // Fixed set of Livelihood services — DILP/TUPAD/SLP/CLPEP are the only
   // sub-programs, so this is no longer a user-editable list.
@@ -183,7 +169,6 @@ export default function LivelihoodMaintenanceForm() {
 
   // Project form
   const [selectedService, setSelectedService] = useState('')
-  const [formData, setFormData] = useState(blankForm)
   const [dilpFormData, setDilpFormData] = useState<DILPFormData>(blankDilpForm)
   const [dilpAttachments, setDilpAttachments] = useState<AttachmentItem[]>([])
   const [tupadFormData, setTupadFormData] = useState<TUPADFormData>(blankTupadForm)
@@ -310,7 +295,6 @@ export default function LivelihoodMaintenanceForm() {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const resetForm = () => {
-    setFormData(blankForm)
     setDilpFormData(blankDilpForm)
     setDilpAttachments([])
     setTupadFormData(blankTupadForm)
@@ -402,20 +386,6 @@ export default function LivelihoodMaintenanceForm() {
         assistanceAmount: p?.assistanceAmount  ?? '',
         dateReleased:     p?.dateReleased      ?? '',
       })
-    } else {
-      setFormData({
-        title:           a.title,
-        description:     a.description     ?? '',
-        date:            a.date,
-        location:        a.location,
-        facilitator:     a.facilitator     ?? '',
-        counselor:       a.counselor       ?? '',
-        sessionDuration: a.sessionDuration ?? '',
-        participants:    a.participants != null ? String(a.participants) : '',
-        startDate:       a.startDate       ?? '',
-        endDate:         a.endDate         ?? '',
-        status:          a.status,
-      })
     }
   }
 
@@ -429,6 +399,7 @@ export default function LivelihoodMaintenanceForm() {
   // own Save button and only calls this via onSave() once valid, so no
   // duplicate checks are needed here.
   const handleSaveDilpProject = async () => {
+    if (isSaving) return
     const realId = editingId !== null ? editingId - DILP_ID_OFFSET : null
     const payload = {
       projectIdNumber:     dilpFormData.projectIdNumber,
@@ -443,6 +414,7 @@ export default function LivelihoodMaintenanceForm() {
       status:              dilpFormData.status,
       documents:           dilpAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
     }
+    setIsSaving(true)
     try {
       if (realId !== null) await dilpService.updateProject(realId, payload)
       else await dilpService.createProject(payload)
@@ -451,6 +423,8 @@ export default function LivelihoodMaintenanceForm() {
       goToList()
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -458,6 +432,7 @@ export default function LivelihoodMaintenanceForm() {
   // itself -- it guards its own Save button and only calls this via onSave()
   // once valid, so no duplicate check is needed here.
   const handleSaveTupadProject = async () => {
+    if (isSaving) return
     const realId = editingId !== null ? editingId - TUPAD_ID_OFFSET : null
     const payload = {
       title:            tupadFormData.title.trim(),
@@ -471,6 +446,7 @@ export default function LivelihoodMaintenanceForm() {
       dateReleased:     tupadFormData.dateReleased,
       documents:        tupadAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
     }
+    setIsSaving(true)
     try {
       if (realId !== null) await tupadService.updateProject(realId, payload)
       else await tupadService.createProject(payload)
@@ -479,10 +455,13 @@ export default function LivelihoodMaintenanceForm() {
       goToList()
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleSaveClpepIntervention = async () => {
+    if (isSaving) return
     if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
     if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
     if (!clpepFormData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Date.', confirmButtonColor: '#0077BE' }); return }
@@ -503,6 +482,7 @@ export default function LivelihoodMaintenanceForm() {
       status:                   clpepFormData.status,
       documents:                 clpepAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
     }
+    setIsSaving(true)
     try {
       if (realId !== null) await clpepService.updateIntervention(realId, payload)
       else await clpepService.createIntervention(payload)
@@ -511,6 +491,8 @@ export default function LivelihoodMaintenanceForm() {
       goToList()
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save intervention.', confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -518,6 +500,7 @@ export default function LivelihoodMaintenanceForm() {
   // itself -- it guards its own Save button and only calls this via onSave()
   // once valid, so no duplicate checks are needed here.
   const handleSaveSlpProject = async () => {
+    if (isSaving) return
     // Status is a manual staff judgment call, not derived -- this is a soft
     // nudge (not a block) for the case where Ongoing/Completed is picked
     // before the project's own Date Started has actually arrived yet.
@@ -547,6 +530,7 @@ export default function LivelihoodMaintenanceForm() {
       dateReleased:     slpFormData.dateReleased,
       documents:        slpAttachments.map(a => ({ fileName: a.name, dataUrl: a.dataUrl, id: a.id })),
     }
+    setIsSaving(true)
     try {
       if (realId !== null) await slpService.updateProject(realId, payload)
       else await slpService.createProject(payload)
@@ -555,6 +539,8 @@ export default function LivelihoodMaintenanceForm() {
       goToList()
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -565,40 +551,7 @@ export default function LivelihoodMaintenanceForm() {
     if (selectedService === 'DILEEP (TUPAD)') { handleSaveTupadProject(); return }
     if (selectedService === 'CLPEP') { handleSaveClpepIntervention(); return }
     if (selectedService === 'SLP') { handleSaveSlpProject(); return }
-
-    if (!formData.title.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a project title.', confirmButtonColor: '#0077BE' }); return }
-
-    payload = {
-      id:              editingId ?? Date.now(),
-      program:         'Livelihood',
-      service:         selectedService,
-      title:           formData.title.trim(),
-      description:     formData.description.trim()   || undefined,
-      date:            formData.date,
-      location:        formData.location,
-      facilitator:     formData.facilitator           || undefined,
-      counselor:       formData.counselor             || undefined,
-      sessionDuration: formData.sessionDuration       || undefined,
-      participants:    parseInt(formData.participants) || undefined,
-      startDate:       formData.startDate             || undefined,
-      endDate:         formData.endDate               || undefined,
-      status:          formData.status,
-    }
-
-    if (editingId !== null) {
-      setActivities(prev => prev.map(a => a.id === editingId ? payload : a))
-      Swal.fire({ icon: 'success', title: 'Project Updated', text: 'The project has been updated.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-    } else {
-      setActivities(prev => [...prev, payload])
-      Swal.fire({ icon: 'success', title: 'Project Added', text: 'New Livelihood project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
-    }
-
-    goToList()
   }
-
-  // The backend has no separate draft state for interventions, so "Save
-  // Draft" now saves the same way "Save Intervention" does.
-  const handleSaveDraft = () => { handleSaveClpepIntervention() }
 
   // Offsets checked largest-first: CLPEP (900000) > TUPAD (800000) > DILP
   // (700000) > SLP (600000) — checking TUPAD before CLPEP would misroute
@@ -770,6 +723,7 @@ export default function LivelihoodMaintenanceForm() {
                 attachments={dilpAttachments}
                 onAddAttachment={att => setDilpAttachments(prev => [...prev, att])}
                 onRemoveAttachment={idx => setDilpAttachments(prev => prev.filter((_, i) => i !== idx))}
+                isSaving={isSaving}
               />
             </div>
           )}
@@ -786,6 +740,7 @@ export default function LivelihoodMaintenanceForm() {
                 attachments={tupadAttachments}
                 onAddAttachment={att => setTupadAttachments(prev => [...prev, att])}
                 onRemoveAttachment={idx => setTupadAttachments(prev => prev.filter((_, i) => i !== idx))}
+                isSaving={isSaving}
               />
             </div>
           )}
@@ -797,12 +752,12 @@ export default function LivelihoodMaintenanceForm() {
                 formData={clpepFormData}
                 onChange={setClpepFormData}
                 onSave={handleSave}
-                onSaveDraft={handleSaveDraft}
                 mode={mode}
                 onCancel={mode === 'add' ? goHome : goToList}
                 attachments={clpepAttachments}
                 onAddAttachment={att => setClpepAttachments(prev => [...prev, att])}
                 onRemoveAttachment={idx => setClpepAttachments(prev => prev.filter((_, i) => i !== idx))}
+                isSaving={isSaving}
               />
             </div>
           )}
@@ -819,145 +774,8 @@ export default function LivelihoodMaintenanceForm() {
                 attachments={slpAttachments}
                 onAddAttachment={att => setSlpAttachments(prev => [...prev, att])}
                 onRemoveAttachment={idx => setSlpAttachments(prev => prev.filter((_, i) => i !== idx))}
+                isSaving={isSaving}
               />
-            </div>
-          )}
-
-          {/* Generic form for other services */}
-          {selectedService !== 'DILEEP (DILP)' && selectedService !== 'DILEEP (TUPAD)' && selectedService !== 'SLP' && selectedService !== 'CLPEP' && (selectedService || mode !== 'add') && (
-            <div className="border-t pt-6 space-y-5">
-              {/* Title + Description */}
-              <div>
-                <label className={labelCls}>Project Title <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  readOnly={isView}
-                  onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
-                  className={inputCls}
-                  placeholder="e.g. Community Livelihood Project – Batch 1"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Description</label>
-                <textarea
-                  value={formData.description}
-                  readOnly={isView}
-                  onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                  className={inputCls + ' resize-none'}
-                  rows={3}
-                  placeholder="Enter project description"
-                />
-              </div>
-
-              {/* Date + Location */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Date</label>
-                  <DatePicker className={inputCls} value={formData.date} readOnly={isView}
-                    onChange={value => setFormData(p => ({ ...p, date: value }))} />
-                </div>
-                <div>
-                  <label className={labelCls}>Location / Venue</label>
-                  <input type="text" value={formData.location} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, location: e.target.value }))}
-                    className={inputCls} placeholder="Enter location" />
-                </div>
-              </div>
-
-              {/* Facilitator + Participants */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Person In Charge / Facilitator</label>
-                  <input type="text" value={formData.facilitator} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, facilitator: e.target.value }))}
-                    className={inputCls} placeholder="Enter facilitator name" />
-                </div>
-                <div>
-                  <label className={labelCls}>Number of Participants</label>
-                  <input type="number" min="0" value={formData.participants} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, participants: e.target.value }))}
-                    className={inputCls} placeholder="0" />
-                </div>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className={labelCls}>Status</label>
-                <div className="flex gap-6 mt-1">
-                  {(['Planned', 'Ongoing', 'Completed'] as const).map(s => (
-                    <label key={s} className={`flex items-center gap-2 ${isView ? 'cursor-default' : 'cursor-pointer'}`}>
-                      <input
-                        type="radio"
-                        name="livelihood-status"
-                        value={s}
-                        checked={formData.status === s}
-                        onChange={() => setFormData(p => ({ ...p, status: s }))}
-                        disabled={isView}
-                        className="w-4 h-4 text-brand-blue focus:ring-brand-blue disabled:cursor-default"
-                      />
-                      <span className="text-sm text-gray-700">{s}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Section divider: Additional info */}
-              <div className="border-t pt-5 mt-1">
-                <p className="text-xs font-semibold text-brand-blue uppercase tracking-wider mb-4">
-                  Additional Project / Session Information
-                </p>
-
-                {/* Coordinator + Session Duration */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className={labelCls}>Coordinator / Project Officer</label>
-                    <input type="text" value={formData.counselor} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, counselor: e.target.value }))}
-                      className={inputCls} placeholder="Enter coordinator name" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Session Duration / No. of Sessions</label>
-                    <input type="text" value={formData.sessionDuration} readOnly={isView}
-                      onChange={e => setFormData(p => ({ ...p, sessionDuration: e.target.value }))}
-                      className={inputCls} placeholder="e.g. 10 days, 8 hours each" />
-                  </div>
-                </div>
-
-                {/* Start + End dates */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Start Date</label>
-                    <DatePicker className={inputCls} value={formData.startDate} readOnly={isView}
-                      onChange={value => setFormData(p => ({ ...p, startDate: value }))} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>End Date</label>
-                    <DatePicker className={inputCls} value={formData.endDate} readOnly={isView}
-                      onChange={value => setFormData(p => ({ ...p, endDate: value }))} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-3 border-t pt-4 mt-2">
-                <button
-                  type="button"
-                  onClick={mode === 'add' ? goHome : goToList}
-                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                >
-                  {mode === 'add' ? 'Cancel' : 'Back to Projects'}
-                </button>
-                {!isView && (
-                  <button
-                    onClick={handleSave}
-                    disabled={!canManage('livelihood-maintenance')}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
-                  >
-                    {mode === 'edit' ? 'Update Project' : 'Save Project'}
-                  </button>
-                )}
-              </div>
             </div>
           )}
 

@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
   Download, Upload, AlertCircle, MoreHorizontal, Users,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
@@ -529,9 +529,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       <button
                         onClick={() => handleAssignTraining(selectedTraining.id)}
                         disabled={!canManage('skills') || isAssigning}
-                        className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+                        className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center justify-center gap-2"
                       >
-                        {assigningProfile.assignedTrainingId ? 'Re-assign' : 'Assign'}
+                        {isAssigning && <Loader2 size={16} className="animate-spin" />}
+                        {isAssigning ? 'Assigning…' : (assigningProfile.assignedTrainingId ? 'Re-assign' : 'Assign')}
                       </button>
                     </>
                   )}

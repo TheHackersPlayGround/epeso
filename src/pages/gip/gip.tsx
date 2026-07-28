@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, Upload, Download, ChevronDown, MoreHorizontal,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useGIP } from '../../contexts/GIPContext'
@@ -215,6 +215,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [viewingApplicant, setViewingApplicant] = useState<GIPApplicant | null>(null)
 
   const [assignTarget, setAssignTarget] = useState<GIPApplicant | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [assignStep, setAssignStep] = useState<1 | 2>(1)
   const [assignSearch, setAssignSearch] = useState('')
   const [selectedBatch, setSelectedBatch] = useState<GIPBatch | null>(null)
@@ -305,7 +306,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
   }
 
   const handleAssignBatch = async (batch: GIPBatch) => {
-    if (!assignTarget) return
+    if (!assignTarget || isAssigning) return
+    setIsAssigning(true)
     try {
       await gipApiService.assignBatch(assignTarget.id, batch.id)
       await refreshProfiles()
@@ -317,12 +319,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
       Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${batch.batchName}" successfully.`, confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign batch.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   const handleUnassignBatch = async (targetId?: number) => {
+    if (isAssigning) return
     const applicant = targetId ? applicants.find(a => a.id === targetId) : viewBatchTarget
     if (!applicant) return
+    setIsAssigning(true)
     try {
       await gipApiService.unassignBatch(applicant.id)
       await refreshProfiles()
@@ -331,6 +337,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
       Swal.fire({ icon: 'success', title: 'Removed', text: 'Applicant has been unassigned from the batch.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -524,13 +532,14 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   )}
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
-                  <button onClick={() => setAssignStep(1)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
+                  <button onClick={() => setAssignStep(1)} disabled={isAssigning} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Back</button>
                   <button
                     onClick={() => handleAssignBatch(selectedBatch)}
-                    disabled={!canManage('gip')}
-                    className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+                    disabled={!canManage('gip') || isAssigning}
+                    className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center justify-center gap-1.5"
                   >
-                    {assignTarget.assignedBatchId ? 'Re-assign' : 'Assign'}
+                    {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                    {isAssigning ? 'Assigning…' : (assignTarget.assignedBatchId ? 'Re-assign' : 'Assign')}
                   </button>
                 </div>
               </>
@@ -592,10 +601,13 @@ export default function GIPView({ onBack }: GIPViewProps) {
               <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
                 <button
                   onClick={() => handleUnassignBatch()}
-                  disabled={!canChange || !canManage('gip')}
+                  disabled={!canChange || !canManage('gip') || isAssigning}
                   title={!canChange ? 'This batch is no longer Planned — unassigning would erase the only record of this assignment.' : undefined}
-                  className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                >Unassign</button>
+                  className="flex-1 py-2 border border-red-200 text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent flex items-center justify-center gap-1.5"
+                >
+                  {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                  {isAssigning ? 'Removing…' : 'Unassign'}
+                </button>
                 <button
                   onClick={() => { setViewBatchTarget(null); openAssignModal(viewBatchTarget) }}
                   disabled={!canChange || !canManage('gip')}

@@ -47,6 +47,8 @@ const FILTER_DEFS: { key: FilterKey; label: string; type: 'text' | 'date' | 'sel
   { key: 'status',           label: 'Status',              type: 'select', options: ['Pending', 'Approved', 'Ongoing', 'Completed', 'Rejected'] },
   { key: 'employmentStatus', label: 'Employment Status',   type: 'select', options: EMPLOYMENT_STATUS_OPTIONS },
   { key: 'address',          label: 'Address',             type: 'text' },
+  // Employment Referral's Desired Position/Type of Skill are shown directly as
+  // subtext in the Type of Request column instead of separate filters here.
   { key: 'typeOfRequest',    label: 'Type of Request',     type: 'select', options: REQUEST_TYPES },
 ]
 
@@ -572,6 +574,16 @@ export default function OFWView({ onBack }: OFWViewProps) {
                         <span className="block truncate" title={profile.typeOfRequest.join(', ')}>
                           {profile.typeOfRequest.join(', ') || '—'}
                         </span>
+                        {/* Employment Referral sub-fields -- only shown when at least one is
+                            filled in, so this stays blank for every other request type. */}
+                        {(profile.desiredPosition || profile.typeOfSkill) && (
+                          <span
+                            className="block truncate text-xs text-gray-400 mt-0.5"
+                            title={[profile.desiredPosition && `Position: ${profile.desiredPosition}`, profile.typeOfSkill && `Skill: ${profile.typeOfSkill}`].filter(Boolean).join(' • ')}
+                          >
+                            {[profile.desiredPosition, profile.typeOfSkill].filter(Boolean).join(' • ')}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge status={profile.status} />

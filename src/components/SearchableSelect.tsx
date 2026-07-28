@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import type { LocationOption } from '../services/locationService'
 
@@ -36,8 +36,47 @@ export default function SearchableSelect({
   const [results, setResults] = useState<LocationOption[]>([])
   const [loading, setLoading] = useState(false)
   const [highlight, setHighlight] = useState(0)
+  const [dropdownRect, setDropdownRect] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const skipNextSearch = useRef(false)
+
+  const GAP = 4
+  const PREFERRED_HEIGHT = 240 // matches the old fixed max-h-60
+
+  // Positioned via `fixed` + measured coordinates instead of `absolute`, so the
+  // list floats above the page instead of being clipped -- this field is used
+  // inside forms whose step content scrolls in its own `overflow-y-auto` box
+  // (e.g. TUPADProfileForm), and an `absolute` dropdown is clipped at that
+  // container's edge rather than overlaying the rest of the form. Recomputed on
+  // every scroll (capture phase, so it also catches the ancestor scroll
+  // container's own scroll events, not just the window's) and resize so it
+  // stays glued to the input.
+  //
+  // Also flips to open upward when there isn't enough room below (e.g. a field
+  // near the bottom of the viewport, like Province just above a form's footer
+  // buttons) -- otherwise the list runs off the bottom of the screen with no
+  // way to reach the rest of it, since it's outside any scrollable ancestor.
+  useLayoutEffect(() => {
+    if (!open) return
+    function updateRect() {
+      if (!boxRef.current) return
+      const r = boxRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - r.bottom - GAP
+      const spaceAbove = r.top - GAP
+      if (spaceBelow < PREFERRED_HEIGHT && spaceAbove > spaceBelow) {
+        setDropdownRect({ bottom: window.innerHeight - r.top + GAP, left: r.left, width: r.width, maxHeight: Math.min(PREFERRED_HEIGHT, spaceAbove) })
+      } else {
+        setDropdownRect({ top: r.bottom + GAP, left: r.left, width: r.width, maxHeight: Math.min(PREFERRED_HEIGHT, spaceBelow) })
+      }
+    }
+    updateRect()
+    window.addEventListener('scroll', updateRect, true)
+    window.addEventListener('resize', updateRect)
+    return () => {
+      window.removeEventListener('scroll', updateRect, true)
+      window.removeEventListener('resize', updateRect)
+    }
+  }, [open])
 
   // Keep the input text in sync with the confirmed value from the parent
   // (covers external resets like province changing or edit-mode prefill).
@@ -111,7 +150,14 @@ export default function SearchableSelect({
           onChange={(e) => { setText(e.target.value); setOpen(true) }}
           onFocus={() => !disabled && setOpen(true)}
           onKeyDown={onKeyDown}
-          autoComplete="off"
+          // Chrome ignores autoComplete="off" on fields it pattern-matches as an
+          // address (province/city/etc.), still showing its own native autofill
+          // suggestions -- which render above the page entirely, on top of this
+          // dropdown, since they're not part of the DOM. "new-password" is the
+          // standard workaround: Chrome treats it as an explicit opt-out signal
+          // it actually honors, regardless of what the field semantically is.
+          autoComplete="new-password"
+          name="search-no-autofill"
           className={`${baseInput} ${stateInput}`}
         />
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -119,8 +165,18 @@ export default function SearchableSelect({
         </span>
       </div>
 
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-60 overflow-y-auto">
+      {open && !disabled && dropdownRect && (
+        <div
+          style={{
+            position: 'fixed',
+            top: dropdownRect.top,
+            bottom: dropdownRect.bottom,
+            left: dropdownRect.left,
+            width: dropdownRect.width,
+            maxHeight: dropdownRect.maxHeight,
+          }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] overflow-y-auto"
+        >
           {loading ? (
             <p className="px-3 py-2.5 text-sm text-gray-400">Searching…</p>
           ) : results.length === 0 ? (

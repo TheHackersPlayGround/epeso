@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
@@ -346,9 +346,10 @@ type AssignInterventionModalProps = {
   onAssign: (id: number) => void
   onUnassign: () => void
   onClose: () => void
+  isAssigning: boolean
 }
 
-function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose }: AssignInterventionModalProps) {
+function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose, isAssigning }: AssignInterventionModalProps) {
   const [search, setSearch] = useState('')
   const [confirmIntervention, setConfirmIntervention] = useState<CLPEPIntervention | null>(null)
 
@@ -376,7 +377,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
               </h2>
               <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
+            <button type="button" onClick={onClose} disabled={isAssigning} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
               <X size={20} />
             </button>
           </div>
@@ -423,17 +424,19 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
               <button
                 type="button"
                 onClick={() => setConfirmIntervention(null)}
-                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={isAssigning}
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Back
               </button>
               <button
                 type="button"
-                onClick={() => { onAssign(confirmIntervention.id); onClose() }}
-                disabled={!canManage('livelihood')}
-                className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-sm font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => onAssign(confirmIntervention.id)}
+                disabled={!canManage('livelihood') || isAssigning}
+                className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-sm font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                Assign
+                {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                {isAssigning ? 'Assigning…' : 'Assign'}
               </button>
             </div>
           </>
@@ -456,11 +459,12 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                     </div>
                     <button
                       type="button"
-                      onClick={() => { onUnassign(); onClose() }}
-                      disabled={!canManage('livelihood')}
-                      className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={onUnassign}
+                      disabled={!canManage('livelihood') || isAssigning}
+                      className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      Unassign
+                      {isAssigning && <Loader2 size={12} className="animate-spin" />}
+                      {isAssigning ? 'Removing…' : 'Unassign'}
                     </button>
                   </div>
                 </div>
@@ -831,6 +835,7 @@ export default function CLPEPTab() {
   const [viewingBeneficiary, setViewingBeneficiary] = useState<CLPEPApplicant | null>(null)
   const [editingBeneficiary, setEditingBeneficiary] = useState<CLPEPApplicant | null>(null)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<CLPEPApplicant | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedIntervention, setViewingAssignedIntervention] = useState<CLPEPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -884,6 +889,8 @@ export default function CLPEPTab() {
   }
 
   async function handleAssignIntervention(beneficiary: CLPEPApplicant, interventionId: number) {
+    if (isAssigning) return
+    setIsAssigning(true)
     try {
       await clpepService.assignIntervention(beneficiary.id, interventionId)
       await refreshProfiles()
@@ -892,11 +899,14 @@ export default function CLPEPTab() {
       Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary assigned successfully.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign intervention.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   async function handleUnassignIntervention() {
-    if (!assigningBeneficiary) return
+    if (!assigningBeneficiary || isAssigning) return
+    setIsAssigning(true)
     try {
       await clpepService.unassignIntervention(assigningBeneficiary.id)
       await refreshProfiles()
@@ -905,6 +915,8 @@ export default function CLPEPTab() {
       Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned intervention has been removed.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -1020,6 +1032,7 @@ export default function CLPEPTab() {
           onAssign={interventionId => handleAssignIntervention(assigningBeneficiary, interventionId)}
           onUnassign={handleUnassignIntervention}
           onClose={() => setAssigningBeneficiary(null)}
+          isAssigning={isAssigning}
         />
       )}
 

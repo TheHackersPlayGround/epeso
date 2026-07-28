@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import Swal from 'sweetalert2'
@@ -358,9 +358,10 @@ type AssignProjectModalProps = {
   onAssign: (projectId: number) => void
   onUnassign: () => void
   onClose: () => void
+  isAssigning: boolean
 }
 
-function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClose }: AssignProjectModalProps) {
+function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClose, isAssigning }: AssignProjectModalProps) {
   const [search, setSearch] = useState('')
   const [confirmProject, setConfirmProject] = useState<SLPProject | null>(null)
   const canAssign = beneficiary.assessmentResult === 'Qualified'
@@ -396,8 +397,9 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
             <button
               type="button"
               onClick={onClose}
+              disabled={isAssigning}
               aria-label="Close modal"
-              className="text-white/70 hover:text-white transition-colors mt-0.5"
+              className="text-white/70 hover:text-white transition-colors mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <X size={18} />
             </button>
@@ -441,17 +443,19 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
               <button
                 type="button"
                 onClick={() => setConfirmProject(null)}
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={isAssigning}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Back
               </button>
               <button
                 type="button"
-                onClick={() => { onAssign(confirmProject.id); onClose() }}
-                disabled={!canManage('livelihood')}
-                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-xs font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => onAssign(confirmProject.id)}
+                disabled={!canManage('livelihood') || isAssigning}
+                className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-xs font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                Assign
+                {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                {isAssigning ? 'Assigning…' : 'Assign'}
               </button>
             </div>
           </>
@@ -482,11 +486,12 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
                     </div>
                     <button
                       type="button"
-                      onClick={() => { onUnassign(); onClose() }}
-                      disabled={!canManage('livelihood')}
-                      className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={onUnassign}
+                      disabled={!canManage('livelihood') || isAssigning}
+                      className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      Unassign
+                      {isAssigning && <Loader2 size={12} className="animate-spin" />}
+                      {isAssigning ? 'Removing…' : 'Unassign'}
                     </button>
                   </div>
                 </div>
@@ -869,6 +874,7 @@ export default function SLPTab() {
   const [viewingBeneficiary, setViewingBeneficiary] = useState<SLPApplicant | null>(null)
   const [editingBeneficiary, setEditingBeneficiary] = useState<SLPApplicant | null>(null)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<SLPApplicant | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<SLPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -924,6 +930,8 @@ export default function SLPTab() {
   }
 
   async function handleAssignProject(beneficiary: SLPApplicant, projectId: number) {
+    if (isAssigning) return
+    setIsAssigning(true)
     try {
       await slpService.assignProject(beneficiary.id, projectId)
       await refreshProfiles()
@@ -932,11 +940,14 @@ export default function SLPTab() {
       Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary assigned successfully.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign project.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   async function handleUnassignProject() {
-    if (!assigningBeneficiary) return
+    if (!assigningBeneficiary || isAssigning) return
+    setIsAssigning(true)
     try {
       await slpService.unassignProject(assigningBeneficiary.id)
       await refreshProfiles()
@@ -945,6 +956,8 @@ export default function SLPTab() {
       Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned project has been removed.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -1069,6 +1082,7 @@ export default function SLPTab() {
           onAssign={projectId => handleAssignProject(assigningBeneficiary, projectId)}
           onUnassign={handleUnassignProject}
           onClose={() => setAssigningBeneficiary(null)}
+          isAssigning={isAssigning}
         />
       )}
 

@@ -1,5 +1,5 @@
 import { useState, useRef, type RefObject } from 'react'
-import { ArrowLeft, Upload, X, FileText, Eye } from 'lucide-react'
+import { ArrowLeft, Upload, X, FileText, Eye, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
 import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
@@ -13,6 +13,7 @@ interface SPESMaintenanceFormProps {
   onSaveBatch: (batch: Omit<SPESBatch, 'id'>) => void
   onUpdateBatch?: (batch: SPESBatch) => void
   onCancel: () => void
+  isSaving?: boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -123,10 +124,19 @@ function formatFileSize(bytes: number) {
 // `fixed inset-0` modal nested inside an ancestor with opacity/filter/
 // transform stops being positioned relative to the viewport.
 function DocPreviewModal({ doc, onClose }: { doc: SPESSavedDocument; onClose: () => void }) {
-  const src = doc.dataUrl || doc.url
+  // Blob/server url first, base64 dataUrl only as a fallback -- a large PDF's
+  // dataUrl is a multi-MB data: URI, which Chromium's PDF viewer silently fails
+  // to render past a few MB, showing a blank page (the blob/server url has no
+  // such size limit).
+  const src = doc.url || doc.dataUrl
+  const isPdf = /\.pdf$/i.test(doc.fileName)
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      {/* PDFs render via the browser's native viewer, which needs real room for
+          its own toolbar/thumbnail sidebar -- so it gets a near-fullscreen modal,
+          unlike the fixed, more modest box images/fallback content use (which
+          just center-fit). */}
+      <div className={`bg-white rounded-xl shadow-2xl w-full flex flex-col ${isPdf ? 'max-w-[95vw] h-[95vh]' : 'max-w-4xl max-h-[90vh]'}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
           <button type="button" onClick={onClose} aria-label="Close preview" className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
@@ -138,7 +148,7 @@ function DocPreviewModal({ doc, onClose }: { doc: SPESSavedDocument; onClose: ()
             <div className="flex items-center justify-center h-full">
               <img src={src} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
             </div>
-          ) : /\.pdf$/i.test(doc.fileName) ? (
+          ) : isPdf ? (
             <iframe src={src} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -271,7 +281,7 @@ const emptyBatch: Omit<SPESBatch, 'id'> = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SPESMaintenanceForm({
-  mode, initialBatch, onSaveBatch, onUpdateBatch, onCancel,
+  mode, initialBatch, onSaveBatch, onUpdateBatch, onCancel, isSaving = false,
 }: SPESMaintenanceFormProps) {
   const [form, setForm] = useState<Omit<SPESBatch, 'id'>>(
     initialBatch ? { ...initialBatch } : emptyBatch
@@ -338,7 +348,7 @@ export default function SPESMaintenanceForm({
   }
 
   const handleSave = () => {
-    if (!validate()) return
+    if (isSaving || !validate()) return
     if (isEdit && onUpdateBatch && initialBatch) {
       onUpdateBatch({ ...initialBatch, ...form })
     } else {
@@ -588,10 +598,11 @@ export default function SPESMaintenanceForm({
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={!canManage('spes-maintenance')}
-                  className="px-6 py-2.5 text-sm bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+                  disabled={!canManage('spes-maintenance') || isSaving}
+                  className="px-6 py-2.5 text-sm bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
                 >
-                  {isEdit ? 'Update Batch' : 'Save Batch'}
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Saving…' : (isEdit ? 'Update Batch' : 'Save Batch')}
                 </button>
               </>
             )}

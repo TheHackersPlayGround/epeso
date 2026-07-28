@@ -301,14 +301,19 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                           <span className={checked ? 'text-gray-800' : 'text-gray-400'}>{type}</span>
                         </label>
 
-                        {/* Employment referral sub-panel */}
-                        {type === 'employment referral' && checked && (
+                        {/* Employment referral sub-panel — only shown if at least one of its
+                            fields actually has something in it, not just because the checkbox
+                            is ticked (a blank "Desired Position: —" box tells the viewer nothing). */}
+                        {type === 'employment referral' && checked
+                          && (profile.desiredPosition || profile.typeOfSkill || (profile.agencies ?? []).length > 0) && (
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#0077BE' }}>Employment Referral Details</p>
-                            <div className="grid grid-cols-2 gap-4 mb-2">
-                              <Field label="Desired Position" value={profile.desiredPosition} />
-                              <Field label="Type of Skill" value={profile.typeOfSkill} />
-                            </div>
+                            {(profile.desiredPosition || profile.typeOfSkill) && (
+                              <div className="grid grid-cols-2 gap-4 mb-2">
+                                {profile.desiredPosition && <Field label="Desired Position" value={profile.desiredPosition} />}
+                                {profile.typeOfSkill && <Field label="Type of Skill" value={profile.typeOfSkill} />}
+                              </div>
+                            )}
                             {(profile.agencies ?? []).length > 0 && (
                               <div>
                                 <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Agencies</p>
@@ -322,46 +327,39 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                           </div>
                         )}
 
-                        {/* OWWA Welfare Case sub-panel */}
-                        {type === 'OWWA Welfare Case' && checked && (
+                        {/* OWWA Welfare Case sub-panel — only shown when a file was actually attached. */}
+                        {type === 'OWWA Welfare Case' && checked && profile.owwaWelfareFile && (
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#0077BE' }}>OWWA Welfare Case Form</p>
-                            {profile.owwaWelfareFile ? (
-                              <DownloadButton attachment={profile.owwaWelfareFile} onPreview={() => setPreviewDoc(profile.owwaWelfareFile!)} />
-                            ) : (
-                              <p className="text-sm text-gray-400 italic">No file attached</p>
-                            )}
+                            <DownloadButton attachment={profile.owwaWelfareFile} onPreview={() => setPreviewDoc(profile.owwaWelfareFile!)} />
                           </div>
                         )}
 
-                        {/* Inquiry (pls specify) sub-panel */}
-                        {type === 'inquiry (pls specify)' && checked && (
+                        {/* Inquiry (pls specify) sub-panel — only shown when specified. */}
+                        {type === 'inquiry (pls specify)' && checked && profile.inquirySpecify && (
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <Field label="Please Specify" value={profile.inquirySpecify} />
                           </div>
                         )}
 
-                        {/* Other DOLE program (please specify) sub-panel */}
-                        {type === 'other DOLE program (please specify)' && checked && (
+                        {/* Other DOLE program (please specify) sub-panel — only shown when specified. */}
+                        {type === 'other DOLE program (please specify)' && checked && profile.otherProgramSpecify && (
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <Field label="Please Specify" value={profile.otherProgramSpecify} />
                           </div>
                         )}
 
-                        {/* Livelihood ELPOR sub-panel */}
-                        {type === 'livelihood' && checked && (
+                        {/* Livelihood ELPOR sub-panel — only shown when at least one ELPOR
+                            form was actually attached, and then only lists the ones that were
+                            (no "No file" placeholders for the rest). */}
+                        {type === 'livelihood' && checked && ELPOR_FORMS.some(f => profile.elporFiles?.[f]) && (
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#0077BE' }}>ELPOR Forms</p>
                             <div className="space-y-2">
-                              {ELPOR_FORMS.map(formName => {
-                                const att = profile.elporFiles?.[formName]
-                                return att ? (
+                              {ELPOR_FORMS.filter(formName => profile.elporFiles?.[formName]).map(formName => {
+                                const att = profile.elporFiles![formName]
+                                return (
                                   <DownloadButton key={formName} attachment={{ ...att, name: formName }} onPreview={() => setPreviewDoc({ ...att, name: formName })} />
-                                ) : (
-                                  <div key={formName} className="flex items-center gap-3 bg-white border border-gray-100 rounded-lg px-3 py-2">
-                                    <span className="text-sm text-gray-500 flex-1">{formName}</span>
-                                    <span className="text-xs text-gray-400 italic">No file</span>
-                                  </div>
                                 )
                               })}
                             </div>

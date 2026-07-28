@@ -1,5 +1,5 @@
 ﻿import { useRef, useState } from 'react'
-import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
+import { Upload, X, FileText, Image as ImageIcon, Eye, Loader2 } from 'lucide-react'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
@@ -42,6 +42,7 @@ interface DILPFormProps {
   attachments?: AttachmentItem[]
   onAddAttachment?: (att: AttachmentItem) => void
   onRemoveAttachment?: (idx: number) => void
+  isSaving?: boolean
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ function isPdfAttachment(att: AttachmentItem) {
 
 export default function DILPForm({
   formData, onChange, onSave, mode = 'add', onCancel,
-  attachments = [], onAddAttachment, onRemoveAttachment,
+  attachments = [], onAddAttachment, onRemoveAttachment, isSaving = false,
 }: DILPFormProps) {
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
@@ -112,7 +113,7 @@ export default function DILPForm({
     reader.onload = () => {
       onAddAttachment({
         name: file.name,
-        url: reader.result as string,
+        url: URL.createObjectURL(file),
         dataUrl: reader.result as string,
         fileType: file.type,
         id: Date.now().toString() + Math.random().toString(36),
@@ -339,13 +340,14 @@ export default function DILPForm({
       {/* ─── Buttons ──────────────────────────────────────────────────────────── */}
       <div className="flex justify-end gap-3 border-t pt-4">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+          <button type="button" onClick={onCancel} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm">
             {mode === 'add' ? 'Cancel' : 'Back to Projects List'}
           </button>
         )}
         {mode !== 'view' && (
-          <button onClick={handleSaveClick} disabled={!canManage('livelihood-maintenance')} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
-            {mode === 'edit' ? 'Update Project' : 'Save Project'}
+          <button onClick={handleSaveClick} disabled={!canManage('livelihood-maintenance') || isSaving} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2">
+            {isSaving && <Loader2 size={16} className="animate-spin" />}
+            {isSaving ? 'Saving…' : (mode === 'edit' ? 'Update Project' : 'Save Project')}
           </button>
         )}
       </div>
@@ -353,7 +355,11 @@ export default function DILPForm({
       {/* ─── File preview modal ───────────────────────────────────────────────── */}
       {previewItem && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          {/* PDFs render via the browser's native viewer, which needs real room for
+              its own toolbar/thumbnail sidebar -- so it gets a near-fullscreen modal,
+              unlike the fixed, more modest box images/fallback content use (which
+              just center-fit). */}
+          <div className={`bg-white rounded-xl shadow-2xl w-full flex flex-col ${isPdfAttachment(previewItem) ? 'max-w-[95vw] h-[95vh]' : 'max-w-4xl max-h-[90vh]'}`}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <div>
                 <p className="text-sm font-semibold text-gray-800 truncate max-w-lg">{previewItem.name}</p>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Upload, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
+import { Upload, X, FileText, Image as ImageIcon, Eye, Loader2 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
@@ -24,12 +24,12 @@ interface CLPEPFormProps {
   formData: CLPEPFormData
   onChange: (data: CLPEPFormData) => void
   onSave: () => void
-  onSaveDraft: () => void
   mode?: 'add' | 'edit' | 'view'
   onCancel?: () => void
   attachments?: AttachmentItem[]
   onAddAttachment?: (att: AttachmentItem) => void
   onRemoveAttachment?: (idx: number) => void
+  isSaving?: boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -84,8 +84,8 @@ const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CLPEPForm({
-  formData, onChange, onSave, onSaveDraft, mode = 'add', onCancel,
-  attachments = [], onAddAttachment, onRemoveAttachment,
+  formData, onChange, onSave, mode = 'add', onCancel,
+  attachments = [], onAddAttachment, onRemoveAttachment, isSaving = false,
 }: CLPEPFormProps) {
   const isView = mode === 'view'
   const isAdd = mode === 'add'
@@ -103,7 +103,7 @@ export default function CLPEPForm({
     reader.onload = () => {
       onAddAttachment({
         name: file.name,
-        url: reader.result as string,
+        url: URL.createObjectURL(file),
         dataUrl: reader.result as string,
         fileType: file.type,
         id: Date.now().toString() + Math.random().toString(36),
@@ -375,33 +375,26 @@ export default function CLPEPForm({
           </button>
         )}
         {mode !== 'view' && (
-          <>
-            {mode === 'add' && (
-              <button
-                type="button"
-                onClick={onSaveDraft}
-                disabled={!canManage('livelihood-maintenance')}
-                className="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-200"
-              >
-                Save Draft
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!canManage('livelihood-maintenance')}
-              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
-            >
-              {mode === 'edit' ? 'Update Intervention' : 'Save Intervention'}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!canManage('livelihood-maintenance') || isSaving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
+          >
+            {isSaving && <Loader2 size={16} className="animate-spin" />}
+            {isSaving ? 'Saving…' : (mode === 'edit' ? 'Update Intervention' : 'Save Intervention')}
+          </button>
         )}
       </div>
 
       {/* ─── File preview modal ───────────────────────────────────────────────── */}
       {previewItem && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          {/* PDFs render via the browser's native viewer, which needs real room for
+              its own toolbar/thumbnail sidebar -- so it gets a near-fullscreen modal,
+              unlike the fixed, more modest box images/fallback content use (which
+              just center-fit). */}
+          <div className={`bg-white rounded-xl shadow-2xl w-full flex flex-col ${isPdfAttachment(previewItem) ? 'max-w-[95vw] h-[95vh]' : 'max-w-4xl max-h-[90vh]'}`}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <div>
                 <p className="text-sm font-semibold text-gray-800 truncate max-w-lg">{previewItem.name}</p>

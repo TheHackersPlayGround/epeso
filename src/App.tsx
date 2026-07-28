@@ -29,21 +29,8 @@ import { DILPProvider } from './contexts/DILPContext'
 import { TUPADProvider } from './contexts/TUPADContext'
 import { SLPProvider } from './contexts/SLPContext'
 import { CLPEPProvider } from './contexts/CLPEPContext'
-import { LIVELIHOOD_SEED, SLP_PROJECTS_SEED, CLPEP_INTERVENTIONS_SEED } from './contexts/LivelihoodContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import './styles/App.css'
-
-function initLivelihoodLS() {
-  const set = (key: string, data: unknown[]) => {
-    try { if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(data)) } catch { /* quota */ }
-  }
-  set('lp_dileep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'DILEEP (DILP)' || b.service === 'DILEEP (TUPAD)'))
-  set('lp_slp_v4', LIVELIHOOD_SEED.filter(b => b.service === 'SLP'))
-  set('lp_clpep_v4', LIVELIHOOD_SEED.filter(b => b.service === 'CLPEP'))
-  set('lp_slp_projects_v2', SLP_PROJECTS_SEED)
-  set('lp_clpep_interventions_v1', CLPEP_INTERVENTIONS_SEED)
-}
-initLivelihoodLS()
 
 type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
 

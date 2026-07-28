@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, Upload, Download, ChevronDown, MoreHorizontal,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useSPES } from '../../contexts/SPESContext'
@@ -145,9 +145,9 @@ function ImportResultView({ result }: { result: ImportResult }) {
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
 
-function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confirmText = 'Confirm' }: {
+function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confirmText = 'Confirm', isSaving = false }: {
   isOpen: boolean; type: 'confirm' | 'success'; title: string; message: string
-  onConfirm: () => void; onCancel: () => void; confirmText?: string
+  onConfirm: () => void; onCancel: () => void; confirmText?: string; isSaving?: boolean
 }) {
   if (!isOpen) return null
   const Icon = type === 'success' ? Users : AlertCircle
@@ -161,8 +161,11 @@ function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confi
         <div className="flex gap-3 justify-center">
           {type === 'confirm' ? (
             <>
-              <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
-              <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
+              <button onClick={onCancel} disabled={isSaving} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
+              <button onClick={onConfirm} disabled={isSaving} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                {isSaving && <Loader2 size={16} className="animate-spin" />}
+                {isSaving ? 'Please wait…' : confirmText}
+              </button>
             </>
           ) : (
             <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
@@ -225,6 +228,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [assignTarget, setAssignTarget] = useState<SPESApplicant | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
   const [confirmingBatch, setConfirmingBatch] = useState<SPESBatch | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedBatchFor, setViewingAssignedBatchFor] = useState<SPESApplicant | null>(null)
   const [confirmUnassignId, setConfirmUnassignId] = useState<number | null>(null)
   const [batchSearch, setBatchSearch] = useState('')
@@ -326,7 +330,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
   }
 
   const handleAssign = async (batch: SPESBatch) => {
-    if (!assignTarget) return
+    if (!assignTarget || isAssigning) return
+    setIsAssigning(true)
     try {
       await spesApiService.assignBatch(assignTarget.id, batch.id)
       await refreshProfiles()
@@ -338,12 +343,16 @@ export default function SPESView({ onBack }: SPESViewProps) {
       Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${batch.batchName}" successfully.`, confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign batch.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   const handleUnassign = async (targetId?: number) => {
+    if (isAssigning) return
     const id = targetId ?? assignTarget?.id
     if (!id) return
+    setIsAssigning(true)
     try {
       await spesApiService.unassignBatch(id)
       await refreshProfiles()
@@ -355,6 +364,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
       Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned batch has been removed.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -466,6 +477,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
               confirmText="Yes, Assign"
               onConfirm={() => handleAssign(selectedBatch)}
               onCancel={() => setConfirmingBatch(null)}
+              isSaving={isAssigning}
             />
           </>
         )
@@ -927,8 +939,13 @@ export default function SPESView({ onBack }: SPESViewProps) {
         title="Remove Batch Assignment"
         message="Are you sure you want to remove the assigned batch from this applicant?"
         confirmText="Yes, Remove"
-        onConfirm={() => { if (confirmUnassignId !== null) { handleUnassign(confirmUnassignId); setConfirmUnassignId(null) } }}
+        onConfirm={async () => {
+          if (confirmUnassignId === null) return
+          await handleUnassign(confirmUnassignId)
+          setConfirmUnassignId(null)
+        }}
         onCancel={() => setConfirmUnassignId(null)}
+        isSaving={isAssigning}
       />
     </>
   )

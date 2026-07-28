@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import {
   Search, Plus, ChevronDown, ChevronRight, ChevronLeft, X, Download, Upload,
-  MoreHorizontal, Users, Info,
+  MoreHorizontal, Users, Info, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
@@ -223,9 +223,10 @@ type AssignProjectModalProps = {
   onAssign: (projectId: number, projectName: string) => void
   onUnassign: () => void
   onClose: () => void
+  isAssigning: boolean
 }
 
-function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassign, onClose }: AssignProjectModalProps) {
+function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassign, onClose, isAssigning }: AssignProjectModalProps) {
   const [projectSearch, setProjectSearch] = useState('')
   const [selectedProject, setSelectedProject] = useState<DILEEPProject | null>(null)
 
@@ -250,7 +251,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
             <h3 className="text-white font-bold text-base">Assign Project</h3>
             <p className="text-white/80 text-xs mt-0.5">{formatDisplayName(beneficiary)}</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="text-white/80 hover:text-white transition-colors p-1 mt-0.5">
+          <button onClick={onClose} disabled={isAssigning} aria-label="Close" className="text-white/80 hover:text-white transition-colors p-1 mt-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
             <X size={18} />
           </button>
         </div>
@@ -299,16 +300,18 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
             <div className="px-4 py-4 border-t border-gray-100 flex gap-3 mt-3">
               <button
                 onClick={() => setSelectedProject(null)}
-                className="flex-1 py-2.5 text-xs text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                disabled={isAssigning}
+                className="flex-1 py-2.5 text-xs text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                onClick={() => { onAssign(selectedProject.id, projectTitle(program, selectedProject)); onClose() }}
-                disabled={!canManage('livelihood')}
-                className="flex-1 py-2.5 text-xs text-white bg-brand-blue rounded-xl hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => onAssign(selectedProject.id, projectTitle(program, selectedProject))}
+                disabled={!canManage('livelihood') || isAssigning}
+                className="flex-1 py-2.5 text-xs text-white bg-brand-blue rounded-xl hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                Assign
+                {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                {isAssigning ? 'Assigning…' : 'Assign'}
               </button>
             </div>
           </>
@@ -353,11 +356,12 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                   </div>
                   <button
                     type="button"
-                    onClick={() => { onUnassign(); onClose() }}
-                    disabled={!canManage('livelihood')}
-                    className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors flex-shrink-0 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={onUnassign}
+                    disabled={!canManage('livelihood') || isAssigning}
+                    className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors flex-shrink-0 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
-                    Unassign
+                    {isAssigning && <Loader2 size={12} className="animate-spin" />}
+                    {isAssigning ? 'Removing…' : 'Unassign'}
                   </button>
                 </div>
               </div>
@@ -596,6 +600,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [editingBeneficiary, setEditingBeneficiary] = useState<DILEEPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<DILEEPApplicant | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<DILEEPApplicant | null>(null)
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<TUPADApplicant | null>(null)
 
@@ -688,7 +693,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   }
 
   async function handleAssignProject(projectId: number, projectName: string) {
-    if (!assigningBeneficiary) return
+    if (!assigningBeneficiary || isAssigning) return
+    setIsAssigning(true)
     try {
       if (isDILP) await dilpService.assignProject(assigningBeneficiary.id, projectId)
       else await tupadService.assignProject(assigningBeneficiary.id, projectId)
@@ -698,11 +704,14 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${projectName}" successfully.`, confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign project.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
   async function handleUnassignProject() {
-    if (!assigningBeneficiary) return
+    if (!assigningBeneficiary || isAssigning) return
+    setIsAssigning(true)
     try {
       if (isDILP) await dilpService.unassignProject(assigningBeneficiary.id)
       else await tupadService.unassignProject(assigningBeneficiary.id)
@@ -712,6 +721,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned project has been removed.', confirmButtonColor: '#0077BE' })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -1148,6 +1159,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
           onAssign={handleAssignProject}
           onUnassign={handleUnassignProject}
           onClose={() => setAssigningBeneficiary(null)}
+          isAssigning={isAssigning}
         />
       )}
 

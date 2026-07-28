@@ -76,6 +76,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [spesAction, setSpesAction] = useState<SPESAction>('')
   const [spesBatchAction, setSpesBatchAction] = useState<SPESBatchAction>('')
   const [selectedBatch, setSelectedBatch] = useState<SPESBatch | null>(null)
+  const [isSavingSpesBatch, setIsSavingSpesBatch] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [statusConfirm, setStatusConfirm] = useState<{
@@ -86,6 +87,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [gipAction, setGipAction] = useState<GIPAction>('')
   const [gipBatchAction, setGipBatchAction] = useState<GIPBatchAction>('')
   const [selectedGipBatch, setSelectedGipBatch] = useState<GIPBatch | null>(null)
+  const [isSavingGipBatch, setIsSavingGipBatch] = useState(false)
   const [gipOpenMenuId, setGipOpenMenuId] = useState<number | null>(null)
   const [gipMenuPos, setGipMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [gipStatusConfirm, setGipStatusConfirm] = useState<{
@@ -127,6 +129,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   // ── SPES handlers ──────────────────────────────────────────────────────────
 
   const handleAddBatch = async (data: Omit<SPESBatch, 'id'>) => {
+    if (isSavingSpesBatch) return
+    setIsSavingSpesBatch(true)
     try {
       await spesApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshSpesBatches()
@@ -140,10 +144,14 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSavingSpesBatch(false)
     }
   }
 
   const handleUpdateBatch = async (updated: SPESBatch) => {
+    if (isSavingSpesBatch) return
+    setIsSavingSpesBatch(true)
     try {
       await spesApiService.updateBatch(updated.id, updated as unknown as Record<string, unknown>)
       await refreshSpesBatches()
@@ -159,6 +167,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsSavingSpesBatch(false)
     }
   }
 
@@ -201,6 +211,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     ?? (e as { message?: string })?.message ?? fallback
 
   const handleAddGipBatch = async (data: Omit<GIPBatch, 'id'>) => {
+    if (isSavingGipBatch) return
+    setIsSavingGipBatch(true)
     try {
       await gipApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshGipBatches()
@@ -214,10 +226,14 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+    } finally {
+      setIsSavingGipBatch(false)
     }
   }
 
   const handleUpdateGipBatch = async (updated: GIPBatch) => {
+    if (isSavingGipBatch) return
+    setIsSavingGipBatch(true)
     try {
       await gipApiService.updateBatch(updated.id, updated as unknown as Record<string, unknown>)
       await refreshGipBatches()
@@ -233,6 +249,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       })
     } catch (e: unknown) {
       Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+    } finally {
+      setIsSavingGipBatch(false)
     }
   }
 
@@ -318,6 +336,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           onSaveBatch={handleAddBatch}
           onUpdateBatch={handleUpdateBatch}
           onCancel={() => { setSpesBatchAction(''); setSelectedBatch(null) }}
+          isSaving={isSavingSpesBatch}
         />
       </div>
     )
@@ -431,6 +450,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           onSaveBatch={handleAddGipBatch}
           onUpdateBatch={handleUpdateGipBatch}
           onCancel={() => { setGipBatchAction(''); setSelectedGipBatch(null) }}
+          isSaving={isSavingGipBatch}
         />
       </div>
     )
@@ -629,6 +649,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               mode="batch"
               onSaveBatch={handleAddGipBatch}
               onCancel={() => setGipAction('')}
+              isSaving={isSavingGipBatch}
             />
           )}
 
@@ -936,6 +957,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               mode="batch"
               onSaveBatch={handleAddBatch}
               onCancel={() => setSpesAction('')}
+              isSaving={isSavingSpesBatch}
             />
           )}
 

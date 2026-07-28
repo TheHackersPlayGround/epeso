@@ -4,7 +4,7 @@ import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Trash2, PlayCircle, CheckCircle, RefreshCw, Search, Plus,
-  ArrowLeft, Edit2, Users, ChevronLeft, ChevronRight,
+  ArrowLeft, Edit2, Users, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
@@ -78,6 +78,7 @@ function TrainingForm({
   onChange,
   onSave,
   onCancel,
+  isSaving = false,
 }: {
   mode: 'add' | 'edit' | 'view'
   form: typeof blank
@@ -86,6 +87,7 @@ function TrainingForm({
   onChange: (field: keyof typeof blank, value: string) => void
   onSave?: () => void
   onCancel: () => void
+  isSaving?: boolean
 }) {
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
@@ -224,9 +226,10 @@ function TrainingForm({
                 {isView ? 'Close' : 'Cancel'}
               </button>
               {!isView && onSave && (
-                <button onClick={onSave} disabled={!canManage('skills-maintenance')}
-                  className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
-                  {mode === 'add' ? 'Save Activity' : 'Save Changes'}
+                <button onClick={onSave} disabled={!canManage('skills-maintenance') || isSaving}
+                  className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2">
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Saving…' : (mode === 'add' ? 'Save Activity' : 'Save Changes')}
                 </button>
               )}
             </div>
@@ -686,6 +689,7 @@ export default function SkillsTrainingMaintenanceForm() {
           batches={batches}
           onChange={setEdit}
           onSave={handleSaveEdit}
+          isSaving={isSaving}
           onCancel={() => setTrainingSubView('')}
         />
       </>
@@ -735,6 +739,7 @@ export default function SkillsTrainingMaintenanceForm() {
           batches={batches}
           onChange={setAdd}
           onSave={handleSaveAdd}
+          isSaving={isSaving}
           onCancel={() => { resetAdd(); setAction('') }}
         />
       )}
@@ -928,7 +933,8 @@ export default function SkillsTrainingMaintenanceForm() {
                     onClick={handleAddBatch}
                     disabled={isSavingBatch}
                     className="px-5 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Plus size={16} /> Add Batch
+                    {isSavingBatch ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                    {isSavingBatch ? 'Saving…' : 'Add Batch'}
                   </button>
                 </div>
                 <p className="text-gray-400 text-sm mt-2">Press Enter or click "Add Batch" to save.</p>
@@ -976,31 +982,31 @@ export default function SkillsTrainingMaintenanceForm() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="border-b-2 border-gray-200">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-8 py-5 text-left text-gray-800 font-bold">Batch Number</th>
-                    <th className="px-8 py-5 text-left text-gray-800 font-bold">Trainings Count</th>
-                    <th className="px-8 py-5 text-right text-gray-800 font-bold">Actions</th>
+                    <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Batch Number</th>
+                    <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Trainings Count</th>
+                    <th className="px-6 py-4 w-16 text-right text-sm text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedBatches.map(b => (
                     <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <span className="w-2.5 h-2.5 rounded-full bg-brand-blue flex-shrink-0" />
-                          <span className="text-gray-800 font-semibold">{b.batchName}</span>
+                          <span className="text-sm font-medium text-gray-800">{b.batchName}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-4">
                         {b.trainingCount > 0
-                          ? <span className="px-4 py-2 bg-blue-50 text-brand-blue rounded-full text-sm font-medium">{b.trainingCount} training{b.trainingCount !== 1 ? 's' : ''}</span>
+                          ? <span className="px-3 py-1 bg-blue-50 text-brand-blue rounded-full text-xs font-medium">{b.trainingCount} training{b.trainingCount !== 1 ? 's' : ''}</span>
                           : <span className="text-gray-400 text-sm">None</span>}
                       </td>
-                      <td className="px-8 py-6 text-right">
+                      <td className="px-6 py-4 text-right">
                         <button onClick={() => confirmDeleteBatch(b)}
-                          className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={18} />
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                          <Trash2 size={16} />
                         </button>
                       </td>
                     </tr>

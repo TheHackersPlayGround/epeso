@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import {
   ArrowLeft, Search, Plus, X, Users,
   ChevronDown, AlertCircle, CheckCircle, Upload, Download, MoreHorizontal,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -232,6 +232,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [editingApplicant, setEditingApplicant] = useState<CDSPApplicant | null>(null)
   const [viewingApplicant, setViewingApplicant] = useState<CDSPApplicant | null>(null)
   const [assignTarget, setAssignTarget] = useState<CDSPApplicant | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
@@ -318,7 +319,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     }
   }
   const handleAssign = async (activity: CdspActivity) => {
-    if (!assignTarget?.beneficiaryServiceId) return
+    if (!assignTarget?.beneficiaryServiceId || isAssigning) return
+    setIsAssigning(true)
     try {
       await cdspApiService.addParticipant({ activityId: activity.id, beneficiaryServiceId: assignTarget.beneficiaryServiceId })
       await Promise.all([refreshProfiles(), refreshActivities()])
@@ -328,13 +330,17 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to assign activity.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
   const handleUnassign = async (targetId?: number) => {
+    if (isAssigning) return
     const applicant = targetId
       ? applicants.find(a => a.id === targetId)
       : assignTarget
     if (!applicant?.beneficiaryServiceId || !applicant?.assignedActivityId) return
+    setIsAssigning(true)
     try {
       await cdspApiService.removeParticipant({ activityId: applicant.assignedActivityId, beneficiaryServiceId: applicant.beneficiaryServiceId })
       await Promise.all([refreshProfiles(), refreshActivities()])
@@ -345,6 +351,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to remove assignment.'
       Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -478,8 +486,12 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         cancelButtonColor: '#6b7280',
                       }).then(r => { if (r.isConfirmed) handleUnassign(viewingAssignedFor.id) })
                     }}
-                    className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium"
-                  >Unassign</button>
+                    disabled={isAssigning}
+                    className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                    {isAssigning ? 'Removing…' : 'Unassign'}
+                  </button>
                 )}
                 {canChange && canManage('cdsp') && (
                   <button
@@ -614,10 +626,13 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         cancelButtonColor: '#6b7280',
                       }).then(r => { if (r.isConfirmed) handleUnassign(assignTarget.id) })
                     }}
-                    disabled={!canManage('cdsp') || currentActivity.status === 'Completed'}
+                    disabled={!canManage('cdsp') || currentActivity.status === 'Completed' || isAssigning}
                     title={currentActivity.status === 'Completed' ? 'This activity is already completed — unassigning would erase its completion record.' : undefined}
-                    className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >Unassign</button>
+                    className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isAssigning && <Loader2 size={12} className="animate-spin" />}
+                    {isAssigning ? 'Removing…' : 'Unassign'}
+                  </button>
                 </div>
               )}
 
@@ -733,13 +748,17 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                 <button
                   onClick={() => setSelectedActivity(null)}
-                  className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium"
+                  disabled={isAssigning}
+                  className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >Change Activity</button>
                 <button
                   onClick={doAssign}
-                  disabled={!canManage('cdsp')}
-                  className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
-                >{isAssigned ? 'Re-assign' : 'Assign'}</button>
+                  disabled={!canManage('cdsp') || isAssigning}
+                  className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl hover:bg-brand-blue-dark transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center justify-center gap-1.5"
+                >
+                  {isAssigning && <Loader2 size={14} className="animate-spin" />}
+                  {isAssigning ? 'Assigning…' : (isAssigned ? 'Re-assign' : 'Assign')}
+                </button>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Users, Upload, FileText, Eye, Trash2, ChevronDown } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import SearchableSelect from '../../components/SearchableSelect'
+import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
@@ -854,38 +855,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       </div>
     </div>
 
-    {previewDoc && (
-      <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <p className="text-sm text-gray-500 truncate">{previewDoc.fileName}</p>
-            <button
-              type="button"
-              onClick={() => setPreviewDoc(null)}
-              aria-label="Close preview"
-              className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto p-4 bg-gray-50">
-            {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(previewDoc.fileName) ? (
-              <div className="flex items-center justify-center h-full">
-                <img src={previewDoc.dataUrl || previewDoc.url} alt={previewDoc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-              </div>
-            ) : /\.pdf$/i.test(previewDoc.fileName) ? (
-              <iframe src={previewDoc.dataUrl || previewDoc.url} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <FileText size={64} className="mb-4 text-gray-400" />
-                <p className="text-lg font-medium mb-2">Preview not available</p>
-                <a href={previewDoc.dataUrl || previewDoc.url} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
+    {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </>
   )
 }

@@ -296,7 +296,7 @@ export default function CDSPMaintenanceForm() {
     setOpenMenuId(null)
     const result = await Swal.fire({
       title: 'Delete Activity?',
-      text: `Are you sure you want to delete "${a.title}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete "${a.title}"? This will move the activity to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',

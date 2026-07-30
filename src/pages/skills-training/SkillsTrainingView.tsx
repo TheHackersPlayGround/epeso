@@ -264,7 +264,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null; name: string }>({ open: false, id: null, name: '' })
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
 
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
@@ -420,11 +420,11 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const handleDelete = async (id: number) => {
     try {
       await skillsTrainingService.deleteProfile(id)
-      setDeleteConfirm({ open: false, id: null })
+      setDeleteConfirm({ open: false, id: null, name: '' })
       await refreshProfiles()
       setSuccessModal({ open: true, message: 'Profile has been deleted.' })
     } catch (e) {
-      setDeleteConfirm({ open: false, id: null })
+      setDeleteConfirm({ open: false, id: null, name: '' })
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: BRAND })
     }
   }
@@ -512,10 +512,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       <ConfirmModal
         isOpen={deleteConfirm.open} type="confirm"
         title="Delete Profile"
-        message="Are you sure you want to delete this profile? This action cannot be undone."
+        message={`Are you sure you want to delete ${deleteConfirm.name}? This will move the applicant to the recycle bin.`}
         confirmText="Delete" cancelText="Cancel"
         onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm({ open: false, id: null })}
+        onCancel={() => setDeleteConfirm({ open: false, id: null, name: '' })}
       />
       <ConfirmModal
         isOpen={successModal.open} type="success"
@@ -965,7 +965,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 )
               })()}
               <div className="my-1 border-t border-gray-100" />
-              <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id }); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
+              <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id, name: `${profile.lastName}, ${profile.firstName}` }); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>
           </>,
           document.body

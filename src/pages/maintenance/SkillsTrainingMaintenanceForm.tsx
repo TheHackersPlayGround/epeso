@@ -469,7 +469,7 @@ export default function SkillsTrainingMaintenanceForm() {
   const confirmDeleteBatch = async (b: SkillsTrainingBatch) => {
     const result = await Swal.fire({
       title: 'Delete Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',
@@ -1121,7 +1121,7 @@ export default function SkillsTrainingMaintenanceForm() {
               <Trash2 size={24} className="text-red-500" />
             </div>
             <h3 className="text-gray-800 mb-2">Delete Training</h3>
-            <p className="text-gray-600 mb-6 text-sm">Are you sure? This action cannot be undone.</p>
+            <p className="text-gray-600 mb-6 text-sm">Are you sure? This will move the training to the recycle bin.</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setTrainingDeleteConfirm(null)} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
               <button onClick={handleDeleteTraining}

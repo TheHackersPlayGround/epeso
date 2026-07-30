@@ -33,7 +33,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
                     : 'border-transparent text-gray-600 hover:text-gray-800'
                 }`}
               >
-                {tab === 'users' ? 'System Users' : tab === 'data' ? 'Data Management' : 'Activity Logs'}
+                {tab === 'users' ? 'System Users' : tab === 'data' ? 'Backup' : 'Activity Logs'}
               </button>
             ))}
           </div>

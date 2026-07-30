@@ -9,7 +9,17 @@
 import axiosClient from './axiosClient'
 import { ENDPOINTS } from '../config/api'
 
-export type RecycleRecordType = 'applicant' | 'employer' | 'referral' | 'gipApplicant' | 'cdspApplicant' | 'spesApplicant' | 'dilpApplicant' | 'tupadApplicant' | 'slpApplicant' | 'clpepApplicant' | 'skillsTrainingApplicant' | 'ofwProfile'
+export type RecycleRecordType =
+  | 'applicant' | 'employer' | 'referral'
+  | 'gipApplicant' | 'gipBatch'
+  | 'cdspApplicant' | 'cdspService' | 'cdspActivity'
+  | 'spesApplicant' | 'spesBatch'
+  | 'dilpApplicant' | 'dilpProject'
+  | 'tupadApplicant' | 'tupadProject'
+  | 'slpApplicant' | 'slpProject'
+  | 'clpepApplicant' | 'clpepIntervention'
+  | 'skillsTrainingApplicant' | 'skillsTrainingBatch' | 'skillsTrainingActivity'
+  | 'ofwProfile'
 
 export type RecycleBinRecord = {
   recordType: RecycleRecordType
@@ -23,14 +33,14 @@ export type RecycleBinRecord = {
 
 // Which module's endpoints handle a given record type.
 function endpointsFor(recordType: RecycleRecordType) {
-  if (recordType === 'gipApplicant') return ENDPOINTS.gip
-  if (recordType === 'cdspApplicant') return ENDPOINTS.cdsp
-  if (recordType === 'spesApplicant') return ENDPOINTS.spes
-  if (recordType === 'dilpApplicant') return ENDPOINTS.dilp
-  if (recordType === 'tupadApplicant') return ENDPOINTS.tupad
-  if (recordType === 'slpApplicant') return ENDPOINTS.slp
-  if (recordType === 'clpepApplicant') return ENDPOINTS.clpep
-  if (recordType === 'skillsTrainingApplicant') return ENDPOINTS.skillsTraining
+  if (recordType === 'gipApplicant' || recordType === 'gipBatch') return ENDPOINTS.gip
+  if (recordType === 'cdspApplicant' || recordType === 'cdspService' || recordType === 'cdspActivity') return ENDPOINTS.cdsp
+  if (recordType === 'spesApplicant' || recordType === 'spesBatch') return ENDPOINTS.spes
+  if (recordType === 'dilpApplicant' || recordType === 'dilpProject') return ENDPOINTS.dilp
+  if (recordType === 'tupadApplicant' || recordType === 'tupadProject') return ENDPOINTS.tupad
+  if (recordType === 'slpApplicant' || recordType === 'slpProject') return ENDPOINTS.slp
+  if (recordType === 'clpepApplicant' || recordType === 'clpepIntervention') return ENDPOINTS.clpep
+  if (recordType === 'skillsTrainingApplicant' || recordType === 'skillsTrainingBatch' || recordType === 'skillsTrainingActivity') return ENDPOINTS.skillsTraining
   if (recordType === 'ofwProfile') return ENDPOINTS.ofw
   return ENDPOINTS.employment
 }

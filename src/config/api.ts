@@ -217,4 +217,7 @@ export const ENDPOINTS = {
     restoreRecord:    '/ofw/restoreRecord',
     purgeRecord:      '/ofw/purgeRecord',
   },
+  activityLogs: {
+    list: '/activity_logs/list',
+  },
 } as const

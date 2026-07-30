@@ -192,7 +192,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     setOpenMenuId(null)
     const result = await Swal.fire({
       title: 'Delete SPES Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',
@@ -274,7 +274,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     setGipOpenMenuId(null)
     const result = await Swal.fire({
       title: 'Delete GIP Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',

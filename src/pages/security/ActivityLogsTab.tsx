@@ -4,6 +4,7 @@ import {
   Trash, Trash2, RotateCcw, Clock, AlertTriangle,
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
+import { listActivityLogs } from '../../services/activityLogService'
 import { listDeleted, restoreRecord, purgeRecord, type RecycleBinRecord } from '../../services/recycleBinService'
 import { useGIP } from '../../contexts/GIPContext'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -26,28 +27,38 @@ interface ActivityLog {
   status: 'Success' | 'Failed'
 }
 
-const mockActivityLogs: ActivityLog[] = [
-  { id: 1,  timestamp: '2026-05-11 09:02 AM', user: 'admin',    role: 'Administrator', action: 'Login',         module: 'System',          details: 'Successful login',                         status: 'Success' },
-  { id: 2,  timestamp: '2026-05-11 09:05 AM', user: 'admin',    role: 'Administrator', action: 'Add Record',    module: 'Applicants',      details: 'Added applicant: Juan Dela Cruz',          status: 'Success' },
-  { id: 3,  timestamp: '2026-05-11 09:18 AM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Employers',       details: 'Viewed employer: ABC Corporation',         status: 'Success' },
-  { id: 4,  timestamp: '2026-05-11 09:31 AM', user: 'staff002', role: 'Staff',         action: 'Edit Record',   module: 'Applicants',      details: 'Edited applicant: Maria Santos',           status: 'Success' },
-  { id: 5,  timestamp: '2026-05-11 09:45 AM', user: 'staff001', role: 'Staff',         action: 'Login',         module: 'System',          details: 'Failed login attempt',                     status: 'Failed'  },
-  { id: 6,  timestamp: '2026-05-11 10:00 AM', user: 'admin',    role: 'Administrator', action: 'Delete Record', module: 'Applicants',      details: 'Deleted applicant: Pedro Reyes',           status: 'Success' },
-  { id: 7,  timestamp: '2026-05-11 10:12 AM', user: 'staff002', role: 'Staff',         action: 'Export',        module: 'Reports',         details: 'Exported ELPOR report to Excel',           status: 'Success' },
-  { id: 8,  timestamp: '2026-05-11 10:25 AM', user: 'admin',    role: 'Administrator', action: 'Add Record',    module: 'OFW Services',    details: 'Added OFW profile: Ana Reyes',             status: 'Success' },
-  { id: 9,  timestamp: '2026-05-11 10:40 AM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Skills Training', details: 'Viewed skills training participant list',  status: 'Success' },
-  { id: 10, timestamp: '2026-05-11 10:55 AM', user: 'admin',    role: 'Administrator', action: 'Edit Record',   module: 'Employers',       details: 'Updated employer: XYZ Enterprise',         status: 'Success' },
-  { id: 11, timestamp: '2026-05-11 11:08 AM', user: 'staff002', role: 'Staff',         action: 'Add Record',    module: 'Skills Training', details: 'Assigned training to: Jose Garcia',        status: 'Success' },
-  { id: 12, timestamp: '2026-05-11 11:20 AM', user: 'staff001', role: 'Staff',         action: 'Export',        module: 'Applicants',      details: 'Exported applicant list to CSV',           status: 'Failed'  },
-  { id: 13, timestamp: '2026-05-11 11:35 AM', user: 'admin',    role: 'Administrator', action: 'Add User',      module: 'User Management', details: 'Created user: staff004',                   status: 'Success' },
-  { id: 14, timestamp: '2026-05-11 11:50 AM', user: 'admin',    role: 'Administrator', action: 'Edit Record',   module: 'OFW Services',    details: 'Updated ELPOR entry: Ramon Cruz',          status: 'Success' },
-  { id: 15, timestamp: '2026-05-11 12:02 PM', user: 'staff001', role: 'Staff',         action: 'View Record',   module: 'Reports',         details: 'Viewed monthly PESO report',               status: 'Success' },
-  { id: 16, timestamp: '2026-05-11 01:10 PM', user: 'staff002', role: 'Staff',         action: 'Login',         module: 'System',          details: 'Successful login after session timeout',   status: 'Success' },
-  { id: 17, timestamp: '2026-05-11 01:25 PM', user: 'admin',    role: 'Administrator', action: 'Delete Record', module: 'Employers',       details: "Deleted employer: Old Co.",                status: 'Success' },
-  { id: 18, timestamp: '2026-05-11 01:38 PM', user: 'staff001', role: 'Staff',         action: 'Edit Record',   module: 'OFW Services',    details: 'Updated OFW request status: Liza Mendoza', status: 'Success' },
-  { id: 19, timestamp: '2026-05-11 02:00 PM', user: 'admin',    role: 'Administrator', action: 'Export',        module: 'Skills Training', details: 'Exported skills training list to Excel',   status: 'Success' },
-  { id: 20, timestamp: '2026-05-11 02:15 PM', user: 'staff002', role: 'Staff',         action: 'Delete Record', module: 'Skills Training', details: 'Unauthorized delete attempt blocked',      status: 'Failed'  },
-]
+// Backend module values are the same lowercase permission slugs used across the
+// app (e.g. 'cdsp', 'cdsp-maintenance', 'system') — mapped here to readable
+// labels for display/filtering. Falls back to the raw slug for anything unmapped.
+const MODULE_LABELS: Record<string, string> = {
+  system: 'System', security: 'Security', report: 'Report', documents: 'Documents',
+  employment: 'Employment Facilitation', ofw: 'OFW',
+  cdsp: 'CDSP Records', 'cdsp-maintenance': 'CDSP Maintenance',
+  gip: 'GIP Records', 'gip-maintenance': 'GIP Maintenance',
+  spes: 'SPES Records', 'spes-maintenance': 'SPES Maintenance',
+  livelihood: 'Livelihood Records', 'livelihood-maintenance': 'Livelihood Maintenance',
+  skills: 'Skills Training Records', 'skills-maintenance': 'Skills Training Maintenance',
+}
+function formatModule(slug: string): string {
+  return MODULE_LABELS[slug] ?? slug
+}
+
+// Colors the action badge by verb prefix rather than an exact-match list, since
+// the real action vocabulary (Create/Update/Delete Profile|Batch|Activity|...)
+// is far larger than any fixed set.
+function actionBadgeClass(action: string): string {
+  if (action === 'Login' || action === 'Logout') return 'bg-gray-100 text-gray-600'
+  if (/^(Create|Add)\b/.test(action)) return 'bg-green-50 text-green-700'
+  if (/^(Update|Edit)\b/.test(action)) return 'bg-blue-50 text-blue-700'
+  if (/^(Delete|Purge)\b/.test(action)) return 'bg-red-50 text-red-700'
+  if (/^Restore\b/.test(action)) return 'bg-teal-50 text-teal-700'
+  return 'bg-gray-50 text-gray-600'
+}
+
+function formatTimestamp(ts: string): string {
+  const d = new Date(ts.replace(' ', 'T'))
+  return isNaN(d.getTime()) ? ts : d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
+}
 
 // The recycle bin shows real soft-deleted records from every module that
 // supports soft delete: Employment Facilitation (applicants, employers,
@@ -63,23 +74,62 @@ function getDaysRemaining(deletedAt: string): number {
   return Math.max(0, 30 - diff)
 }
 
-const logActions  = ['All', 'Login', 'Add Record', 'Edit Record', 'Delete Record', 'Export', 'Add User', 'View Record']
-const logModules  = ['All', 'System', 'Applicants', 'Employers', 'OFW Services', 'Skills Training', 'Reports', 'User Management']
 const logStatuses = ['All', 'Success', 'Failed']
-const binModules  = ['All', 'Applicants', 'Employers', 'Referrals', 'GIP Applicants', 'CDSP Applicants', 'SPES Applicants', 'DILP Beneficiaries', 'TUPAD Beneficiaries', 'SLP Beneficiaries', 'CLPEP Beneficiaries']
+const binModules  = [
+  'All', 'Applicants', 'Employers', 'Referrals',
+  'GIP Applicants', 'GIP Batches',
+  'CDSP Applicants', 'CDSP Services', 'CDSP Activities',
+  'SPES Applicants', 'SPES Batches',
+  'DILP Beneficiaries', 'DILP Projects',
+  'TUPAD Beneficiaries', 'TUPAD Projects',
+  'SLP Beneficiaries', 'SLP Projects',
+  'CLPEP Beneficiaries', 'CLPEP Interventions',
+  'Skills Training Applicants', 'Skills Training Batches', 'Skills Training Activities',
+  'OFW Profiles',
+]
+
+// Colors the recycle bin's Module badge — records and their program's
+// Maintenance-level entities (batches/projects/activities/interventions)
+// share one color per program, so the family is recognizable at a glance.
+const BIN_MODULE_BADGE: Record<string, string> = {
+  'Applicants': 'bg-blue-50 text-blue-700',
+  'Employers': 'bg-purple-50 text-purple-700',
+  'Referrals': 'bg-amber-50 text-amber-700',
+  'GIP Applicants': 'bg-sky-50 text-sky-700',
+  'GIP Batches': 'bg-sky-50 text-sky-700',
+  'CDSP Applicants': 'bg-teal-50 text-teal-700',
+  'CDSP Services': 'bg-teal-50 text-teal-700',
+  'CDSP Activities': 'bg-teal-50 text-teal-700',
+  'SPES Applicants': 'bg-indigo-50 text-indigo-700',
+  'SPES Batches': 'bg-indigo-50 text-indigo-700',
+  'DILP Beneficiaries': 'bg-emerald-50 text-emerald-700',
+  'DILP Projects': 'bg-emerald-50 text-emerald-700',
+  'TUPAD Beneficiaries': 'bg-orange-50 text-orange-700',
+  'TUPAD Projects': 'bg-orange-50 text-orange-700',
+  'SLP Beneficiaries': 'bg-cyan-50 text-cyan-700',
+  'SLP Projects': 'bg-cyan-50 text-cyan-700',
+  'CLPEP Beneficiaries': 'bg-rose-50 text-rose-700',
+  'CLPEP Interventions': 'bg-rose-50 text-rose-700',
+  'Skills Training Applicants': 'bg-lime-50 text-lime-700',
+  'Skills Training Batches': 'bg-lime-50 text-lime-700',
+  'Skills Training Activities': 'bg-lime-50 text-lime-700',
+  'OFW Profiles': 'bg-fuchsia-50 text-fuchsia-700',
+}
 
 export default function ActivityLogsTab() {
-  const { refreshProfiles: refreshGipProfiles } = useGIP()
-  const { refreshProfiles: refreshCdspProfiles } = useCDSP()
-  const { refreshProfiles: refreshSpesProfiles } = useSPES()
-  const { refreshProfiles: refreshDilpProfiles } = useDILP()
-  const { refreshProfiles: refreshTupadProfiles } = useTUPAD()
-  const { refreshProfiles: refreshSlpProfiles } = useSLP()
-  const { refreshProfiles: refreshClpepProfiles } = useCLPEP()
-  const { refreshProfiles: refreshSkillsTrainingProfiles } = useSkillsTraining()
+  const { refreshProfiles: refreshGipProfiles, refreshBatches: refreshGipBatches } = useGIP()
+  const { refreshProfiles: refreshCdspProfiles, refreshActivities: refreshCdspActivities, refreshServices: refreshCdspServices } = useCDSP()
+  const { refreshProfiles: refreshSpesProfiles, refreshBatches: refreshSpesBatches } = useSPES()
+  const { refreshProfiles: refreshDilpProfiles, refreshProjects: refreshDilpProjects } = useDILP()
+  const { refreshProfiles: refreshTupadProfiles, refreshProjects: refreshTupadProjects } = useTUPAD()
+  const { refreshProfiles: refreshSlpProfiles, refreshProjects: refreshSlpProjects } = useSLP()
+  const { refreshProfiles: refreshClpepProfiles, refreshInterventions: refreshClpepInterventions } = useCLPEP()
+  const { refreshProfiles: refreshSkillsTrainingProfiles, refreshBatches: refreshSkillsTrainingBatches, refreshActivities: refreshSkillsTrainingActivities } = useSkillsTraining()
   const { refreshProfiles: refreshOfwProfiles } = useOFW()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
+  const [logs,        setLogs]        = useState<ActivityLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(true)
   const [logSearch,       setLogSearch]       = useState('')
   const [logActionFilter, setLogActionFilter] = useState('All')
   const [logModuleFilter, setLogModuleFilter] = useState('All')
@@ -99,10 +149,16 @@ export default function ActivityLogsTab() {
     title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
   }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
 
-  const filteredLogs = useMemo(() => mockActivityLogs.filter(log => {
+  // Filter option lists are derived from the real data rather than hardcoded,
+  // since the actual action/module vocabulary (Create/Update/Delete Profile|
+  // Batch|Activity across a dozen modules) is far larger than any fixed set.
+  const logActions = useMemo(() => ['All', ...Array.from(new Set(logs.map(l => l.action))).sort()], [logs])
+  const logModules = useMemo(() => ['All', ...Array.from(new Set(logs.map(l => l.module))).sort()], [logs])
+
+  const filteredLogs = useMemo(() => logs.filter(log => {
     const matchSearch = logSearch === '' || log.user.toLowerCase().includes(logSearch.toLowerCase()) || log.details.toLowerCase().includes(logSearch.toLowerCase())
     return matchSearch && (logActionFilter === 'All' || log.action === logActionFilter) && (logModuleFilter === 'All' || log.module === logModuleFilter) && (logStatusFilter === 'All' || log.status === logStatusFilter)
-  }), [logSearch, logActionFilter, logModuleFilter, logStatusFilter])
+  }), [logs, logSearch, logActionFilter, logModuleFilter, logStatusFilter])
 
   const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / logsPerPage))
   const paginatedLogs = filteredLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage)
@@ -115,10 +171,28 @@ export default function ActivityLogsTab() {
 
   const totalBinPages = Math.max(1, Math.ceil(filteredBin.length / binPerPage))
   const paginatedBin  = filteredBin.slice((binPage - 1) * binPerPage, binPage * binPerPage)
-  const expiringCount = recycleBin.filter(i => getDaysRemaining(i.deletedAt) <= 7).length
+  const expiringDaysLeft = recycleBin.map(i => getDaysRemaining(i.deletedAt)).filter(d => d <= 7)
+  const expiringCount = expiringDaysLeft.length
+  // The banner's wording should reflect the most urgent item's real countdown,
+  // not the fixed 7-day threshold used to decide whether to show it at all.
+  const soonestExpiry = expiringCount > 0 ? Math.min(...expiringDaysLeft) : 0
 
   useEffect(() => { setLogPage(1) }, [logSearch, logActionFilter, logModuleFilter, logStatusFilter])
   useEffect(() => { setBinPage(1) }, [binModuleFilter, binSearch])
+
+  const reloadLogs = useCallback(async () => {
+    setLogsLoading(true)
+    try {
+      const res = await listActivityLogs()
+      setLogs(res.data ?? [])
+    } catch {
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load activity logs. Please try again.', onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })) })
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reloadLogs() }, [reloadLogs])
 
   const reloadBin = useCallback(async () => {
     setBinLoading(true)
@@ -154,13 +228,23 @@ export default function ActivityLogsTab() {
   // no manual page refresh needed.
   const refreshModuleFor = async (recordType: RecycleBinItem['recordType']) => {
     if (recordType === 'gipApplicant') await refreshGipProfiles()
+    if (recordType === 'gipBatch') await refreshGipBatches()
     if (recordType === 'cdspApplicant') await refreshCdspProfiles()
+    if (recordType === 'cdspActivity') await refreshCdspActivities()
+    if (recordType === 'cdspService') await refreshCdspServices()
     if (recordType === 'spesApplicant') await refreshSpesProfiles()
+    if (recordType === 'spesBatch') await refreshSpesBatches()
     if (recordType === 'dilpApplicant') await refreshDilpProfiles()
+    if (recordType === 'dilpProject') await refreshDilpProjects()
     if (recordType === 'tupadApplicant') await refreshTupadProfiles()
+    if (recordType === 'tupadProject') await refreshTupadProjects()
     if (recordType === 'slpApplicant') await refreshSlpProfiles()
+    if (recordType === 'slpProject') await refreshSlpProjects()
     if (recordType === 'clpepApplicant') await refreshClpepProfiles()
+    if (recordType === 'clpepIntervention') await refreshClpepInterventions()
     if (recordType === 'skillsTrainingApplicant') await refreshSkillsTrainingProfiles()
+    if (recordType === 'skillsTrainingBatch') await refreshSkillsTrainingBatches()
+    if (recordType === 'skillsTrainingActivity') await refreshSkillsTrainingActivities()
     if (recordType === 'ofwProfile') await refreshOfwProfiles()
   }
 
@@ -259,7 +343,7 @@ export default function ActivityLogsTab() {
             </div>
             <div className="relative">
               <select value={logModuleFilter} onChange={e => setLogModuleFilter(e.target.value)} className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] outline-none bg-white text-gray-700 cursor-pointer">
-                {logModules.map(m => <option key={m} value={m}>{m === 'All' ? 'All Modules' : m}</option>)}
+                {logModules.map(m => <option key={m} value={m}>{m === 'All' ? 'All Modules' : formatModule(m)}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
@@ -284,9 +368,11 @@ export default function ActivityLogsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.length > 0 ? paginatedLogs.map(log => (
+                {logsLoading ? (
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</td></tr>
+                ) : filteredLogs.length > 0 ? paginatedLogs.map(log => (
                   <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{log.timestamp}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatTimestamp(log.timestamp)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="text-xs text-gray-800">{log.user}</span>
@@ -294,16 +380,9 @@ export default function ActivityLogsTab() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        log.action === 'Login'         ? 'bg-gray-100 text-gray-600' :
-                        log.action === 'Add Record' || log.action === 'Add User' ? 'bg-green-50 text-green-700' :
-                        log.action === 'Edit Record'   ? 'bg-blue-50 text-blue-700' :
-                        log.action === 'Delete Record' ? 'bg-red-50 text-red-700' :
-                        log.action === 'Export'        ? 'bg-purple-50 text-purple-700' :
-                        'bg-gray-50 text-gray-600'
-                      }`}>{log.action}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${actionBadgeClass(log.action)}`}>{log.action}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{log.module}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatModule(log.module)}</td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[240px]">{log.details}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-xs ${log.status === 'Success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{log.status}</span>
@@ -361,7 +440,7 @@ export default function ActivityLogsTab() {
             <div className="mx-6 mt-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
               <AlertTriangle size={18} className="text-amber-500 flex-shrink-0" />
               <p className="text-sm text-amber-700 m-0">
-                <span className="font-medium">{expiringCount} item{expiringCount !== 1 ? 's' : ''}</span> will be permanently deleted within 7 days. Restore them now if needed.
+                <span className="font-medium">{expiringCount} item{expiringCount !== 1 ? 's' : ''}</span> will be permanently deleted {soonestExpiry === 0 ? 'today' : `within ${soonestExpiry} day${soonestExpiry !== 1 ? 's' : ''}`}. Restore them now if needed.
               </p>
             </div>
           )}
@@ -411,19 +490,11 @@ export default function ActivityLogsTab() {
                       <tr key={`${item.recordType}-${item.id}`} className={`border-b border-gray-100 hover:bg-gray-50 ${isUrgent ? 'bg-red-50/40' : isWarning ? 'bg-amber-50/40' : ''}`}>
                         <td className="px-4 py-3"><span className="text-sm text-gray-800">{item.name}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            item.module === 'Applicants'      ? 'bg-blue-50 text-blue-700' :
-                            item.module === 'Employers'       ? 'bg-purple-50 text-purple-700' :
-                            item.module === 'Referrals'       ? 'bg-amber-50 text-amber-700' :
-                            item.module === 'GIP Applicants'  ? 'bg-sky-50 text-sky-700' :
-                            item.module === 'CDSP Applicants' ? 'bg-teal-50 text-teal-700' :
-                            item.module === 'SPES Applicants' ? 'bg-indigo-50 text-indigo-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>{item.module}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${BIN_MODULE_BADGE[item.module] ?? 'bg-gray-100 text-gray-600'}`}>{item.module}</span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[220px]">{item.description}</td>
                         <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{item.deletedBy}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{item.deletedAt}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatTimestamp(item.deletedAt)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className={`flex items-center gap-1.5 text-xs font-medium ${isUrgent ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-gray-500'}`}>
                             <Clock size={13} />

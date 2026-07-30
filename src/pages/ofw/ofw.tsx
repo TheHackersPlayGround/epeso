@@ -67,20 +67,6 @@ function StatusBadge({ status }: { status: OFWProfile['status'] }) {
   )
 }
 
-function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-        <p className="text-sm text-gray-700 mb-5">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
-          <button onClick={onConfirm} className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700">Delete</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 interface ActionMenuProps {
   profile: OFWProfile
   pos: { top: number; left: number }
@@ -151,7 +137,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [viewProfile, setViewProfile] = useState<OFWProfile | null>(null)
   const [editProfile, setEditProfile] = useState<OFWProfile | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<OFWProfile | null>(null)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     profile: OFWProfile
     newStatus: OFWProfile['status']
@@ -241,13 +226,23 @@ export default function OFWView({ onBack }: OFWViewProps) {
     }
   }
 
-  const handleDeleteProfile = async (id: number) => {
+  const handleDeleteProfile = async (profile: OFWProfile) => {
+    const result = await Swal.fire({
+      title: 'Delete Profile?',
+      text: `Are you sure you want to delete "${profile.name}" (${profile.referenceNumber})? This will move the profile to the recycle bin.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!result.isConfirmed) return
     try {
-      await ofwService.deleteProfile(id)
+      await ofwService.deleteProfile(profile.id)
       await refreshProfiles()
-      setDeleteTarget(null)
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The profile has been deleted and moved to the recycle bin.', confirmButtonColor: '#0077BE', timer: 1500, showConfirmButton: false })
     } catch (e) {
-      setDeleteTarget(null)
       Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
     }
   }
@@ -606,7 +601,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                               const label = newStatus === 'Ongoing' ? 'Start Processing' : newStatus === 'Rejected' ? 'Reject' : `Mark as ${newStatus}`
                               handleStatusChange(profile, newStatus, label)
                             }}
-                            onDelete={() => setDeleteTarget(profile)}
+                            onDelete={() => handleDeleteProfile(profile)}
                             onClose={closeMenu}
                           />
                         )}
@@ -645,14 +640,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
           )}
         </div>
       </div>
-
-      {deleteTarget && (
-        <ConfirmModal
-          message={`Delete profile for "${deleteTarget.name}" (${deleteTarget.referenceNumber})? This action cannot be undone.`}
-          onConfirm={() => handleDeleteProfile(deleteTarget.id)}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
 
       {/* ── Status change confirmation modal ────────────────────── */}
       {pendingStatusChange !== null && (() => {

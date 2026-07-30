@@ -583,7 +583,7 @@ export default function LivelihoodMaintenanceForm() {
     setOpenMenuId(null)
     const result = await Swal.fire({
       title: 'Delete Project?',
-      text: `Are you sure you want to delete "${a.title}"? This action cannot be undone.`,
+      text: `Are you sure you want to delete "${a.title}"? This will move the project to the recycle bin.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Delete',

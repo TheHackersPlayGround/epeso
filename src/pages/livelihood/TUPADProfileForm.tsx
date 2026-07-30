@@ -283,17 +283,17 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         <div className="grid grid-cols-4 gap-4">
           <div>
             <label className={labelClass}>Last Name <span className="text-red-500">*</span></label>
-            <input ref={lastNameRef} className={`${inputClass} ${errCls('lastName')}`} placeholder="Dela Cruz" value={formData.lastName ?? ''} onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }} />
+            <input ref={lastNameRef} className={`${inputClass} ${errCls('lastName')}`} placeholder="Enter last name" value={formData.lastName ?? ''} onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }} />
             {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
           </div>
           <div>
             <label className={labelClass}>First Name <span className="text-red-500">*</span></label>
-            <input ref={firstNameRef} className={`${inputClass} ${errCls('firstName')}`} placeholder="Juan" value={formData.firstName ?? ''} onChange={e => { updateField({ firstName: e.target.value }); clearFieldError('firstName') }} />
+            <input ref={firstNameRef} className={`${inputClass} ${errCls('firstName')}`} placeholder="Enter first name" value={formData.firstName ?? ''} onChange={e => { updateField({ firstName: e.target.value }); clearFieldError('firstName') }} />
             {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
           </div>
           <div>
             <label className={labelClass}>Middle Name</label>
-            <input ref={middleNameRef} className={`${inputClass} ${errCls('middleName')}`} placeholder="M." value={formData.middleName ?? ''} onChange={e => { updateField({ middleName: e.target.value }); clearFieldError('middleName') }} />
+            <input ref={middleNameRef} className={`${inputClass} ${errCls('middleName')}`} placeholder="Enter middle name" value={formData.middleName ?? ''} onChange={e => { updateField({ middleName: e.target.value }); clearFieldError('middleName') }} />
             {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
           </div>
           <div>

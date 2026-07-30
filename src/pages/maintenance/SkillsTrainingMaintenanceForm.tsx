@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   PlusCircle, Tag, FolderOpen, ClipboardList, MoreHorizontal,
   Trash2, PlayCircle, CheckCircle, RefreshCw, Search, Plus,
@@ -277,6 +278,10 @@ export default function SkillsTrainingMaintenanceForm() {
     activity: SkillsTrainingActivity; nextStatus: TrainingStatus; label: string
   } | null>(null)
   const [trainingDeleteConfirm, setTrainingDeleteConfirm] = useState<number | null>(null)
+  // Blocks marking a training Ongoing while it has 0 actually-assigned
+  // participants (assignedCount -- the real linked-profiles count, not the
+  // manually-typed "Number of Participants/Beneficiaries" estimate field).
+  const [zeroParticipantsAlert, setZeroParticipantsAlert] = useState(false)
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -373,6 +378,10 @@ export default function SkillsTrainingMaintenanceForm() {
     if (!selectedTraining || isSaving) return
     if (!editForm.title.trim()) {
       Swal.fire({ icon: 'warning', title: 'Required', text: 'Title is required.', confirmButtonColor: BRAND_BLUE })
+      return
+    }
+    if (editForm.status === 'Ongoing' && (selectedTraining.assignedCount ?? 0) === 0) {
+      setZeroParticipantsAlert(true)
       return
     }
     setIsSaving(true)
@@ -487,6 +496,12 @@ export default function SkillsTrainingMaintenanceForm() {
   const handleConfirmStatusChange = async () => {
     if (!trainingStatusConfirm) return
     const { activity, nextStatus } = trainingStatusConfirm
+
+    if (nextStatus === 'Ongoing' && (activity.assignedCount ?? 0) === 0) {
+      setTrainingStatusConfirm(null)
+      setZeroParticipantsAlert(true)
+      return
+    }
 
     if (nextStatus === 'Completed') {
       try {
@@ -1115,6 +1130,16 @@ export default function SkillsTrainingMaintenanceForm() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={zeroParticipantsAlert}
+        type="error"
+        title="No Participants Assigned"
+        message="This training has 0 participants assigned. Please add participants to this training before marking it as Ongoing."
+        confirmText="OK"
+        onConfirm={() => setZeroParticipantsAlert(false)}
+        onCancel={() => setZeroParticipantsAlert(false)}
+      />
     </>
   )
 }

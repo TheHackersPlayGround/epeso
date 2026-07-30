@@ -16,7 +16,7 @@ import { downloadImportTemplate, importSkillsTrainingApplicants, type ImportResu
 import ConfirmModal from '../shared/ConfirmModal'
 import SkillsTrainingProfileForm, {
   ViewProfilePanel, BRAND,
-  CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, StatusBadge,
+  CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, STATUS_OPTIONS, StatusBadge,
 } from './SkillsTrainingProfileForm'
 
 interface SkillsTrainingViewProps {
@@ -154,6 +154,89 @@ function ImportResultView({ result }: { result: ImportResult }) {
   )
 }
 
+// ── Update Status Modal ───────────────────────────────────────────────────────
+// Quick status change (e.g. Waitlisted -> Accepted) without opening the full
+// Edit form -- mirrors Employment Facilitation's Update Status modal for
+// Placements/Referrals. Uses the same STATUS_OPTIONS (Waitlisted/Accepted only)
+// as the Add/Edit form -- the backend type/validation technically also allows
+// Pending/Rejected, but neither is ever surfaced anywhere in this module's UI.
+
+type UpdateProfileStatusModalProps = {
+  profile: SkillsTrainingProfile
+  onClose: () => void
+  onSave: (id: number, newStatus: SkillsTrainingProfile['status']) => Promise<void>
+}
+
+function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileStatusModalProps) {
+  const [selectedStatus, setSelectedStatus] = useState<SkillsTrainingProfile['status']>(profile.status)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await onSave(profile.id, selectedStatus)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Update Status</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close update status modal"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            Updating status for <span className="font-semibold text-gray-800">{profile.lastName}, {profile.firstName}</span>
+          </p>
+
+          <div>
+            <label htmlFor="skills-profile-status" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              id="skills-profile-status"
+              value={selectedStatus}
+              onChange={e => setSelectedStatus(e.target.value as SkillsTrainingProfile['status'])}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900"
+            >
+              {STATUS_OPTIONS.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
   const { profiles, activities, batches, qualifications, purposes, refreshProfiles, refreshActivities } = useSkillsTraining()
   const plannedTrainings = activities.filter(t => t.status === 'Planned')
@@ -161,6 +244,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [viewingProfile, setViewingProfile] = useState<SkillsTrainingProfile | null>(null)
   const [editingProfile, setEditingProfile] = useState<SkillsTrainingProfile | null>(null)
+  const [updatingStatusProfile, setUpdatingStatusProfile] = useState<SkillsTrainingProfile | null>(null)
 
   const [assigningProfile, setAssigningProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assignSearch, setAssignSearch] = useState('')
@@ -277,9 +361,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     'Birthdate': p.birthdate, 'Age': p.age, 'Sex': p.sex, 'Civil Status': p.civilStatus,
     'Address': [p.streetPurok, p.barangay, p.cityMunicipality, p.province].filter(Boolean).join(', '),
     'Contact #': p.contactNumber,
-    'Classification': p.classification.join(', '),
-    'Desired Qualification': p.desiredQualification.join(', '),
-    'Purpose of Training': p.purposeOfTraining.join(', '),
+    'Classification': [...p.classification, ...p.classificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
+    'Desired Qualification': [...p.desiredQualification, ...p.qualificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
+    'Purpose of Training': [...p.purposeOfTraining, ...p.purposeOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
     'Assigned Training': p.assignedTrainingTitle, 'Status': p.status,
     'Date Applied': p.dateApplicationReceived,
   }))
@@ -345,6 +429,43 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     }
   }
 
+  // Quick status-only change (Update Status modal) -- stUpdateProfile requires
+  // the full profile payload (name/sex/birthdate/etc. are all validated
+  // server-side), so this resends the profile's own current data unchanged and
+  // only overrides `status`, rather than needing a separate status-only endpoint.
+  const handleUpdateProfileStatus = async (id: number, newStatus: SkillsTrainingProfile['status']) => {
+    const p = profiles.find(x => x.id === id)
+    if (!p) return
+    try {
+      await skillsTrainingService.updateProfile(id, {
+        firstName: p.firstName,
+        lastName: p.lastName,
+        middleName: p.middleName,
+        sex: p.sex,
+        birthdate: p.birthdate,
+        civilStatus: p.civilStatus,
+        streetPurok: p.streetPurok,
+        barangayId: p.barangayId,
+        contactNumber: p.contactNumber,
+        receivedBy: p.receivedBy,
+        dateApplicationReceived: p.dateApplicationReceived,
+        status: newStatus,
+        classification: p.classification,
+        classificationOther: p.classificationOther,
+        desiredQualification: p.desiredQualification,
+        qualificationOther: p.qualificationOther,
+        purposeOfTraining: p.purposeOfTraining,
+        purposeOther: p.purposeOther,
+        attachedDocuments: p.attachedDocuments,
+      })
+      await refreshProfiles()
+      setSuccessModal({ open: true, message: `Status updated to ${newStatus}.` })
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: BRAND })
+      throw e // keep the Update Status modal open so the user can retry
+    }
+  }
+
   if (isFormOpen) {
     return (
       <SkillsTrainingProfileForm
@@ -403,6 +524,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         onConfirm={() => setSuccessModal({ open: false, message: '' })}
         onCancel={() => setSuccessModal({ open: false, message: '' })}
       />
+
+      {updatingStatusProfile && (
+        <UpdateProfileStatusModal
+          profile={updatingStatusProfile}
+          onClose={() => setUpdatingStatusProfile(null)}
+          onSave={handleUpdateProfileStatus}
+        />
+      )}
 
       {isImportModalOpen && (
         <SkillsTrainingImportModal
@@ -463,11 +592,16 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     </div>
                   ) : plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).map(training => {
                     const isAssigned = assigningProfile.assignedTrainingId === training.id
+                    // participants doubles as the training's target slot count (see
+                    // the "Slots: assigned/participants" readout in step 2) -- 0 means
+                    // no slot count has been set yet, so there's nothing to assign into.
+                    const noSlots = training.participants === 0
                     return (
                       <button
                         key={training.id}
-                        onClick={() => { setSelectedTraining(training); setAssignStep(2) }}
-                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${isAssigned ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50'}`}
+                        onClick={() => { if (noSlots) return; setSelectedTraining(training); setAssignStep(2) }}
+                        disabled={noSlots}
+                        className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${noSlots ? 'border-gray-200 opacity-50 cursor-not-allowed' : isAssigned ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50'}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
@@ -477,8 +611,11 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">{training.service}</p>
                             <p className="text-xs text-gray-500 mt-1">{training.location}{training.date ? ` · ${training.date}` : ''}</p>
+                            {noSlots && <p className="text-xs text-red-500 mt-1">No participant slots set for this training yet — set a slot count in Maintenance first.</p>}
                           </div>
-                          <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold bg-yellow-100 text-yellow-700">Planned</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-semibold ${noSlots ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {noSlots ? 'No Slots' : 'Planned'}
+                          </span>
                         </div>
                       </button>
                     )
@@ -522,7 +659,22 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
                   {assignViewOnly ? (
-                    <button onClick={closeAssignModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Close</button>
+                    <>
+                      {/* Only safe to pull someone out of a training that hasn't started yet --
+                          once it's Ongoing/Completed/Cancelled, removing the assignment here
+                          could contradict attendance/records already tied to that run. */}
+                      {selectedTraining.status === 'Planned' && (
+                        <button
+                          onClick={handleUnassignTraining}
+                          disabled={!canManage('skills') || isAssigning}
+                          className="flex-1 py-2 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isAssigning && <Loader2 size={16} className="animate-spin" />}
+                          {isAssigning ? 'Removing…' : 'Unassign'}
+                        </button>
+                      )}
+                      <button onClick={closeAssignModal} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Close</button>
+                    </>
                   ) : (
                     <>
                       <button onClick={() => { setAssignStep(1); setSelectedTraining(null) }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Back</button>
@@ -684,26 +836,48 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.age ? `${profile.age} yrs` : '—'}</td>}
                       {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.civilStatus || '—'}</td>}
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {profile.classification.slice(0, 1).map(c => <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>)}
-                          {(profile.classification.length + profile.classificationOther.filter(Boolean).length) > 1 && (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{profile.classification.length + profile.classificationOther.filter(Boolean).length - 1}</span>
-                          )}
-                        </div>
+                        {(() => {
+                          // A value entered only via "Others, please specify" (no
+                          // standard checkbox picked) must still show here -- reading
+                          // just `classification` left this cell blank whenever every
+                          // entry was a custom "Other" one, even though the profile
+                          // clearly has data (visible in View Profile as "Others: X").
+                          const items = [...profile.classification, ...profile.classificationOther.filter(Boolean).map(v => `Others: ${v}`)]
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {items.slice(0, 1).map((c, i) => <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>)}
+                              {items.length > 1 && (
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{items.length - 1}</span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {profile.desiredQualification.slice(0, 1).map(q => <span key={q} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{q}</span>)}
-                          {(profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length) > 1 && (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{profile.desiredQualification.length + profile.qualificationOther.filter(Boolean).length - 1}</span>
-                          )}
-                        </div>
+                        {(() => {
+                          const items = [...profile.desiredQualification, ...profile.qualificationOther.filter(Boolean).map(v => `Others: ${v}`)]
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {items.slice(0, 1).map((q, i) => <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{q}</span>)}
+                              {items.length > 1 && (
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{items.length - 1}</span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {profile.purposeOfTraining.slice(0, 1).map(pt => <span key={pt} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs max-w-[140px] truncate inline-block">{pt}</span>)}
-                          {profile.purposeOfTraining.length > 1 && <span className="px-2 py-0.5 bg-green-50 text-green-500 rounded text-xs">+{profile.purposeOfTraining.length - 1}</span>}
-                        </div>
+                        {(() => {
+                          const items = [...profile.purposeOfTraining, ...profile.purposeOther.filter(Boolean).map(v => `Others: ${v}`)]
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {items.slice(0, 1).map((pt, i) => <span key={i} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs max-w-[140px] truncate inline-block">{pt}</span>)}
+                              {items.length > 1 && (
+                                <span className="px-2 py-0.5 bg-green-50 text-green-500 rounded text-xs">+{items.length - 1}</span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         {profile.assignedTrainingId ? (
@@ -777,6 +951,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
+              <button onClick={() => { setUpdatingStatusProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
               {(() => {
                 const hasActive = !!profile.assignedTrainingId
                 if (hasActive) {

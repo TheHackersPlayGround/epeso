@@ -15,6 +15,7 @@ import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import { useOFW } from '../../contexts/OFWContext'
+import { useDocuments } from '../../contexts/DocumentsContext'
 
 interface ActivityLog {
   id: number
@@ -86,6 +87,7 @@ const binModules  = [
   'CLPEP Beneficiaries', 'CLPEP Interventions',
   'Skills Training Applicants', 'Skills Training Batches', 'Skills Training Activities',
   'OFW Profiles',
+  'Document Folders', 'Document Files',
 ]
 
 // Colors the recycle bin's Module badge — records and their program's
@@ -114,6 +116,8 @@ const BIN_MODULE_BADGE: Record<string, string> = {
   'Skills Training Batches': 'bg-lime-50 text-lime-700',
   'Skills Training Activities': 'bg-lime-50 text-lime-700',
   'OFW Profiles': 'bg-fuchsia-50 text-fuchsia-700',
+  'Document Folders': 'bg-yellow-50 text-yellow-700',
+  'Document Files': 'bg-yellow-50 text-yellow-700',
 }
 
 export default function ActivityLogsTab() {
@@ -126,6 +130,7 @@ export default function ActivityLogsTab() {
   const { refreshProfiles: refreshClpepProfiles, refreshInterventions: refreshClpepInterventions } = useCLPEP()
   const { refreshProfiles: refreshSkillsTrainingProfiles, refreshBatches: refreshSkillsTrainingBatches, refreshActivities: refreshSkillsTrainingActivities } = useSkillsTraining()
   const { refreshProfiles: refreshOfwProfiles } = useOFW()
+  const { refreshFolders: refreshDocumentsFolders, refreshDocuments: refreshDocumentsDocuments } = useDocuments()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logs,        setLogs]        = useState<ActivityLog[]>([])
@@ -246,6 +251,8 @@ export default function ActivityLogsTab() {
     if (recordType === 'skillsTrainingBatch') await refreshSkillsTrainingBatches()
     if (recordType === 'skillsTrainingActivity') await refreshSkillsTrainingActivities()
     if (recordType === 'ofwProfile') await refreshOfwProfiles()
+    if (recordType === 'documentsFolder') await refreshDocumentsFolders()
+    if (recordType === 'documentsDocument') await refreshDocumentsDocuments()
   }
 
   const handleRestoreItem = (item: RecycleBinItem) => {

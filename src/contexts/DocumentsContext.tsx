@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import * as documentsService from '../services/documentsService'
 
 export interface FileItem {
   id: string
@@ -21,23 +22,55 @@ export interface FolderItem {
 
 interface DocumentsContextValue {
   folders: FolderItem[]
-  setFolders: React.Dispatch<React.SetStateAction<FolderItem[]>>
   files: FileItem[]
-  setFiles: React.Dispatch<React.SetStateAction<FileItem[]>>
+  loading: boolean
+  refreshFolders: () => Promise<void>
+  refreshDocuments: () => Promise<void>
 }
 
 const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 
-const SEED_FOLDERS: FolderItem[] = [
-  { id: 'root', name: 'Documents', parentId: null },
-]
+// 'root' is a virtual folder — it never exists as a row in the backend, it's
+// just the tree's entry point that real top-level folders (parentId: 'root')
+// attach to.
+const ROOT_FOLDER: FolderItem = { id: 'root', name: 'Documents', parentId: null }
+
+function inferFileType(name: string): FileItem['type'] {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  return (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png'].includes(ext) ? ext : 'other') as FileItem['type']
+}
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {
-  const [folders, setFolders] = useState<FolderItem[]>(SEED_FOLDERS)
-  const [files, setFiles] = useState<FileItem[]>([])
+  const [folders, setFolders] = useState<FolderItem[]>([ROOT_FOLDER])
+  const [files, setFiles]     = useState<FileItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refreshFolders = useCallback(async () => {
+    try {
+      const res = await documentsService.listFolders()
+      setFolders([ROOT_FOLDER, ...(res.data ?? [])])
+    } catch {
+      // silent — show empty list rather than crashing
+    }
+  }, [])
+
+  const refreshDocuments = useCallback(async () => {
+    try {
+      const res = await documentsService.listDocuments()
+      const data: FileItem[] = (res.data ?? []).map((d: any) => ({ ...d, type: inferFileType(d.name) }))
+      setFiles(data)
+    } catch {
+      // silent
+    }
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([refreshFolders(), refreshDocuments()]).finally(() => setLoading(false))
+  }, [refreshFolders, refreshDocuments])
 
   return (
-    <DocumentsContext.Provider value={{ folders, setFolders, files, setFiles }}>
+    <DocumentsContext.Provider value={{ folders, files, loading, refreshFolders, refreshDocuments }}>
       {children}
     </DocumentsContext.Provider>
   )

@@ -20,6 +20,7 @@ export type RecycleRecordType =
   | 'clpepApplicant' | 'clpepIntervention'
   | 'skillsTrainingApplicant' | 'skillsTrainingBatch' | 'skillsTrainingActivity'
   | 'ofwProfile'
+  | 'documentsFolder' | 'documentsDocument'
 
 export type RecycleBinRecord = {
   recordType: RecycleRecordType
@@ -42,12 +43,13 @@ function endpointsFor(recordType: RecycleRecordType) {
   if (recordType === 'clpepApplicant' || recordType === 'clpepIntervention') return ENDPOINTS.clpep
   if (recordType === 'skillsTrainingApplicant' || recordType === 'skillsTrainingBatch' || recordType === 'skillsTrainingActivity') return ENDPOINTS.skillsTraining
   if (recordType === 'ofwProfile') return ENDPOINTS.ofw
+  if (recordType === 'documentsFolder' || recordType === 'documentsDocument') return ENDPOINTS.documents
   return ENDPOINTS.employment
 }
 
 // GET listDeleted from every module that supports soft delete, merged newest-first.
 export async function listDeleted(): Promise<RecycleBinRecord[]> {
-  const [efRes, gipRes, cdspRes, spesRes, dilpRes, tupadRes, slpRes, clpepRes, skillsRes, ofwRes] = await Promise.all([
+  const [efRes, gipRes, cdspRes, spesRes, dilpRes, tupadRes, slpRes, clpepRes, skillsRes, ofwRes, docsRes] = await Promise.all([
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.employment.listDeleted),
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.gip.listDeleted),
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.cdsp.listDeleted),
@@ -58,12 +60,13 @@ export async function listDeleted(): Promise<RecycleBinRecord[]> {
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.clpep.listDeleted),
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.skillsTraining.listDeleted),
     axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.ofw.listDeleted),
+    axiosClient.get<{ status: string; data: RecycleBinRecord[] }>(ENDPOINTS.documents.listDeleted),
   ])
   const merged = [
     ...(efRes.data.data ?? []), ...(gipRes.data.data ?? []), ...(cdspRes.data.data ?? []),
     ...(spesRes.data.data ?? []), ...(dilpRes.data.data ?? []), ...(tupadRes.data.data ?? []),
     ...(slpRes.data.data ?? []), ...(clpepRes.data.data ?? []), ...(skillsRes.data.data ?? []),
-    ...(ofwRes.data.data ?? []),
+    ...(ofwRes.data.data ?? []), ...(docsRes.data.data ?? []),
   ]
   merged.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
   return merged

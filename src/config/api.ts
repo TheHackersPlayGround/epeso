@@ -220,4 +220,18 @@ export const ENDPOINTS = {
   activityLogs: {
     list: '/activity_logs/list',
   },
+  documents: {
+    listFolders:    '/documents/listFolders',
+    createFolder:   '/documents/createFolder',
+    renameFolder:   '/documents/renameFolder',
+    deleteFolder:   '/documents/deleteFolder',
+    listDocuments:  '/documents/listDocuments',
+    uploadDocument: '/documents/uploadDocument',
+    renameDocument: '/documents/renameDocument',
+    moveDocument:   '/documents/moveDocument',
+    deleteDocument: '/documents/deleteDocument',
+    listDeleted:    '/documents/listDeleted',
+    restoreRecord:  '/documents/restoreRecord',
+    purgeRecord:    '/documents/purgeRecord',
+  },
 } as const

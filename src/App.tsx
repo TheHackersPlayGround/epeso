@@ -130,14 +130,12 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
 
   if (currentPage === 'documents') {
     return (
-      <DocumentsProvider>
-        <div className="h-screen flex flex-col overflow-hidden">
-          {navbar}
-          <div className="flex-1 overflow-hidden">
-            <DocumentsView onBack={() => setCurrentPage('dashboard')} />
-          </div>
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-hidden">
+          <DocumentsView onBack={() => setCurrentPage('dashboard')} />
         </div>
-      </DocumentsProvider>
+      </div>
     )
   }
 
@@ -334,7 +332,9 @@ export default function App() {
                   <TUPADProvider>
                     <SLPProvider>
                       <CLPEPProvider>
-                        <AppContent onLogout={handleLogout} />
+                        <DocumentsProvider>
+                          <AppContent onLogout={handleLogout} />
+                        </DocumentsProvider>
                       </CLPEPProvider>
                     </SLPProvider>
                   </TUPADProvider>

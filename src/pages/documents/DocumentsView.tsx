@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
 import { useDocuments } from '../../contexts/DocumentsContext'
+import * as documentsService from '../../services/documentsService'
 import ConfirmModal from '../shared/ConfirmModal'
 
 const BRAND = '#0077BE'
@@ -16,9 +17,6 @@ const BRAND_DARK = '#0065A5'
 
 interface DocumentsViewProps {
   onBack: () => void
-  onAddToRecycleBin?: (item: {
-    name: string; module: string; description: string; deletedBy: string; deletedAt: string
-  }) => void
 }
 
 type SortKey = 'date' | 'name' | 'type' | 'size'
@@ -28,8 +26,20 @@ interface ExcelData {
   sheets: Record<string, string[][]>
 }
 
-export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsViewProps) {
-  const { folders, setFolders, files, setFiles } = useDocuments()
+// Reads a browser File as a base64 data URL — the backend's upload endpoint
+// (and every other module's document upload) expects that format, not
+// multipart form data.
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+export default function DocumentsView({ onBack }: DocumentsViewProps) {
+  const { folders, files, refreshFolders, refreshDocuments } = useDocuments()
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedFolder, setSelectedFolder] = useState('root')
@@ -61,6 +71,9 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
   const [deleteFolderConfirm, setDeleteFolderConfirm] = useState<{ open: boolean; id: string | null }>({ open: false, id: null })
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const [errorModal, setErrorModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
+  // Shown when a folder delete is blocked for containing files/subfolders —
+  // offers a one-click way to go look inside instead of just an OK dismiss.
+  const [folderInUseModal, setFolderInUseModal] = useState<{ open: boolean; folderId: string | null; message: string }>({ open: false, folderId: null, message: '' })
 
   // DOCX preview
   const [docxPreview, setDocxPreview] = useState<{ isOpen: boolean; fileName: string; fileUrl: string }>({ isOpen: false, fileName: '', fileUrl: '' })
@@ -75,16 +88,6 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0)
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
-  const getFolderDepth = (folderId: string): number => {
-    let depth = 0
-    let cur = folderId
-    while (cur && cur !== 'root') {
-      const f = folders.find(x => x.id === cur)
-      if (f?.parentId) { depth++; cur = f.parentId } else break
-    }
-    return depth
-  }
-
   const getChildFolders = (parentId: string) => folders.filter(f => f.parentId === parentId)
 
   const getFolderItemCount = (folderId: string) => files.filter(f => f.folderId === folderId).length
@@ -118,108 +121,191 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────────
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-
-    const ext = f.name.split('.').pop()?.toLowerCase() ?? 'other'
-    const type = (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png'].includes(ext)
-      ? ext : 'other') as FileItem['type']
-
-    const kb = f.size / 1024
-    const size = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(0)} KB`
-
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: f.name, type, size,
-      uploadedBy: 'Current User',
-      uploadedDate: new Date().toISOString().split('T')[0],
-      category: 'Uncategorized',
-      folderId: selectedFolder,
-      fileUrl: URL.createObjectURL(f),
+  // Shared by the file picker and drag-and-drop — uploads sequentially so one
+  // failure (e.g. a bad file) doesn't abort the rest of the batch. skippedFolders
+  // (drag-and-drop only) is folded into the same result modal rather than a
+  // separate one, so the two don't race/overlap when both files and a folder
+  // are dropped together.
+  const uploadFiles = async (fileList: File[], skippedFolders = 0) => {
+    if (fileList.length === 0) {
+      if (skippedFolders > 0) {
+        setErrorModal({ open: true, message: "Folders can't be dropped directly — open the folder on your device and drop its files instead." })
+      }
+      return
     }
-    setFiles(prev => [...prev, newFile])
-    setSuccessModal({ open: true, message: `"${f.name}" uploaded successfully!` })
+    let uploaded = 0
+    let failed = 0
+    for (const f of fileList) {
+      try {
+        const dataUrl = await readAsDataUrl(f)
+        await documentsService.uploadDocument({ folderId: selectedFolder, fileName: f.name, dataUrl })
+        uploaded++
+      } catch {
+        failed++
+      }
+    }
+    await refreshDocuments()
+
+    const folderNote = skippedFolders > 0
+      ? ` (${skippedFolders} folder${skippedFolders === 1 ? '' : 's'} skipped — folders can't be uploaded directly)`
+      : ''
+
+    if (failed === 0) {
+      setSuccessModal({ open: true, message: (uploaded === 1 ? 'File uploaded successfully!' : `${uploaded} files uploaded successfully!`) + folderNote })
+    } else {
+      setErrorModal({ open: true, message: `${uploaded} file(s) uploaded, ${failed} failed to upload.${folderNote}` })
+    }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = Array.from(e.target.files ?? [])
     e.target.value = ''
+    await uploadFiles(list)
+  }
+
+  // Drag-and-drop onto the file area. Without preventDefault here, dropping a
+  // folder falls through to the browser's default action — navigating the
+  // whole tab to a local "Index of ..." directory listing. Folders are
+  // skipped (with a heads-up) rather than uploaded, since there's no bulk/
+  // recursive-folder upload — only individual files.
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (canManage('documents')) setIsDraggingOver(true)
+  }
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDraggingOver(false)
+  }
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDraggingOver(false)
+    if (!canManage('documents')) return
+
+    const droppedFiles: File[] = []
+    let folderCount = 0
+    const items = e.dataTransfer.items
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.()
+        if (entry && !entry.isFile) { folderCount++; continue }
+        const file = items[i].getAsFile()
+        if (file) droppedFiles.push(file)
+      }
+    } else {
+      droppedFiles.push(...Array.from(e.dataTransfer.files))
+    }
+
+    await uploadFiles(droppedFiles, folderCount)
   }
 
   // ── Folder CRUD ───────────────────────────────────────────────────────────────
-  const handleCreateFolder = () => {
+  const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return
-    if (getFolderDepth(newFolderParent) >= 2) {
-      setErrorModal({ open: true, message: 'Cannot create folder: maximum nesting depth (2 levels) reached.' })
-      return
-    }
-    setFolders(prev => [...prev, { id: `folder_${Date.now()}`, name: newFolderName.trim(), parentId: newFolderParent }])
-    setExpandedFolders(prev => [...prev, newFolderParent])
+    const name = newFolderName.trim()
+    const parentId = newFolderParent
     setIsNewFolderModalOpen(false)
     setNewFolderName('')
-    setSuccessModal({ open: true, message: 'Folder created successfully!' })
+    try {
+      await documentsService.createFolder({ name, parentId })
+      await refreshFolders()
+      setExpandedFolders(prev => [...prev, parentId])
+      setSuccessModal({ open: true, message: 'Folder created successfully!' })
+    } catch (err) {
+      setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to create the folder.' })
+    }
   }
 
-  const handleEditFolder = () => {
+  const handleEditFolder = async () => {
     if (!folderToEdit || !editFolderName.trim()) return
-    setFolders(prev => prev.map(f => f.id === folderToEdit.id ? { ...f, name: editFolderName.trim() } : f))
+    const folder = folderToEdit
+    const name = editFolderName.trim()
     setIsEditFolderModalOpen(false)
     setFolderToEdit(null)
-    setSuccessModal({ open: true, message: 'Folder renamed successfully!' })
+    try {
+      await documentsService.renameFolder(folder.id, name)
+      await refreshFolders()
+      setSuccessModal({ open: true, message: 'Folder renamed successfully!' })
+    } catch (err) {
+      setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to rename the folder.' })
+    }
   }
 
-  const handleDeleteFolder = (folderId: string) => {
-    const filesInside = files.filter(f => f.folderId === folderId).length
-    if (filesInside > 0) {
-      setErrorModal({ open: true, message: `Cannot delete folder: it contains ${filesInside} file(s). Move or delete the files first.` })
-      setDeleteFolderConfirm({ open: false, id: null })
-      return
-    }
-    const subfolders = folders.filter(f => f.parentId === folderId).length
-    if (subfolders > 0) {
-      setErrorModal({ open: true, message: `Cannot delete folder: it contains ${subfolders} subfolder(s). Delete the subfolders first.` })
-      setDeleteFolderConfirm({ open: false, id: null })
-      return
-    }
-    setFolders(prev => prev.filter(f => f.id !== folderId))
-    if (selectedFolder === folderId) setSelectedFolder('root')
+  const handleDeleteFolder = async (folderId: string) => {
     setDeleteFolderConfirm({ open: false, id: null })
-    setSuccessModal({ open: true, message: 'Folder deleted successfully!' })
+    try {
+      await documentsService.deleteFolder(folderId)
+      await refreshFolders()
+      if (selectedFolder === folderId) setSelectedFolder('root')
+      setSuccessModal({ open: true, message: 'Folder moved to recycle bin.' })
+    } catch (err) {
+      setFolderInUseModal({
+        open: true, folderId,
+        message: err instanceof Error ? err.message : 'Failed to delete the folder.',
+      })
+    }
   }
 
   // ── File CRUD ─────────────────────────────────────────────────────────────────
-  const handleDeleteFile = (fileId: string) => {
-    const f = files.find(x => x.id === fileId)
-    if (f) {
-      onAddToRecycleBin?.({
-        name: f.name, module: 'Documents',
-        description: `File: ${f.name} (${f.type.toUpperCase()}) – ${f.size}`,
-        deletedBy: 'Current User',
-        deletedAt: new Date().toISOString().split('T')[0],
-      })
-      if (f.fileUrl) URL.revokeObjectURL(f.fileUrl)
-    }
-    setFiles(prev => prev.filter(x => x.id !== fileId))
+  const handleDeleteFile = async (fileId: string) => {
     setDeleteFileConfirm({ open: false, id: null })
-    setSuccessModal({ open: true, message: 'File deleted successfully.' })
+    try {
+      await documentsService.deleteDocument(fileId)
+      await refreshDocuments()
+      setSuccessModal({ open: true, message: 'File moved to recycle bin.' })
+    } catch (err) {
+      setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to delete the file.' })
+    }
   }
 
-  const handleDownloadFile = (file: FileItem) => {
+  // A plain <a download> only forces a save when the URL is same-origin —
+  // the backend serves uploads/ from a different origin (localhost vs the
+  // Vite dev server), so the browser was ignoring `download` and just
+  // navigating to view the file instead. Fetching it into a blob first gives
+  // a same-origin blob: URL, which the browser will actually save.
+  const handleDownloadFile = async (file: FileItem) => {
     if (!file.fileUrl) return
-    const a = document.createElement('a')
-    a.href = file.fileUrl; a.download = file.name
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    try {
+      const res = await fetch(file.fileUrl)
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl; a.download = file.name
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      // Fallback: at least open it so the user isn't left with nothing.
+      window.open(file.fileUrl, '_blank')
+    }
   }
 
-  const handleMoveFile = () => {
+  const handleMoveFile = async () => {
     if (!fileToMove) return
-    setFiles(prev => prev.map(f => f.id === fileToMove.id ? { ...f, folderId: moveDestination } : f))
+    const file = fileToMove
+    const destination = moveDestination
     setIsMoveModalOpen(false); setFileToMove(null)
-    setSuccessModal({ open: true, message: 'File moved successfully!' })
+    try {
+      await documentsService.moveDocument(file.id, destination)
+      await refreshDocuments()
+      setSuccessModal({ open: true, message: 'File moved successfully!' })
+    } catch (err) {
+      setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to move the file.' })
+    }
   }
 
-  const handleRenameFile = () => {
+  const handleRenameFile = async () => {
     if (!fileToRename || !renameFileValue.trim()) return
-    setFiles(prev => prev.map(f => f.id === fileToRename.id ? { ...f, name: renameFileValue.trim() } : f))
+    const file = fileToRename
+    const name = renameFileValue.trim()
     setIsRenameFileModalOpen(false); setFileToRename(null)
-    setSuccessModal({ open: true, message: 'File renamed successfully!' })
+    try {
+      await documentsService.renameDocument(file.id, name)
+      await refreshDocuments()
+      setSuccessModal({ open: true, message: 'File renamed successfully!' })
+    } catch (err) {
+      setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to rename the file.' })
+    }
   }
 
   // ── File preview ──────────────────────────────────────────────────────────────
@@ -402,14 +488,14 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
       {/* Confirm modals */}
       <ConfirmModal
         isOpen={deleteFileConfirm.open} type="confirm"
-        title="Delete File" message="Move this file to Recycle Bin? This cannot be undone."
+        title="Delete File" message="This will move the file to the recycle bin."
         confirmText="Delete" cancelText="Cancel"
         onConfirm={() => deleteFileConfirm.id && handleDeleteFile(deleteFileConfirm.id)}
         onCancel={() => setDeleteFileConfirm({ open: false, id: null })}
       />
       <ConfirmModal
         isOpen={deleteFolderConfirm.open} type="confirm"
-        title="Delete Folder" message="Are you sure you want to delete this folder?"
+        title="Delete Folder" message="This will move the folder to the recycle bin."
         confirmText="Delete" cancelText="Cancel"
         onConfirm={() => deleteFolderConfirm.id && handleDeleteFolder(deleteFolderConfirm.id)}
         onCancel={() => setDeleteFolderConfirm({ open: false, id: null })}
@@ -425,6 +511,19 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
         title="Cannot Complete" message={errorModal.message} confirmText="OK"
         onConfirm={() => setErrorModal({ open: false, message: '' })}
         onCancel={() => setErrorModal({ open: false, message: '' })}
+      />
+      <ConfirmModal
+        isOpen={folderInUseModal.open} type="confirm"
+        title="Folder Not Empty" message={folderInUseModal.message}
+        confirmText="Go to Folder" cancelText="OK"
+        onConfirm={() => {
+          if (folderInUseModal.folderId) {
+            setSelectedFolder(folderInUseModal.folderId)
+            setExpandedFolders(prev => prev.includes(folderInUseModal.folderId!) ? prev : [...prev, folderInUseModal.folderId!])
+          }
+          setFolderInUseModal({ open: false, folderId: null, message: '' })
+        }}
+        onCancel={() => setFolderInUseModal({ open: false, folderId: null, message: '' })}
       />
 
       {/* New Folder Modal */}
@@ -668,7 +767,7 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
             {/* Action bar */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <input type="file" id="doc-upload" onChange={handleFileSelect} disabled={!canManage('documents')} className="hidden" />
+                <input type="file" id="doc-upload" multiple onChange={handleFileSelect} disabled={!canManage('documents')} className="hidden" />
                 <label htmlFor={canManage('documents') ? 'doc-upload' : undefined}
                   className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm ${canManage('documents') ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'}`}
                   style={{ backgroundColor: BRAND }}
@@ -722,12 +821,15 @@ export default function DocumentsView({ onBack, onAddToRecycleBin }: DocumentsVi
             </div>
 
             {/* File area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div
+              className={`flex-1 overflow-y-auto p-6 transition-colors ${isDraggingOver ? 'bg-blue-50 ring-2 ring-inset ring-[#0077BE]' : ''}`}
+              onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
+            >
               {filteredFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Folder size={64} className="text-gray-300 mb-4" />
-                  <p className="text-gray-500 text-lg mb-2">No documents in this folder</p>
-                  <p className="text-gray-400 text-sm">Upload files to get started</p>
+                  <p className="text-gray-500 text-lg mb-2">{isDraggingOver ? 'Drop files to upload' : 'No documents in this folder'}</p>
+                  <p className="text-gray-400 text-sm">{isDraggingOver ? '' : 'Upload files, or drag and drop them here'}</p>
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">

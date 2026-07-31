@@ -7,19 +7,20 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { registerPdfFont, PDF_FONT_FAMILY } from './fonts/registerPdfFont'
 import Swal from 'sweetalert2'
-import { fetchEfReport } from '../../services/reportService'
+import { fetchEfReport, fetchGeneralPesoReport } from '../../services/reportService'
 import { generatePesoMonthlyReport } from './pesoMonthlyReport'
+import { generateGeneralPesoWorkbook } from './generalPesoReport'
+import { GENERAL_PESO_PROGRAM_COLORS } from './generalPesoColors'
 import { useCDSP } from '../../contexts/CDSPContext'
 import { useGIP } from '../../contexts/GIPContext'
 import { useSPES } from '../../contexts/SPESContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
 import { useOFW } from '../../contexts/OFWContext'
 import { useDILP } from '../../contexts/DILPContext'
 import { useTUPAD } from '../../contexts/TUPADContext'
 import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
-import { SEED as EF_APPLICANT_SEED, VACANCY_SEED, REFERRAL_SEED, PLACEMENT_SEED } from '../../contexts/EmploymentContext'
+import { REFERRAL_SEED, PLACEMENT_SEED } from '../../contexts/EmploymentContext'
 
 interface ReportViewProps {
   onBack: () => void
@@ -58,7 +59,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: gipApplicants, gipBatches } = useGIP()
   const { applicants: spesApplicants, spesBatches } = useSPES()
   const { profiles: skillsProfiles, activities: skillsActivities } = useSkillsTraining()
-  const { activities } = useProgramActivities()
   const { profiles: ofwProfiles } = useOFW()
   const { applicants: dilpApplicants, projects: dilpProjects } = useDILP()
   const { applicants: tupadApplicants, projects: tupadProjects } = useTUPAD()
@@ -72,6 +72,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [spesReportType, setSpesReportType] = useState<'participants' | 'batches'>('participants')
   const [livelihoodReportType, setLivelihoodReportType] = useState<'beneficiaries' | 'projects'>('beneficiaries')
   const [skillsReportType, setSkillsReportType] = useState<'participants' | 'activities'>('participants')
+  // General PESO Report: which programs to roll up — defaults to all of them
+  // (matches the report's previous "always everything" behavior); the user
+  // can narrow it down via the "Include Programs" picker.
+  const [selectedGeneralPrograms, setSelectedGeneralPrograms] = useState<string[]>(
+    REPORT_CATEGORIES.filter(c => c.id !== 'general-peso').map(c => c.id),
+  )
+  const [isProgramMenuOpen, setIsProgramMenuOpen] = useState(false)
+  const [generalPesoLoading, setGeneralPesoLoading] = useState(false)
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('monthly')
   const [month, setMonth] = useState('05')
   const [year, setYear] = useState('2026')
@@ -107,8 +115,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
     } catch { return fallback }
   }
 
-  const efApplicants = () => readLS('ef_applicants', EF_APPLICANT_SEED)
-  const efVacancies  = () => readLS('ef_vacancies',  VACANCY_SEED)
   const efReferrals  = () => readLS('ef_referrals',  REFERRAL_SEED)
   const efPlacements = () => readLS('ef_placements', PLACEMENT_SEED)
 
@@ -301,6 +307,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // everywhere else in the app) — there's no separate Counselor/Duration field
   // the way CDSP's sessions have.
   const SKILLS_TRAINING_ACTIVITY_COLUMNS = ['Training Title', 'Training Batch', 'Date', 'Venue', 'Facilitator', 'Participants', 'Status']
+  // General PESO Report columns — one row PER PROGRAM (aggregated server-side
+  // from live data), not per-participant, so there's no Sex/Age/Address here.
+  // "Activities Conducted" and "Placements" are null (rendered as "-") for
+  // programs the concept doesn't apply to, rather than a faked number.
+  const GENERAL_PESO_COLUMNS = ['Program / Service', 'Participants', 'Male', 'Female', 'Activities Conducted', 'Placements']
 
   const getLivelihoodProjectColumns = (): string[] => {
     if (programType === 'DILEEP (DILP)') return LIVELIHOOD_DILP_PROJECT_COLUMNS
@@ -327,7 +338,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (category === 'livelihood' && livelihoodReportType === 'projects') return getLivelihoodProjectColumns()
     if (category === 'skills-training' && skillsReportType === 'activities') return SKILLS_TRAINING_ACTIVITY_COLUMNS
     const map: Record<ReportCategory, string[]> = {
-      'general-peso': ['Program / Service', 'Activities Conducted', 'Participants', 'Beneficiaries', 'Placements', 'Status'],
+      'general-peso': GENERAL_PESO_COLUMNS,
       'employment-facilitation': ['Applicant Name', 'Employer', 'Job Title', 'Referral Status', 'Placement Status', 'Employment Type', 'Date Referred', 'Date Hired'],
       'ofw-services': ['No.', 'OFW Name', 'Sex', 'Civil Status', 'Contact Number', 'Email', 'Address', 'Barangay', 'Municipality',
                         'Type of Request', 'Employment Status', 'Desired Position', 'Type of Skill', 'Agencies',
@@ -810,50 +821,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Remarks': p.remarks || '-',
           }))
 
-      case 'general-peso': {
-        const lhBeneficiaryCount = dilpApplicants.length + tupadApplicants.length + slpApplicants.length + clpepApplicants.length
-        const lhActivityCount = dilpProjects.length + tupadProjects.length + slpProjects.length + clpepInterventions.length
-        const CDSP_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
-        return [
-          { 'Program / Service': 'Employment Facilitation', 'Activities Conducted': efVacancies().length, 'Participants': efApplicants().length, 'Beneficiaries': efApplicants().length, 'Placements': efPlacements().length, 'Status': 'Active' },
-          { 'Program / Service': 'CDSP', 'Activities Conducted': activities.filter(a => a.program === 'CDSP' || CDSP_SERVICES.includes(a.service)).length, 'Participants': cdspApplicants.length, 'Beneficiaries': cdspApplicants.length, 'Placements': 0, 'Status': 'Active' },
-          { 'Program / Service': 'GIP', 'Activities Conducted': gipBatches.length, 'Participants': gipApplicants.length, 'Beneficiaries': gipApplicants.length, 'Placements': gipApplicants.length, 'Status': 'Active' },
-          { 'Program / Service': 'SPES', 'Activities Conducted': spesBatches.length, 'Participants': spesApplicants.length, 'Beneficiaries': spesApplicants.length, 'Placements': spesApplicants.length, 'Status': 'Active' },
-          { 'Program / Service': 'Skills Training', 'Activities Conducted': skillsActivities.length, 'Participants': skillsProfiles.length, 'Beneficiaries': skillsProfiles.length, 'Placements': 0, 'Status': 'Active' },
-          { 'Program / Service': 'Livelihood', 'Activities Conducted': lhActivityCount, 'Participants': lhBeneficiaryCount, 'Beneficiaries': lhBeneficiaryCount, 'Placements': 0, 'Status': 'Active' },
-          { 'Program / Service': 'OFW Services', 'Activities Conducted': ofwProfiles.length, 'Participants': ofwProfiles.length, 'Beneficiaries': ofwProfiles.length, 'Placements': 0, 'Status': 'Active' },
-        ]
-      }
-
+      // 'general-peso' is handled entirely by handleGenerateGeneralPesoReport()
+      // (a live backend call, since it aggregates across every program's real
+      // data) — handleGenerateReport short-circuits to it before ever reaching
+      // generateData(), the same way Employment Facilitation short-circuits to
+      // handleGeneratePesoReport().
       default:
         return []
     }
-  }
-
-  const generateAnalytics = () => {
-    const efCount = efApplicants().length
-    const lhCount = dilpApplicants.length + tupadApplicants.length + slpApplicants.length + clpepApplicants.length
-    const counts = {
-      'Employment Facilitation': efCount,
-      'Skills Training': skillsProfiles.length,
-      'SPES': spesApplicants.length,
-      'CDSP': cdspApplicants.length,
-      'Livelihood': lhCount,
-      'GIP': gipApplicants.length,
-      'OFW Services': ofwProfiles.length,
-    }
-    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1
-    const colors: Record<string, string> = {
-      'Employment Facilitation': '#3B82F6', 'Skills Training': '#F59E0B', 'SPES': '#F97316',
-      'CDSP': '#EC4899', 'Livelihood': '#8B5CF6', 'GIP': '#06B6D4', 'OFW Services': '#10B981',
-    }
-    const barChartData = Object.entries(counts)
-      .map(([program, value]) => ({ program, value }))
-      .sort((a, b) => b.value - a.value)
-    const pieChartData = Object.entries(counts)
-      .filter(([, v]) => v > 0)
-      .map(([program, value]) => ({ program, value: parseFloat(((value / total) * 100).toFixed(1)), color: colors[program] }))
-    return { barChartData, pieChartData }
   }
 
   // Participant-program summary (CDSP / GIP / SPES): total participants, a breakdown
@@ -911,11 +886,101 @@ export default function ReportView({ onBack }: ReportViewProps) {
     }
   }
 
+  // General PESO Report — cross-program summary pulled LIVE from the backend
+  // (/reports/summary), scoped to whichever programs the user picked in the
+  // "Include Programs" selector. Unlike Employment Facilitation, this DOES get
+  // an on-screen preview (a per-program table + the usual Excel/CSV/PDF export
+  // menu) — only the Excel format is special-cased later, to carry a real
+  // native chart instead of the generic ExcelJS table.
+  const handleGenerateGeneralPesoReport = async () => {
+    if (selectedGeneralPrograms.length === 0) {
+      Swal.fire('Error', 'Select at least one program to include.', 'error')
+      return
+    }
+    let from: string, to: string
+    if (reportPeriod === 'annual') {
+      from = `${year}-01-01`; to = `${year}-12-31`
+    } else if (reportPeriod === 'custom') {
+      if (!fromDate || !toDate) { Swal.fire('Error', 'Please select a From and To date.', 'error'); return }
+      from = fromDate; to = toDate
+    } else {
+      const m = Number(month)
+      const lastDay = new Date(Number(year), m, 0).getDate()
+      from = `${year}-${month}-01`
+      to = `${year}-${month}-${String(lastDay).padStart(2, '0')}`
+    }
+    setGeneralPesoLoading(true)
+    try {
+      const result = await fetchGeneralPesoReport(from, to, selectedGeneralPrograms)
+      const columns = GENERAL_PESO_COLUMNS
+      const data = result.programs.map(r => ({
+        'Program / Service': r.program,
+        'Participants': r.participants,
+        'Male': r.male,
+        'Female': r.female,
+        'Activities Conducted': r.activities ?? '-',
+        'Placements': r.placements ?? '-',
+      }))
+      const initialColumns: Record<string, boolean> = {}
+      columns.forEach(col => { initialColumns[col] = true })
+      setVisibleColumns(initialColumns)
+      setPreviewPage(1)
+
+      const totalParticipants = result.programs.reduce((s, r) => s + r.participants, 0)
+      const totalMale = result.programs.reduce((s, r) => s + r.male, 0)
+      const totalFemale = result.programs.reduce((s, r) => s + r.female, 0)
+      const barChartData = result.programs
+        .map(r => ({ program: r.program, value: r.participants }))
+        .sort((a, b) => b.value - a.value)
+      const pieChartData = result.programs
+        .filter(r => r.participants > 0)
+        .map(r => ({
+          program: r.program,
+          value: totalParticipants > 0 ? parseFloat(((r.participants / totalParticipants) * 100).toFixed(1)) : 0,
+          color: GENERAL_PESO_PROGRAM_COLORS[r.program] || '#94A3B8',
+        }))
+      // Same {total, byGroup, groupLabel, male, female} shape generateProgramAnalytics()
+      // returns for CDSP/GIP/SPES/etc, so the on-screen Summary card, Excel Summary
+      // sheet, and PDF summary block all render this the same way as every other
+      // category — plus barChartData/pieChartData for the extra cross-program chart.
+      const analytics = {
+        total: totalParticipants,
+        male: totalMale,
+        female: totalFemale,
+        byGroup: result.programs.map(r => ({ group: r.program, value: r.participants })),
+        groupLabel: 'Participants by Program',
+        barChartData,
+        pieChartData,
+      }
+
+      setGeneratedReport({
+        category: 'general-peso' as ReportCategory,
+        categoryName: 'General PESO Report',
+        programType: '',
+        period: reportPeriod,
+        periodDetails: getPeriodDetails(),
+        columns,
+        data,
+        analytics,
+        generalPrograms: result.programs, // raw per-program rows, used by the native-chart Excel export
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the report.'
+      Swal.fire('Error', msg, 'error')
+    } finally {
+      setGeneralPesoLoading(false)
+    }
+  }
+
   const handleGenerateReport = () => {
     if (!reportCategory) return
     // Employment Facilitation generates the official PESO/LMI report (live data,
     // downloaded as the 4-sheet .xlsx) rather than the generic on-screen view.
     if (reportCategory === 'employment-facilitation') { handleGeneratePesoReport(); return }
+    // General PESO Report aggregates live across every selected program on the
+    // backend — it does get an on-screen preview (unlike EF above), so it can't
+    // just short-circuit to a download, but it does need its own async fetch.
+    if (reportCategory === 'general-peso') { handleGenerateGeneralPesoReport(); return }
     const columns = getReportColumns(reportCategory)
     const data = generateData(reportCategory)
     // Default columns are visible; optional ones start hidden (toggle via Columns menu).
@@ -925,10 +990,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setVisibleColumns(initialColumns)
     setPreviewPage(1) // start a freshly generated report on the first page
     let analytics = null
-    if (reportCategory === 'general-peso') analytics = generateAnalytics()
     // Activity List rows are per-activity, not per-participant, so the
     // participant-level Sex/Program breakdown below doesn't apply — skip analytics.
-    else if (reportCategory === 'cdsp' && cdspReportType === 'participants') analytics = generateProgramAnalytics(data, 'Program Type', 'Participants by Program Type', cdspPrograms)
+    if (reportCategory === 'cdsp' && cdspReportType === 'participants') analytics = generateProgramAnalytics(data, 'Program Type', 'Participants by Program Type', cdspPrograms)
     // Batch List rows are per-batch, not per-intern, so the participant-level
     // Sex/Assigned Office breakdown below doesn't apply — skip analytics.
     else if (reportCategory === 'gip' && gipReportType === 'participants') analytics = generateProgramAnalytics(data, 'Assigned Office', 'Participants by Assigned Office')
@@ -1072,6 +1136,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const fileName = [generatedReport.categoryName, reportTypeSuffix, generatedReport.periodDetails]
       .filter(Boolean).join('_').replace(/ /g, '_')
 
+    // General PESO Report's Excel export carries a REAL native Excel chart
+    // (built by patching a template workbook, the same technique the PESO/LMI
+    // report uses for its own charts) rather than ExcelJS's plain data — so it
+    // needs its own generator instead of the generic ExcelJS path below.
+    if (format === 'excel' && generatedReport.category === 'general-peso') {
+      await generateGeneralPesoWorkbook(generatedReport.generalPrograms, generatedReport.analytics, generatedReport.periodDetails, fileName)
+      return
+    }
+
     if (format === 'excel') {
       const wb = new ExcelJS.Workbook()
       const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
@@ -1120,23 +1193,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
         ws.views = [{ state: 'frozen', ySplit: 1 }]
         applyPrint(ws, true) // repeat the header row on each printed page
-      }
-
-      // Optional analytics summary sheet (General PESO report).
-      if (generatedReport.analytics && generatedReport.category === 'general-peso') {
-        const aoa: any[][] = [
-          ['PESO COMPREHENSIVE REPORT'], [],
-          ['Report Period', generatedReport.periodDetails], [],
-          ['PROGRAM PARTICIPATION SUMMARY'], ['Program', 'Participants'],
-          ...generatedReport.analytics.barChartData.map((d: any) => [d.program, d.value]), [],
-          ['PROGRAM DISTRIBUTION'], ['Program', 'Percentage'],
-          ...generatedReport.analytics.pieChartData.map((d: any) => [d.program, `${d.value.toFixed(1)}%`]),
-        ]
-        const ws = wb.addWorksheet('Analytics Summary')
-        aoa.forEach(r => ws.addRow(r))
-        ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
-        ws.getRow(1).font = { bold: true, size: 14 }
-        applyPrint(ws)
       }
 
       // Participant-program summary sheet (CDSP / GIP / SPES / Livelihood / Skills
@@ -1415,6 +1471,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.text(`Report Period: ${generatedReport.periodDetails}`, centerX, y, { align: 'center' }); y += 15
 
       if (generatedReport.category === 'general-peso' && generatedReport.analytics) {
+        const a = generatedReport.analytics
+        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
+        doc.text(`Total Participants: ${a.total}`, 14, y)
+        doc.text(`Male: ${a.male}`, 90, y)
+        doc.text(`Female: ${a.female}`, 140, y); y += 10
         doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Program Participation Summary', 14, y); y += 6
         doc.addImage(await createBarChartImage(generatedReport.analytics.barChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5); y += usableWidth * 0.5 + 2
@@ -2165,6 +2226,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setSpesReportType('participants')
     setLivelihoodReportType('beneficiaries')
     setSkillsReportType('participants')
+    setSelectedGeneralPrograms(REPORT_CATEGORIES.filter(c => c.id !== 'general-peso').map(c => c.id))
     setGeneratedReport(null)
   }
 
@@ -2196,6 +2258,46 @@ export default function ReportView({ onBack }: ReportViewProps) {
               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
           </div>
+
+          {reportCategory === 'general-peso' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Include Programs</label>
+              <div className="relative">
+                <button type="button" onClick={() => setIsProgramMenuOpen(!isProgramMenuOpen)}
+                  className="w-full flex items-center justify-between pl-3 pr-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
+                  <span>
+                    {selectedGeneralPrograms.length === REPORT_CATEGORIES.length - 1
+                      ? 'All Programs'
+                      : selectedGeneralPrograms.length === 0
+                        ? 'None selected'
+                        : `${selectedGeneralPrograms.length} Program${selectedGeneralPrograms.length === 1 ? '' : 's'} Selected`}
+                  </span>
+                  <ChevronDown size={16} className="text-gray-500" />
+                </button>
+                {isProgramMenuOpen && <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsProgramMenuOpen(false)} />
+                  <div className="absolute left-0 top-full mt-2 w-full max-h-72 overflow-y-auto bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-2">
+                    <div className="flex justify-between px-4 py-1 mb-1 border-b border-gray-100">
+                      <button type="button"
+                        onClick={() => setSelectedGeneralPrograms(REPORT_CATEGORIES.filter(c => c.id !== 'general-peso').map(c => c.id))}
+                        className="text-xs text-[#0077BE] hover:underline">Select All</button>
+                      <button type="button" onClick={() => setSelectedGeneralPrograms([])}
+                        className="text-xs text-[#0077BE] hover:underline">Clear All</button>
+                    </div>
+                    {REPORT_CATEGORIES.filter(c => c.id !== 'general-peso').map(cat => (
+                      <label key={cat.id} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={selectedGeneralPrograms.includes(cat.id)}
+                          onChange={() => setSelectedGeneralPrograms(prev =>
+                            prev.includes(cat.id) ? prev.filter(p => p !== cat.id) : [...prev, cat.id])}
+                          className="rounded border-gray-300" />
+                        <span className="text-sm text-gray-700">{cat.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>}
+              </div>
+            </div>
+          )}
 
           {reportCategory === 'cdsp' && (
             <div>
@@ -2346,10 +2448,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
           </div>
 
           <div className="flex justify-end pt-2">
-            <button onClick={handleGenerateReport} disabled={!reportCategory || pesoLoading}
+            <button onClick={handleGenerateReport}
+              disabled={!reportCategory || pesoLoading || generalPesoLoading || (reportCategory === 'general-peso' && selectedGeneralPrograms.length === 0)}
               className="px-5 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#0066A3] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
               <BarChart2 size={16} />
-              {pesoLoading ? 'Generating…' : 'Generate Report'}
+              {(pesoLoading || generalPesoLoading) ? 'Generating…' : 'Generate Report'}
             </button>
           </div>
         </div>
@@ -2512,8 +2615,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </div>
       )}
 
-      {/* Participant-program Summary (CDSP / GIP / SPES / Livelihood / Skills Training / OFW) */}
-      {generatedReport && ['cdsp', 'gip', 'spes', 'livelihood', 'skills-training', 'ofw-services'].includes(generatedReport.category) && generatedReport.analytics && (
+      {/* Participant-program Summary (General PESO / CDSP / GIP / SPES / Livelihood / Skills Training / OFW) */}
+      {generatedReport && ['general-peso', 'cdsp', 'gip', 'spes', 'livelihood', 'skills-training', 'ofw-services'].includes(generatedReport.category) && generatedReport.analytics && (
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
             <BarChart2 size={20} className="text-[#0077BE]" />

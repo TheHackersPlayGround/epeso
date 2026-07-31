@@ -234,4 +234,7 @@ export const ENDPOINTS = {
     restoreRecord:  '/documents/restoreRecord',
     purgeRecord:    '/documents/purgeRecord',
   },
+  reports: {
+    summary: '/reports/summary',
+  },
 } as const

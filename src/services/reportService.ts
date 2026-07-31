@@ -59,3 +59,30 @@ export async function fetchEfReport(from: string, to: string): Promise<EfMonthly
   )
   return res.data.data
 }
+
+// ── General PESO Report (cross-program summary, live from the backend) ──
+
+export type GeneralPesoProgramRow = {
+  key: string
+  program: string
+  participants: number
+  male: number
+  female: number
+  activities: number | null
+  placements: number | null
+}
+
+export type GeneralPesoReport = {
+  from: string
+  to: string
+  programs: GeneralPesoProgramRow[]
+}
+
+// Fetch the cross-program summary for the given date range and program keys
+// (the same ids used in REPORT_CATEGORIES, e.g. 'cdsp', 'gip', 'livelihood').
+export async function fetchGeneralPesoReport(from: string, to: string, programs: string[]): Promise<GeneralPesoReport> {
+  const res = await axiosClient.get<{ status: string; data: GeneralPesoReport }>(
+    `${ENDPOINTS.reports.summary}?from=${from}&to=${to}&programs=${programs.join(',')}`,
+  )
+  return res.data.data
+}

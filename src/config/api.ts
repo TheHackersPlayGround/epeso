@@ -237,4 +237,10 @@ export const ENDPOINTS = {
   reports: {
     summary: '/reports/summary',
   },
+  backup: {
+    listBackups:    '/backup/listBackups',
+    createBackup:   '/backup/createBackup',
+    downloadBackup: '/backup/downloadBackup',
+    deleteBackup:   '/backup/deleteBackup',
+  },
 } as const

@@ -26,6 +26,26 @@ interface ExcelData {
   sheets: Record<string, string[][]>
 }
 
+// Hoisted to module scope rather than defined inside DocumentsView — if it
+// were a component defined inline in the render body, every re-render (e.g.
+// every keystroke in a modal's input) would give React a brand-new function
+// identity for it, which React treats as a different component type and
+// remounts entirely, including the input inside it (losing focus/selection
+// every keystroke). Same bug class already hit once in GIPMaintenanceForm.tsx.
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-500" /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // Reads a browser File as a base64 data URL — the backend's upload endpoint
 // (and every other module's document upload) expects that format, not
 // multipart form data.
@@ -459,19 +479,6 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
         </button>
       </div>
     </>
-  )
-
-  // ── Modal helper ──────────────────────────────────────────────────────────────
-  const ModalShell = ({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-500" /></button>
-        </div>
-        {children}
-      </div>
-    </div>
   )
 
   const inpCls = `w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400`

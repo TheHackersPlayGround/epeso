@@ -616,6 +616,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
           <div className="p-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">File Name <span className="text-red-500">*</span></label>
             <input autoFocus value={renameFileValue} onChange={e => setRenameFileValue(e.target.value)}
+              onFocus={e => {
+                const dotIndex = renameFileValue.lastIndexOf('.')
+                e.target.setSelectionRange(0, dotIndex > 0 ? dotIndex : renameFileValue.length)
+              }}
               onKeyDown={e => e.key === 'Enter' && handleRenameFile()}
               className={inpCls} style={inpStyle} />
           </div>
@@ -634,7 +638,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       {/* Image / Generic File Preview Modal */}
       {filePreview.isOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className={`relative w-full flex flex-col ${filePreview.type === 'pdf' ? 'max-w-[95vw] h-[95vh]' : 'max-w-4xl max-h-[90vh]'}`}>
             {/* Header bar */}
             <div className="flex items-center justify-between bg-white rounded-t-xl px-6 py-4 flex-shrink-0">
               <p className="text-gray-800 font-semibold text-base truncate pr-4">{filePreview.fileName}</p>
@@ -656,7 +660,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             {/* Content */}
             <div className="flex-1 overflow-auto bg-gray-900 rounded-b-xl flex items-center justify-center p-4">
               {filePreview.type === 'pdf' ? (
-                <embed src={filePreview.fileUrl} type="application/pdf" className="w-full rounded bg-white" style={{ height: '75vh' }} />
+                <embed src={filePreview.fileUrl} type="application/pdf" className="w-full h-full rounded bg-white" />
               ) : (filePreview.type === 'jpg' || filePreview.type === 'png' || filePreview.type === 'other') ? (
                 <img src={filePreview.fileUrl} alt={filePreview.fileName} className="max-w-full max-h-[70vh] object-contain rounded shadow-lg" />
               ) : (
@@ -834,11 +838,12 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {filteredFiles.map(file => (
-                    <div key={file.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all group relative"
+                    <div key={file.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all group relative cursor-pointer"
                       style={{ borderColor: undefined }}
+                      onClick={() => handleViewFile(file)}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = BRAND)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = '')}>
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity relative">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity relative" onClick={e => e.stopPropagation()}>
                         <button onClick={e => { e.stopPropagation(); setActiveMenuId(activeMenuId === file.id ? null : file.id) }}
                           className="p-1.5 bg-white rounded-lg shadow-md hover:bg-gray-50">
                           <MoreVertical size={16} className="text-gray-700" />
@@ -857,13 +862,14 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
               ) : (
                 <div className="bg-white rounded-lg border border-gray-200">
                   {filteredFiles.map((file, i) => (
-                    <div key={file.id} className={`flex items-center gap-4 p-4 hover:bg-gray-50 group ${i !== filteredFiles.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                    <div key={file.id} className={`flex items-center gap-4 p-4 hover:bg-gray-50 group cursor-pointer ${i !== filteredFiles.length - 1 ? 'border-b border-gray-200' : ''}`}
+                      onClick={() => handleViewFile(file)}>
                       <div className="flex-shrink-0">{getFileIcon(file.type, 32)}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
                         <p className="text-xs text-gray-500">{file.uploadedDate} · {file.size} · {file.uploadedBy}</p>
                       </div>
-                      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative">
+                      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative" onClick={e => e.stopPropagation()}>
                         <button onClick={e => { e.stopPropagation(); setActiveMenuId(activeMenuId === file.id ? null : file.id) }}
                           className="p-2 hover:bg-gray-200 rounded-lg">
                           <MoreVertical size={18} className="text-gray-700" />

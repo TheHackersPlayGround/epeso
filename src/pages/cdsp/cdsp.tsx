@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
-  ChevronDown, AlertCircle, CheckCircle, Upload, Download, MoreHorizontal,
+  ChevronDown, AlertCircle, Upload, Download, MoreHorizontal,
   ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -149,44 +149,6 @@ function activityStatusBadge(status: string) {
   return 'bg-yellow-100 text-yellow-700'
 }
 
-// ─── Confirm Modal ─────────────────────────────────────────────────────────────
-
-function ConfirmModal({
-  isOpen, type, title, message, onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel',
-}: {
-  isOpen: boolean
-  type: 'confirm' | 'success' | 'error'
-  title: string
-  message: string
-  onConfirm: () => void
-  onCancel: () => void
-  confirmText?: string
-  cancelText?: string
-}) {
-  if (!isOpen) return null
-  const Icon = type === 'success' ? CheckCircle : AlertCircle
-  const iconColor = type === 'success' ? 'text-green-500' : type === 'error' ? 'text-red-500' : 'text-brand-blue'
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
-        <Icon size={56} className={`mx-auto mb-4 ${iconColor}`} />
-        <p className="text-xl text-gray-800 mb-3 font-semibold">{title}</p>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex gap-3 justify-center">
-          {type === 'confirm' ? (
-            <>
-              <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">{cancelText}</button>
-              <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
-            </>
-          ) : (
-            <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
@@ -241,6 +203,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [selectedActivity, setSelectedActivity] = useState<CdspActivity | null>(null)
   const [viewingAssignedFor, setViewingAssignedFor] = useState<CDSPApplicant | null>(null)
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<CDSPApplicant | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [unassignConfirm, setUnassignConfirm] = useState<number | null>(null)
+  const [confirmingAssign, setConfirmingAssign] = useState(false)
 
   const filtered = applicants.filter((a) => {
     const fullName = `${a.lastName} ${a.firstName} ${a.middleName}`.toLowerCase()
@@ -289,10 +254,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.createProfile(data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setIsFormOpen(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been added successfully.' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save profile.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
   const handleEditSave = async (data: Omit<CDSPApplicant, 'id'>) => {
@@ -301,10 +266,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setEditingApplicant(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been updated successfully.' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to update profile.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
   const handleDelete = async (id: number) => {
@@ -312,10 +277,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await cdspApiService.deleteProfile(id)
       await refreshProfiles()
       setDeleteConfirm({ open: false, id: null })
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted and moved to the recycle bin.', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The applicant has been deleted and moved to the recycle bin.' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete profile.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
   const handleAssign = async (activity: CdspActivity) => {
@@ -326,10 +291,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       await Promise.all([refreshProfiles(), refreshActivities()])
       setAssignTarget(null)
       setSelectedActivity(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${activity.title}" successfully.`, confirmButtonText: 'OK', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: `Assigned to "${activity.title}" successfully.` })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to assign activity.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     } finally {
       setIsAssigning(false)
     }
@@ -347,10 +312,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       setAssignTarget(null)
       setSelectedActivity(null)
       setViewingAssignedFor(null)
-      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned activity has been removed.', confirmButtonText: 'OK', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'Assigned activity has been removed.' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to remove assignment.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     } finally {
       setIsAssigning(false)
     }
@@ -474,18 +439,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                 {canChange && canManage('cdsp') && (
                   <button
-                    onClick={() => {
-                      Swal.fire({
-                        icon: 'warning',
-                        title: 'Remove Assignment',
-                        text: 'Are you sure you want to remove the assigned activity from this applicant?',
-                        showCancelButton: true,
-                        confirmButtonText: 'Yes, Remove',
-                        cancelButtonText: 'Cancel',
-                        confirmButtonColor: '#0077BE',
-                        cancelButtonColor: '#6b7280',
-                      }).then(r => { if (r.isConfirmed) handleUnassign(viewingAssignedFor.id) })
-                    }}
+                    onClick={() => setUnassignConfirm(viewingAssignedFor.id)}
                     disabled={isAssigning}
                     className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
@@ -614,18 +568,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      Swal.fire({
-                        icon: 'warning',
-                        title: 'Remove Assignment',
-                        text: 'Are you sure you want to remove the assigned activity from this applicant?',
-                        showCancelButton: true,
-                        confirmButtonText: 'Yes, Remove',
-                        cancelButtonText: 'Cancel',
-                        confirmButtonColor: '#0077BE',
-                        cancelButtonColor: '#6b7280',
-                      }).then(r => { if (r.isConfirmed) handleUnassign(assignTarget.id) })
-                    }}
+                    onClick={() => setUnassignConfirm(assignTarget.id)}
                     disabled={!canManage('cdsp') || currentActivity.status === 'Completed' || isAssigning}
                     title={currentActivity.status === 'Completed' ? 'This activity is already completed — unassigning would erase its completion record.' : undefined}
                     className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
@@ -703,18 +646,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <span className="text-sm text-gray-800 font-medium">{value}</span>
             </div>
           ) : null
-        const doAssign = () => {
-          Swal.fire({
-            icon: 'warning',
-            title: 'Confirm Assignment',
-            text: `Assign "${selectedActivity.title}" to ${assignTarget.firstName} ${assignTarget.lastName}?`,
-            showCancelButton: true,
-            confirmButtonText: 'Yes, Assign',
-            cancelButtonText: 'Cancel',
-            confirmButtonColor: '#0077BE',
-            cancelButtonColor: '#6b7280',
-          }).then(r => { if (r.isConfirmed) handleAssign(selectedActivity) })
-        }
+        const doAssign = () => setConfirmingAssign(true)
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[85vh]">
@@ -761,6 +693,17 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 </button>
               </div>
             </div>
+            <ConfirmModal
+              isOpen={confirmingAssign}
+              type="confirm"
+              title="Confirm Assignment"
+              message={`Assign "${selectedActivity.title}" to ${assignTarget.firstName} ${assignTarget.lastName}?`}
+              confirmText="Yes, Assign"
+              cancelText="Cancel"
+              confirmVariant="brand"
+              onConfirm={() => { setConfirmingAssign(false); handleAssign(selectedActivity) }}
+              onCancel={() => setConfirmingAssign(false)}
+            />
           </div>
         )
       })()}
@@ -1025,6 +968,27 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
           </>
         )
       })()}
+
+      <ConfirmModal
+        isOpen={unassignConfirm !== null}
+        type="confirm"
+        title="Remove Assignment"
+        message="Are you sure you want to remove the assigned activity from this applicant?"
+        confirmText="Yes, Remove"
+        cancelText="Cancel"
+        confirmVariant="brand"
+        onConfirm={() => { if (unassignConfirm !== null) handleUnassign(unassignConfirm); setUnassignConfirm(null) }}
+        onCancel={() => setUnassignConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        confirmText="OK"
+        onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </>
   )
 }

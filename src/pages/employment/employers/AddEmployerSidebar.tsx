@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
-import Swal from 'sweetalert2';
 import { X, Briefcase } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../services/locationService';
 import ApplicantReviewModal from '../shared/ApplicantReviewModal';
+import ConfirmModal from '../../shared/ConfirmModal';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 
 interface EmployerFormData {
@@ -44,6 +44,7 @@ type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'registratio
 export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string }>({ isOpen: false, type: 'success', message: '' });
   const [formData, setFormData] = useState<EmployerFormData>({
     companyName: '',
     industry: '',
@@ -88,16 +89,10 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     try {
       // onSave persists to the backend; await so success only shows on success.
       await onSave(formData);
-      await Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: 'Employer has been successfully added to the system.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      });
+      setResultModal({ isOpen: true, type: 'success', message: 'Employer has been successfully added to the system.' });
       onClose();
     } catch {
-      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the employer. Please try again.' });
+      setResultModal({ isOpen: true, type: 'error', message: 'Could not save the employer. Please try again.' });
     }
   };
 
@@ -507,6 +502,11 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
         summaryContent={renderSummary()}
         onBackToEdit={() => setShowConfirmation(false)}
         onConfirm={handleConfirmSave}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type}
+        title={resultModal.type === 'success' ? 'Success!' : 'Save failed'} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
       />
 
     </>

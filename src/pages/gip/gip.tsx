@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
-  AlertCircle, Upload, Download, ChevronDown, MoreHorizontal,
+  Upload, Download, ChevronDown, MoreHorizontal,
   ChevronRight, ChevronLeft, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -141,28 +141,6 @@ function ImportResultView({ result }: { result: ImportResult }) {
   )
 }
 
-// ─── Confirm Modal (delete only — success/error use Swal) ──────────────────────
-
-function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Confirm' }: {
-  isOpen: boolean; title: string; message: string
-  onConfirm: () => void; onCancel: () => void; confirmText?: string
-}) {
-  if (!isOpen) return null
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
-        <AlertCircle size={56} className="mx-auto mb-4 text-brand-blue" />
-        <h3 className="text-xl text-gray-800 mb-3">{title}</h3>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex gap-3 justify-center">
-          <button onClick={onCancel} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">Cancel</button>
-          <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">{confirmText}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function errMsg(e: unknown, fallback: string) {
   return (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
     ?? (e as { message?: string })?.message ?? fallback
@@ -224,6 +202,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -276,9 +255,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       await gipApiService.createProfile(data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setIsFormOpen(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save profile.') })
     }
   }
 
@@ -288,9 +267,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       await gipApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setEditingApplicant(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been updated successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update profile.') })
     }
   }
 
@@ -299,9 +278,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       await gipApiService.deleteProfile(id)
       await refreshProfiles()
       setDeleteConfirm({ open: false, id: null })
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted and moved to the recycle bin.', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The applicant has been deleted and moved to the recycle bin.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete profile.') })
     }
   }
 
@@ -316,9 +295,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       setAssignStep(1)
       setSelectedBatch(null)
       setAssignSearch('')
-      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${batch.batchName}" successfully.`, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: `Assigned to "${batch.batchName}" successfully.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign batch.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to assign batch.') })
     } finally {
       setIsAssigning(false)
     }
@@ -334,9 +313,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
       await refreshProfiles()
       await refreshBatches()
       setViewBatchTarget(null)
-      Swal.fire({ icon: 'success', title: 'Removed', text: 'Applicant has been unassigned from the batch.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'Applicant has been unassigned from the batch.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -416,6 +395,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
     <>
       <ConfirmModal
         isOpen={deleteConfirm.open}
+        type="confirm"
         title="Delete Applicant?"
         message={(() => {
           const applicant = applicants.find(a => a.id === deleteConfirm.id)
@@ -423,8 +403,13 @@ export default function GIPView({ onBack }: GIPViewProps) {
           return `Are you sure you want to delete ${name}? This will move the applicant to the recycle bin.`
         })()}
         confirmText="Delete"
+        cancelText="Cancel"
         onConfirm={() => deleteConfirm.id !== null && handleDelete(deleteConfirm.id)}
         onCancel={() => setDeleteConfirm({ open: false, id: null })}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       {/* Assign Batch Modal */}

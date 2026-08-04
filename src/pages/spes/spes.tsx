@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { fmtDate } from '../../utils/formatDate'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
   AlertCircle, Upload, Download, ChevronDown, MoreHorizontal,
-  ChevronLeft, ChevronRight, Loader2,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useSPES } from '../../contexts/SPESContext'
@@ -143,39 +143,6 @@ function ImportResultView({ result }: { result: ImportResult }) {
   )
 }
 
-// ─── Confirm Modal ────────────────────────────────────────────────────────────
-
-function ConfirmModal({ isOpen, type, title, message, onConfirm, onCancel, confirmText = 'Confirm', isSaving = false }: {
-  isOpen: boolean; type: 'confirm' | 'success'; title: string; message: string
-  onConfirm: () => void; onCancel: () => void; confirmText?: string; isSaving?: boolean
-}) {
-  if (!isOpen) return null
-  const Icon = type === 'success' ? Users : AlertCircle
-  const iconColor = type === 'success' ? 'text-green-500' : 'text-brand-blue'
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center">
-        <Icon size={56} className={`mx-auto mb-4 ${iconColor}`} />
-        <h3 className="text-xl text-gray-800 mb-3">{title}</h3>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex gap-3 justify-center">
-          {type === 'confirm' ? (
-            <>
-              <button onClick={onCancel} disabled={isSaving} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
-              <button onClick={onConfirm} disabled={isSaving} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                {isSaving && <Loader2 size={16} className="animate-spin" />}
-                {isSaving ? 'Please wait…' : confirmText}
-              </button>
-            </>
-          ) : (
-            <button onClick={onConfirm} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark">OK</button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function errMsg(e: unknown, fallback: string) {
   return (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
     ?? (e as { message?: string })?.message ?? fallback
@@ -237,6 +204,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteConfirm, setDeleteConfirm] = useState<SPESApplicant | null>(null)
 
   const batchNameFor = (applicant: SPESApplicant) =>
     spesBatches.find(b => b.id === applicant.assignedBatchId)?.batchName ?? ''
@@ -289,9 +258,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
       await spesApiService.createProfile(data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setIsFormOpen(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save profile.') })
     }
   }
 
@@ -301,31 +270,27 @@ export default function SPESView({ onBack }: SPESViewProps) {
       await spesApiService.updateProfile(editingApplicant.id, data as unknown as Record<string, unknown>)
       await refreshProfiles()
       setEditingApplicant(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Applicant profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Applicant profile has been updated successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update profile.') })
     }
   }
 
-  const handleDelete = async (applicant: SPESApplicant) => {
+  const handleDelete = (applicant: SPESApplicant) => {
+    setDeleteConfirm(applicant)
+  }
+
+  const proceedDelete = async () => {
+    if (!deleteConfirm) return
+    const applicant = deleteConfirm
     const name = `${applicant.lastName}, ${applicant.firstName}${applicant.middleName ? ' ' + applicant.middleName.charAt(0) + '.' : ''}`
-    const result = await Swal.fire({
-      title: 'Delete Applicant?',
-      text: `Are you sure you want to delete ${name}? This will move the applicant to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+    setDeleteConfirm(null)
     try {
       await spesApiService.deleteProfile(applicant.id)
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The applicant has been deleted and moved to the recycle bin.', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: `${name} has been deleted and moved to the recycle bin.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete profile.') })
     }
   }
 
@@ -340,9 +305,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
       setSelectedBatch(null)
       setConfirmingBatch(null)
       setBatchSearch('')
-      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${batch.batchName}" successfully.`, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: `Assigned to "${batch.batchName}" successfully.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign batch.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to assign batch.') })
     } finally {
       setIsAssigning(false)
     }
@@ -361,9 +326,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
       setSelectedBatch(null)
       setViewingAssignedBatchFor(null)
       setBatchSearch('')
-      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned batch has been removed.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'Assigned batch has been removed.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -475,9 +440,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
               title="Confirm Assignment"
               message={`Assign "${selectedBatch.batchName}" to ${assignTarget.firstName} ${assignTarget.lastName}?`}
               confirmText="Yes, Assign"
+              cancelText="Cancel"
               onConfirm={() => handleAssign(selectedBatch)}
               onCancel={() => setConfirmingBatch(null)}
-              isSaving={isAssigning}
             />
           </>
         )
@@ -939,13 +904,32 @@ export default function SPESView({ onBack }: SPESViewProps) {
         title="Remove Batch Assignment"
         message="Are you sure you want to remove the assigned batch from this applicant?"
         confirmText="Yes, Remove"
+        cancelText="Cancel"
         onConfirm={async () => {
           if (confirmUnassignId === null) return
           await handleUnassign(confirmUnassignId)
           setConfirmUnassignId(null)
         }}
         onCancel={() => setConfirmUnassignId(null)}
-        isSaving={isAssigning}
+      />
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        type="confirm"
+        title="Delete Applicant?"
+        message={deleteConfirm ? `Are you sure you want to delete ${deleteConfirm.lastName}, ${deleteConfirm.firstName}${deleteConfirm.middleName ? ' ' + deleteConfirm.middleName.charAt(0) + '.' : ''}? This will move the applicant to the recycle bin.` : ''}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={proceedDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        confirmText="OK"
+        onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   )

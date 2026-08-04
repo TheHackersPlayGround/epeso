@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../../shared/ConfirmModal'
 import { Search, Plus, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { Employer } from '../../../contexts/EmploymentContext'
@@ -469,13 +469,15 @@ export default function EmployersTab() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sidebarMode, setSidebarMode] = useState<'view' | 'edit' | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
 
   const availableFilters = STATIC_FILTERS
 
   useEffect(() => {
     listEmployers()
       .then(setEmployers)
-      .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load employers.' }))
+      .catch(() => setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load employers.' }))
       .finally(() => setLoading(false))
   }, [])
 
@@ -520,39 +522,29 @@ export default function EmployersTab() {
       setEmployers(fresh)
       setSelectedEmployer(null)
       setSidebarMode(null)
-      Swal.fire({
-        icon: 'success',
-        title: 'Changes Saved!',
-        text: 'Employer information has been successfully updated.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Changes Saved!', message: 'Employer information has been successfully updated.' })
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to update employer.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
 
-  async function handleDelete(id: number) {
-    const result = await Swal.fire({
-      title: 'Delete Employer?',
-      text: 'Are you sure you want to delete this employer? This will move the employer to the recycle bin.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+  function handleDelete(id: number) {
+    setDeleteConfirmId(id)
+  }
+
+  async function confirmDeleteEmployer() {
+    const id = deleteConfirmId
+    if (id === null) return
+    setDeleteConfirmId(null)
     try {
       await deleteEmployer(id)
       setEmployers(prev => prev.filter(e => e.id !== id))
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to delete employer.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
 
@@ -724,6 +716,16 @@ export default function EmployersTab() {
           }}
         />
       )}
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null} type="confirm"
+        title="Delete Employer?" message="Are you sure you want to delete this employer? This will move the employer to the recycle bin."
+        confirmText="Yes, Delete" cancelText="Cancel"
+        onConfirm={confirmDeleteEmployer} onCancel={() => setDeleteConfirmId(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

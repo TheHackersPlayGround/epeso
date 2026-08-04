@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Swal from 'sweetalert2'
 import Login from './pages/auth/login'
 import SecuritySetup from './pages/auth/SecuritySetup'
 import Dashboard from './pages/dashboard/dashboard'
@@ -30,6 +29,7 @@ import { TUPADProvider } from './contexts/TUPADContext'
 import { SLPProvider } from './contexts/SLPContext'
 import { CLPEPProvider } from './contexts/CLPEPContext'
 import { logout as apiLogout, getMe } from './services/userService'
+import ConfirmModal from './pages/shared/ConfirmModal'
 import './styles/App.css'
 
 type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
@@ -257,6 +257,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
+  const [logoutConfirm, setLogoutConfirm] = useState(false)
 
   // Read the cached user and decide whether the security-questions setup is required.
   const refreshSetupGate = () => {
@@ -282,25 +283,15 @@ export default function App() {
     return () => { active = false }
   }, [])
 
-  const handleLogout = () => {
-    Swal.fire({
-      title: 'Log out?',
-      text: 'Are you sure you want to log out?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, log out',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#0077BE',
-      cancelButtonColor: '#6b7280',
-      reverseButtons: true,
-    }).then(result => {
-      if (!result.isConfirmed) return
-      // End the backend session; ignore network errors so the UI still logs out.
-      apiLogout().catch(() => { /* already effectively logged out */ })
-      try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
-      setNeedsSetup(false)
-      setIsLoggedIn(false)
-    })
+  const handleLogout = () => setLogoutConfirm(true)
+
+  const confirmLogout = () => {
+    setLogoutConfirm(false)
+    // End the backend session; ignore network errors so the UI still logs out.
+    apiLogout().catch(() => { /* already effectively logged out */ })
+    try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+    setNeedsSetup(false)
+    setIsLoggedIn(false)
   }
 
   if (checkingSession) {
@@ -315,35 +306,43 @@ export default function App() {
     return <Login onLogin={() => { refreshSetupGate(); setIsLoggedIn(true) }} />
   }
 
-  // First-login gate: admins must set up security questions before reaching the app.
-  if (needsSetup) {
-    return <SecuritySetup onDone={() => setNeedsSetup(false)} onLogout={handleLogout} />
-  }
-
-  // Providers lifted here so their state survives navigation between modules and Maintenance.
   return (
-    <CDSPProvider>
-      <GIPProvider>
-        <SPESProvider>
-          <OFWProvider>
-            <SkillsTrainingProvider>
-              <ProgramActivitiesProvider>
-                <DILPProvider>
-                  <TUPADProvider>
-                    <SLPProvider>
-                      <CLPEPProvider>
-                        <DocumentsProvider>
-                          <AppContent onLogout={handleLogout} />
-                        </DocumentsProvider>
-                      </CLPEPProvider>
-                    </SLPProvider>
-                  </TUPADProvider>
-                </DILPProvider>
-              </ProgramActivitiesProvider>
-            </SkillsTrainingProvider>
-          </OFWProvider>
-        </SPESProvider>
-      </GIPProvider>
-    </CDSPProvider>
+    <>
+      {needsSetup ? (
+        // First-login gate: admins must set up security questions before reaching the app.
+        <SecuritySetup onDone={() => setNeedsSetup(false)} onLogout={handleLogout} />
+      ) : (
+        // Providers lifted here so their state survives navigation between modules and Maintenance.
+        <CDSPProvider>
+          <GIPProvider>
+            <SPESProvider>
+              <OFWProvider>
+                <SkillsTrainingProvider>
+                  <ProgramActivitiesProvider>
+                    <DILPProvider>
+                      <TUPADProvider>
+                        <SLPProvider>
+                          <CLPEPProvider>
+                            <DocumentsProvider>
+                              <AppContent onLogout={handleLogout} />
+                            </DocumentsProvider>
+                          </CLPEPProvider>
+                        </SLPProvider>
+                      </TUPADProvider>
+                    </DILPProvider>
+                  </ProgramActivitiesProvider>
+                </SkillsTrainingProvider>
+              </OFWProvider>
+            </SPESProvider>
+          </GIPProvider>
+        </CDSPProvider>
+      )}
+      <ConfirmModal
+        isOpen={logoutConfirm} type="confirm" confirmVariant="brand"
+        title="Log out?" message="Are you sure you want to log out?"
+        confirmText="Yes, log out" cancelText="Cancel"
+        onConfirm={confirmLogout} onCancel={() => setLogoutConfirm(false)}
+      />
+    </>
   )
 }

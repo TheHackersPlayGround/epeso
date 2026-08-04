@@ -4,11 +4,11 @@ import * as XLSX from "xlsx";
 import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
 import type { Applicant } from "./applicants/ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./applicants/ApplicantsTab";
-import Swal from "sweetalert2";
 import { listApplicants, createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { listVacancies } from "../../services/vacancyService";
 import { createReferral } from "../../services/referralService";
-import { confirmReferralOk } from "../../utils/referralGuard";
+import { useReferralGuard } from "../../utils/referralGuard";
+import ConfirmModal from "../shared/ConfirmModal";
 import ApplicantsTab from "./applicants/ApplicantsTab";
 import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
@@ -54,6 +54,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   const [referred, setReferred] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const { confirmReferralOk, referralGuardModal } = useReferralGuard()
 
   useEffect(() => {
     listVacancies().then(all => {
@@ -181,6 +182,12 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
           )}
         </div>
       </div>
+      <ConfirmModal
+        isOpen={referralGuardModal.isOpen} type="confirm" confirmVariant="brand"
+        title="Possible duplicate referral" message={referralGuardModal.message}
+        confirmText="Yes, refer again" cancelText="Cancel"
+        onConfirm={referralGuardModal.onConfirm} onCancel={referralGuardModal.onCancel}
+      />
     </div>
   );
 }
@@ -386,6 +393,10 @@ function toApplicantData(a: Applicant): ApplicantData {
 export default function EmploymentFacilitation({ onBack }: EmploymentFacilitationProps) {
   // ── Applicant state (source of truth = the database) ──
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [deleteApplicantConfirm, setDeleteApplicantConfirm] = useState<Applicant | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean; type: 'success' | 'error'; title: string; message: string
+  }>({ isOpen: false, type: 'success', title: '', message: '' });
 
   // Reload the Employment Facilitation applicants from the backend.
   async function reloadApplicants() {
@@ -530,26 +541,22 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     await reloadApplicants();
   }
 
-  async function handleDeleteApplicant(applicant: Applicant) {
-    const result = await Swal.fire({
-      title: "Delete Applicant?",
-      text: `Are you sure you want to delete ${applicant.name}? This will move the applicant to the recycle bin.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, Delete",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-    });
-    if (!result.isConfirmed) return;
+  function handleDeleteApplicant(applicant: Applicant) {
+    setDeleteApplicantConfirm(applicant);
+  }
+
+  async function confirmDeleteApplicant() {
+    const applicant = deleteApplicantConfirm;
+    if (!applicant) return;
+    setDeleteApplicantConfirm(null);
     try {
       await deleteApplicant(applicant.id);
       await reloadApplicants();
-      Swal.fire({ icon: "success", title: "Deleted", text: "The applicant has been deleted and moved to the recycle bin.", timer: 1500, showConfirmButton: false });
+      setConfirmModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The applicant has been deleted and moved to the recycle bin.' });
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : "Failed to delete applicant.";
-      Swal.fire({ icon: "error", title: "Error", text: msg });
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: msg });
     }
   }
 
@@ -631,6 +638,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
   // ── Tab layout ────────────────────────────────────────────────────
   return (
+    <>
     <div className="min-h-full flex flex-col bg-brand-bg">
       {/* Title row */}
       <div className="px-8 pt-7 pb-5 flex items-center gap-4">
@@ -742,5 +750,17 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
         />
       )}
     </div>
+    <ConfirmModal
+      isOpen={!!deleteApplicantConfirm} type="confirm"
+      title="Delete Applicant?"
+      message={`Are you sure you want to delete ${deleteApplicantConfirm?.name}? This will move the applicant to the recycle bin.`}
+      confirmText="Yes, Delete" cancelText="Cancel"
+      onConfirm={confirmDeleteApplicant} onCancel={() => setDeleteApplicantConfirm(null)}
+    />
+    <ConfirmModal
+      isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message}
+      confirmText="OK" onConfirm={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+    />
+    </>
   );
 }

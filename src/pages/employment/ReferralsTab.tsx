@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import type { Referral } from '../../contexts/EmploymentContext'
 import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
@@ -256,21 +256,16 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
   function closeMenu() { setOpenMenuId(null) }
 
   const menuReferral = referrals.find(r => r.id === openMenuId) ?? null
+  const [removeConfirm, setRemoveConfirm] = useState(false)
 
-  async function handleConfirmRemove() {
+  function handleConfirmRemove() {
     if (!menuReferral) return
-    const result = await Swal.fire({
-      title: 'Remove Referral?',
-      text: `Remove referral for "${menuReferral.applicantName}"? This will move the referral to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Remove',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
-    onRemove(menuReferral.id)
+    setRemoveConfirm(true)
+  }
+
+  function proceedRemove() {
+    if (menuReferral) onRemove(menuReferral.id)
+    setRemoveConfirm(false)
     closeMenu()
   }
 
@@ -356,6 +351,12 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
           </div>
         </>
       )}
+      <ConfirmModal
+        isOpen={removeConfirm} type="confirm"
+        title="Remove Referral?" message={`Remove referral for "${menuReferral?.applicantName}"? This will move the referral to the recycle bin.`}
+        confirmText="Yes, Remove" cancelText="Cancel"
+        onConfirm={proceedRemove} onCancel={() => setRemoveConfirm(false)}
+      />
     </div>
   )
 }
@@ -450,6 +451,7 @@ export default function ReferralsTab() {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
 
   async function reload() {
     const data = await listReferrals()
@@ -488,7 +490,7 @@ export default function ReferralsTab() {
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to remove referral. Please try again.'
-      Swal.fire('Error', msg, 'error')
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
 
@@ -500,7 +502,7 @@ export default function ReferralsTab() {
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to update referral status. Please try again.'
-      Swal.fire('Error', msg, 'error')
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
       throw err // keep the Update Status modal open so the user can retry
     }
 
@@ -519,13 +521,7 @@ export default function ReferralsTab() {
       Pending:      { title: 'Status Updated',   text: `${name}'s referral is now set to Pending.` },
     }
     const note = notes[newStatus]
-    Swal.fire({
-      icon: 'success',
-      title: note.title,
-      text: note.text,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+    setResultModal({ isOpen: true, type: 'success', title: note.title, message: note.text })
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────
@@ -659,6 +655,10 @@ export default function ReferralsTab() {
           onSave={handleUpdateStatus}
         />
       )}
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

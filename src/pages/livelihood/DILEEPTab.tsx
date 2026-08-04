@@ -5,7 +5,7 @@ import {
   MoreHorizontal, Users, Info, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import { canManage } from '../../utils/permissions'
 import { useDILP } from '../../contexts/DILPContext'
 import type { DILPApplicant, DILPProject } from '../../contexts/DILPContext'
@@ -603,6 +603,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<DILEEPApplicant | null>(null)
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<TUPADApplicant | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
 
   useEffect(() => {
     onWizardChange(isAddOpen || !!editingBeneficiary || !!viewingBeneficiary)
@@ -622,9 +624,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       else await tupadService.createProfile(data)
       await refreshProfiles()
       setIsAddOpen(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Beneficiary profile has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save profile.') })
     }
   }
 
@@ -635,9 +637,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       else await tupadService.updateProfile(editingBeneficiary.id, data)
       await refreshProfiles()
       setEditingBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Beneficiary profile has been updated successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update profile.') })
     }
   }
 
@@ -670,25 +672,22 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
 
   function closeMenu() { setOpenMenuId(null) }
 
-  async function handleConfirmRemove(id: number, name: string) {
+  function handleConfirmRemove(id: number, name: string) {
     closeMenu()
-    const result = await Swal.fire({
-      title: 'Remove Beneficiary?',
-      text: `This will move ${name} to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, remove',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-    })
-    if (!result.isConfirmed) return
+    setRemoveConfirm({ id, name })
+  }
+
+  async function proceedRemove() {
+    if (!removeConfirm) return
+    const { id, name } = removeConfirm
+    setRemoveConfirm(null)
     try {
       if (isDILP) await dilpService.deleteProfile(id)
       else await tupadService.deleteProfile(id)
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Removed', text: `${name} moved to the recycle bin.`, timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: `${name} moved to the recycle bin.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove beneficiary.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove beneficiary.') })
     }
   }
 
@@ -701,9 +700,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       await refreshProfiles()
       await refreshProjects()
       setAssigningBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: `Assigned to "${projectName}" successfully.`, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: `Assigned to "${projectName}" successfully.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign project.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to assign project.') })
     } finally {
       setIsAssigning(false)
     }
@@ -718,9 +717,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       await refreshProfiles()
       await refreshProjects()
       setAssigningBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned project has been removed.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'Assigned project has been removed.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -1244,6 +1243,16 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
         onImported={() => { refreshProfiles(); }}
       />
     )}
+    <ConfirmModal
+      isOpen={removeConfirm !== null} type="confirm"
+      title="Remove Beneficiary?" message={removeConfirm ? `This will move ${removeConfirm.name} to the recycle bin.` : ''}
+      confirmText="Yes, remove" cancelText="Cancel"
+      onConfirm={proceedRemove} onCancel={() => setRemoveConfirm(null)}
+    />
+    <ConfirmModal
+      isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+      confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+    />
     </>
   )
 }

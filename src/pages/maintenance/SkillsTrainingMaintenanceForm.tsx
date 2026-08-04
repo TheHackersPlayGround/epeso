@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import Swal from 'sweetalert2'
 import DatePicker from '../../components/DatePicker'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
@@ -282,6 +281,9 @@ export default function SkillsTrainingMaintenanceForm() {
   // participants (assignedCount -- the real linked-profiles count, not the
   // manually-typed "Number of Participants/Beneficiaries" estimate field).
   const [zeroParticipantsAlert, setZeroParticipantsAlert] = useState(false)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteBatchConfirm, setDeleteBatchConfirm] = useState<SkillsTrainingBatch | null>(null)
+  const [attendanceIncompleteModal, setAttendanceIncompleteModal] = useState<{ isOpen: boolean; activity: SkillsTrainingActivity | null; unmarked: number }>({ isOpen: false, activity: null, unmarked: 0 })
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -328,7 +330,7 @@ export default function SkillsTrainingMaintenanceForm() {
         p.beneficiaryServiceId === beneficiaryServiceId ? { ...p, attended: value } : p
       ))
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update attendance.', confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to update attendance.' })
     }
   }
 
@@ -366,9 +368,9 @@ export default function SkillsTrainingMaintenanceForm() {
       await Promise.all([refreshActivities(), refreshBatches()])
       resetAdd()
       setAction('')
-      Swal.fire({ icon: 'success', title: 'Training Saved', text: `"${addForm.title.trim()}" has been added.`, confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'success', title: 'Training Saved', message: `"${addForm.title.trim()}" has been added.` })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save training.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save training.') })
     } finally {
       setIsSaving(false)
     }
@@ -377,7 +379,7 @@ export default function SkillsTrainingMaintenanceForm() {
   const handleSaveEdit = async () => {
     if (!selectedTraining || isSaving) return
     if (!editForm.title.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Title is required.', confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Title is required.' })
       return
     }
     if (editForm.status === 'Ongoing' && (selectedTraining.assignedCount ?? 0) === 0) {
@@ -399,9 +401,9 @@ export default function SkillsTrainingMaintenanceForm() {
       await Promise.all([refreshActivities(), refreshProfiles(), refreshBatches()])
       setSelectedTraining(res.data)
       setTrainingSubView('')
-      Swal.fire({ icon: 'success', title: 'Training Updated', text: 'Changes saved successfully.', confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'success', title: 'Training Updated', message: 'Changes saved successfully.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update training.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update training.') })
     } finally {
       setIsSaving(false)
     }
@@ -441,16 +443,16 @@ export default function SkillsTrainingMaintenanceForm() {
 
   const handleAddBatch = async () => {
     const name = newBatchName.trim()
-    if (!name) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a batch name.', confirmButtonColor: BRAND_BLUE }); return }
+    if (!name) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter a batch name.' }); return }
     if (isSavingBatch) return
     setIsSavingBatch(true)
     try {
       await skillsTrainingService.createBatch({ batchName: name })
       await refreshBatches()
       setNewBatchName('')
-      Swal.fire({ icon: 'success', title: 'Batch Added', text: `${name} has been added.`, confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Added', message: `${name} has been added.` })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to add batch.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to add batch.') })
     } finally {
       setIsSavingBatch(false)
     }
@@ -460,24 +462,20 @@ export default function SkillsTrainingMaintenanceForm() {
     try {
       await skillsTrainingService.deleteBatch(id)
       await refreshBatches()
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The batch has been deleted.', confirmButtonColor: BRAND_BLUE, timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The batch has been deleted.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete batch.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete batch.') })
     }
   }
 
-  const confirmDeleteBatch = async (b: SkillsTrainingBatch) => {
-    const result = await Swal.fire({
-      title: 'Delete Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+  const confirmDeleteBatch = (b: SkillsTrainingBatch) => {
+    setDeleteBatchConfirm(b)
+  }
+
+  const proceedDeleteBatch = async () => {
+    if (!deleteBatchConfirm) return
+    const b = deleteBatchConfirm
+    setDeleteBatchConfirm(null)
     await handleDeleteBatch(b.id)
   }
 
@@ -489,7 +487,7 @@ export default function SkillsTrainingMaintenanceForm() {
       await Promise.all([refreshActivities(), refreshBatches()])
     } catch (e) {
       setTrainingDeleteConfirm(null)
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete training.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete training.') })
     }
   }
 
@@ -509,17 +507,8 @@ export default function SkillsTrainingMaintenanceForm() {
         const participants: ParticipantRecord[] = res.data ?? []
         const unmarked = participants.filter(p => p.attended === null).length
         if (unmarked > 0) {
-          await Swal.fire({
-            icon: 'warning',
-            title: 'Attendance Incomplete',
-            html: `<b>${unmarked} participant${unmarked !== 1 ? 's have' : ' has'}</b> not been marked present or absent yet.<br><br>Please mark attendance for all participants before completing this training.`,
-            confirmButtonText: 'Go to Attendance',
-            confirmButtonColor: BRAND_BLUE,
-          })
           setTrainingStatusConfirm(null)
-          setSelectedTraining(activity)
-          setAction('view_trainings')
-          setTrainingSubView('view_participants')
+          setAttendanceIncompleteModal({ isOpen: true, activity, unmarked })
           return
         }
       } catch { /* proceed if participants can't be fetched */ }
@@ -529,10 +518,10 @@ export default function SkillsTrainingMaintenanceForm() {
       await skillsTrainingService.updateActivityStatus(activity.id, nextStatus)
       await Promise.all([refreshActivities(), refreshProfiles()])
       setTrainingStatusConfirm(null)
-      Swal.fire({ icon: 'success', title: 'Status Updated', text: `Status changed to ${nextStatus}.`, confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'success', title: 'Status Updated', message: `Status changed to ${nextStatus}.` })
     } catch (e) {
       setTrainingStatusConfirm(null)
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: BRAND_BLUE })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update status.') })
     }
   }
 
@@ -1139,6 +1128,42 @@ export default function SkillsTrainingMaintenanceForm() {
         confirmText="OK"
         onConfirm={() => setZeroParticipantsAlert(false)}
         onCancel={() => setZeroParticipantsAlert(false)}
+      />
+      <ConfirmModal
+        isOpen={attendanceIncompleteModal.isOpen}
+        type="error"
+        title="Attendance Incomplete"
+        message={`${attendanceIncompleteModal.unmarked} participant${attendanceIncompleteModal.unmarked !== 1 ? 's have' : ' has'} not been marked present or absent yet.\n\nPlease mark attendance for all participants before completing this training.`}
+        confirmText="Go to Attendance"
+        onConfirm={() => {
+          const activity = attendanceIncompleteModal.activity
+          setAttendanceIncompleteModal({ isOpen: false, activity: null, unmarked: 0 })
+          if (activity) {
+            setSelectedTraining(activity)
+            setAction('view_trainings')
+            setTrainingSubView('view_participants')
+          }
+        }}
+        onCancel={() => setAttendanceIncompleteModal({ isOpen: false, activity: null, unmarked: 0 })}
+      />
+      <ConfirmModal
+        isOpen={deleteBatchConfirm !== null}
+        type="confirm"
+        title="Delete Batch?"
+        message={deleteBatchConfirm ? `Are you sure you want to delete "${deleteBatchConfirm.batchName}"? This will move the batch to the recycle bin.` : ''}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={proceedDeleteBatch}
+        onCancel={() => setDeleteBatchConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        confirmText="OK"
+        onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   )

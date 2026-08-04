@@ -8,7 +8,7 @@ import { renderAsync } from 'docx-preview'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
-import { useDocuments } from '../../contexts/DocumentsContext'
+import { useDocuments, IMAGE_TYPES } from '../../contexts/DocumentsContext'
 import * as documentsService from '../../services/documentsService'
 import ConfirmModal from '../shared/ConfirmModal'
 
@@ -130,7 +130,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       case 'pdf': return <FileText size={size} className="text-red-500" />
       case 'doc': case 'docx': return <FileText size={size} className="text-blue-500" />
       case 'xls': case 'xlsx': return <FileSpreadsheet size={size} className="text-green-600" />
-      case 'jpg': case 'png': return <ImageIcon size={size} className="text-purple-500" />
+      case 'ppt': case 'pptx': return <FileText size={size} className="text-orange-500" />
+      case 'txt': return <FileText size={size} className="text-gray-500" />
+      case 'jpg': case 'jpeg': case 'png': case 'gif': case 'webp': case 'bmp': case 'svg':
+        return <ImageIcon size={size} className="text-purple-500" />
       default: return <File size={size} className="text-gray-500" />
     }
   }
@@ -668,7 +671,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             <div className="flex-1 overflow-auto bg-gray-900 rounded-b-xl flex items-center justify-center p-4">
               {filePreview.type === 'pdf' ? (
                 <embed src={filePreview.fileUrl} type="application/pdf" className="w-full h-full rounded bg-white" />
-              ) : (filePreview.type === 'jpg' || filePreview.type === 'png' || filePreview.type === 'other') ? (
+              ) : (IMAGE_TYPES as string[]).includes(filePreview.type) ? (
                 <img src={filePreview.fileUrl} alt={filePreview.fileName} className="max-w-full max-h-[70vh] object-contain rounded shadow-lg" />
               ) : (
                 <div className="text-center text-white">

@@ -3,7 +3,7 @@ import { fmtDate } from '../../utils/formatDate'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import * as clpepService from '../../services/clpepService'
 import { useCLPEP } from '../../contexts/CLPEPContext'
 import type { CLPEPApplicant, CLPEPIntervention } from '../../contexts/CLPEPContext'
@@ -840,6 +840,8 @@ export default function CLPEPTab() {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
 
   const availableFilters: FilterOption[] = useMemo(() => [
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
@@ -850,9 +852,9 @@ export default function CLPEPTab() {
       await clpepService.createProfile(data)
       await refreshProfiles()
       setIsAddOpen(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Beneficiary profile has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save profile.') })
     }
   }
 
@@ -862,29 +864,26 @@ export default function CLPEPTab() {
       await clpepService.updateProfile(editingBeneficiary.id, data)
       await refreshProfiles()
       setEditingBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Beneficiary profile has been updated successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update profile.') })
     }
   }
 
-  async function handleConfirmRemove(id: number, name: string) {
-    const result = await Swal.fire({
-      title: 'Remove Beneficiary?',
-      text: `This will move ${name} to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, remove',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-    })
-    if (!result.isConfirmed) return
+  function handleConfirmRemove(id: number, name: string) {
+    setRemoveConfirm({ id, name })
+  }
+
+  async function proceedRemove() {
+    if (!removeConfirm) return
+    const { id, name } = removeConfirm
+    setRemoveConfirm(null)
     try {
       await clpepService.deleteProfile(id)
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Removed', text: `${name} moved to the recycle bin.`, timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: `${name} moved to the recycle bin.` })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove beneficiary.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove beneficiary.') })
     }
   }
 
@@ -896,9 +895,9 @@ export default function CLPEPTab() {
       await refreshProfiles()
       await refreshInterventions()
       setAssigningBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'Beneficiary assigned successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'Beneficiary assigned successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign intervention.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to assign intervention.') })
     } finally {
       setIsAssigning(false)
     }
@@ -912,9 +911,9 @@ export default function CLPEPTab() {
       await refreshProfiles()
       await refreshInterventions()
       setAssigningBeneficiary(null)
-      Swal.fire({ icon: 'success', title: 'Removed', text: 'Assigned intervention has been removed.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'Assigned intervention has been removed.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -1132,7 +1131,16 @@ export default function CLPEPTab() {
           onViewAssignedIntervention={setViewingAssignedIntervention}
         />
       </div>
-
+      <ConfirmModal
+        isOpen={removeConfirm !== null} type="confirm"
+        title="Remove Beneficiary?" message={removeConfirm ? `This will move ${removeConfirm.name} to the recycle bin.` : ''}
+        confirmText="Yes, remove" cancelText="Cancel"
+        onConfirm={proceedRemove} onCancel={() => setRemoveConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

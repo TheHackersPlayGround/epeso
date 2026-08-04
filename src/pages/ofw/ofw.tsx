@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import Swal from 'sweetalert2'
 import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
+import ConfirmModal from '../shared/ConfirmModal'
 import { canManage } from '../../utils/permissions'
 import * as XLSX from 'xlsx'
 import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
@@ -142,6 +142,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
     newStatus: OFWProfile['status']
     label: string
   } | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<OFWProfile | null>(null)
 
   // Search & filter
   const [searchTerm, setSearchTerm] = useState('')
@@ -208,9 +210,9 @@ export default function OFWView({ onBack }: OFWViewProps) {
       await ofwService.createProfile(toApiPayload(data))
       await refreshProfiles()
       setShowAddForm(false)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'OFW profile has been added successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'OFW profile has been added successfully.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to save profile.') })
     }
   }
 
@@ -220,30 +222,26 @@ export default function OFWView({ onBack }: OFWViewProps) {
       await refreshProfiles()
       setEditProfile(null)
       setViewProfile(null)
-      Swal.fire({ icon: 'success', title: 'Success', text: 'OFW profile has been updated successfully.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'OFW profile has been updated successfully.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update profile.') })
     }
   }
 
-  const handleDeleteProfile = async (profile: OFWProfile) => {
-    const result = await Swal.fire({
-      title: 'Delete Profile?',
-      text: `Are you sure you want to delete "${profile.name}" (${profile.referenceNumber})? This will move the profile to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+  const handleDeleteProfile = (profile: OFWProfile) => {
+    setDeleteConfirmProfile(profile)
+  }
+
+  const confirmDeleteProfile = async () => {
+    const profile = deleteConfirmProfile
+    if (!profile) return
+    setDeleteConfirmProfile(null)
     try {
       await ofwService.deleteProfile(profile.id)
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The profile has been deleted and moved to the recycle bin.', confirmButtonColor: '#0077BE', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The profile has been deleted and moved to the recycle bin.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete profile.') })
     }
   }
 
@@ -258,17 +256,13 @@ export default function OFWView({ onBack }: OFWViewProps) {
       await ofwService.updateStatus(profile.id, newStatus)
       await refreshProfiles()
       setPendingStatusChange(null)
-      Swal.fire({
-        icon: newStatus === 'Rejected' ? 'error' : 'success',
-        title: 'Status Updated',
-        text: `${profile.name}'s request is now ${newStatus}.`,
-        confirmButtonColor: '#0077BE',
-        timer: 2000,
-        timerProgressBar: true,
+      setResultModal({
+        isOpen: true, type: newStatus === 'Rejected' ? 'error' : 'success', title: 'Status Updated',
+        message: `${profile.name}'s request is now ${newStatus}.`,
       })
     } catch (e) {
       setPendingStatusChange(null)
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update status.') })
     }
   }
 
@@ -720,6 +714,17 @@ export default function OFWView({ onBack }: OFWViewProps) {
           </div>
         )
       })()}
+      <ConfirmModal
+        isOpen={deleteConfirmProfile !== null} type="confirm"
+        title="Delete Profile?"
+        message={deleteConfirmProfile ? `Are you sure you want to delete "${deleteConfirmProfile.name}" (${deleteConfirmProfile.referenceNumber})? This will move the profile to the recycle bin.` : ''}
+        confirmText="Yes, Delete" cancelText="Cancel"
+        onConfirm={confirmDeleteProfile} onCancel={() => setDeleteConfirmProfile(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

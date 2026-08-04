@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { X, Briefcase, Plus } from 'lucide-react';
-import Swal from 'sweetalert2';
+import ConfirmModal from '../../shared/ConfirmModal';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../services/locationService';
@@ -43,6 +43,7 @@ type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'jobOpenings
 
 export default function EditEmployerSidebar({ initialData, onSave, onClose }: EditEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
+  const [saveConfirm, setSaveConfirm] = useState(false);
   const [formData, setFormData] = useState<EmployerFormData>({
     ...initialData,
     barangayId: initialData.barangayId ?? null,
@@ -142,17 +143,11 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
       return;
     }
 
-    const result = await Swal.fire({
-      icon: 'question',
-      title: 'Save Changes?',
-      text: "Are you sure you want to save the changes made to this employer's information?",
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Save',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#0077BE',
-      cancelButtonColor: '#6b7280',
-    });
-    if (!result.isConfirmed) return;
+    setSaveConfirm(true);
+  };
+
+  const confirmSave = () => {
+    setSaveConfirm(false);
     // The parent persists, closes this sidebar, and shows the success alert.
     onSave(formData);
   };
@@ -459,7 +454,12 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
           </div>
         </div>
       </div>
-
+      <ConfirmModal
+        isOpen={saveConfirm} type="confirm" confirmVariant="brand"
+        title="Save Changes?" message="Are you sure you want to save the changes made to this employer's information?"
+        confirmText="Yes, Save" cancelText="Cancel"
+        onConfirm={confirmSave} onCancel={() => setSaveConfirm(false)}
+      />
     </>
   );
 }

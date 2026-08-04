@@ -1,10 +1,10 @@
 ﻿import { useState, useRef } from 'react';
-import Swal from 'sweetalert2';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../../services/locationService';
 import ApplicantReviewModal from '../shared/ApplicantReviewModal';
+import ConfirmModal from '../../shared/ConfirmModal';
 import { createDefaultApplicantFormData } from './applicantDefaults';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 
@@ -206,6 +206,8 @@ interface UploadedDocument {
 export default function AddApplicantSidebar({ onSave, onClose, initialData, isEditMode = false }: AddApplicantSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' });
+  const [warningModal, setWarningModal] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' });
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>(
     initialData?.savedDocuments?.map(d => ({ id: d.id, documentType: d.documentType, customName: d.customName, fileName: d.fileName, fileSize: d.fileSize, url: d.url })) ?? []
   );
@@ -323,18 +325,15 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     try {
       // onSave persists to the backend; await so a failure doesn't show success.
       await onSave({ ...formData, profileImage });
-      await Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: isEditMode
+      setResultModal({
+        isOpen: true, type: 'success', title: 'Success!',
+        message: isEditMode
           ? 'Applicant profile has been successfully updated.'
           : 'Applicant has been successfully added to the system.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
       });
       onClose();
     } catch {
-      Swal.fire({ icon: 'error', title: 'Save failed', text: 'Could not save the applicant. Please try again.' });
+      setResultModal({ isOpen: true, type: 'error', title: 'Save failed', message: 'Could not save the applicant. Please try again.' });
     }
   };
 
@@ -410,13 +409,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
     // Validation: Check if document type is selected
     if (!currentDocType) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a document type first.', confirmButtonColor: '#0077BE' });
+      setWarningModal({ isOpen: true, title: 'Required', message: 'Please select a document type first.' });
       return;
     }
 
     // Validation: If "Others" is selected, check if custom name is provided
     if (currentDocType === 'Others (Specify)' && !currentCustomName.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Required', text: 'Please specify the document name for "Others".', confirmButtonColor: '#0077BE' });
+      setWarningModal({ isOpen: true, title: 'Required', message: 'Please specify the document name for "Others".' });
       return;
     }
 
@@ -434,7 +433,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     ];
     const allowedExt = /\.(pdf|jpe?g|png|docx?|xlsx?)$/i;
     if (!allowedTypes.includes(file.type) && !allowedExt.test(file.name)) {
-      Swal.fire({ icon: 'warning', title: 'Invalid File Type', text: 'Only PDF, Word, Excel, JPG, and PNG files are allowed.', confirmButtonColor: '#0077BE' });
+      setWarningModal({ isOpen: true, title: 'Invalid File Type', message: 'Only PDF, Word, Excel, JPG, and PNG files are allowed.' });
       return;
     }
 
@@ -2136,11 +2135,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   onClick={(e) => {
                     if (!currentDocType || (currentDocType === 'Others (Specify)' && !currentCustomName.trim())) {
                       e.preventDefault();
-                      Swal.fire({
-                        icon: 'warning',
-                        title: 'Required',
-                        text: 'Please select a document type' + (currentDocType === 'Others (Specify)' ? ' and specify the document name' : '') + ' first.',
-                        confirmButtonColor: '#0077BE',
+                      setWarningModal({
+                        isOpen: true, title: 'Required',
+                        message: 'Please select a document type' + (currentDocType === 'Others (Specify)' ? ' and specify the document name' : '') + ' first.',
                       });
                     }
                   }}
@@ -2536,7 +2533,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         onConfirm={handleConfirmSave}
       />
 
-      {/* Success Modal */}
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
+      <ConfirmModal
+        isOpen={warningModal.isOpen} type="error" title={warningModal.title} message={warningModal.message}
+        confirmText="OK" onConfirm={() => setWarningModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Document Preview Modal */}
       {previewDocument && (

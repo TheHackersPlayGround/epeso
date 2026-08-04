@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
@@ -134,6 +134,9 @@ export default function CDSPMaintenanceForm() {
     nextStatus: ActivityStatus
     label: string
   } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<CdspActivity | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [attendanceIncompleteModal, setAttendanceIncompleteModal] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' })
 
   // Field-level validation (activity form + add-service form)
   const { clearFieldError, errCls, fieldMessage, runValidation, setFieldErrors } = useFieldValidation()
@@ -163,7 +166,7 @@ export default function CDSPMaintenanceForm() {
         p.beneficiaryServiceId === beneficiaryServiceId ? { ...p, attended: value } : p
       ))
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update attendance.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to update attendance.' })
     }
   }
 
@@ -264,17 +267,17 @@ export default function CDSPMaintenanceForm() {
     try {
       if (editingId !== null) {
         await cdspService.updateActivity(editingId, payload)
-        Swal.fire({ icon: 'success', title: 'Activity Updated', text: 'The activity has been updated.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+        setResultModal({ isOpen: true, type: 'success', title: 'Activity Updated', message: 'The activity has been updated.' })
       } else {
         await cdspService.createActivity(payload)
-        Swal.fire({ icon: 'success', title: 'Activity Added', text: 'New CDSP activity has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+        setResultModal({ isOpen: true, type: 'success', title: 'Activity Added', message: 'New CDSP activity has been saved.' })
       }
       await refreshActivities()
       await refreshProfiles()
       goToList()
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to save activity.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     } finally {
       setIsSaving(false)
     }
@@ -285,27 +288,23 @@ export default function CDSPMaintenanceForm() {
       await cdspService.deleteActivity(id)
       await refreshActivities()
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The activity has been deleted.', confirmButtonColor: '#0077BE', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The activity has been deleted.' })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? 'Failed to delete activity.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
 
-  const confirmDelete = async (a: CdspActivity) => {
+  const confirmDelete = (a: CdspActivity) => {
     setOpenMenuId(null)
-    const result = await Swal.fire({
-      title: 'Delete Activity?',
-      text: `Are you sure you want to delete "${a.title}"? This will move the activity to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
-    await handleDelete(a.id)
+    setDeleteConfirm(a)
+  }
+
+  const proceedDelete = async () => {
+    if (!deleteConfirm) return
+    const id = deleteConfirm.id
+    setDeleteConfirm(null)
+    await handleDelete(id)
   }
 
   const handleStatusChange = async () => {
@@ -318,12 +317,9 @@ export default function CDSPMaintenanceForm() {
         const participants: ParticipantRecord[] = res.data ?? []
         const unmarked = participants.filter(p => p.attended === null).length
         if (unmarked > 0) {
-          await Swal.fire({
-            icon: 'warning',
-            title: 'Attendance Incomplete',
-            html: `<b>${unmarked} participant${unmarked !== 1 ? 's have' : ' has'}</b> not been marked present or absent yet.<br><br>Please mark attendance for all participants before completing this activity.`,
-            confirmButtonText: 'Go to Attendance',
-            confirmButtonColor: '#0077BE',
+          setAttendanceIncompleteModal({
+            isOpen: true,
+            message: `${unmarked} participant${unmarked !== 1 ? 's have' : ' has'} not been marked present or absent yet.\n\nPlease mark attendance for all participants before completing this activity.`,
           })
           setStatusConfirm(null)
           setSelectedActivity(activity)
@@ -337,10 +333,10 @@ export default function CDSPMaintenanceForm() {
       await cdspService.updateActivityStatus(activity.id, nextStatus)
       await refreshActivities()
       await refreshProfiles()
-      Swal.fire({ icon: 'success', title: 'Status Updated', text: `Activity is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setResultModal({ isOpen: true, type: 'success', title: 'Status Updated', message: `Activity is now ${nextStatus}.` })
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (e as { message?: string })?.message ?? `Failed to ${label.toLowerCase()}.`
-      Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     } finally {
       setStatusConfirm(null)
     }
@@ -912,6 +908,7 @@ export default function CDSPMaintenanceForm() {
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="pb-8">
       {action !== 'view_participants' && action !== 'view_activity' && action !== 'edit_activity' && renderLanding()}
 
@@ -1001,5 +998,20 @@ export default function CDSPMaintenanceForm() {
         )
       })()}
     </div>
+    <ConfirmModal
+      isOpen={deleteConfirm !== null} type="confirm"
+      title="Delete Activity?" message={deleteConfirm ? `Are you sure you want to delete "${deleteConfirm.title}"? This will move the activity to the recycle bin.` : ''}
+      confirmText="Yes, Delete" cancelText="Cancel"
+      onConfirm={proceedDelete} onCancel={() => setDeleteConfirm(null)}
+    />
+    <ConfirmModal
+      isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+      confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+    />
+    <ConfirmModal
+      isOpen={attendanceIncompleteModal.isOpen} type="error" title="Attendance Incomplete" message={attendanceIncompleteModal.message}
+      confirmText="Go to Attendance" onConfirm={() => setAttendanceIncompleteModal({ isOpen: false, message: '' })} onCancel={() => setAttendanceIncompleteModal({ isOpen: false, message: '' })}
+    />
+    </>
   )
 }

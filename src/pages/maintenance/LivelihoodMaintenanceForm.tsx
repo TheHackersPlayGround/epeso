@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
@@ -198,6 +198,9 @@ export default function LivelihoodMaintenanceForm() {
     nextStatus: ProjectStatus
     label: string
   } | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteConfirm, setDeleteConfirm] = useState<ProgramActivity | null>(null)
+  const [futureDateConfirm, setFutureDateConfirm] = useState(false)
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
@@ -419,10 +422,10 @@ export default function LivelihoodMaintenanceForm() {
       if (realId !== null) await dilpService.updateProject(realId, payload)
       else await dilpService.createProject(payload)
       await dilp.refreshProjects()
-      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New DILP project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setResultModal({ isOpen: true, type: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', message: realId !== null ? 'The project has been updated.' : 'New DILP project has been saved.' })
       goToList()
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to save project.' })
     } finally {
       setIsSaving(false)
     }
@@ -451,10 +454,10 @@ export default function LivelihoodMaintenanceForm() {
       if (realId !== null) await tupadService.updateProject(realId, payload)
       else await tupadService.createProject(payload)
       await tupad.refreshProjects()
-      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New TUPAD project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setResultModal({ isOpen: true, type: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', message: realId !== null ? 'The project has been updated.' : 'New TUPAD project has been saved.' })
       goToList()
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to save project.' })
     } finally {
       setIsSaving(false)
     }
@@ -462,10 +465,10 @@ export default function LivelihoodMaintenanceForm() {
 
   const handleSaveClpepIntervention = async () => {
     if (isSaving) return
-    if (!clpepFormData.interventionName.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Intervention Name.', confirmButtonColor: '#0077BE' }); return }
-    if (!clpepFormData.interventionCategory) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select an Intervention Category.', confirmButtonColor: '#0077BE' }); return }
-    if (!clpepFormData.date) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter a Date.', confirmButtonColor: '#0077BE' }); return }
-    if (!clpepFormData.implementingOfficer.trim()) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please enter an Implementing Officer.', confirmButtonColor: '#0077BE' }); return }
+    if (!clpepFormData.interventionName.trim()) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter an Intervention Name.' }); return }
+    if (!clpepFormData.interventionCategory) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please select an Intervention Category.' }); return }
+    if (!clpepFormData.date) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter a Date.' }); return }
+    if (!clpepFormData.implementingOfficer.trim()) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter an Implementing Officer.' }); return }
 
     const realId = editingId !== null ? editingId - CLPEP_ID_OFFSET : null
     const payload = {
@@ -487,10 +490,10 @@ export default function LivelihoodMaintenanceForm() {
       if (realId !== null) await clpepService.updateIntervention(realId, payload)
       else await clpepService.createIntervention(payload)
       await clpep.refreshInterventions()
-      Swal.fire({ icon: 'success', title: realId !== null ? 'Intervention Updated' : 'Intervention Added', text: realId !== null ? 'The intervention has been updated.' : 'New CLPEP intervention has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setResultModal({ isOpen: true, type: 'success', title: realId !== null ? 'Intervention Updated' : 'Intervention Added', message: realId !== null ? 'The intervention has been updated.' : 'New CLPEP intervention has been saved.' })
       goToList()
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save intervention.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to save intervention.' })
     } finally {
       setIsSaving(false)
     }
@@ -499,24 +502,19 @@ export default function LivelihoodMaintenanceForm() {
   // Required-field / name-character validation now happens inside SLPForm
   // itself -- it guards its own Save button and only calls this via onSave()
   // once valid, so no duplicate checks are needed here.
-  const handleSaveSlpProject = async () => {
+  const handleSaveSlpProject = () => {
     if (isSaving) return
     // Status is a manual staff judgment call, not derived -- this is a soft
     // nudge (not a block) for the case where Ongoing/Completed is picked
     // before the project's own Date Started has actually arrived yet.
     if ((slpFormData.status === 'Ongoing' || slpFormData.status === 'Completed') && slpFormData.dateStarted > todayIso()) {
-      const confirm = await Swal.fire({
-        icon: 'warning',
-        title: 'Date Started is in the future',
-        text: `This project's Date Started (${slpFormData.dateStarted}) hasn't happened yet. Mark it as ${slpFormData.status} anyway?`,
-        showCancelButton: true,
-        confirmButtonText: `Yes, mark as ${slpFormData.status}`,
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#0077BE',
-      })
-      if (!confirm.isConfirmed) return
+      setFutureDateConfirm(true)
+      return
     }
+    doSaveSlpProject()
+  }
 
+  const doSaveSlpProject = async () => {
     const realId = editingId !== null ? editingId - SLP_ID_OFFSET : null
     const payload = {
       projectName:      slpFormData.projectName.trim(),
@@ -535,17 +533,17 @@ export default function LivelihoodMaintenanceForm() {
       if (realId !== null) await slpService.updateProject(realId, payload)
       else await slpService.createProject(payload)
       await slp.refreshProjects()
-      Swal.fire({ icon: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', text: realId !== null ? 'The project has been updated.' : 'New SLP project has been saved.', confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+      setResultModal({ isOpen: true, type: 'success', title: realId !== null ? 'Project Updated' : 'Project Added', message: realId !== null ? 'The project has been updated.' : 'New SLP project has been saved.' })
       goToList()
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to save project.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to save project.' })
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleSave = () => {
-    if (!selectedService) { Swal.fire({ icon: 'warning', title: 'Required', text: 'Please select a service type.', confirmButtonColor: '#0077BE' }); return }
+    if (!selectedService) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please select a service type.' }); return }
 
     if (selectedService === 'DILEEP (DILP)') { handleSaveDilpProject(); return }
     if (selectedService === 'DILEEP (TUPAD)') { handleSaveTupadProject(); return }
@@ -573,25 +571,21 @@ export default function LivelihoodMaintenanceForm() {
       } else {
         setActivities(prev => prev.filter(a => a.id !== id))
       }
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'The project has been deleted.', confirmButtonColor: '#0077BE', timer: 1500, showConfirmButton: false })
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The project has been deleted.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to delete project.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to delete project.' })
     }
   }
 
-  const confirmDelete = async (a: ProgramActivity) => {
+  const confirmDelete = (a: ProgramActivity) => {
     setOpenMenuId(null)
-    const result = await Swal.fire({
-      title: 'Delete Project?',
-      text: `Are you sure you want to delete "${a.title}"? This will move the project to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+    setDeleteConfirm(a)
+  }
+
+  const proceedDelete = async () => {
+    if (!deleteConfirm) return
+    const a = deleteConfirm
+    setDeleteConfirm(null)
     await handleDelete(a.id)
   }
 
@@ -622,11 +616,11 @@ export default function LivelihoodMaintenanceForm() {
         setActivities(prev => prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a))
       }
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: (e as { message?: string })?.message ?? 'Failed to update status.', confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to update status.' })
       setStatusConfirm(null)
       return
     }
-    Swal.fire({ icon: 'success', title: 'Status Updated', text: `Project is now ${nextStatus}.`, confirmButtonColor: '#0077BE', timer: 2000, timerProgressBar: true })
+    setResultModal({ isOpen: true, type: 'success', title: 'Status Updated', message: `Project is now ${nextStatus}.` })
     setStatusConfirm(null)
   }
 
@@ -1266,6 +1260,37 @@ export default function LivelihoodMaintenanceForm() {
           </div>
         )
       })()}
+
+      <ConfirmModal
+        isOpen={futureDateConfirm}
+        type="confirm"
+        title="Date Started is in the future"
+        message={`This project's Date Started (${slpFormData.dateStarted}) hasn't happened yet. Mark it as ${slpFormData.status} anyway?`}
+        confirmText={`Yes, mark as ${slpFormData.status}`}
+        cancelText="Cancel"
+        confirmVariant="brand"
+        onConfirm={() => { setFutureDateConfirm(false); doSaveSlpProject() }}
+        onCancel={() => setFutureDateConfirm(false)}
+      />
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        type="confirm"
+        title="Delete Project?"
+        message={deleteConfirm ? `Are you sure you want to delete "${deleteConfirm.title}"? This will move the project to the recycle bin.` : ''}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={proceedDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        confirmText="OK"
+        onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

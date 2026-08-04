@@ -12,7 +12,7 @@ import {
   type Promotion,
   type PromotionInput,
 } from '../../services/placementService'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
@@ -852,6 +852,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null)
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
   const [promotingPlacement, setPromotingPlacement] = useState<Placement | null>(null)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
 
   async function reload() {
     const data = await listPlacements()
@@ -899,7 +900,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to update placement status. Please try again.'
-      Swal.fire('Error', msg, 'error')
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
       throw err // keep the Update Status modal open so the user can retry
     }
 
@@ -913,13 +914,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
       Completed:  { title: 'Status Updated', text: `${name}'s placement has been marked as Completed.` },
     }
     const note = notes[newStatus]
-    Swal.fire({
-      icon: 'success',
-      title: note.title,
-      text: note.text,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+    setResultModal({ isOpen: true, type: 'success', title: note.title, message: note.text })
   }
 
   async function handleRecordPromotion(id: number, input: PromotionInput) {
@@ -930,7 +925,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to record promotion. Please try again.'
-      Swal.fire('Error', msg, 'error')
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
       throw err // keep the Record Promotion modal open so the user can retry
     }
 
@@ -938,13 +933,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     // local optimistic merge can't reproduce it correctly — reload instead.
     await reload()
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Promotion Recorded',
-      text: `${name} has been promoted to ${input.newJobTitle}.`,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#0077BE',
-    })
+    setResultModal({ isOpen: true, type: 'success', title: 'Promotion Recorded', message: `${name} has been promoted to ${input.newJobTitle}.` })
   }
 
   // ── Export helpers ─────────────────────────────────────────────────────────
@@ -1105,6 +1094,10 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
           onSave={handleRecordPromotion}
         />
       )}
+      <ConfirmModal
+        isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
+        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

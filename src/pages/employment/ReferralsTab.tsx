@@ -487,6 +487,7 @@ export default function ReferralsTab() {
     try {
       await deleteReferral(id)
       setReferrals(prev => prev.filter(r => r.id !== id))
+      setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'The referral has been removed.' })
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to remove referral. Please try again.'

@@ -331,7 +331,6 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           ? 'Applicant profile has been successfully updated.'
           : 'Applicant has been successfully added to the system.',
       });
-      onClose();
     } catch {
       setResultModal({ isOpen: true, type: 'error', title: 'Save failed', message: 'Could not save the applicant. Please try again.' });
     }
@@ -2535,7 +2534,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
 
       <ConfirmModal
         isOpen={resultModal.isOpen} type={resultModal.type} title={resultModal.title} message={resultModal.message}
-        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        confirmText="OK"
+        onConfirm={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
+        onCancel={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
       />
       <ConfirmModal
         isOpen={warningModal.isOpen} type="error" title={warningModal.title} message={warningModal.message}

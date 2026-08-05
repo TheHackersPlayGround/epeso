@@ -485,6 +485,7 @@ export default function SkillsTrainingMaintenanceForm() {
       await skillsTrainingService.deleteActivity(trainingDeleteConfirm)
       setTrainingDeleteConfirm(null)
       await Promise.all([refreshActivities(), refreshBatches()])
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The training has been deleted.' })
     } catch (e) {
       setTrainingDeleteConfirm(null)
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete training.') })

@@ -541,6 +541,7 @@ export default function EmployersTab() {
     try {
       await deleteEmployer(id)
       setEmployers(prev => prev.filter(e => e.id !== id))
+      setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The employer has been deleted and moved to the recycle bin.' })
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to delete employer.'

@@ -888,8 +888,17 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     id: number,
     updates: Pick<Placement, 'dateHired' | 'status'>,
   ) {
-    await updatePlacement(id, updates)
+    try {
+      await updatePlacement(id, updates)
+    } catch (err: unknown) {
+      // axiosClient's interceptor flattens backend errors into Error.message.
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to update placement. Please try again.'
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
+      throw err // keep the Edit Placement modal open so the user can retry
+    }
+
     setPlacements(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+    setResultModal({ isOpen: true, type: 'success', title: 'Placement Updated', message: 'The placement details have been updated successfully.' })
   }
 
   async function handleUpdateStatus(id: number, newStatus: Placement['status']) {

@@ -90,7 +90,6 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
       // onSave persists to the backend; await so success only shows on success.
       await onSave(formData);
       setResultModal({ isOpen: true, type: 'success', message: 'Employer has been successfully added to the system.' });
-      onClose();
     } catch {
       setResultModal({ isOpen: true, type: 'error', message: 'Could not save the employer. Please try again.' });
     }
@@ -506,7 +505,9 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
       <ConfirmModal
         isOpen={resultModal.isOpen} type={resultModal.type}
         title={resultModal.type === 'success' ? 'Success!' : 'Save failed'} message={resultModal.message}
-        confirmText="OK" onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        confirmText="OK"
+        onConfirm={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
+        onCancel={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
       />
 
     </>

@@ -160,6 +160,7 @@ function EditField({
 export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileViewProps) {
   const [user, setUser] = useState<ProfileUser>(getCurrentUser)
   const [saveError, setSaveError] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const isAdmin = user.role === 'Administrator'
   const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
   const fullName = `${user.firstName} ${user.lastName}`
@@ -211,6 +212,7 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
       try { localStorage.setItem('peso_current_user', JSON.stringify(draft)) } catch { /* quota */ }
       onNameChange?.(draft.firstName)
       setIsEditing(false)
+      setSaveSuccess(true)
     } catch {
       setSaveError(true)
     }
@@ -415,6 +417,11 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
       isOpen={saveError} type="error" title="Save failed"
       message="Could not update your profile. Please try again."
       confirmText="OK" onConfirm={() => setSaveError(false)} onCancel={() => setSaveError(false)}
+    />
+    <ConfirmModal
+      isOpen={saveSuccess} type="success" title="Success!"
+      message="Your profile has been updated successfully."
+      confirmText="OK" onConfirm={() => setSaveSuccess(false)} onCancel={() => setSaveSuccess(false)}
     />
     </>
   )

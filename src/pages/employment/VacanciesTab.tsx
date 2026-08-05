@@ -1022,7 +1022,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     setFilterValues((prev) => ({ ...prev, [id]: value }))
   }
 
-  async function handleToggleStatus(id: number, _currentStatus: Vacancy['status']) {
+  async function handleToggleStatus(id: number, currentStatus: Vacancy['status']) {
     try {
       await toggleVacancyStatus(id)
       // Reload so the derived fields (effective status, remaining) recompute — a
@@ -1030,6 +1030,10 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       // full vacancy stays Closed), so an optimistic single-field update is unsafe.
       const fresh = await listVacancies()
       setVacancies(fresh)
+      setConfirmModal({
+        isOpen: true, type: 'success', title: 'Status Updated',
+        message: currentStatus === 'Open' ? 'The vacancy has been closed.' : 'The vacancy has been re-opened.',
+      })
     } catch {
       setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to update vacancy status.' })
     }

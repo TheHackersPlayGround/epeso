@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Plus, FolderOpen, PlusCircle, MoreHorizontal,
   Edit2, Trash2, CheckCircle, PlayCircle, RefreshCw, ClipboardList,
@@ -105,6 +105,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const [spesParticipantPerPage, setSpesParticipantPerPage] = useState(10)
   const [gipParticipantPage, setGipParticipantPage] = useState(1)
   const [gipParticipantPerPage, setGipParticipantPerPage] = useState(10)
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  const [deleteSpesBatchConfirm, setDeleteSpesBatchConfirm] = useState<{ id: number; batchName: string } | null>(null)
+  const [deleteGipBatchConfirm, setDeleteGipBatchConfirm] = useState<{ id: number; batchName: string } | null>(null)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -135,15 +138,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       await spesApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshSpesBatches()
       setSpesAction('')
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Added',
-        text: 'New SPES batch has been added successfully.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Added', message: 'New SPES batch has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to save batch.') })
     } finally {
       setIsSavingSpesBatch(false)
     }
@@ -158,15 +155,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       await refreshSpesProfiles()
       setSpesBatchAction('')
       setSelectedBatch(null)
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Updated',
-        text: 'Batch details have been saved successfully.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Updated', message: 'Batch details have been saved successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to update batch.') })
     } finally {
       setIsSavingSpesBatch(false)
     }
@@ -176,31 +167,21 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     try {
       await spesApiService.deleteBatch(batchId)
       await refreshSpesBatches()
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Deleted',
-        text: 'SPES batch has been deleted.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Deleted', message: 'SPES batch has been deleted.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: '#0077BE' })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to delete batch.') })
     }
   }
 
-  const confirmDeleteSpesBatch = async (b: { id: number; batchName: string }) => {
+  const confirmDeleteSpesBatch = (b: { id: number; batchName: string }) => {
     setOpenMenuId(null)
-    const result = await Swal.fire({
-      title: 'Delete SPES Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+    setDeleteSpesBatchConfirm(b)
+  }
+
+  const proceedDeleteSpesBatch = async () => {
+    if (!deleteSpesBatchConfirm) return
+    const b = deleteSpesBatchConfirm
+    setDeleteSpesBatchConfirm(null)
     await handleDeleteSpesBatch(b.id)
   }
 
@@ -217,15 +198,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       await gipApiService.createBatch(data as unknown as Record<string, unknown>)
       await refreshGipBatches()
       setGipAction('')
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Added',
-        text: 'New GIP batch has been added successfully.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: GIP_CONFIRM_COLOR,
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Added', message: 'New GIP batch has been added successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to save batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to save batch.') })
     } finally {
       setIsSavingGipBatch(false)
     }
@@ -240,15 +215,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       await refreshGipProfiles()
       setGipBatchAction('')
       setSelectedGipBatch(null)
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Updated',
-        text: 'Batch details have been saved successfully.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: GIP_CONFIRM_COLOR,
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Updated', message: 'Batch details have been saved successfully.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to update batch.') })
     } finally {
       setIsSavingGipBatch(false)
     }
@@ -258,31 +227,21 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     try {
       await gipApiService.deleteBatch(batchId)
       await refreshGipBatches()
-      Swal.fire({
-        icon: 'success',
-        title: 'Batch Deleted',
-        text: 'GIP batch has been deleted.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: GIP_CONFIRM_COLOR,
-      })
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Deleted', message: 'GIP batch has been deleted.' })
     } catch (e: unknown) {
-      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to delete batch.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to delete batch.') })
     }
   }
 
-  const confirmDeleteGipBatch = async (b: { id: number; batchName: string }) => {
+  const confirmDeleteGipBatch = (b: { id: number; batchName: string }) => {
     setGipOpenMenuId(null)
-    const result = await Swal.fire({
-      title: 'Delete GIP Batch?',
-      text: `Are you sure you want to delete "${b.batchName}"? This will move the batch to the recycle bin.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
+    setDeleteGipBatchConfirm(b)
+  }
+
+  const proceedDeleteGipBatch = async () => {
+    if (!deleteGipBatchConfirm) return
+    const b = deleteGipBatchConfirm
+    setDeleteGipBatchConfirm(null)
     await handleDeleteGipBatch(b.id)
   }
 
@@ -1299,16 +1258,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       await refreshSpesBatches()
                       await refreshSpesProfiles()
                       setStatusConfirm(null)
-                      Swal.fire({
-                        icon: 'success',
-                        title: 'Status Updated',
-                        text: `Batch status changed to ${nextStatus}.`,
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: '#0077BE',
-                      })
+                      setResultModal({ isOpen: true, type: 'success', title: 'Status Updated', message: `Batch status changed to ${nextStatus}.` })
                     } catch (e: unknown) {
                       setStatusConfirm(null)
-                      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch status.'), confirmButtonColor: '#0077BE' })
+                      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to update batch status.') })
                     }
                   }}
                   className={`px-6 py-2.5 rounded-lg transition-colors font-medium ${confirmBtnClass}`}
@@ -1408,16 +1361,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       await refreshGipBatches()
                       await refreshGipProfiles()
                       setGipStatusConfirm(null)
-                      Swal.fire({
-                        icon: 'success',
-                        title: 'Status Updated',
-                        text: `Batch status changed to ${nextStatus}.`,
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: GIP_CONFIRM_COLOR,
-                      })
+                      setResultModal({ isOpen: true, type: 'success', title: 'Status Updated', message: `Batch status changed to ${nextStatus}.` })
                     } catch (e: unknown) {
                       setGipStatusConfirm(null)
-                      Swal.fire({ icon: 'error', title: 'Error', text: apiErrMsg(e, 'Failed to update batch status.'), confirmButtonColor: GIP_CONFIRM_COLOR })
+                      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: apiErrMsg(e, 'Failed to update batch status.') })
                     }
                   }}
                   className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white"
@@ -1431,6 +1378,35 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         )
       })()}
 
+      <ConfirmModal
+        isOpen={deleteSpesBatchConfirm !== null}
+        type="confirm"
+        title="Delete SPES Batch?"
+        message={deleteSpesBatchConfirm ? `Are you sure you want to delete "${deleteSpesBatchConfirm.batchName}"? This will move the batch to the recycle bin.` : ''}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={proceedDeleteSpesBatch}
+        onCancel={() => setDeleteSpesBatchConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={deleteGipBatchConfirm !== null}
+        type="confirm"
+        title="Delete GIP Batch?"
+        message={deleteGipBatchConfirm ? `Are you sure you want to delete "${deleteGipBatchConfirm.batchName}"? This will move the batch to the recycle bin.` : ''}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={proceedDeleteGipBatch}
+        onCancel={() => setDeleteGipBatchConfirm(null)}
+      />
+      <ConfirmModal
+        isOpen={resultModal.isOpen}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        confirmText="OK"
+        onConfirm={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setResultModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

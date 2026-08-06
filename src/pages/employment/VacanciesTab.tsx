@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Download } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
@@ -8,7 +7,8 @@ import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from
 import { listEmployers } from '../../services/employerService'
 import { listApplicants } from '../../services/applicantService'
 import { createReferral } from '../../services/referralService'
-import { confirmReferralOk } from '../../utils/referralGuard'
+import { useReferralGuard } from '../../utils/referralGuard'
+import ConfirmModal from '../shared/ConfirmModal'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
@@ -246,38 +246,21 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
   function closeMenu() { setOpenMenuId(null) }
 
   const menuVacancy = vacancies.find((v) => v.id === openMenuId) ?? null
+  const [statusConfirm, setStatusConfirm] = useState<'close' | 'reopen' | null>(null)
 
-  async function handleConfirmClose() {
+  function handleConfirmClose() {
     if (!menuVacancy) return
-    const result = await Swal.fire({
-      title: 'Close Vacancy?',
-      text: `"${menuVacancy.jobTitle}" will no longer accept applicants.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Close',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
-    onToggleStatus(menuVacancy.id, menuVacancy.status)
-    closeMenu()
+    setStatusConfirm('close')
   }
 
-  async function handleConfirmReopen() {
+  function handleConfirmReopen() {
     if (!menuVacancy) return
-    const result = await Swal.fire({
-      title: 'Re-open Vacancy?',
-      text: `"${menuVacancy.jobTitle}" will be visible to applicants again.`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Re-open',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#0077BE',
-      cancelButtonColor: '#6b7280',
-    })
-    if (!result.isConfirmed) return
-    onToggleStatus(menuVacancy.id, menuVacancy.status)
+    setStatusConfirm('reopen')
+  }
+
+  function proceedStatusToggle() {
+    if (menuVacancy) onToggleStatus(menuVacancy.id, menuVacancy.status)
+    setStatusConfirm(null)
     closeMenu()
   }
   const showIndustry = activeFilters.includes('industry')
@@ -381,6 +364,16 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
           </div>
         </>
       )}
+      <ConfirmModal
+        isOpen={statusConfirm !== null} type="confirm"
+        confirmVariant={statusConfirm === 'reopen' ? 'brand' : 'danger'}
+        title={statusConfirm === 'reopen' ? 'Re-open Vacancy?' : 'Close Vacancy?'}
+        message={statusConfirm === 'reopen'
+          ? `"${menuVacancy?.jobTitle}" will be visible to applicants again.`
+          : `"${menuVacancy?.jobTitle}" will no longer accept applicants.`}
+        confirmText={statusConfirm === 'reopen' ? 'Yes, Re-open' : 'Yes, Close'} cancelText="Cancel"
+        onConfirm={proceedStatusToggle} onCancel={() => setStatusConfirm(null)}
+      />
     </>
   )
 }
@@ -460,6 +453,8 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
   const [applicants, setApplicants] = useState<SimpleApplicant[]>([])
   const [loadingApplicants, setLoadingApplicants] = useState(true)
   const [referred, setReferred] = useState<Set<number>>(new Set())
+  const [referralError, setReferralError] = useState(false)
+  const { confirmReferralOk, referralGuardModal } = useReferralGuard()
 
   useEffect(() => {
     listApplicants()
@@ -510,7 +505,7 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
                       await createReferral(applicant.id, vacancy.id)
                       setReferred(prev => new Set(prev).add(applicant.id))
                     } catch {
-                      Swal.fire('Error', 'Failed to create referral. The applicant may already be referred to this vacancy.', 'error')
+                      setReferralError(true)
                     }
                   }}
                   disabled={referred.has(applicant.id)}
@@ -534,6 +529,17 @@ function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose:
           </button>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={referralGuardModal.isOpen} type="confirm" confirmVariant="brand"
+        title="Possible duplicate referral" message={referralGuardModal.message}
+        confirmText="Yes, refer again" cancelText="Cancel"
+        onConfirm={referralGuardModal.onConfirm} onCancel={referralGuardModal.onCancel}
+      />
+      <ConfirmModal
+        isOpen={referralError} type="error" title="Error"
+        message="Failed to create referral. The applicant may already be referred to this vacancy."
+        confirmText="OK" onConfirm={() => setReferralError(false)} onCancel={() => setReferralError(false)}
+      />
     </div>
   )
 }
@@ -989,6 +995,9 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   const [currentPage, setCurrentPage] = useState(1)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [highlightedVacancyId, setHighlightedVacancyId] = useState<number | null>(null)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean; type: 'success' | 'error'; title: string; message: string
+  }>({ isOpen: false, type: 'success', title: '', message: '' })
 
   useEffect(() => {
     Promise.all([listVacancies(), listEmployers()])
@@ -996,7 +1005,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
         setVacancies(vacs)
         setEmployers(emps.map(e => ({ id: e.id, companyName: e.companyName })))
       })
-      .catch(() => Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load vacancies.' }))
+      .catch(() => setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load vacancies.' }))
       .finally(() => setLoading(false))
   }, [])
 
@@ -1013,7 +1022,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     setFilterValues((prev) => ({ ...prev, [id]: value }))
   }
 
-  async function handleToggleStatus(id: number, _currentStatus: Vacancy['status']) {
+  async function handleToggleStatus(id: number, currentStatus: Vacancy['status']) {
     try {
       await toggleVacancyStatus(id)
       // Reload so the derived fields (effective status, remaining) recompute — a
@@ -1021,8 +1030,12 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       // full vacancy stays Closed), so an optimistic single-field update is unsafe.
       const fresh = await listVacancies()
       setVacancies(fresh)
+      setConfirmModal({
+        isOpen: true, type: 'success', title: 'Status Updated',
+        message: currentStatus === 'Open' ? 'The vacancy has been closed.' : 'The vacancy has been re-opened.',
+      })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update vacancy status.' })
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to update vacancy status.' })
     }
   }
 
@@ -1059,17 +1072,11 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       await createVacancy(data)
       const fresh = await listVacancies()
       setVacancies(fresh)
-      await Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: 'Vacancy has been successfully added to the system.',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#0077BE',
-      })
+      setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'Vacancy has been successfully added to the system.' })
       setShowAddModal(false)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save vacancy.'
-      Swal.fire({ icon: 'error', title: 'Error', text: msg })
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
 
@@ -1197,17 +1204,11 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
               await updateVacancy(updated.id, updated)
               const fresh = await listVacancies()
               setVacancies(fresh)
-              await Swal.fire({
-                icon: 'success',
-                title: 'Success!',
-                text: 'Vacancy has been successfully updated.',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#0077BE',
-              })
+              setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'Vacancy has been successfully updated.' })
               setEditingVacancy(null)
             } catch (err: unknown) {
               const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update vacancy.'
-              Swal.fire({ icon: 'error', title: 'Error', text: msg })
+              setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
             }
           }}
         />
@@ -1219,6 +1220,10 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
           employers={employers}
         />
       )}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message}
+        confirmText="OK" onConfirm={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   )
 }

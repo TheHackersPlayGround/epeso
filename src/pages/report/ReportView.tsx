@@ -6,7 +6,7 @@ import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { registerPdfFont, PDF_FONT_FAMILY } from './fonts/registerPdfFont'
-import Swal from 'sweetalert2'
+import ConfirmModal from '../shared/ConfirmModal'
 import { fetchEfReport, fetchGeneralPesoReport } from '../../services/reportService'
 import { generatePesoMonthlyReport } from './pesoMonthlyReport'
 import { generateGeneralPesoWorkbook } from './generalPesoReport'
@@ -65,6 +65,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: slpApplicants, projects: slpProjects } = useSLP()
   const { applicants: clpepApplicants, interventions: clpepInterventions } = useCLPEP()
 
+  const [infoModal, setInfoModal] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' })
   const [reportCategory, setReportCategory] = useState<ReportCategory | ''>('')
   const [programType, setProgramType] = useState('')
   const [cdspReportType, setCdspReportType] = useState<'participants' | 'sessions'>('participants')
@@ -872,7 +873,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (reportPeriod === 'annual') {
       from = `${year}-01-01`; to = `${year}-12-31`; label = `Year ${year}`; phrase = `For the Year ${year}`
     } else if (reportPeriod === 'custom') {
-      if (!fromDate || !toDate) { Swal.fire('Error', 'Please select a From and To date.', 'error'); return }
+      if (!fromDate || !toDate) { setInfoModal({ isOpen: true, title: 'Error', message: 'Please select a From and To date.' }); return }
       from = fromDate; to = toDate
       const rangeLabel = `${formatLongDate(fromDate)} to ${formatLongDate(toDate)}`
       label = rangeLabel; phrase = `For the period ${rangeLabel}`
@@ -889,7 +890,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       await generatePesoMonthlyReport(data, label, phrase)
     } catch (err: unknown) {
       const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the PESO report.'
-      Swal.fire('Error', msg, 'error')
+      setInfoModal({ isOpen: true, title: 'Error', message: msg })
     } finally {
       setPesoLoading(false)
     }
@@ -903,14 +904,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // native chart instead of the generic ExcelJS table.
   const handleGenerateGeneralPesoReport = async () => {
     if (selectedGeneralPrograms.length === 0) {
-      Swal.fire('Error', 'Select at least one program to include.', 'error')
+      setInfoModal({ isOpen: true, title: 'Error', message: 'Select at least one program to include.' })
       return
     }
     let from: string, to: string
     if (reportPeriod === 'annual') {
       from = `${year}-01-01`; to = `${year}-12-31`
     } else if (reportPeriod === 'custom') {
-      if (!fromDate || !toDate) { Swal.fire('Error', 'Please select a From and To date.', 'error'); return }
+      if (!fromDate || !toDate) { setInfoModal({ isOpen: true, title: 'Error', message: 'Please select a From and To date.' }); return }
       from = fromDate; to = toDate
     } else {
       const m = Number(month)
@@ -975,7 +976,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       })
     } catch (err: unknown) {
       const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the report.'
-      Swal.fire('Error', msg, 'error')
+      setInfoModal({ isOpen: true, title: 'Error', message: msg })
     } finally {
       setGeneralPesoLoading(false)
     }
@@ -1698,7 +1699,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         a.employmentStatus || '-',
       ])
     if (roster.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Participants', text: 'This session has no participants assigned yet.', confirmButtonColor: '#0077BE' })
+      setInfoModal({ isOpen: true, title: 'No Participants', message: 'This session has no participants assigned yet.' })
       return
     }
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'Highest Education', 'Employment Status']
@@ -1812,7 +1813,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         a.highestEducation || '-',
       ])
     if (interns.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Interns', text: 'This batch has no interns assigned yet.', confirmButtonColor: '#0077BE' })
+      setInfoModal({ isOpen: true, title: 'No Interns', message: 'This batch has no interns assigned yet.' })
       return
     }
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'School Name', 'Course', 'Highest Education']
@@ -1917,7 +1918,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         a.course || '-',
       ])
     if (students.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Students', text: 'This batch has no students assigned yet.', confirmButtonColor: '#0077BE' })
+      setInfoModal({ isOpen: true, title: 'No Students', message: 'This batch has no students assigned yet.' })
       return
     }
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'School Name', 'Grade/Year Level', 'Course']
@@ -2123,7 +2124,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     }
 
     if (beneficiaries.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Beneficiaries', text: `This ${unit.toLowerCase()} has no beneficiaries assigned yet.`, confirmButtonColor: '#0077BE' })
+      setInfoModal({ isOpen: true, title: 'No Beneficiaries', message: `This ${unit.toLowerCase()} has no beneficiaries assigned yet.` })
       return
     }
 
@@ -2186,7 +2187,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         p.civilStatus || '-',
       ])
     if (participants.length === 0) {
-      Swal.fire({ icon: 'info', title: 'No Participants', text: 'This training has no participants assigned yet.', confirmButtonColor: '#0077BE' })
+      setInfoModal({ isOpen: true, title: 'No Participants', message: 'This training has no participants assigned yet.' })
       return
     }
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'Civil Status']
@@ -2240,6 +2241,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
@@ -2890,5 +2892,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </div>
       )}
     </div>
+    <ConfirmModal
+      isOpen={infoModal.isOpen} type="error" title={infoModal.title} message={infoModal.message}
+      confirmText="OK" onConfirm={() => setInfoModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setInfoModal(prev => ({ ...prev, isOpen: false }))}
+    />
+    </>
   )
 }

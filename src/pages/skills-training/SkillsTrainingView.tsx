@@ -7,7 +7,6 @@ import {
   ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import Swal from 'sweetalert2'
 import { canManage } from '../../utils/permissions'
 import type { SkillsTrainingProfile, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
@@ -15,7 +14,7 @@ import * as skillsTrainingService from '../../services/skillsTrainingService'
 import { downloadImportTemplate, importSkillsTrainingApplicants, type ImportResult } from './skillsTrainingImport'
 import ConfirmModal from '../shared/ConfirmModal'
 import SkillsTrainingProfileForm, {
-  ViewProfilePanel, BRAND,
+  ViewProfilePanel,
   CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, STATUS_OPTIONS, StatusBadge,
 } from './SkillsTrainingProfileForm'
 
@@ -266,6 +265,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null; name: string }>({ open: false, id: null, name: '' })
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
+  const [errorModal, setErrorModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
 
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
@@ -397,7 +397,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       await Promise.all([refreshProfiles(), refreshActivities()])
       setSuccessModal({ open: true, message: 'Training activity assigned successfully.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to assign training.'), confirmButtonColor: BRAND })
+      setErrorModal({ open: true, message: errMsg(e, 'Failed to assign training.') })
     } finally {
       setIsAssigning(false)
     }
@@ -411,7 +411,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       await Promise.all([refreshProfiles(), refreshActivities()])
       setSuccessModal({ open: true, message: 'Assigned activity has been removed.' })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to remove assignment.'), confirmButtonColor: BRAND })
+      setErrorModal({ open: true, message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -425,7 +425,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       setSuccessModal({ open: true, message: 'Profile has been deleted.' })
     } catch (e) {
       setDeleteConfirm({ open: false, id: null, name: '' })
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to delete profile.'), confirmButtonColor: BRAND })
+      setErrorModal({ open: true, message: errMsg(e, 'Failed to delete profile.') })
     }
   }
 
@@ -461,7 +461,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       await refreshProfiles()
       setSuccessModal({ open: true, message: `Status updated to ${newStatus}.` })
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update status.'), confirmButtonColor: BRAND })
+      setErrorModal({ open: true, message: errMsg(e, 'Failed to update status.') })
       throw e // keep the Update Status modal open so the user can retry
     }
   }
@@ -479,7 +479,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             await refreshProfiles()
             setSuccessModal({ open: true, message: 'Profile added successfully!' })
           } catch (e) {
-            Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to save profile.'), confirmButtonColor: BRAND })
+            setErrorModal({ open: true, message: errMsg(e, 'Failed to save profile.') })
           }
         }}
       />
@@ -497,7 +497,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
             await refreshProfiles()
             setSuccessModal({ open: true, message: 'Profile updated successfully!' })
           } catch (e) {
-            Swal.fire({ icon: 'error', title: 'Error', text: errMsg(e, 'Failed to update profile.'), confirmButtonColor: BRAND })
+            setErrorModal({ open: true, message: errMsg(e, 'Failed to update profile.') })
           }
         }}
       />
@@ -523,6 +523,13 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         confirmText="OK"
         onConfirm={() => setSuccessModal({ open: false, message: '' })}
         onCancel={() => setSuccessModal({ open: false, message: '' })}
+      />
+      <ConfirmModal
+        isOpen={errorModal.open} type="error"
+        title="Error" message={errorModal.message}
+        confirmText="OK"
+        onConfirm={() => setErrorModal({ open: false, message: '' })}
+        onCancel={() => setErrorModal({ open: false, message: '' })}
       />
 
       {updatingStatusProfile && (

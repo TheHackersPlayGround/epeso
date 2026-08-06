@@ -5,7 +5,7 @@ import * as documentsService from '../services/documentsService'
 export interface FileItem {
   id: string
   name: string
-  type: 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'jpg' | 'png' | 'other'
+  type: 'pdf' | 'doc' | 'docx' | 'xls' | 'xlsx' | 'ppt' | 'pptx' | 'jpg' | 'jpeg' | 'png' | 'gif' | 'webp' | 'bmp' | 'svg' | 'txt' | 'other'
   size: string
   uploadedBy: string
   uploadedDate: string
@@ -13,6 +13,10 @@ export interface FileItem {
   folderId: string
   fileUrl?: string
 }
+
+// Extensions the preview modal can actually render via <img> — kept in one
+// place so DocumentsView's preview routing and this list can't drift apart.
+export const IMAGE_TYPES: FileItem['type'][] = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg']
 
 export interface FolderItem {
   id: string
@@ -37,7 +41,8 @@ const ROOT_FOLDER: FolderItem = { id: 'root', name: 'Documents', parentId: null 
 
 function inferFileType(name: string): FileItem['type'] {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  return (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'png'].includes(ext) ? ext : 'other') as FileItem['type']
+  const known = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', ...IMAGE_TYPES]
+  return (known.includes(ext) ? ext : 'other') as FileItem['type']
 }
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {

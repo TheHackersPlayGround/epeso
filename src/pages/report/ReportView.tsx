@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import * as XLSX from 'xlsx'
 import ExcelJS from 'exceljs'
@@ -86,6 +86,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [fromDate, setFromDate] = useState('2026-01-01')
   const [toDate, setToDate] = useState('2026-05-14')
   const [generatedReport, setGeneratedReport] = useState<any>(null)
+
+  // A previously generated report is only a snapshot of the config at the time
+  // "Generate Report" was clicked — if the user changes any filter afterward
+  // without regenerating, clear it so the stale report can't be mistaken for
+  // reflecting the new selection.
+  useEffect(() => {
+    setGeneratedReport(null)
+  }, [reportCategory, programType, cdspReportType, gipReportType, spesReportType, livelihoodReportType, skillsReportType, selectedGeneralPrograms, reportPeriod, month, year, fromDate, toDate])
+
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
   // Which row's Export Attendees/Interns/Students dropdown is open, keyed by
@@ -2451,7 +2460,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <button onClick={handleGenerateReport}
               disabled={!reportCategory || pesoLoading || generalPesoLoading || (reportCategory === 'general-peso' && selectedGeneralPrograms.length === 0)}
               className="px-5 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#0066A3] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
-              <BarChart2 size={16} />
+              {(pesoLoading || generalPesoLoading) ? <Loader2 size={16} className="animate-spin" /> : <BarChart2 size={16} />}
               {(pesoLoading || generalPesoLoading) ? 'Generating…' : 'Generate Report'}
             </button>
           </div>

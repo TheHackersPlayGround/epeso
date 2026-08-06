@@ -91,6 +91,20 @@ function setBarColor(chartXml: string): string {
   return chartXml.replace('<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>', '<a:solidFill><a:srgbClr val="0077BE"/></a:solidFill>')
 }
 
+// The pie chart's <c:dLbls> block (written by real Excel, all show* flags off
+// by default) already has a <c:showPercent val="0"/> — flip it on so each
+// slice shows its share of the total, rather than authoring new label XML
+// by hand (Excel's validator has previously rejected hand-authored chart XML).
+// A <c:numFmt> is also inserted (schema requires it, if present, before the
+// show* flags) so Excel prints one decimal place (31.6%) instead of its
+// default whole-number rounding — matching the on-screen report's precision,
+// which independently rounds the same raw fraction to one decimal.
+function setPieShowPercent(chartXml: string): string {
+  return chartXml
+    .replace('<c:dLbls>', '<c:dLbls><c:numFmt formatCode="0.0%" sourceLinked="0"/>')
+    .replace('<c:showPercent val="0"/>', '<c:showPercent val="1"/>')
+}
+
 export async function generateGeneralPesoWorkbook(
   programs: GeneralPesoProgramRow[],
   analytics: { total: number; male: number; female: number },
@@ -132,6 +146,7 @@ export async function generateGeneralPesoWorkbook(
   pie = setStrCache(pie, names)
   pie = setNumCache(pie, counts)
   pie = setPieColors(pie, names)
+  pie = setPieShowPercent(pie)
   zip.file(CHART_PIE, pie)
 
   // ── Report sheet: period + headline stats ──

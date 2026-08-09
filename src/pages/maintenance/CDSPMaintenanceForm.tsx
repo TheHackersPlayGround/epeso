@@ -4,7 +4,7 @@ import DatePicker from '../../components/DatePicker'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
   Edit2, Trash2, PlayCircle, CheckCircle, RefreshCw, ArrowLeft,
-  Search, Users, Plus, ChevronLeft, ChevronRight, X, Loader2,
+  Search, Users, Plus, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
 import { useCDSP } from '../../contexts/CDSPContext'

@@ -227,10 +227,10 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Import Applicants</h3>
-          <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-800">Import Applicants</h3>
+          <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600 transition-colors text-lg">✕</button>
         </div>
 
         <div className="overflow-y-auto">
@@ -238,7 +238,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
             <ImportResultView result={result} />
           ) : (
             <>
-              <label className={`block border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 text-gray-400 hover:border-brand-blue"}`}>
+              <label className={`block border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 text-gray-400 hover:border-brand-blue"}`}>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -246,18 +246,18 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
                   disabled={isImporting}
                   onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
                 />
-                <p className="text-3xl mb-2">📂</p>
+                <p className="text-4xl mb-3">📂</p>
                 {file ? (
-                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
+                  <p className="text-base font-medium text-brand-blue break-all">{file.name}</p>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-gray-600">Click to upload or drag & drop</p>
-                    <p className="text-xs mt-1">Excel (.xlsx) or CSV files</p>
+                    <p className="text-base font-medium text-gray-600">Click to upload or drag & drop</p>
+                    <p className="text-sm mt-1">Excel (.xlsx) or CSV files</p>
                   </>
                 )}
               </label>
 
-              <p className="text-xs text-gray-400 mt-3 text-center">
+              <p className="text-sm text-gray-400 mt-4 text-center">
                 Download the{" "}
                 <button type="button" onClick={() => { void downloadImportTemplate(); }} className="text-brand-blue cursor-pointer hover:underline">template file</button>{" "}
                 to ensure correct column format.
@@ -274,13 +274,13 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
           )}
         </div>
 
-        <div className="flex gap-3 mt-5">
+        <div className="flex gap-3 mt-6">
           {result ? (
-            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">Done</button>
+            <button onClick={onClose} className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-base hover:bg-brand-blue-dark transition-colors">Done</button>
           ) : (
             <>
-              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-base text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-base hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {isImporting ? "Importing…" : "Import"}
               </button>
             </>
@@ -485,12 +485,18 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       }
     }
 
-    const parts = (n: string) => n.trim().split(/\s+/);
-    result = [...result].sort((a, b) => {
-      const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase();
-      const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase();
-      return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA);
-    });
+    if (sortOrder) {
+      // name is "Lastname, Firstname M. Suffix" (see employment.php's $name
+      // build) — split on the comma rather than whitespace, since a surname
+      // can itself contain spaces (e.g. "Dela Cruz").
+      const surnameOf = (n: string) => (n.split(',')[0] ?? n).trim().toLowerCase();
+      const firstNameOf = (n: string) => (n.split(',')[1] ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+      result = [...result].sort((a, b) => {
+        const keyA = sortOrder.startsWith('firstName') ? firstNameOf(a.name) : surnameOf(a.name);
+        const keyB = sortOrder.startsWith('firstName') ? firstNameOf(b.name) : surnameOf(b.name);
+        return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA);
+      });
+    }
 
     return result;
   }, [applicants, searchQuery, activeFilters, filterValues, sortOrder]);

@@ -641,9 +641,9 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
             )}
             {selectedApplicant.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
               <div key={idx} className="mt-2">
-                <div className="font-bold text-base text-gray-900">{pref.occupation}</div>
-                {pref.localCity && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Local:</span> {pref.localCity}</div>}
-                {pref.overseasCountry && <div className="text-sm mt-0.5 text-gray-600"><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
+                <div className="text-sm text-gray-700"><span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}</div>
+                {pref.localCity && <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Local:</span> {pref.localCity}</div>}
+                {pref.overseasCountry && <div className="text-sm mt-1 text-gray-600"><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
               </div>
             ))}
           </div>

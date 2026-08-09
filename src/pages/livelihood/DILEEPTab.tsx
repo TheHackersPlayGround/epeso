@@ -229,6 +229,7 @@ type AssignProjectModalProps = {
 function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassign, onClose, isAssigning }: AssignProjectModalProps) {
   const [projectSearch, setProjectSearch] = useState('')
   const [selectedProject, setSelectedProject] = useState<DILEEPProject | null>(null)
+  const [confirmingAssign, setConfirmingAssign] = useState(false)
 
   const serviceLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'DILEEP (TUPAD)'
 
@@ -244,7 +245,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         {/* Header */}
         <div className="bg-brand-blue px-5 pt-5 pb-4 flex items-start justify-between">
           <div>
@@ -306,7 +307,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                 Cancel
               </button>
               <button
-                onClick={() => onAssign(selectedProject.id, projectTitle(program, selectedProject))}
+                onClick={() => setConfirmingAssign(true)}
                 disabled={!canManage('livelihood') || isAssigning}
                 className="flex-1 py-2.5 text-xs text-white bg-brand-blue rounded-xl hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
@@ -431,6 +432,16 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
           </>
         )}
       </div>
+      <ConfirmModal
+        isOpen={confirmingAssign}
+        type="confirm"
+        title="Confirm Assignment"
+        message={selectedProject ? `Assign "${projectTitle(program, selectedProject)}" to ${formatDisplayName(beneficiary)}?` : ''}
+        confirmText="Yes, Assign"
+        cancelText="Cancel"
+        onConfirm={() => { setConfirmingAssign(false); if (selectedProject) onAssign(selectedProject.id, projectTitle(program, selectedProject)) }}
+        onCancel={() => setConfirmingAssign(false)}
+      />
     </div>
   )
 }

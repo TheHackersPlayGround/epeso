@@ -25,10 +25,6 @@ export function listProfiles() {
   return axiosClient.get(ENDPOINTS.gip.listProfiles).then(r => r.data)
 }
 
-export function getProfile(id: number) {
-  return axiosClient.get(`${ENDPOINTS.gip.getProfile}/${id}`).then(r => r.data)
-}
-
 export function createProfile(data: Record<string, unknown>) {
   return axiosClient.post(ENDPOINTS.gip.createProfile, data).then(r => r.data)
 }

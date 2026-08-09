@@ -127,14 +127,14 @@ function DocPreviewModal({ doc, onClose }: { doc: SkillsTrainingSavedDocument; o
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
-export const BRAND = '#0077BE'
+const BRAND = '#0077BE'
 
 export const CLASSIFICATION_OPTIONS = ['Student', 'Out of School Youth', 'Women', 'PWD', 'Employed', 'Unemployed']
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
 export const SEX_OPTIONS = ['Male', 'Female']
 export const STATUS_OPTIONS = ['Waitlisted', 'Accepted']
 
-export const emptyForm: Omit<SkillsTrainingProfile, 'id'> = {
+const emptyForm: Omit<SkillsTrainingProfile, 'id'> = {
   beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '', birthdate: '', age: 0,
   sex: '', civilStatus: '', contactNumber: '',

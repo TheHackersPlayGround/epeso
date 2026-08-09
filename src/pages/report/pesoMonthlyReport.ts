@@ -51,8 +51,11 @@ function setDoughnutLabels(chartXml: string, values: number[]): string {
     if (!m) return block
     const i = Number(m[1])
     if (i >= values.length) return block
-    const p = total > 0 ? Math.round((values[i] / total) * 100) : 0
-    return `<c:dLbl>${inner.replace(/(<a:t>)[^<]*(<\/a:t>)/, `$1${p}%$2`)}</c:dLbl>`
+    // A 0/0 doughnut has no real slice angle to place a label at, so Excel
+    // stacks both slices' labels on top of each other — blank them instead
+    // of writing two overlapping "0%"s.
+    const text = total > 0 ? `${Math.round((values[i] / total) * 100)}%` : ''
+    return `<c:dLbl>${inner.replace(/(<a:t>)[^<]*(<\/a:t>)/, `$1${text}$2`)}</c:dLbl>`
   })
 }
 

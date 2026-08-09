@@ -61,10 +61,6 @@ export function listProfiles() {
   return axiosClient.get(ENDPOINTS.skillsTraining.listProfiles).then(r => r.data)
 }
 
-export function getProfile(id: number) {
-  return axiosClient.get(`${ENDPOINTS.skillsTraining.getProfile}/${id}`).then(r => r.data)
-}
-
 export function createProfile(data: Record<string, unknown>) {
   return axiosClient.post(ENDPOINTS.skillsTraining.createProfile, data).then(r => r.data)
 }

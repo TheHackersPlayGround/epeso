@@ -12,7 +12,7 @@ import type { CDSPApplicant, CdspActivity } from '../../contexts/CDSPContext'
 import { canManage } from '../../utils/permissions'
 import * as cdspApiService from '../../services/cdspService'
 import CDSPProfileForm, {
-  ViewApplicantPanel, emptyForm, CDSP_SEED_SERVICES,
+  ViewApplicantPanel, CDSP_SEED_SERVICES,
   getEffectiveStatus, StatusBadge, CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS,
 } from './CDSPProfileForm'
 import { downloadImportTemplate, importCdspApplicants, type ImportResult } from './cdspImport'

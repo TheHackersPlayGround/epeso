@@ -243,7 +243,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     { id: 'documents' as Section, label: 'X. DOCUMENTS / ATTACHMENTS' },
   ];
 
-  const requiredKeys = ['firstName', 'surname', 'dateOfBirth', 'sex', 'civilStatus', 'contactNumber', 'barangay', 'municipality', 'province'] as const;
+  type RequiredKey = 'firstName' | 'surname' | 'dateOfBirth' | 'sex' | 'civilStatus' | 'contactNumber' | 'barangay' | 'municipality' | 'province';
 
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation();
 
@@ -257,14 +257,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const municipalityWrapRef = useRef<HTMLDivElement>(null);
   const barangayWrapRef = useRef<HTMLDivElement>(null);
 
-  function fieldError(key: typeof requiredKeys[number]) {
+  function fieldError(key: RequiredKey) {
     return !!fieldErrors[key];
   }
 
-  const inputClass = (key: typeof requiredKeys[number]) =>
+  const inputClass = (key: RequiredKey) =>
     `w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 transition-colors border-gray-300 focus:ring-brand-blue ${errCls(key)}`;
 
-  const ErrorMsg = ({ k }: { k: typeof requiredKeys[number] }) =>
+  const ErrorMsg = ({ k }: { k: RequiredKey }) =>
     fieldMessage(k) ? <p className="text-red-500 text-xs mt-1">{fieldMessage(k)}</p> : null;
 
   // Deferred one tick so the personalInfo section (which may not be the

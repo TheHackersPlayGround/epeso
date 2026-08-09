@@ -6,8 +6,6 @@ import {
   Search, Users, Plus, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { canManage } from '../../utils/permissions'
-import { useProgramActivities } from '../../contexts/ProgramActivitiesContext'
-import type { ProgramActivity } from '../../contexts/ProgramActivitiesContext'
 import { useDILP } from '../../contexts/DILPContext'
 import * as dilpService from '../../services/dilpService'
 import { useTUPAD } from '../../contexts/TUPADContext'
@@ -25,12 +23,9 @@ import type { SLPFormData } from './SLPForm'
 import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
 
-// DILP/TUPAD/SLP/CLPEP projects now all live in their own backend-persisted
-// tables (see DILPContext/TUPADContext/SLPContext/CLPEPContext), not
-// ProgramActivitiesContext's localStorage blob. For this shared "all
-// Livelihood projects" table, they're converted into ProgramActivity-shaped
-// rows with an ID offset so the existing table/filter/pagination code
-// doesn't need a parallel implementation.
+// Each program's real id is offset so the four id sequences (DILP/TUPAD/
+// SLP/CLPEP each start back at 1 in their own table) never collide once
+// merged into one ProgramActivity[] list below.
 const DILP_ID_OFFSET = 700000
 const TUPAD_ID_OFFSET = 800000
 const CLPEP_ID_OFFSET = 900000
@@ -67,6 +62,51 @@ type Action =
   | 'view_project'
   | 'view_projects'
   | 'view_participants'
+
+// DILP/TUPAD/SLP/CLPEP projects each live in their own backend-persisted
+// table (see DILPContext/TUPADContext/SLPContext/CLPEPContext) with their own
+// shape — this is the common shape they're converted into for this shared
+// "all Livelihood projects" table, so the table/filter/pagination code below
+// doesn't need four parallel implementations.
+interface ProgramActivity {
+  id: number
+  title: string
+  service: string
+  date: string
+  location: string
+  status: ProjectStatus
+  assignedOffice?: string
+  startDate?: string
+  endDate?: string
+  allowance?: string
+  program?: string
+  facilitator?: string
+  description?: string
+  participants?: number
+  counselor?: string
+  sessionDuration?: string
+  // DILP-specific fields (only present when service === 'DILEEP (DILP)')
+  projectIdNumber?: string
+  projectName?: string
+  typeOfProject?: string
+  programComponent?: string
+  wayOfImplementation?: string
+  region?: string
+  province?: string
+  cityMunicipality?: string
+  barangay?: string
+  streetPurok?: string
+  // TUPAD-specific fields (only present when service === 'DILEEP (TUPAD)')
+  assistanceAmount?: string
+  dateReleased?: string
+  tupadDocuments?: string[]
+  // SLP-specific fields (only present when service === 'SLP')
+  slpTrack?: string
+  // CLPEP-specific fields (only present when service === 'CLPEP')
+  partnerAgency?: string
+  partnerAgencyOther?: string
+  interventionCategoryOther?: string
+}
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -149,7 +189,6 @@ const blankDilpForm: DILPFormData = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function LivelihoodMaintenanceForm() {
-  const { activities, setActivities } = useProgramActivities()
   const dilp = useDILP()
   const tupad = useTUPAD()
   const slp = useSLP()
@@ -271,9 +310,7 @@ export default function LivelihoodMaintenanceForm() {
     dateReleased: p.dateReleased,
   }))
 
-  const BACKEND_SERVICES = ['DILEEP (DILP)', 'DILEEP (TUPAD)', 'SLP', 'CLPEP']
   const livelihoodProjects = [
-    ...activities.filter(a => a.program === 'Livelihood' && !BACKEND_SERVICES.includes(a.service)),
     ...dilpAsActivities,
     ...tupadAsActivities,
     ...slpAsActivities,
@@ -568,8 +605,6 @@ export default function LivelihoodMaintenanceForm() {
       } else if (id >= SLP_ID_OFFSET) {
         await slpService.deleteProject(id - SLP_ID_OFFSET)
         await slp.refreshProjects()
-      } else {
-        setActivities(prev => prev.filter(a => a.id !== id))
       }
       setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The project has been deleted.' })
     } catch (e: unknown) {
@@ -612,8 +647,6 @@ export default function LivelihoodMaintenanceForm() {
         await slpService.updateProjectStatus(project.id - SLP_ID_OFFSET, nextStatus)
         await slp.refreshProjects()
         await slp.refreshProfiles()
-      } else {
-        setActivities(prev => prev.map(a => a.id === project.id ? { ...a, status: nextStatus } : a))
       }
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: (e as { message?: string })?.message ?? 'Failed to update status.' })
@@ -953,14 +986,28 @@ export default function LivelihoodMaintenanceForm() {
         {filteredProjects.length === 0 ? (
           <div className="py-16 text-center">
             <FolderOpen size={48} className="mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-500 mb-4">No Livelihood projects found.</p>
-            <button
-              onClick={() => { resetForm(); setAction('add_project') }}
-              disabled={!canManage('livelihood-maintenance')}
-              className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Add First Project
-            </button>
+            {filterService !== 'All' || filterStatus !== 'All' || searchQuery ? (
+              <>
+                <p className="text-gray-500 mb-4">No projects match your filters.</p>
+                <button
+                  onClick={() => { setFilterService('All'); setFilterStatus('All'); setSearchQuery(''); setCurrentPage(1) }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-600"
+                >
+                  Clear Filters
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 mb-4">No Livelihood projects found.</p>
+                <button
+                  onClick={() => { resetForm(); setAction('add_project') }}
+                  disabled={!canManage('livelihood-maintenance')}
+                  className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add First Project
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -979,8 +1026,8 @@ export default function LivelihoodMaintenanceForm() {
               <tbody>
                 {paginatedProjects.map(a => (
                   <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-800 text-sm">{a.title}</p>
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <p className="font-medium text-gray-800 text-sm line-clamp-1">{a.title}</p>
                       {a.description && (
                         <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
                       )}
@@ -989,7 +1036,7 @@ export default function LivelihoodMaintenanceForm() {
                       <span className="px-2 py-1 bg-blue-50 text-brand-blue rounded-md text-xs font-medium">{a.service}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{a.date || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[160px]">
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[280px]">
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 text-center">

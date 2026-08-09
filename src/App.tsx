@@ -23,7 +23,6 @@ import { SPESProvider } from './contexts/SPESContext'
 import { OFWProvider } from './contexts/OFWContext'
 import { SkillsTrainingProvider } from './contexts/SkillsTrainingContext'
 import { DocumentsProvider } from './contexts/DocumentsContext'
-import { ProgramActivitiesProvider } from './contexts/ProgramActivitiesContext'
 import { DILPProvider } from './contexts/DILPContext'
 import { TUPADProvider } from './contexts/TUPADContext'
 import { SLPProvider } from './contexts/SLPContext'
@@ -318,19 +317,17 @@ export default function App() {
             <SPESProvider>
               <OFWProvider>
                 <SkillsTrainingProvider>
-                  <ProgramActivitiesProvider>
-                    <DILPProvider>
-                      <TUPADProvider>
-                        <SLPProvider>
-                          <CLPEPProvider>
-                            <DocumentsProvider>
-                              <AppContent onLogout={handleLogout} />
-                            </DocumentsProvider>
-                          </CLPEPProvider>
-                        </SLPProvider>
-                      </TUPADProvider>
-                    </DILPProvider>
-                  </ProgramActivitiesProvider>
+                  <DILPProvider>
+                    <TUPADProvider>
+                      <SLPProvider>
+                        <CLPEPProvider>
+                          <DocumentsProvider>
+                            <AppContent onLogout={handleLogout} />
+                          </DocumentsProvider>
+                        </CLPEPProvider>
+                      </SLPProvider>
+                    </TUPADProvider>
+                  </DILPProvider>
                 </SkillsTrainingProvider>
               </OFWProvider>
             </SPESProvider>

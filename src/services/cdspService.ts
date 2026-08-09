@@ -5,14 +5,6 @@ export function listCdspServices() {
   return axiosClient.get(ENDPOINTS.cdsp.listServices).then(r => r.data)
 }
 
-export function createService(data: { serviceName: string; serviceCode?: string }) {
-  return axiosClient.post(ENDPOINTS.cdsp.createService, data).then(r => r.data)
-}
-
-export function deleteService(id: number) {
-  return axiosClient.delete(`${ENDPOINTS.cdsp.deleteService}/${id}`).then(r => r.data)
-}
-
 export function listActivities() {
   return axiosClient.get(ENDPOINTS.cdsp.listActivities).then(r => r.data)
 }
@@ -51,10 +43,6 @@ export function updateAttendance(data: { activityId: number; beneficiaryServiceI
 
 export function listProfiles() {
   return axiosClient.get(ENDPOINTS.cdsp.listProfiles).then(r => r.data)
-}
-
-export function getProfile(id: number) {
-  return axiosClient.get(`${ENDPOINTS.cdsp.getProfile}/${id}`).then(r => r.data)
 }
 
 export function createProfile(data: Record<string, unknown>) {

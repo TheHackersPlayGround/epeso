@@ -16,10 +16,8 @@ export const ENDPOINTS = {
     list: '/users/list',
     create: '/users/create',
     update: '/users/update',
-    deactivate: '/users/deactivate',
   },
   locations: {
-    barangays: '/locations/barangays',
     provinces: '/locations/provinces',
     cities: '/locations/cities',
     barangaysByCity: '/locations/barangaysByCity',

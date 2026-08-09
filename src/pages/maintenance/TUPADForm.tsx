@@ -47,6 +47,23 @@ function isPdfAttachment(att: AttachmentItem) {
   return att.fileType === 'application/pdf' || /\.pdf$/i.test(att.name)
 }
 
+// Display-only comma formatting for the Assistance Amount input -- the
+// underlying value stays a plain numeric string (no commas), matching what
+// the backend expects (tupad.php's tupadMoneyOrNull strips commas anyway, but
+// keeping the stored value clean avoids depending on that).
+function formatAmountDisplay(raw: string): string {
+  if (!raw) return ''
+  const [intPart, decPart] = raw.split('.')
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas
+}
+function sanitizeAmountInput(v: string): string {
+  let s = v.replace(/,/g, '').replace(/[^\d.]/g, '')
+  const firstDot = s.indexOf('.')
+  if (firstDot !== -1) s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '')
+  return s
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TUPADForm({
@@ -231,12 +248,11 @@ export default function TUPADForm({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">₱</span>
               <input
                 id="tupad-assistanceAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.assistanceAmount}
+                type="text"
+                inputMode="decimal"
+                value={formatAmountDisplay(formData.assistanceAmount)}
                 readOnly={isView}
-                onChange={e => field('assistanceAmount', e.target.value)}
+                onChange={e => field('assistanceAmount', sanitizeAmountInput(e.target.value))}
                 className={inputCls + ' pl-7'}
                 placeholder="0.00"
               />

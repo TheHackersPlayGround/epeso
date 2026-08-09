@@ -27,29 +27,6 @@ export interface User {
   permissions: string[]
 }
 
-export const mockUsers: User[] = [
-  { id: 1,  firstName: 'System',   lastName: 'Administrator', username: 'admin',        email: 'admin@peso.gov.ph',        role: 'Administrator', status: 'Active',   lastLogin: '2026-06-14 09:30 AM', permissions: [] },
-  { id: 2,  firstName: 'Juan',     lastName: 'Dela Cruz',     username: 'staff001',     email: 'staff001@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-13 02:15 PM', permissions: ['view-applicants', 'view-employers'] },
-  { id: 3,  firstName: 'Maria',    lastName: 'Santos',        username: 'staff002',     email: 'staff002@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-13 11:45 AM', permissions: ['view-applicants', 'add-applicant'] },
-  { id: 4,  firstName: 'Carlo',    lastName: 'Reyes',         username: 'staff003',     email: 'staff003@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-05-28 03:20 PM', permissions: [] },
-  { id: 5,  firstName: 'Ana',      lastName: 'Bautista',      username: 'staff004',     email: 'staff004@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-12 10:00 AM', permissions: ['view-applicants', 'view-employers', 'add-applicant'] },
-  { id: 6,  firstName: 'Roberto',  lastName: 'Alvarez',       username: 'staff005',     email: 'staff005@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-11 08:45 AM', permissions: ['view-applicants'] },
-  { id: 7,  firstName: 'Liza',     lastName: 'Mendoza',       username: 'staff006',     email: 'staff006@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-05-15 01:30 PM', permissions: ['view-applicants', 'view-employers'] },
-  { id: 8,  firstName: 'Ramon',    lastName: 'Cruz',          username: 'staff007',     email: 'staff007@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-14 07:55 AM', permissions: ['view-applicants', 'add-applicant', 'edit-applicant'] },
-  { id: 9,  firstName: 'Cristina', lastName: 'Villanueva',    username: 'staff008',     email: 'staff008@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-10 04:10 PM', permissions: ['view-applicants', 'view-employers', 'view-programs'] },
-  { id: 10, firstName: 'Dennis',   lastName: 'Ocampo',        username: 'staff009',     email: 'staff009@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-09 09:20 AM', permissions: ['view-applicants'] },
-  { id: 11, firstName: 'Joana',    lastName: 'Fernandez',     username: 'staff010',     email: 'staff010@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-04-30 02:00 PM', permissions: [] },
-  { id: 12, firstName: 'Miguel',   lastName: 'Torres',        username: 'staff011',     email: 'staff011@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-13 03:45 PM', permissions: ['view-applicants', 'view-employers', 'add-applicant', 'edit-applicant'] },
-  { id: 13, firstName: 'Grace',    lastName: 'Limbo',         username: 'staff012',     email: 'staff012@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-12 11:10 AM', permissions: ['view-applicants', 'view-programs'] },
-  { id: 14, firstName: 'Patrick',  lastName: 'Manalac',       username: 'staff013',     email: 'staff013@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-11 12:30 PM', permissions: ['view-applicants', 'view-employers'] },
-  { id: 15, firstName: 'Sheila',   lastName: 'Aguilar',       username: 'staff014',     email: 'staff014@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-05-20 09:00 AM', permissions: ['view-applicants'] },
-  { id: 16, firstName: 'Ronaldo',  lastName: 'Magno',         username: 'staff015',     email: 'staff015@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-14 08:15 AM', permissions: ['view-applicants', 'add-applicant'] },
-  { id: 17, firstName: 'Norma',    lastName: 'Cuevas',        username: 'supervisor01', email: 'supervisor01@peso.gov.ph', role: 'Administrator', status: 'Active',   lastLogin: '2026-06-14 07:30 AM', permissions: [] },
-  { id: 18, firstName: 'Felix',    lastName: 'Sanchez',       username: 'staff016',     email: 'staff016@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-13 05:00 PM', permissions: ['view-applicants', 'view-employers', 'view-programs', 'add-applicant'] },
-  { id: 19, firstName: 'Lourdes',  lastName: 'Bayot',         username: 'staff017',     email: 'staff017@peso.gov.ph',     role: 'Staff',         status: 'Active',   lastLogin: '2026-06-12 10:50 AM', permissions: ['view-applicants'] },
-  { id: 20, firstName: 'Rodel',    lastName: 'Cañete',        username: 'staff018',     email: 'staff018@peso.gov.ph',     role: 'Staff',         status: 'Inactive', lastLogin: '2026-05-05 03:30 PM', permissions: [] },
-]
-
 export interface PermissionSection {
   label: string | null
   editorDescription: string
@@ -64,7 +41,7 @@ export interface PermissionGroup {
 // get two independent sections -- Records (applicant/profile access) and
 // Maintenance (batch/activity/project management) -- so an admin can grant
 // either, or both, per staff member. Everything else keeps a single section.
-export const permissionGroups: PermissionGroup[] = [
+const permissionGroups: PermissionGroup[] = [
   { title: 'EMPLOYMENT FACILITATION', sections: [
     { label: null, editorDescription: 'View, Add, Edit & Delete', permissions: [{ id: 'view-employment', label: 'View Employment Facilitation' }, { id: 'manage-employment', label: 'Manage Employment Facilitation' }] },
   ] },
@@ -184,7 +161,6 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
   }
 
   const [showPassword,        setShowPassword]        = useState(false)
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [changePassword,      setChangePassword]      = useState(false)
   const [showNewPassword,     setShowNewPassword]     = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -551,16 +527,16 @@ export default function SystemUsersTab() {
               <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 text-sm">No users match your search or filters.</td></tr>
             ) : paginatedUsers.map(user => (
               <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-6 py-4 text-gray-800 font-medium whitespace-nowrap">{user.firstName} {user.lastName}</td>
-                <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{user.username}</td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 text-sm text-gray-800 font-medium whitespace-nowrap">{user.firstName} {user.lastName}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{user.username}</td>
+                <td className="px-6 py-4 text-sm">
                   <span className={`px-3 py-1 rounded-full text-sm ${user.role === 'Administrator' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{user.role}</span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 text-sm">
                   <span className={`px-3 py-1 rounded-full text-sm ${user.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{user.status}</span>
                 </td>
-                <td className="px-6 py-4 text-gray-600">{user.lastLogin}</td>
-                <td className="px-6 py-4 text-gray-600">
+                <td className="px-6 py-4 text-sm text-gray-600">{user.lastLogin}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">
                   {user.permissions.length === 0 ? (
                     <span className="text-sm text-gray-400">None</span>
                   ) : user.permissions.length === totalPermissionsCount ? (

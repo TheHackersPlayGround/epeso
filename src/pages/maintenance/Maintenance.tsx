@@ -674,12 +674,12 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Name</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Assigned Office</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Slots</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Period</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Status</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap w-20">Actions</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Batch Name</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Assigned Office</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Slots</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Period</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -687,10 +687,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                           const participantCount = gipApplicants.filter(a => a.assignedBatchId === b.id).length
                           return (
                             <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
-                              <td className="px-6 py-4">
+                              <td className="px-6 py-4 text-sm">
                                 <span className="text-gray-800 font-medium">{b.batchName}</span>
                                 {b.description && (
-                                  <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
                                 )}
                                 {participantCount > 0 && (
                                   <span className="inline-flex items-center gap-1 text-xs mt-1" style={{ color: GIP_CONFIRM_COLOR }}>
@@ -698,20 +698,20 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-gray-600 max-w-[180px]">
+                              <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]">
                                 <p className="line-clamp-1">{b.assignedOffice || '—'}</p>
                                 {b.deploymentLocation && (
                                   <p className="text-xs text-gray-400 line-clamp-1">{b.deploymentLocation}</p>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-gray-600 text-center">
+                              <td className="px-6 py-4 text-sm text-gray-600 text-center">
                                 {b.slots ? (
                                   <span className={b.assignedCount >= parseInt(b.slots, 10) ? 'text-red-500 font-semibold' : ''}>
                                     {b.assignedCount}/{b.slots}
                                   </span>
                                 ) : '—'}
                               </td>
-                              <td className="px-6 py-4 text-gray-600 whitespace-nowrap text-sm">
+                              <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                                 {b.startDate && b.endDate ? `${b.startDate} – ${b.endDate}` : '—'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -980,22 +980,22 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Batch Name</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Employer / Agency</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Slots</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Program Period</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Funding Source</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap">Status</th>
-                          <th className="px-6 py-4 text-left text-gray-700 whitespace-nowrap w-20">Actions</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Batch Name</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Employer / Agency</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Slots</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Program Period</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Funding Source</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
+                          <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {paginatedSpesBatches.map(b => (
                           <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 text-sm">
                               <span className="text-gray-800 font-medium">{b.batchName}</span>
                               {b.description && (
-                                <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
+                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
                               )}
                               {(() => {
                                 const count = spesApplicants.filter(a => a.assignedBatchId === b.id).length
@@ -1006,25 +1006,25 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                 ) : null
                               })()}
                             </td>
-                            <td className="px-6 py-4 text-gray-600 max-w-[180px]">
+                            <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]">
                               <p className="line-clamp-1">{b.employer || '—'}</p>
                               {b.deploymentLocation && (
                                 <p className="text-xs text-gray-400 line-clamp-1">{b.deploymentLocation}</p>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-gray-600 text-center whitespace-nowrap">
+                            <td className="px-6 py-4 text-sm text-gray-600 text-center whitespace-nowrap">
                               {b.availableSlots ? (
                                 <span className={b.assignedCount >= parseInt(b.availableSlots, 10) ? 'text-red-500 font-semibold' : ''}>
                                   {b.assignedCount}/{b.availableSlots}
                                 </span>
                               ) : '—'}
                             </td>
-                            <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                            <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                               {b.programStartDate && b.programEndDate
                                 ? `${b.programStartDate} – ${b.programEndDate}`
                                 : '—'}
                             </td>
-                            <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                            <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                               {b.fundingSource || '—'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">

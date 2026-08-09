@@ -813,13 +813,13 @@ export default function SkillsTrainingMaintenanceForm() {
                   <tbody>
                     {paginatedTrainings.map(a => (
                       <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <p className="font-medium text-gray-800 text-sm">{a.title}</p>
+                        <td className="px-6 py-4 max-w-[240px]">
+                          <p className="font-medium text-gray-800 text-sm line-clamp-1">{a.title}</p>
                           {a.description && (
                             <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
                           )}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           {a.service && isBatchName(a.service) ? (
                             <span className="px-2 py-1 bg-blue-50 text-brand-blue rounded-md text-xs font-medium">
                               {a.service}
@@ -829,7 +829,7 @@ export default function SkillsTrainingMaintenanceForm() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{a.date || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-[160px]">
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-[280px]">
                           <span className="line-clamp-1">{a.location || '—'}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 text-center">
@@ -991,7 +991,7 @@ export default function SkillsTrainingMaintenanceForm() {
                   <tr>
                     <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Batch Number</th>
                     <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Trainings Count</th>
-                    <th className="px-6 py-4 w-16 text-right text-sm text-gray-700 font-semibold">Actions</th>
+                    <th className="px-6 py-4 w-16 text-center text-sm text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1008,7 +1008,7 @@ export default function SkillsTrainingMaintenanceForm() {
                           ? <span className="px-3 py-1 bg-blue-50 text-brand-blue rounded-full text-xs font-medium">{b.trainingCount} training{b.trainingCount !== 1 ? 's' : ''}</span>
                           : <span className="text-gray-400 text-sm">None</span>}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-center">
                         <button onClick={() => confirmDeleteBatch(b)}
                           className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
                           <Trash2 size={16} />

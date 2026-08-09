@@ -20,7 +20,9 @@ import { useDILP } from '../../contexts/DILPContext'
 import { useTUPAD } from '../../contexts/TUPADContext'
 import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
-import { REFERRAL_SEED, PLACEMENT_SEED } from '../../contexts/EmploymentContext'
+import type { Referral, Placement } from '../../contexts/EmploymentContext'
+import { listReferrals } from '../../services/referralService'
+import { listPlacements } from '../../services/placementService'
 
 interface ReportViewProps {
   onBack: () => void
@@ -65,6 +67,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: slpApplicants, projects: slpProjects } = useSLP()
   const { applicants: clpepApplicants, interventions: clpepInterventions } = useCLPEP()
 
+  // Employment Facilitation has no shared Context (see EmploymentContext.tsx —
+  // it's types-only), so referrals/placements are fetched directly here,
+  // unlike every other category above which reads from an already-live Context.
+  const [efReferrals, setEfReferrals] = useState<Referral[]>([])
+  const [efPlacements, setEfPlacements] = useState<Placement[]>([])
+  useEffect(() => {
+    listReferrals().then(setEfReferrals).catch(() => {})
+    listPlacements().then(setEfPlacements).catch(() => {})
+  }, [])
+
   const [infoModal, setInfoModal] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' })
   const [reportCategory, setReportCategory] = useState<ReportCategory | ''>('')
   const [programType, setProgramType] = useState('')
@@ -82,10 +94,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [isProgramMenuOpen, setIsProgramMenuOpen] = useState(false)
   const [generalPesoLoading, setGeneralPesoLoading] = useState(false)
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('monthly')
-  const [month, setMonth] = useState('05')
-  const [year, setYear] = useState('2026')
-  const [fromDate, setFromDate] = useState('2026-01-01')
-  const [toDate, setToDate] = useState('2026-05-14')
+  // Local Date getters, not toISOString() — the latter is UTC and can read back
+  // as yesterday's date in the early-morning hours on a positive-UTC-offset
+  // machine (same pitfall inSelectedPeriod/formatLongDate below avoid).
+  const now = new Date()
+  const currentYear = String(now.getFullYear())
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0')
+  const todayIso = `${currentYear}-${currentMonth}-${String(now.getDate()).padStart(2, '0')}`
+  const [month, setMonth] = useState(currentMonth)
+  const [year, setYear] = useState(currentYear)
+  const [fromDate, setFromDate] = useState(`${currentYear}-01-01`)
+  const [toDate, setToDate] = useState(todayIso)
   const [generatedReport, setGeneratedReport] = useState<any>(null)
 
   // A previously generated report is only a snapshot of the config at the time
@@ -116,18 +135,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [previewPage, setPreviewPage] = useState(1)
   const [previewPerPage, setPreviewPerPage] = useState(10)
 
-  const readLS = (key: string, fallback: any[] = []): any[] => {
-    try {
-      const raw = localStorage.getItem(key)
-      if (!raw) return fallback
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback
-    } catch { return fallback }
-  }
-
-  const efReferrals  = () => readLS('ef_referrals',  REFERRAL_SEED)
-  const efPlacements = () => readLS('ef_placements', PLACEMENT_SEED)
-
   const cdspPrograms = cdspServices.length > 0 ? cdspServices.map(s => s.name) : ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
   const livelihoodPrograms = ['DILEEP (DILP)', 'DILEEP (TUPAD)', 'SLP', 'CLPEP']
 
@@ -140,7 +147,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
     { value: '11', label: 'November' }, { value: '12', label: 'December' },
   ]
 
-  const years = ['2024', '2025', '2026', '2027']
+  // 2 years back through 1 year ahead of today, so this stays current on its
+  // own instead of needing to be manually bumped every year.
+  const years = Array.from({ length: 4 }, (_, i) => String(Number(currentYear) - 2 + i))
 
   // Folio / long bond (8.5 × 13") — matches the Excel exports' paper size
   // (ExcelJS paperSize: 14) instead of jsPDF's A4 default. Shared by the main
@@ -428,8 +437,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const generateData = (category: ReportCategory): any[] => {
     switch (category) {
       case 'employment-facilitation': {
-        const referrals = efReferrals()
-        const placements = efPlacements()
+        const referrals = efReferrals
+        const placements = efPlacements
         const placedIds = new Set(placements.map((p: any) => p.applicantId))
         const placedRows = placements.map((p: any) => ({
           'Applicant Name': p.applicantName,
@@ -1164,7 +1173,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       // landscape, scaled to fit all columns across one page width, header row repeated.
       const applyPrint = (ws: ExcelJS.Worksheet, repeatHeader = false) => {
         ws.pageSetup = {
-          paperSize: 14, // 14 = Folio / Long bond (8.5 × 13")
+          paperSize: 14 as ExcelJS.PaperSize, // 14 = Folio / Long bond (8.5 × 13") — not in exceljs's PaperSize enum, but a valid OOXML code
           orientation: 'landscape',
           fitToPage: true,
           fitToWidth: 1,

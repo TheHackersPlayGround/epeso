@@ -36,7 +36,7 @@ export const ELPOR_FORMS = ['ELPOR Form A', 'ELPOR Form A2', 'ELPOR Form B', 'EL
 export const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Unemployed', 'Self Employed', 'Underemployed']
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
 
-export const emptyOFWForm: Omit<OFWProfile, 'id'> = {
+const emptyOFWForm: Omit<OFWProfile, 'id'> = {
   beneficiaryServiceId: 0,
   referenceNumber: '',
   lastName: '', firstName: '', middleName: '', suffix: '',

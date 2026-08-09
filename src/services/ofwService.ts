@@ -9,10 +9,6 @@ export function listProfiles() {
   return axiosClient.get(ENDPOINTS.ofw.listProfiles).then(r => r.data)
 }
 
-export function getProfile(id: number) {
-  return axiosClient.get(`${ENDPOINTS.ofw.getProfile}/${id}`).then(r => r.data)
-}
-
 export function createProfile(data: Record<string, unknown>) {
   return axiosClient.post(ENDPOINTS.ofw.createProfile, data).then(r => r.data)
 }

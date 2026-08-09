@@ -352,6 +352,7 @@ type AssignInterventionModalProps = {
 function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnassign, onClose, isAssigning }: AssignInterventionModalProps) {
   const [search, setSearch] = useState('')
   const [confirmIntervention, setConfirmIntervention] = useState<CLPEPIntervention | null>(null)
+  const [confirmingAssign, setConfirmingAssign] = useState(false)
 
   const currentIntervention = beneficiary.assignedInterventionId
     ? interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
@@ -431,7 +432,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
               </button>
               <button
                 type="button"
-                onClick={() => onAssign(confirmIntervention.id)}
+                onClick={() => setConfirmingAssign(true)}
                 disabled={!canManage('livelihood') || isAssigning}
                 className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-sm font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
@@ -546,6 +547,16 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
           </>
         )}
       </div>
+      <ConfirmModal
+        isOpen={confirmingAssign}
+        type="confirm"
+        title="Confirm Assignment"
+        message={confirmIntervention ? `Assign "${confirmIntervention.interventionName}" to ${formatDisplayName(beneficiary)}?` : ''}
+        confirmText="Yes, Assign"
+        cancelText="Cancel"
+        onConfirm={() => { setConfirmingAssign(false); if (confirmIntervention) onAssign(confirmIntervention.id) }}
+        onCancel={() => setConfirmingAssign(false)}
+      />
     </div>
   )
 }

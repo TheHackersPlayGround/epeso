@@ -15,7 +15,7 @@ export type FilterOption = {
   options?: string[];
 };
 
-export const AVAILABLE_FILTERS: FilterOption[] = [
+const AVAILABLE_FILTERS: FilterOption[] = [
   { id: "disability", label: "PWD / Disability", options: ["Yes", "No"] },
   { id: "civilStatus", label: "Civil Status", options: ["Single", "Married", "Widowed", "Separated", "Annulled"] },
   // "Sex" intentionally omitted as a filter — it is already a default table column.

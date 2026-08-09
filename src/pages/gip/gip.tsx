@@ -197,6 +197,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [assignStep, setAssignStep] = useState<1 | 2>(1)
   const [assignSearch, setAssignSearch] = useState('')
   const [selectedBatch, setSelectedBatch] = useState<GIPBatch | null>(null)
+  const [confirmingBatch, setConfirmingBatch] = useState<GIPBatch | null>(null)
   const [viewBatchTarget, setViewBatchTarget] = useState<GIPApplicant | null>(null)
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
@@ -295,6 +296,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
       setAssignStep(1)
       setSelectedBatch(null)
       setAssignSearch('')
+      setConfirmingBatch(null)
       setResultModal({ isOpen: true, type: 'success', title: 'Success', message: `Assigned to "${batch.batchName}" successfully.` })
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to assign batch.') })
@@ -375,6 +377,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setAssignStep(1)
     setSelectedBatch(null)
     setAssignSearch('')
+    setConfirmingBatch(null)
   }
 
   if (isFormOpen) return <GIPProfileForm initial={emptyForm} mode="add" onSave={handleAddSave} onClose={() => setIsFormOpen(false)} />
@@ -519,7 +522,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
                   <button onClick={() => setAssignStep(1)} disabled={isAssigning} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Back</button>
                   <button
-                    onClick={() => handleAssignBatch(selectedBatch)}
+                    onClick={() => setConfirmingBatch(selectedBatch)}
                     disabled={!canManage('gip') || isAssigning}
                     className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center justify-center gap-1.5"
                   >
@@ -530,6 +533,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
               </>
             )}
           </div>
+          <ConfirmModal
+            isOpen={!!confirmingBatch}
+            type="confirm"
+            title="Confirm Assignment"
+            message={`Assign "${confirmingBatch?.batchName}" to ${assignTarget.firstName} ${assignTarget.lastName}?`}
+            confirmText="Yes, Assign"
+            cancelText="Cancel"
+            onConfirm={() => confirmingBatch && handleAssignBatch(confirmingBatch)}
+            onCancel={() => setConfirmingBatch(null)}
+          />
         </div>
       )}
 

@@ -29,7 +29,7 @@ export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated'
 
 export const CDSP_SEED_SERVICES = ['Career Coaching', 'Pre-Employment Coaching', 'Labor Employment for Graduating Students']
 
-export const emptyForm: Omit<CDSPApplicant, 'id'> = {
+const emptyForm: Omit<CDSPApplicant, 'id'> = {
   beneficiaryServiceId: 0, serviceId: 0, assignedActivityId: null, barangayId: 0,
   lastName: '', firstName: '', middleName: '',
   sex: '', birthdate: '', age: 0, civilStatus: '',

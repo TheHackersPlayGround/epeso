@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import {
   Download, Search, ChevronDown, ChevronLeft, ChevronRight,
   Trash, Trash2, RotateCcw, Clock, AlertTriangle,
@@ -213,13 +214,14 @@ export default function ActivityLogsTab() {
   useEffect(() => { reloadBin() }, [reloadBin])
 
   const handleExportLogs = () => {
-    const rows = [['Timestamp', 'User', 'Role', 'Action', 'Module', 'Details', 'Status'], ...filteredLogs.map(l => [l.timestamp, l.user, l.role, l.action, l.module, l.details, l.status])]
-    const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href  = URL.createObjectURL(blob)
-    link.download = `ActivityLogs_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
+    const rows = filteredLogs.map(l => ({
+      'Timestamp': l.timestamp, 'User': l.user, 'Role': l.role,
+      'Action': l.action, 'Module': l.module, 'Details': l.details, 'Status': l.status,
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Activity Logs')
+    XLSX.writeFile(wb, `ActivityLogs_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
   const closeModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -277,16 +279,36 @@ export default function ActivityLogsTab() {
       isOpen: true, type: 'confirm', title: 'Permanently Delete',
       message: `Permanently delete "${item.name}"?\n\nThis action CANNOT be undone. The record will be lost forever.`,
       confirmText: 'Yes, Delete Permanently', cancelText: 'Cancel',
-      onConfirm: async () => {
-        try {
-          await purgeRecord(item.recordType, item.id)
-          await reloadBin()
-          setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: closeModal })
-        } catch (err: unknown) {
-          showError(err instanceof Error && err.message ? err.message : `Failed to delete "${item.name}".`)
-        }
-      },
+      onConfirm: () => proceedPurge(item, false),
     })
+  }
+
+  // `force=false` first — an EF applicant with placement/referral history gets
+  // blocked by the backend (detail.code === 'has_history') so we can show a
+  // second, more specific warning before retrying with force=true.
+  const proceedPurge = async (item: RecycleBinItem, force: boolean) => {
+    try {
+      await purgeRecord(item.recordType, item.id, force)
+      await reloadBin()
+      setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: closeModal })
+    } catch (err: unknown) {
+      const detail = err instanceof Error
+        ? (err as Error & { detail?: { code?: string; placements?: number; referrals?: number } }).detail
+        : undefined
+      if (detail?.code === 'has_history') {
+        const parts: string[] = []
+        if (detail.placements) parts.push(`${detail.placements} placement${detail.placements !== 1 ? 's' : ''}`)
+        if (detail.referrals) parts.push(`${detail.referrals} referral${detail.referrals !== 1 ? 's' : ''}`)
+        setConfirmModal({
+          isOpen: true, type: 'confirm', title: 'Has Placement/Referral History',
+          message: `"${item.name}" has ${parts.join(' and ')}. Deleting will permanently remove all of that history too, along with the applicant record.\n\nThis cannot be undone. Delete anyway?`,
+          confirmText: 'Yes, Delete Everything', cancelText: 'Cancel',
+          onConfirm: () => proceedPurge(item, true),
+        })
+        return
+      }
+      showError(err instanceof Error && err.message ? err.message : `Failed to delete "${item.name}".`)
+    }
   }
 
   const handleEmptyBin = () => {
@@ -297,9 +319,12 @@ export default function ActivityLogsTab() {
       confirmText: 'Yes, Empty Bin', cancelText: 'Cancel',
       onConfirm: async () => {
         try {
-          // No bulk endpoint — purge each record, then reload once.
+          // No bulk endpoint — purge each record, then reload once. Force
+          // straight away: "Empty Bin" already carries an unambiguous
+          // delete-everything-permanently confirmation, so an EF applicant
+          // with placement/referral history shouldn't silently survive it.
           for (const item of recycleBin) {
-            await purgeRecord(item.recordType, item.id)
+            await purgeRecord(item.recordType, item.id, true)
           }
           await reloadBin()
           setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: closeModal })
@@ -332,7 +357,7 @@ export default function ActivityLogsTab() {
               </button>
               <button onClick={handleExportLogs} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors text-sm">
                 <Download size={16} />
-                Export CSV
+                Export Excel
               </button>
             </div>
           </div>

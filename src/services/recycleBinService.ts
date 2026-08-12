@@ -77,7 +77,10 @@ export async function restoreRecord(recordType: RecycleRecordType, id: number): 
   await axiosClient.post(endpointsFor(recordType).restoreRecord, { recordType, id })
 }
 
-// POST {module}/purgeRecord  { recordType, id }  — permanent delete
-export async function purgeRecord(recordType: RecycleRecordType, id: number): Promise<void> {
-  await axiosClient.post(endpointsFor(recordType).purgeRecord, { recordType, id })
+// POST {module}/purgeRecord  { recordType, id, force? }  — permanent delete.
+// `force` is only meaningful for EF applicants with placement/referral
+// history — the backend blocks the first attempt (409, detail.code ===
+// 'has_history') unless force is true. Harmless no-op for every other type.
+export async function purgeRecord(recordType: RecycleRecordType, id: number, force = false): Promise<void> {
+  await axiosClient.post(endpointsFor(recordType).purgeRecord, { recordType, id, force })
 }

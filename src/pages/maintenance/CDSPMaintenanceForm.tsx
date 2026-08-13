@@ -709,7 +709,7 @@ export default function CDSPMaintenanceForm() {
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location</th>
                   <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Participants</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
-                  <th className="px-6 py-4 w-16" />
+                  <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold w-16">Actions</th>
                 </tr>
               </thead>
               <tbody>

@@ -848,6 +848,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [viewingPlacement, setViewingPlacement] = useState<Placement | null>(null)
   const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null)
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
@@ -1014,12 +1015,12 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
   // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues, sortOrder])
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
-    [filtered, currentPage],
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
   )
 
   if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading placements…</div>
@@ -1068,7 +1069,8 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
           currentPage={currentPage}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
-          itemLabel="placement"
+          itemsPerPage={perPage}
+          onItemsPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
         />
       </div>
 

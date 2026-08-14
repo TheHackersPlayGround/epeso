@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
 import { canManage } from "../../../utils/permissions";
+import TablePagination from "../shared/TablePagination";
 import type { Applicant } from "../../../contexts/EmploymentContext";
 export type { Applicant };
 
@@ -285,80 +286,6 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
         </>
       )}
     </>
-  );
-}
-
-// ─── Pagination ────────────────────────────────────────────────────────────────
-
-type ApplicantsPaginationProps = {
-  currentPage: number;
-  totalItems: number;
-  onPageChange: (page: number) => void;
-};
-
-function ApplicantsPagination({ currentPage, totalItems, onPageChange }: ApplicantsPaginationProps) {
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-
-  if (totalPages <= 1) return null;
-
-  const firstItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  const lastItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
-
-  function buildPageNumbers(): (number | "...")[] {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const pages: (number | "...")[] = [1];
-    if (currentPage > 3) pages.push("...");
-    for (let p = Math.max(2, currentPage - 1); p <= Math.min(totalPages - 1, currentPage + 1); p++) {
-      pages.push(p);
-    }
-    if (currentPage < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-    return pages;
-  }
-
-  return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white">
-      <p className="text-sm text-gray-500">
-        Showing {firstItem}–{lastItem} of {totalItems} applicant{totalItems !== 1 ? "s" : ""}
-      </p>
-      <nav aria-label="Pagination" className="flex items-center gap-1">
-        <button
-          onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          aria-label="Previous page"
-          className="px-3 py-1.5 rounded border border-gray-300 text-sm text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-        >
-          ← Prev
-        </button>
-        {buildPageNumbers().map((page, idx) =>
-          page === "..." ? (
-            <span key={`ellipsis-${idx}`} className="px-3 py-1.5 text-sm text-gray-400 select-none">…</span>
-          ) : (
-            <button
-              key={page}
-              onClick={() => onPageChange(page as number)}
-              aria-label={`Go to page ${page}`}
-              aria-current={currentPage === page ? "page" : undefined}
-              className={`px-3 py-1.5 rounded border text-sm transition-colors ${
-                currentPage === page
-                  ? "bg-brand-blue border-brand-blue text-white font-semibold"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {page}
-            </button>
-          ),
-        )}
-        <button
-          onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          aria-label="Next page"
-          className="px-3 py-1.5 rounded border border-gray-300 text-sm text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-        >
-          Next →
-        </button>
-      </nav>
-    </div>
   );
 }
 
@@ -651,6 +578,8 @@ type ApplicantsTabProps = {
   onExportExcel: () => void;
   onExportCsv: () => void;
   onPageChange: (page: number) => void;
+  perPage: number;
+  onPerPageChange: (n: number) => void;
 };
 
 export default function ApplicantsTab({
@@ -684,6 +613,8 @@ export default function ApplicantsTab({
   onExportExcel,
   onExportCsv,
   onPageChange,
+  perPage,
+  onPerPageChange,
 }: ApplicantsTabProps) {
   return (
     <div className="flex flex-col gap-5">
@@ -738,10 +669,12 @@ export default function ApplicantsTab({
           onDelete={onDeleteApplicant}
         />
 
-        <ApplicantsPagination
+        <TablePagination
           currentPage={currentPage}
           totalItems={filteredCount}
           onPageChange={onPageChange}
+          itemsPerPage={perPage}
+          onItemsPerPageChange={onPerPageChange}
         />
       </div>
     </div>

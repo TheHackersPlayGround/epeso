@@ -326,6 +326,11 @@ export default function SystemUsersTab() {
   const [showEditModal,  setShowEditModal]  = useState(false)
   const [editingUser,    setEditingUser]    = useState<User | null>(null)
 
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean; type: 'confirm' | 'success' | 'error'
+    title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
+  }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
+
   // Load real users from the backend on mount.
   const loadUsers = async () => {
     try {
@@ -343,11 +348,6 @@ export default function SystemUsersTab() {
   }
 
   useEffect(() => { loadUsers() }, [])
-
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean; type: 'confirm' | 'success' | 'error'
-    title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
-  }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
 
   const [formData, setFormData] = useState({ firstName: '', lastName: '', username: '', email: '', password: '', role: 'Staff', status: 'Active' })
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])

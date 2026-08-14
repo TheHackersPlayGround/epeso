@@ -57,8 +57,6 @@ export const ENDPOINTS = {
   },
   cdsp: {
     listServices:             '/cdsp/listServices',
-    createService:            '/cdsp/createService',
-    deleteService:            '/cdsp/deleteService',
     listActivities:           '/cdsp/listActivities',
     createActivity:           '/cdsp/createActivity',
     updateActivity:           '/cdsp/updateActivity',

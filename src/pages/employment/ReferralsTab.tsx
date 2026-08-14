@@ -451,6 +451,7 @@ export default function ReferralsTab() {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
 
   async function reload() {
@@ -592,12 +593,12 @@ export default function ReferralsTab() {
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
   // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues, sortOrder])
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
-    [filtered, currentPage],
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
   )
 
   if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading referrals…</div>
@@ -645,7 +646,8 @@ export default function ReferralsTab() {
           currentPage={currentPage}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
-          itemLabel="referral"
+          itemsPerPage={perPage}
+          onItemsPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
         />
       </div>
 

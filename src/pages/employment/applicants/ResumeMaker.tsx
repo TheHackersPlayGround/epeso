@@ -268,7 +268,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     });
     if (current.length) result.push(current);
     setPages(prev => (JSON.stringify(prev) === JSON.stringify(result) ? prev : result));
-  });
+  }, [selectedApplicant, selectedFields, resumePhoto]);
 
   function handleResumePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

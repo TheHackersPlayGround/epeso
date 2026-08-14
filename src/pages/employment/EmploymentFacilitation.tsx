@@ -411,6 +411,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(ITEMS_PER_PAGE);
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('');
 
   // ── Derived data ──────────────────────────────────────────────────
@@ -504,9 +505,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const isFiltered = searchQuery.trim().length > 0 || activeFilters.some((f) => filterValues[f]);
 
   const paginatedApplicants = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredApplicants.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredApplicants, currentPage]);
+    const start = (currentPage - 1) * perPage;
+    return filteredApplicants.slice(start, start + perPage);
+  }, [filteredApplicants, currentPage, perPage]);
 
   // ── Modal states ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>("applicants");
@@ -724,6 +725,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onExportExcel={handleExportExcel}
               onExportCsv={handleExportCsv}
               onPageChange={setCurrentPage}
+              perPage={perPage}
+              onPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
             />
           )
         )}

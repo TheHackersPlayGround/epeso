@@ -80,7 +80,7 @@ const logStatuses = ['All', 'Success', 'Failed']
 const binModules  = [
   'All', 'Applicants', 'Employers', 'Referrals',
   'GIP Applicants', 'GIP Batches',
-  'CDSP Applicants', 'CDSP Services', 'CDSP Activities',
+  'CDSP Applicants', 'CDSP Activities',
   'SPES Applicants', 'SPES Batches',
   'DILP Beneficiaries', 'DILP Projects',
   'TUPAD Beneficiaries', 'TUPAD Projects',
@@ -101,7 +101,6 @@ const BIN_MODULE_BADGE: Record<string, string> = {
   'GIP Applicants': 'bg-sky-50 text-sky-700',
   'GIP Batches': 'bg-sky-50 text-sky-700',
   'CDSP Applicants': 'bg-teal-50 text-teal-700',
-  'CDSP Services': 'bg-teal-50 text-teal-700',
   'CDSP Activities': 'bg-teal-50 text-teal-700',
   'SPES Applicants': 'bg-indigo-50 text-indigo-700',
   'SPES Batches': 'bg-indigo-50 text-indigo-700',
@@ -123,7 +122,7 @@ const BIN_MODULE_BADGE: Record<string, string> = {
 
 export default function ActivityLogsTab() {
   const { refreshProfiles: refreshGipProfiles, refreshBatches: refreshGipBatches } = useGIP()
-  const { refreshProfiles: refreshCdspProfiles, refreshActivities: refreshCdspActivities, refreshServices: refreshCdspServices } = useCDSP()
+  const { refreshProfiles: refreshCdspProfiles, refreshActivities: refreshCdspActivities } = useCDSP()
   const { refreshProfiles: refreshSpesProfiles, refreshBatches: refreshSpesBatches } = useSPES()
   const { refreshProfiles: refreshDilpProfiles, refreshProjects: refreshDilpProjects } = useDILP()
   const { refreshProfiles: refreshTupadProfiles, refreshProjects: refreshTupadProjects } = useTUPAD()
@@ -238,7 +237,6 @@ export default function ActivityLogsTab() {
     if (recordType === 'gipBatch') await refreshGipBatches()
     if (recordType === 'cdspApplicant') await refreshCdspProfiles()
     if (recordType === 'cdspActivity') await refreshCdspActivities()
-    if (recordType === 'cdspService') await refreshCdspServices()
     if (recordType === 'spesApplicant') await refreshSpesProfiles()
     if (recordType === 'spesBatch') await refreshSpesBatches()
     if (recordType === 'dilpApplicant') await refreshDilpProfiles()
@@ -283,8 +281,9 @@ export default function ActivityLogsTab() {
     })
   }
 
-  // `force=false` first — an EF applicant with placement/referral history gets
-  // blocked by the backend (detail.code === 'has_history') so we can show a
+  // `force=false` first — an EF applicant with placement/referral history, or
+  // a Documents folder with leftover recycle-bin files, gets blocked by the
+  // backend (detail.code === 'has_history' / 'has_files') so we can show a
   // second, more specific warning before retrying with force=true.
   const proceedPurge = async (item: RecycleBinItem, force: boolean) => {
     try {
@@ -293,7 +292,7 @@ export default function ActivityLogsTab() {
       setConfirmModal({ isOpen: true, type: 'success', title: 'Permanently Deleted', message: `"${item.name}" has been permanently deleted.`, onConfirm: closeModal })
     } catch (err: unknown) {
       const detail = err instanceof Error
-        ? (err as Error & { detail?: { code?: string; placements?: number; referrals?: number } }).detail
+        ? (err as Error & { detail?: { code?: string; placements?: number; referrals?: number; count?: number } }).detail
         : undefined
       if (detail?.code === 'has_history') {
         const parts: string[] = []
@@ -302,6 +301,16 @@ export default function ActivityLogsTab() {
         setConfirmModal({
           isOpen: true, type: 'confirm', title: 'Has Placement/Referral History',
           message: `"${item.name}" has ${parts.join(' and ')}. Deleting will permanently remove all of that history too, along with the applicant record.\n\nThis cannot be undone. Delete anyway?`,
+          confirmText: 'Yes, Delete Everything', cancelText: 'Cancel',
+          onConfirm: () => proceedPurge(item, true),
+        })
+        return
+      }
+      if (detail?.code === 'has_files') {
+        const count = detail.count ?? 0
+        setConfirmModal({
+          isOpen: true, type: 'confirm', title: 'Folder Has Files in Recycle Bin',
+          message: `"${item.name}" still has ${count} file${count !== 1 ? 's' : ''} sitting in the Recycle Bin. Deleting this folder will also permanently delete ${count !== 1 ? 'them' : 'it'}.\n\nThis cannot be undone. Delete anyway?`,
           confirmText: 'Yes, Delete Everything', cancelText: 'Cancel',
           onConfirm: () => proceedPurge(item, true),
         })

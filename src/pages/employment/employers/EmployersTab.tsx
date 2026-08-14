@@ -467,6 +467,7 @@ export default function EmployersTab() {
   const [showAdd, setShowAdd] = useState(false)
   const [selectedEmployer, setSelectedEmployer] = useState<Employer | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [sidebarMode, setSidebarMode] = useState<'view' | 'edit' | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
@@ -498,12 +499,12 @@ export default function EmployersTab() {
   }, [employers, searchQuery, activeFilters, filterValues])
 
   // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
-    [filtered, currentPage],
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
   )
 
   // Persist + refresh; the AddEmployerSidebar shows the success alert then closes
@@ -705,7 +706,8 @@ export default function EmployersTab() {
           currentPage={currentPage}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
-          itemLabel="employer"
+          itemsPerPage={perPage}
+          onItemsPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
         />
       </div>
 

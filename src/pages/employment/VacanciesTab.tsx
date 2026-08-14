@@ -993,6 +993,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [highlightedVacancyId, setHighlightedVacancyId] = useState<number | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
@@ -1104,12 +1105,12 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   }, [vacancies, searchQuery, activeFilters, filterValues])
 
   // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / EF_ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * EF_ITEMS_PER_PAGE, currentPage * EF_ITEMS_PER_PAGE),
-    [filtered, currentPage],
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
   )
 
   // Jump to a specific vacancy when navigated here from Placements' Job
@@ -1121,7 +1122,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     if (match) {
       setViewingVacancy(match)
       const idx = filtered.findIndex(v => v.id === focusVacancyId)
-      if (idx !== -1) setCurrentPage(Math.floor(idx / EF_ITEMS_PER_PAGE) + 1)
+      if (idx !== -1) setCurrentPage(Math.floor(idx / perPage) + 1)
       setHighlightedVacancyId(focusVacancyId)
       setTimeout(() => setHighlightedVacancyId(null), 3000)
     }
@@ -1183,8 +1184,8 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
           currentPage={currentPage}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
-          itemLabel="vacancy"
-          itemLabelPlural="vacancies"
+          itemsPerPage={perPage}
+          onItemsPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
         />
       </div>
 

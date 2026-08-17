@@ -7,6 +7,7 @@ import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorPro
         id="tupad-document-upload"
         className="hidden"
         onChange={handleFileChange}
-        accept=".pdf,.jpg,.jpeg,.png"
+        accept={ATTACHMENT_ACCEPT}
       />
       <label
         htmlFor="tupad-document-upload"
@@ -129,7 +130,7 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorPro
         <Upload size={20} />
         <span className="font-medium">Upload Document</span>
       </label>
-      <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG</p>
+      <p className="text-xs text-gray-500 mt-2">Accepted formats: {ATTACHMENT_ACCEPT_LABEL}</p>
 
       {docs.length > 0 && (
         <div className="space-y-3 pt-4 mt-4 border-t border-gray-200">

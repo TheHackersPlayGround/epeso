@@ -202,7 +202,20 @@ export default function OFWView({ onBack }: OFWViewProps) {
     setOpenMenuId(prev => (prev === id ? null : id))
   }
 
-  const nextRefNumber = `OFW-2026-${String(profiles.length + 1).padStart(5, '0')}`
+  // Suggested only -- the field stays editable so staff can override it. Based
+  // on the highest reference number actually in use this year (not a plain
+  // count), since profiles here excludes soft-deleted records: counting would
+  // re-suggest an already-taken number after any deletion. Still best-effort --
+  // a deleted profile that held the current max wouldn't be visible here -- but
+  // the backend's unique constraint on reference_no catches that rare case and
+  // prompts staff for a different number rather than silently colliding.
+  const yearPrefix = `OFW-${new Date().getFullYear()}-`
+  const maxRefSeq = profiles.reduce((max, p) => {
+    if (!p.referenceNumber.startsWith(yearPrefix)) return max
+    const n = parseInt(p.referenceNumber.slice(yearPrefix.length), 10)
+    return Number.isFinite(n) && n > max ? n : max
+  }, 0)
+  const nextRefNumber = `${yearPrefix}${String(maxRefSeq + 1).padStart(5, '0')}`
 
   // ── Profile handlers ──────────────────────────────────────────
   const handleAddProfile = async (data: Omit<OFWProfile, 'id'>) => {

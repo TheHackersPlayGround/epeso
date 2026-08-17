@@ -5,7 +5,9 @@ import DatePicker from '../../components/DatePicker'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
-import { REQUEST_TYPES, ELPOR_FORMS, EMPLOYMENT_STATUS_OPTIONS, CIVIL_STATUS_OPTIONS, DocPreviewModal, ClearButton } from './AddOFWRequestForm'
+import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
+import { REQUEST_TYPES, ELPOR_FORMS, EMPLOYMENT_STATUS_OPTIONS, CIVIL_STATUS_OPTIONS, ClearButton } from './AddOFWRequestForm'
+import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 
 interface OFWProfileModalProps {
   profile: OFWProfile
@@ -612,7 +614,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                           </div>
                           {form.owwaWelfareFile && <DownloadButton attachment={form.owwaWelfareFile} onPreview={() => setPreviewDoc(form.owwaWelfareFile!)} />}
                           <div className="flex items-center gap-3 mt-2">
-                            <input ref={owwaInputRef} type="file" className="hidden"
+                            <input ref={owwaInputRef} type="file" accept={ATTACHMENT_ACCEPT} className="hidden"
                               onChange={async e => { const f = e.target.files?.[0]; if (f) set({ owwaWelfareFile: await readFileAsAttachment(f, 'OWWA Welfare Case Form') }) }}
                             />
                             <button type="button" onClick={() => owwaInputRef.current?.click()} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100">
@@ -654,7 +656,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                                   <span className="text-sm text-gray-500 w-32 inline-block">{formName}</span>
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
-                                  <input ref={el => { elporRefs.current[formName] = el }} type="file" className="hidden"
+                                  <input ref={el => { elporRefs.current[formName] = el }} type="file" accept={ATTACHMENT_ACCEPT} className="hidden"
                                     onChange={async e => { const f = e.target.files?.[0]; if (f) set({ elporFiles: { ...(form.elporFiles ?? {}), [formName]: await readFileAsAttachment(f, formName) } }) }}
                                   />
                                   <button type="button" onClick={() => elporRefs.current[formName]?.click()} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100">
@@ -701,7 +703,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                     {(form.attachedDocuments ?? []).map(doc => (
                       <div key={doc.id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
                         <input className={`${inp} flex-1`} placeholder="Document name (e.g. Birth Certificate)" value={doc.name} onChange={e => updateDocName(doc.id, e.target.value)} />
-                        <input ref={el => { docFileRefs.current[doc.id] = el }} type="file" className="hidden"
+                        <input ref={el => { docFileRefs.current[doc.id] = el }} type="file" accept={ATTACHMENT_ACCEPT} className="hidden"
                           onChange={e => { const f = e.target.files?.[0]; if (f) updateDocFile(doc.id, f) }}
                         />
                         {(doc.dataUrl || doc.url) && (
@@ -749,7 +751,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
           )}
         </div>
       </div>
-      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }

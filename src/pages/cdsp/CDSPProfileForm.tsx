@@ -5,7 +5,9 @@ import type { CDSPApplicant, CDSPSavedDocument } from '../../contexts/CDSPContex
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
+import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -95,40 +97,6 @@ function formatFileSize(bytes: number) {
   return `${Math.round((bytes / Math.pow(1024, i)) * 100) / 100} ${units[i]}`
 }
 
-// Rendered as a sibling of the whole form, not nested inside it -- a
-// `fixed inset-0` modal nested inside an ancestor with opacity/filter/
-// transform stops being positioned relative to the viewport.
-function DocPreviewModal({ doc, onClose }: { doc: CDSPSavedDocument; onClose: () => void }) {
-  const src = doc.dataUrl || doc.url
-  return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <p className="text-sm text-gray-500 truncate">{doc.customName || doc.fileName}</p>
-          <button type="button" onClick={onClose} aria-label="Close preview" className="p-1 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto p-4 bg-gray-50">
-          {/(\.png|\.jpe?g|\.gif|\.webp)$/i.test(doc.fileName) ? (
-            <div className="flex items-center justify-center h-full">
-              <img src={src} alt={doc.fileName} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-            </div>
-          ) : /\.pdf$/i.test(doc.fileName) ? (
-            <iframe src={src} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <FileText size={64} className="mb-4 text-gray-400" />
-              <p className="text-lg font-medium mb-2">Preview not available</p>
-              <a href={src} target="_blank" rel="noreferrer" className="text-sm text-brand-blue underline">Open / download file</a>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function DocAttachSection({
   documents,
   onChange,
@@ -203,13 +171,13 @@ function DocAttachSection({
           Attach File
           <input
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+            accept={ATTACHMENT_ACCEPT}
             className="hidden"
             onChange={handleFileChange}
           />
         </label>
       </div>
-      <p className="text-xs text-gray-400">Supported: PDF, images (JPG, PNG), Word documents.</p>
+      <p className="text-xs text-gray-400">Supported: {ATTACHMENT_ACCEPT_LABEL}</p>
     </div>
   )
 }
@@ -353,7 +321,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
 
         </div>
       </div>
-      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }
@@ -764,7 +732,7 @@ export default function CDSPProfileForm({
 
         </div>
       </div>
-      {previewDoc && <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   )
 }

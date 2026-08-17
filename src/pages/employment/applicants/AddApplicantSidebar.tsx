@@ -7,6 +7,7 @@ import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 import ConfirmModal from '../../shared/ConfirmModal';
 import { createDefaultApplicantFormData } from './applicantDefaults';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
+import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../../utils/attachments';
 
 interface ApplicantFormData {
   // Personal Information
@@ -2120,7 +2121,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <input
                   type="file"
                   id="documentUpload"
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                  accept={ATTACHMENT_ACCEPT}
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -2145,7 +2146,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   <span className="font-medium">Upload Document</span>
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
-                  Accepted formats: PDF, JPG, PNG
+                  Accepted formats: {ATTACHMENT_ACCEPT_LABEL}
                   {!currentDocType && ' â¢ Please select a document type first'}
                   {currentDocType === 'Others (Specify)' && !currentCustomName.trim() && ' â¢ Please specify the document name'}
                 </p>

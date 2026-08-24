@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { X, Users, Upload, Download, FileText, Eye } from 'lucide-react'
-import type { GIPApplicant, GIPBatch, GIPSavedDocument } from '../../contexts/GIPContext'
+import type { GIPApplicant, GIPSavedDocument } from '../../contexts/GIPContext'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import DatePicker from '../../components/DatePicker'
@@ -39,12 +39,6 @@ export function educationFieldFlags(edu: string) {
 
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
 
-export const BATCH_STATUS_COLORS: Record<GIPBatch['status'], string> = {
-  Planned:   'bg-yellow-100 text-yellow-700',
-  Ongoing:   'bg-green-100 text-green-700',
-  Completed: 'bg-gray-100 text-gray-500',
-}
-
 export const emptyForm: Omit<GIPApplicant, 'id'> = {
   gipProfileId: null, beneficiaryServiceId: 0,
   lastName: '', firstName: '', middleName: '',
@@ -53,7 +47,7 @@ export const emptyForm: Omit<GIPApplicant, 'id'> = {
   streetPurok: '', barangay: '', barangayId: 0, cityMunicipality: '', province: '', region: '',
   classification: [], classificationOther: '',
   highestEducation: '', schoolName: '', course: '', strand: '', yearLevel: '', yearGraduated: '',
-  assignedBatchId: null,
+  assignedWorkplaceId: null,
   assignmentHistory: [],
   attachedDocuments: [],
   dateApplicationReceived: '', receivedBy: '',
@@ -62,17 +56,17 @@ export const emptyForm: Omit<GIPApplicant, 'id'> = {
 
 // ─── Exported helpers ──────────────────────────────────────────────────────────
 
-export function deriveStatus(applicant: Omit<GIPApplicant, 'id'>, batches: GIPBatch[]): GIPApplicant['status'] {
-  if (applicant.status === 'Completed' || applicant.status === 'Cancelled') return applicant.status
-  if (!applicant.assignedBatchId) return 'Inactive'
-  const batch = batches.find(b => b.id === applicant.assignedBatchId)
-  if (!batch || batch.status === 'Completed') return 'Inactive'
-  return 'Active'
+// The backend now maintains each applicant's own status directly (Active
+// while assigned, Completed once marked done, Inactive otherwise) -- a
+// workplace no longer has a status of its own to derive from, so this is a
+// straight pass-through kept only so call sites don't need to change shape.
+export function deriveStatus(applicant: Omit<GIPApplicant, 'id'>): GIPApplicant['status'] {
+  return applicant.status
 }
 
 export function StatusBadge({ status }: { status: GIPApplicant['status'] }) {
   const colors: Record<string, string> = {
-    Active:    'bg-green-100 text-green-700',
+    Ongoing:   'bg-green-100 text-green-700',
     Inactive:  'bg-gray-100 text-gray-500',
     Completed: 'bg-blue-100 text-blue-700',
     Cancelled: 'bg-red-100 text-red-600',

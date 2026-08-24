@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import * as gipService from '../services/gipService'
 
 export interface GIPAssignmentHistory {
-  batchId: number
-  batchName: string
+  workplaceId: number
+  workplaceName: string
   assignedDate: string
   completedDate?: string | null
 }
@@ -46,49 +46,44 @@ export interface GIPApplicant {
   strand: string
   yearLevel: string
   yearGraduated: string
-  assignedBatchId: number | null
+  assignedWorkplaceId: number | null
   assignmentHistory: GIPAssignmentHistory[]
   attachedDocuments: GIPSavedDocument[]
   dateApplicationReceived: string
   receivedBy: string
-  status: 'Active' | 'Inactive' | 'Completed' | 'Cancelled'
+  status: 'Ongoing' | 'Inactive' | 'Completed' | 'Cancelled'
   remarks: string
 }
 
-export interface GIPBatch {
+export interface GIPWorkplace {
   id: number
-  batchName: string
+  workplaceName: string
   description: string
-  assignedOffice: string
   deploymentLocation: string
   supervisor: string
-  slots: string
   assignedCount: number
   fundingSource: string
   fundingSourceOther: string
-  startDate: string
-  endDate: string
   allowance: string
-  status: 'Planned' | 'Ongoing' | 'Completed'
   documents: GIPSavedDocument[]
 }
 
 interface GIPContextValue {
   applicants: GIPApplicant[]
-  gipBatches: GIPBatch[]
+  gipWorkplaces: GIPWorkplace[]
   loading: boolean
-  loadingBatches: boolean
+  loadingWorkplaces: boolean
   refreshProfiles: () => Promise<void>
-  refreshBatches: () => Promise<void>
+  refreshWorkplaces: () => Promise<void>
 }
 
 const GIPContext = createContext<GIPContextValue | null>(null)
 
 export function GIPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<GIPApplicant[]>([])
-  const [gipBatches, setGipBatches] = useState<GIPBatch[]>([])
+  const [gipWorkplaces, setGipWorkplaces] = useState<GIPWorkplace[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingBatches, setLoadingBatches] = useState(true)
+  const [loadingWorkplaces, setLoadingWorkplaces] = useState(true)
 
   const refreshProfiles = useCallback(async () => {
     setLoading(true)
@@ -102,25 +97,25 @@ export function GIPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const refreshBatches = useCallback(async () => {
-    setLoadingBatches(true)
+  const refreshWorkplaces = useCallback(async () => {
+    setLoadingWorkplaces(true)
     try {
-      const res = await gipService.listBatches()
-      setGipBatches(res.data ?? [])
+      const res = await gipService.listWorkplaces()
+      setGipWorkplaces(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingBatches(false)
+      setLoadingWorkplaces(false)
     }
   }, [])
 
   useEffect(() => {
     refreshProfiles()
-    refreshBatches()
-  }, [refreshProfiles, refreshBatches])
+    refreshWorkplaces()
+  }, [refreshProfiles, refreshWorkplaces])
 
   return (
-    <GIPContext.Provider value={{ applicants, gipBatches, loading, loadingBatches, refreshProfiles, refreshBatches }}>
+    <GIPContext.Provider value={{ applicants, gipWorkplaces, loading, loadingWorkplaces, refreshProfiles, refreshWorkplaces }}>
       {children}
     </GIPContext.Provider>
   )

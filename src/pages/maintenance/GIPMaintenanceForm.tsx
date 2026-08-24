@@ -4,11 +4,11 @@ import { Upload, X, FileText, Eye, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { canManage } from '../../utils/permissions'
-import type { GIPBatch, GIPSavedDocument } from '../../contexts/GIPContext'
+import type { GIPWorkplace, GIPSavedDocument } from '../../contexts/GIPContext'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 
 // ─── Re-export for consumers ──────────────────────────────────────────────────
-export type { GIPBatch }
+export type { GIPWorkplace }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -22,21 +22,16 @@ const FUNDING_SOURCES = ['DOLE', 'Local Government Unit (LGU)', 'Private / CSR',
 
 // ─── Empty form state ─────────────────────────────────────────────────────────
 
-function emptyBatch(): Omit<GIPBatch, 'id'> {
+function emptyWorkplace(): Omit<GIPWorkplace, 'id'> {
   return {
-    batchName: '',
+    workplaceName: '',
     description: '',
-    assignedOffice: '',
     deploymentLocation: '',
     supervisor: '',
-    slots: '',
     assignedCount: 0,
     fundingSource: 'DOLE',
     fundingSourceOther: '',
-    startDate: '',
-    endDate: '',
     allowance: '',
-    status: 'Planned',
     documents: [],
   }
 }
@@ -62,20 +57,21 @@ function SectionHeader({ title }: { title: string }) {
 // type on every keystroke and remounts the underlying <input>, losing focus
 // after a single character.
 
-type BatchFormState = Omit<GIPBatch, 'id'>
+type WorkplaceFormState = Omit<GIPWorkplace, 'id'>
 
 function Field({
-  label, field, required, placeholder, type = 'text', form, errors, isView, onChange, containerRef,
+  label, field, required, placeholder, type = 'text', min, form, errors, isView, onChange, containerRef,
 }: {
   label: string
-  field: keyof BatchFormState
+  field: keyof WorkplaceFormState
   required?: boolean
   placeholder?: string
   type?: string
-  form: BatchFormState
+  min?: number
+  form: WorkplaceFormState
   errors: Record<string, string>
   isView: boolean
-  onChange: (field: keyof BatchFormState, value: string) => void
+  onChange: (field: keyof WorkplaceFormState, value: string) => void
   containerRef?: RefObject<HTMLDivElement | null>
 }) {
   return (
@@ -98,8 +94,13 @@ function Field({
           ) : (
             <input
               type={type}
+              min={min}
               value={form[field] as string}
-              onChange={e => onChange(field, e.target.value)}
+              onChange={e => {
+                const v = type === 'number' ? e.target.value.replace(/[^0-9]/g, '') : e.target.value
+                onChange(field, v)
+              }}
+              onKeyDown={type === 'number' ? (e => { if (e.key === '-' || e.key === 'e' || e.key === '+') e.preventDefault() }) : undefined}
               placeholder={placeholder}
               className={`${inputCls} ${errors[field] ? 'border-red-400' : ''}`}
             />
@@ -114,49 +115,45 @@ function Field({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface GIPMaintenanceFormProps {
-  mode: 'batch' | 'batch-view' | 'batch-edit'
-  initialBatch?: GIPBatch
-  onSaveBatch: (data: Omit<GIPBatch, 'id'>) => void
-  onUpdateBatch?: (batch: GIPBatch) => void
+  mode: 'workplace' | 'workplace-view' | 'workplace-edit'
+  initialWorkplace?: GIPWorkplace
+  onSaveWorkplace: (data: Omit<GIPWorkplace, 'id'>) => void
+  onUpdateWorkplace?: (workplace: GIPWorkplace) => void
   onCancel: () => void
   isSaving?: boolean
 }
 
 const HEADING: Record<GIPMaintenanceFormProps['mode'], string> = {
-  'batch':      'Add New GIP Batch',
-  'batch-edit': 'Edit GIP Batch',
-  'batch-view': 'GIP Batch Details',
+  'workplace':      'Add New GIP Workplace/Office',
+  'workplace-edit': 'Edit GIP Workplace/Office',
+  'workplace-view': 'GIP Workplace/Office Details',
 }
 
 export default function GIPMaintenanceForm({
   mode,
-  initialBatch,
-  onSaveBatch,
-  onUpdateBatch,
+  initialWorkplace,
+  onSaveWorkplace,
+  onUpdateWorkplace,
   onCancel,
   isSaving = false,
 }: GIPMaintenanceFormProps) {
-  const isView = mode === 'batch-view'
-  const isEdit = mode === 'batch-edit'
-  const isAdd  = mode === 'batch'
+  const isView = mode === 'workplace-view'
+  const isEdit = mode === 'workplace-edit'
+  const isAdd  = mode === 'workplace'
 
-  const [form, setForm] = useState<Omit<GIPBatch, 'id'>>(() =>
-    initialBatch
-      ? { ...initialBatch }
-      : emptyBatch()
+  const [form, setForm] = useState<Omit<GIPWorkplace, 'id'>>(() =>
+    initialWorkplace
+      ? { ...initialWorkplace }
+      : emptyWorkplace()
   )
   const { fieldErrors: errors, clearFieldError, runValidation } = useFieldValidation()
   const [isDragging, setIsDragging] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<GIPSavedDocument | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const batchNameRef = useRef<HTMLDivElement>(null)
-  const assignedOfficeRef = useRef<HTMLDivElement>(null)
+  const workplaceNameRef = useRef<HTMLDivElement>(null)
   const deploymentLocationRef = useRef<HTMLDivElement>(null)
   const supervisorRef = useRef<HTMLDivElement>(null)
-  const slotsRef = useRef<HTMLDivElement>(null)
-  const startDateRef = useRef<HTMLDivElement>(null)
-  const endDateRef = useRef<HTMLDivElement>(null)
   const fundingSourceOtherRef = useRef<HTMLDivElement>(null)
 
   // ── Field helpers ────────────────────────────────────────────────────────────
@@ -173,17 +170,13 @@ export default function GIPMaintenanceForm({
 
   const validate = () => {
     const errs: ValidationError[] = []
-    if (!form.batchName.trim())     errs.push({ field: 'batchName', message: 'Batch name is required', focus: scrollTo(batchNameRef) })
-    if (!form.assignedOffice.trim()) errs.push({ field: 'assignedOffice', message: 'Assigned office is required', focus: scrollTo(assignedOfficeRef) })
+    if (!form.workplaceName.trim())      errs.push({ field: 'workplaceName', message: 'Workplace/office name is required', focus: scrollTo(workplaceNameRef) })
     if (!form.deploymentLocation.trim()) errs.push({ field: 'deploymentLocation', message: 'Deployment location is required', focus: scrollTo(deploymentLocationRef) })
     if (!form.supervisor.trim()) {
       errs.push({ field: 'supervisor', message: 'Supervisor is required', focus: scrollTo(supervisorRef) })
     } else if (!NAME_REGEX.test(form.supervisor.trim())) {
       errs.push({ field: 'supervisor', message: 'Supervisor must contain letters only (no numbers or symbols)', focus: scrollTo(supervisorRef) })
     }
-    if (!form.slots.trim())         errs.push({ field: 'slots', message: 'Number of slots is required', focus: scrollTo(slotsRef) })
-    if (!form.startDate)            errs.push({ field: 'startDate', message: 'Start date is required', focus: scrollTo(startDateRef) })
-    if (!form.endDate)              errs.push({ field: 'endDate', message: 'End date is required', focus: scrollTo(endDateRef) })
     if (form.fundingSource === 'Others' && !form.fundingSourceOther.trim())
       errs.push({ field: 'fundingSourceOther', message: 'Please specify the funding source', focus: scrollTo(fundingSourceOtherRef) })
     return !runValidation(errs)
@@ -209,8 +202,8 @@ export default function GIPMaintenanceForm({
           fileName: file.name,
           fileSize: formatFileSize(file.size),
           // A blob: URL (not the data: dataUrl) so "View" works before the
-          // batch is saved — Chrome/Brave block opening data: URIs in a new
-          // tab, which would otherwise show a blank "Untitled" tab.
+          // workplace is saved — Chrome/Brave block opening data: URIs in a
+          // new tab, which would otherwise show a blank "Untitled" tab.
           url: URL.createObjectURL(file),
           dataUrl,
         }
@@ -227,10 +220,10 @@ export default function GIPMaintenanceForm({
 
   const handleSave = () => {
     if (isSaving || !validate()) return
-    if (isEdit && initialBatch && onUpdateBatch) {
-      onUpdateBatch({ ...form, id: initialBatch.id } as GIPBatch)
+    if (isEdit && initialWorkplace && onUpdateWorkplace) {
+      onUpdateWorkplace({ ...form, id: initialWorkplace.id } as GIPWorkplace)
     } else {
-      onSaveBatch(form)
+      onSaveWorkplace(form)
     }
   }
 
@@ -244,34 +237,22 @@ export default function GIPMaintenanceForm({
         <div>
           <h3 className="text-white m-0 text-lg font-semibold">{HEADING[mode]}</h3>
           <p className="text-white/80 text-sm mt-0.5">
-            {isAdd  && 'Fill in the details to create a new GIP batch.'}
-            {isEdit && 'Update the batch information below.'}
-            {isView && 'Read-only view of the GIP batch details.'}
+            {isAdd  && 'Fill in the details to create a new GIP workplace/office.'}
+            {isEdit && 'Update the workplace/office information below.'}
+            {isView && 'Read-only view of the GIP workplace/office details.'}
           </p>
         </div>
-        {isView && (
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              form.status === 'Planned'   ? 'bg-yellow-100 text-yellow-700' :
-              form.status === 'Ongoing'   ? 'bg-green-100 text-green-700'  :
-              form.status === 'Completed' ? 'bg-blue-100 text-blue-700'    :
-              'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {form.status}
-          </span>
-        )}
       </div>
 
       {/* Form body */}
       <div className="p-6 space-y-8">
 
-        {/* Section 1: Batch Information */}
+        {/* Section 1: Workplace/Office Information */}
         <section>
-          <SectionHeader title="Batch Information" />
+          <SectionHeader title="Workplace/Office Information" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <Field label="Batch Name" field="batchName" required placeholder="e.g. Government Internship Program - Batch 1" form={form} errors={errors} isView={isView} onChange={set} containerRef={batchNameRef} />
+              <Field label="Workplace/Office Name" field="workplaceName" required placeholder="e.g. City Hall" form={form} errors={errors} isView={isView} onChange={set} containerRef={workplaceNameRef} />
             </div>
           </div>
           <div className="mt-4">
@@ -285,21 +266,15 @@ export default function GIPMaintenanceForm({
                 value={form.description}
                 onChange={e => set('description', e.target.value)}
                 rows={3}
-                placeholder="Brief description of this batch..."
+                placeholder="Brief description of this workplace/office..."
                 className={inputCls}
               />
             )}
           </div>
-        </section>
-
-        {/* Section 2: Deployment Information */}
-        <section>
-          <SectionHeader title="Deployment Information" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Assigned Government Office" field="assignedOffice" required placeholder="e.g. City Hall" form={form} errors={errors} isView={isView} onChange={set} containerRef={assignedOfficeRef} />
-            <Field label="Deployment Location" field="deploymentLocation" required placeholder="e.g. Tangub City Hall and Partner Agencies" form={form} errors={errors} isView={isView} onChange={set} containerRef={deploymentLocationRef} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <Field label="Workplace/Office Address" field="deploymentLocation" required placeholder="e.g. Tangub City Hall and Partner Agencies" form={form} errors={errors} isView={isView} onChange={set} containerRef={deploymentLocationRef} />
             <Field label="Supervisor / Immediate Head" field="supervisor" required placeholder="Full name" form={form} errors={errors} isView={isView} onChange={set} containerRef={supervisorRef} />
-            <Field label="Number of GIP Slots" field="slots" required placeholder="e.g. 25" type="number" form={form} errors={errors} isView={isView} onChange={set} containerRef={slotsRef} />
+            <Field label="Monthly Allowance / Stipend (₱)" field="allowance" placeholder="e.g. 5000" form={form} errors={errors} isView={isView} onChange={set} />
             <div>
               <label className={labelCls}>Funding Source<span className="text-red-500 ml-0.5">*</span></label>
               {isView ? (
@@ -331,43 +306,7 @@ export default function GIPMaintenanceForm({
           </div>
         </section>
 
-        {/* Section 3: Internship Period */}
-        <section>
-          <SectionHeader title="Internship Period" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Field label="Start Date" field="startDate" required type="date" form={form} errors={errors} isView={isView} onChange={set} containerRef={startDateRef} />
-            <Field label="End Date" field="endDate" required type="date" form={form} errors={errors} isView={isView} onChange={set} containerRef={endDateRef} />
-            <Field label="Monthly Allowance / Stipend (₱)" field="allowance" placeholder="e.g. 5000" form={form} errors={errors} isView={isView} onChange={set} />
-          </div>
-          <div className="mt-4">
-            <label className={labelCls}>Status<span className="text-red-500 ml-0.5">*</span></label>
-            {isView ? (
-              <p className="text-sm text-gray-800 py-2 px-3 bg-gray-50 rounded-lg">{form.status}</p>
-            ) : (
-              <div className="flex gap-6 mt-1">
-                {(['Planned', 'Ongoing', 'Completed'] as const).map(s => {
-                  const isDisabled = isAdd && s !== 'Planned'
-                  return (
-                  <label key={s} className={`flex items-center gap-2 text-sm text-gray-700 ${isDisabled ? 'cursor-default opacity-40' : 'cursor-pointer'}`}>
-                    <input
-                      type="radio"
-                      name="gip-status"
-                      value={s}
-                      checked={form.status === s}
-                      onChange={() => set('status', s)}
-                      disabled={isDisabled}
-                      className="accent-brand-blue disabled:cursor-default"
-                    />
-                    {s}
-                  </label>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Section 4: Documents */}
+        {/* Section 2: Documents */}
         <section>
           <SectionHeader title="Documents" />
           {!isView && (
@@ -454,7 +393,7 @@ export default function GIPMaintenanceForm({
               className="px-6 py-2.5 text-white bg-brand-blue hover:bg-blue-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
             >
               {isSaving && <Loader2 size={16} className="animate-spin" />}
-              {isSaving ? 'Saving…' : (isAdd ? 'Save Batch' : 'Save Changes')}
+              {isSaving ? 'Saving…' : (isAdd ? 'Save Workplace/Office' : 'Save Changes')}
             </button>
           </>
         )}

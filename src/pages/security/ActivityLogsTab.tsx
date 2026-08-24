@@ -79,7 +79,7 @@ function getDaysRemaining(deletedAt: string): number {
 const logStatuses = ['All', 'Success', 'Failed']
 const binModules  = [
   'All', 'Applicants', 'Employers', 'Referrals',
-  'GIP Applicants', 'GIP Batches',
+  'GIP Applicants', 'GIP Workplaces',
   'CDSP Applicants', 'CDSP Activities',
   'SPES Applicants', 'SPES Batches',
   'DILP Beneficiaries', 'DILP Projects',
@@ -99,7 +99,7 @@ const BIN_MODULE_BADGE: Record<string, string> = {
   'Employers': 'bg-purple-50 text-purple-700',
   'Referrals': 'bg-amber-50 text-amber-700',
   'GIP Applicants': 'bg-sky-50 text-sky-700',
-  'GIP Batches': 'bg-sky-50 text-sky-700',
+  'GIP Workplaces': 'bg-sky-50 text-sky-700',
   'CDSP Applicants': 'bg-teal-50 text-teal-700',
   'CDSP Activities': 'bg-teal-50 text-teal-700',
   'SPES Applicants': 'bg-indigo-50 text-indigo-700',
@@ -121,7 +121,7 @@ const BIN_MODULE_BADGE: Record<string, string> = {
 }
 
 export default function ActivityLogsTab() {
-  const { refreshProfiles: refreshGipProfiles, refreshBatches: refreshGipBatches } = useGIP()
+  const { refreshProfiles: refreshGipProfiles, refreshWorkplaces: refreshGipWorkplaces } = useGIP()
   const { refreshProfiles: refreshCdspProfiles, refreshActivities: refreshCdspActivities } = useCDSP()
   const { refreshProfiles: refreshSpesProfiles, refreshBatches: refreshSpesBatches } = useSPES()
   const { refreshProfiles: refreshDilpProfiles, refreshProjects: refreshDilpProjects } = useDILP()
@@ -234,7 +234,7 @@ export default function ActivityLogsTab() {
   // no manual page refresh needed.
   const refreshModuleFor = async (recordType: RecycleBinItem['recordType']) => {
     if (recordType === 'gipApplicant') await refreshGipProfiles()
-    if (recordType === 'gipBatch') await refreshGipBatches()
+    if (recordType === 'gipWorkplace') await refreshGipWorkplaces()
     if (recordType === 'cdspApplicant') await refreshCdspProfiles()
     if (recordType === 'cdspActivity') await refreshCdspActivities()
     if (recordType === 'spesApplicant') await refreshSpesProfiles()

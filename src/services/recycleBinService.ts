@@ -11,7 +11,7 @@ import { ENDPOINTS } from '../config/api'
 
 export type RecycleRecordType =
   | 'applicant' | 'employer' | 'referral'
-  | 'gipApplicant' | 'gipBatch'
+  | 'gipApplicant' | 'gipWorkplace'
   | 'cdspApplicant' | 'cdspActivity'
   | 'spesApplicant' | 'spesBatch'
   | 'dilpApplicant' | 'dilpProject'
@@ -34,7 +34,7 @@ export type RecycleBinRecord = {
 
 // Which module's endpoints handle a given record type.
 function endpointsFor(recordType: RecycleRecordType) {
-  if (recordType === 'gipApplicant' || recordType === 'gipBatch') return ENDPOINTS.gip
+  if (recordType === 'gipApplicant' || recordType === 'gipWorkplace') return ENDPOINTS.gip
   if (recordType === 'cdspApplicant' || recordType === 'cdspActivity') return ENDPOINTS.cdsp
   if (recordType === 'spesApplicant' || recordType === 'spesBatch') return ENDPOINTS.spes
   if (recordType === 'dilpApplicant' || recordType === 'dilpProject') return ENDPOINTS.dilp

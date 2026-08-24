@@ -58,7 +58,7 @@ const REPORT_CATEGORIES: { id: ReportCategory; name: string }[] = [
 
 export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: cdspApplicants, activities: cdspActivities, services: cdspServices, programInfo: cdspProgramInfo } = useCDSP()
-  const { applicants: gipApplicants, gipBatches } = useGIP()
+  const { applicants: gipApplicants, gipWorkplaces } = useGIP()
   const { applicants: spesApplicants, spesBatches } = useSPES()
   const { profiles: skillsProfiles, activities: skillsActivities } = useSkillsTraining()
   const { profiles: ofwProfiles } = useOFW()
@@ -287,11 +287,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   // CDSP Activity List columns — one row per activity/session, not per participant.
   const CDSP_SESSION_COLUMNS = ['Activity Title', 'Service Type', 'Date', 'Venue', 'Facilitator', 'Counselor', 'Duration', 'Participants', 'Status']
-  // GIP Batch List columns — one row per internship batch/deployment, not per intern.
-  // No "Facilitator"/"Counselor"/"Duration" here — GIP's equivalent context is an
-  // Assigned Office + Coordinator/Supervisor overseeing an extended deployment,
-  // not a single-day session run by one facilitator.
-  const GIP_BATCH_COLUMNS = ['Batch Name', 'Assigned Office', 'Deployment Location', 'Start Date', 'End Date', 'Supervisor', 'Allowance', 'Participants', 'Status']
+  // GIP Workplace/Office List columns — one row per internship workplace/office
+  // deployment, not per intern. No "Facilitator"/"Counselor"/"Duration" here —
+  // GIP's equivalent context is a workplace/office + Coordinator/Supervisor
+  // overseeing an extended deployment, not a single-day session run by one
+  // facilitator.
+  const GIP_WORKPLACE_COLUMNS = ['Assigned Office', 'Workplace/Office Address', 'Supervisor', 'Allowance', 'Participants']
   // SPES Batch List columns — one row per SPES batch. SPES students are deployed
   // to an "Employer" (government office OR private establishment — unlike GIP,
   // which is government-office-only), so that's the accurate label here rather
@@ -299,7 +300,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // underlying field is named availableSlots, but it's the total, not the
   // remaining count — see the separate "Participants" column for how many are
   // filled); there's no per-batch wage/allowance field on SPESBatch the way
-  // there is on GIPBatch, so "Funding Source" fills that context role.
+  // there is on GIPWorkplace, so "Funding Source" fills that context role.
   const SPES_BATCH_COLUMNS = ['Batch Name', 'Employer', 'Deployment Location', 'Start Date', 'End Date', 'Coordinator', 'Total Slots', 'Funding Source', 'Participants', 'Status']
   // Livelihood Project/Intervention List columns — one row per DILP/TUPAD project,
   // SLP project, or CLPEP intervention, not per beneficiary. Unlike CDSP/GIP/SPES's
@@ -352,7 +353,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   const getReportColumns = (category: ReportCategory): string[] => {
     if (category === 'cdsp' && cdspReportType === 'sessions') return CDSP_SESSION_COLUMNS
-    if (category === 'gip' && gipReportType === 'batches') return GIP_BATCH_COLUMNS
+    if (category === 'gip' && gipReportType === 'batches') return GIP_WORKPLACE_COLUMNS
     if (category === 'spes' && spesReportType === 'batches') return SPES_BATCH_COLUMNS
     if (category === 'livelihood' && livelihoodReportType === 'projects') return getLivelihoodProjectColumns()
     if (category === 'skills-training' && skillsReportType === 'activities') return SKILLS_TRAINING_ACTIVITY_COLUMNS
@@ -368,8 +369,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
       'livelihood': ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Program Type', 'Date Applied', 'Civil Status',
                      'Contact Number', 'Street/Purok', 'Barangay', 'Address', 'Assigned Project/Intervention',
                      'Assistance Amount', 'Release Date', 'Status', 'Remarks'],
-      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Deployment Location',
-              'Start Date', 'End Date', 'Status', 'Batch', 'School Name', 'Course', 'Strand', 'Civil Status',
+      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
+              'Start Date', 'End Date', 'Status', 'School Name', 'Course', 'Strand', 'Civil Status',
               'Contact Number', 'Street/Purok', 'Barangay', 'Address', 'Supervisor', 'Allowance', 'Remarks'],
       'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location',
                'Start Date', 'End Date', 'Status', 'Batch', 'Course', 'School Type', 'Civil Status', 'Contact Number',
@@ -389,14 +390,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const withoutStatus = (cols: string[]) => cols.filter(c => c !== 'Status')
     // CDSP Activity List: few columns, all useful — show all by default.
     if (category === 'cdsp' && cdspReportType === 'sessions') return withoutStatus(CDSP_SESSION_COLUMNS)
-    // GIP Batch List: few columns, all useful — show all by default.
-    if (category === 'gip' && gipReportType === 'batches') return withoutStatus(GIP_BATCH_COLUMNS)
+    // GIP Workplace/Office List: few columns, all useful — show all by default.
+    if (category === 'gip' && gipReportType === 'batches') return withoutStatus(GIP_WORKPLACE_COLUMNS)
     // CDSP: the fields that matter for a career-development report are on by default;
     // the rest (contact, address, occupation, civil status, status, remarks) are optional.
     if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Applied', 'Highest Education', 'Employment Status']
     // GIP: interns deployed to government offices — identity, education, deployment office and period.
     // (Status is optional, matching CDSP.)
-    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Deployment Location', 'Start Date', 'End Date']
+    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Start Date', 'End Date']
     // SPES Batch List: few columns, all useful — show all by default.
     if (category === 'spes' && spesReportType === 'batches') return withoutStatus(SPES_BATCH_COLUMNS)
     // SPES: working students — identity, school/year level, employer and period.
@@ -516,39 +517,35 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
       case 'gip':
         if (gipReportType === 'batches') {
-          return gipBatches
-            // Period filter on the batch's start date
-            .filter(b => inSelectedPeriod(b.startDate))
-            .map(b => ({
-              'Batch Name': b.batchName || '-',
-              'Assigned Office': b.assignedOffice || '-',
-              'Deployment Location': b.deploymentLocation || '-',
-              'Start Date': b.startDate || '-',
-              'End Date': b.endDate || '-',
-              'Supervisor': b.supervisor || '-',
-              'Allowance': formatCurrency(b.allowance),
-              'Participants': b.assignedCount ?? 0,
-              'Status': b.status,
-              _batchId: b.id, // not rendered as a column — used to export this batch's interns
+          // Workplaces are a reusable directory (no period of their own, like
+          // EF's employers) -- not period-filtered, unlike other activity lists.
+          return gipWorkplaces
+            .map(w => ({
+              'Assigned Office': w.workplaceName || '-',
+              'Workplace/Office Address': w.deploymentLocation || '-',
+              'Supervisor': w.supervisor || '-',
+              'Allowance': formatCurrency(w.allowance),
+              'Participants': w.assignedCount ?? 0,
+              _batchId: w.id, // not rendered as a column — used to export this workplace's interns
             }))
         }
         return gipApplicants
           // Period filter on the date the application was received
           .filter(a => inSelectedPeriod(a.dateApplicationReceived))
           .map((a, i) => {
-            const batch = gipBatches.find(b => b.id === a.assignedBatchId)
+            const workplace = gipWorkplaces.find(w => w.id === a.assignedWorkplaceId)
+            const history = a.assignmentHistory[0]
             return {
               'No.': i + 1,
               'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
               'Sex': a.sex || '-',
               'Age': a.age || '-',
               'Highest Education': a.highestEducation || '-',
-              'Assigned Office': batch?.assignedOffice || '-',
-              'Deployment Location': batch?.deploymentLocation || '-',
-              'Start Date': batch?.startDate || '-',
-              'End Date': batch?.endDate || '-',
+              'Assigned Office': workplace?.workplaceName || '-',
+              'Workplace/Office Address': workplace?.deploymentLocation || '-',
+              'Start Date': history?.assignedDate || '-',
+              'End Date': history?.completedDate || '-',
               'Status': a.status,
-              'Batch': batch?.batchName || '-',
               'School Name': a.schoolName || '-',
               'Course': a.course || '-',
               'Strand': a.strand || '-',
@@ -557,8 +554,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Street/Purok': a.streetPurok || '-',
               'Barangay': a.barangay || '-',
               'Address': formatAddress(a),
-              'Supervisor': batch?.supervisor || '-',
-              'Allowance': formatCurrency(batch?.allowance),
+              'Supervisor': workplace?.supervisor || '-',
+              'Allowance': formatCurrency(workplace?.allowance),
               'Remarks': a.remarks || '-',
             }
           })
@@ -1147,7 +1144,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     // identically-named files and silently overwrite each other on disk.
     const reportTypeSuffix =
       generatedReport.category === 'cdsp' ? (generatedReport.cdspReportType === 'sessions' ? 'Activity_List' : 'Participant_List') :
-      generatedReport.category === 'gip'  ? (generatedReport.gipReportType === 'batches' ? 'Batch_List' : 'Participant_List') :
+      generatedReport.category === 'gip'  ? (generatedReport.gipReportType === 'batches' ? 'Workplace_List' : 'Participant_List') :
       generatedReport.category === 'spes' ? (generatedReport.spesReportType === 'batches' ? 'Batch_List' : 'Participant_List') :
       generatedReport.category === 'livelihood' ? (generatedReport.livelihoodReportType === 'projects' ? `${livelihoodUnitLabel(generatedReport.programType).plural.replace('/', '_')}_List` : 'Beneficiary_List') :
       generatedReport.category === 'skills-training' ? (generatedReport.skillsReportType === 'activities' ? 'Training_List' : 'Participant_List') :
@@ -1283,38 +1280,33 @@ export default function ReportView({ onBack }: ReportViewProps) {
         applyPrint(ws)
       }
 
-      // GIP Batch List summary sheet — same shape as CDSP's Activity List summary
-      // above. Assigned Office plays the role CDSP's Service Type does (and
-      // matches the grouping GIP's own Participant List analytics already uses).
+      // GIP Workplace/Office List summary sheet — same shape as CDSP's Activity
+      // List summary above. Assigned Office plays the role CDSP's Service Type
+      // does (and matches the grouping GIP's own Participant List analytics
+      // already uses). No status breakdown -- workplaces are a reusable
+      // directory with no status of their own; status lives on applicants.
       if (generatedReport.category === 'gip' && generatedReport.gipReportType === 'batches') {
         const rows = generatedReport.data as any[]
-        const totalBatches = rows.length
+        const totalWorkplaces = rows.length
         const totalParticipants = rows.reduce((sum, r) => sum + (Number(r['Participants']) || 0), 0)
-        const statusCounts: Record<string, number> = {}
         const officeCounts: Record<string, number> = {}
         rows.forEach(r => {
-          const status = r['Status'] || 'Unspecified'
-          statusCounts[status] = (statusCounts[status] || 0) + 1
           const office = r['Assigned Office'] || 'Unspecified'
           officeCounts[office] = (officeCounts[office] || 0) + 1
         })
         const aoa: any[][] = [
-          [`${String(generatedReport.categoryName).toUpperCase()} BATCH LIST SUMMARY`], [],
+          [`${String(generatedReport.categoryName).toUpperCase()} WORKPLACE/OFFICE LIST SUMMARY`], [],
           ['Report Period', generatedReport.periodDetails], [],
-          ['Total Batches', totalBatches],
+          ['Total Workplaces/Offices', totalWorkplaces],
           ['Total Participants', totalParticipants], [],
-          ['BATCHES BY STATUS'], ['Status', 'Batches'],
-          ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
-          ['BATCHES BY ASSIGNED OFFICE'], ['Assigned Office', 'Batches'],
+          ['WORKPLACES/OFFICES BY ASSIGNED OFFICE'], ['Assigned Office', 'Workplaces/Offices'],
           ...Object.entries(officeCounts).map(([k, v]) => [k, v]),
         ]
         const ws = wb.addWorksheet('Summary')
         aoa.forEach(r => ws.addRow(r))
         ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
         ws.getRow(1).font = { bold: true, size: 14 }
-        const byStatusRow = aoa.findIndex(r => r[0] === 'BATCHES BY STATUS') + 1
-        if (byStatusRow > 0) ws.getRow(byStatusRow).font = { bold: true }
-        const byOfficeRow = aoa.findIndex(r => r[0] === 'BATCHES BY ASSIGNED OFFICE') + 1
+        const byOfficeRow = aoa.findIndex(r => r[0] === 'WORKPLACES/OFFICES BY ASSIGNED OFFICE') + 1
         if (byOfficeRow > 0) ws.getRow(byOfficeRow).font = { bold: true }
         applyPrint(ws)
       }
@@ -1800,17 +1792,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
     URL.revokeObjectURL(link.href)
   }
 
-  // Downloads the intern list for a single GIP batch (Batch List row-level
-  // action) — same shape/technique as handleExportSessionRoster (centered
-  // full-width info block, text-formatted contact numbers for Excel), adapted
-  // to batch/intern terminology: a batch info block (Assigned Office,
-  // Deployment Location, Coordinator, Supervisor, Allowance) instead of an
-  // activity info block (Venue, Facilitator, Counselor).
-  const handleExportBatchInterns = async (batchId: number, format: 'excel' | 'pdf' | 'csv') => {
-    const batch = gipBatches.find(b => b.id === batchId)
-    if (!batch) return
+  // Downloads the intern list for a single GIP workplace/office (Workplace
+  // List row-level action) — same shape/technique as handleExportSessionRoster
+  // (centered full-width info block, text-formatted contact numbers for
+  // Excel), adapted to workplace/intern terminology: a workplace info block
+  // (Assigned Office, Workplace/Office Address, Coordinator, Supervisor, Allowance)
+  // instead of an activity info block (Venue, Facilitator, Counselor).
+  const handleExportBatchInterns = async (workplaceId: number, format: 'excel' | 'pdf' | 'csv') => {
+    const workplace = gipWorkplaces.find(w => w.id === workplaceId)
+    if (!workplace) return
     const interns = gipApplicants
-      .filter(a => a.assignedBatchId === batchId)
+      .filter(a => a.assignedWorkplaceId === workplaceId)
       .map((a, i) => [
         i + 1,
         `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
@@ -1822,23 +1814,22 @@ export default function ReportView({ onBack }: ReportViewProps) {
         a.highestEducation || '-',
       ])
     if (interns.length === 0) {
-      setInfoModal({ isOpen: true, title: 'No Interns', message: 'This batch has no interns assigned yet.' })
+      setInfoModal({ isOpen: true, title: 'No Interns', message: 'This workplace/office has no interns assigned yet.' })
       return
     }
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'School Name', 'Course', 'Highest Education']
     const infoLines: { label: string; value: string | number }[][] = [
-      [{ label: 'Batch: ', value: batch.batchName || '-' }],
-      [{ label: 'Assigned Office: ', value: batch.assignedOffice || '-' }, { label: '     Deployment Location: ', value: batch.deploymentLocation || '-' }],
-      [{ label: 'Start Date: ', value: batch.startDate || '-' }, { label: '     End Date: ', value: batch.endDate || '-' }],
-      [{ label: 'Supervisor: ', value: batch.supervisor || '-' }],
-      [{ label: 'Allowance: ', value: batch.allowance || '-' }],
+      [{ label: 'Assigned Office: ', value: workplace.workplaceName || '-' }, { label: '     Workplace/Office Address: ', value: workplace.deploymentLocation || '-' }],
+      [{ label: 'Supervisor: ', value: workplace.supervisor || '-' }],
+      [{ label: 'Allowance: ', value: workplace.allowance || '-' }],
       [{ label: 'Total Interns: ', value: interns.length }],
     ]
-    const safeName = (batch.batchName || 'Batch').replace(/[^a-z0-9]+/gi, '_')
+    const safeName = (workplace.workplaceName || 'Workplace').replace(/[^a-z0-9]+/gi, '_')
+    const exportDate = new Date().toISOString().split('T')[0]
 
     if (format === 'pdf') {
       const doc = buildRosterPdf('GIP INTERN LIST', infoLines, headerLabels, interns)
-      doc.save(`GIP_Interns_${safeName}_${batch.startDate || 'undated'}.pdf`)
+      doc.save(`GIP_Interns_${safeName}_${exportDate}.pdf`)
       return
     }
     if (format === 'csv') {
@@ -1846,7 +1837,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `GIP_Interns_${safeName}_${batch.startDate || 'undated'}.csv`
+      link.download = `GIP_Interns_${safeName}_${exportDate}.csv`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -1901,7 +1892,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `GIP_Interns_${safeName}_${batch.startDate || 'undated'}.xlsx`
+    link.download = `GIP_Interns_${safeName}_${exportDate}.xlsx`
     link.click()
     URL.revokeObjectURL(link.href)
   }
@@ -2340,7 +2331,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 <select value={gipReportType} onChange={e => setGipReportType(e.target.value as 'participants' | 'batches')}
                   className="appearance-none w-full pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
                   <option value="participants">Participant List</option>
-                  <option value="batches">Batch List</option>
+                  <option value="batches">Workplace/Office List</option>
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>

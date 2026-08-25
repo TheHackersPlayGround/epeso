@@ -88,7 +88,6 @@ export const ENDPOINTS = {
     assignWorkplace:      '/gip/assignWorkplace',
     unassignWorkplace:    '/gip/unassignWorkplace',
     completeAssignment:   '/gip/completeAssignment',
-    reopenAssignment:     '/gip/reopenAssignment',
     listDeleted:          '/gip/listDeleted',
     restoreRecord:        '/gip/restoreRecord',
     purgeRecord:          '/gip/purgeRecord',

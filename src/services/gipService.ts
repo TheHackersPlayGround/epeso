@@ -41,10 +41,8 @@ export function unassignWorkplace(applicantId: number) {
   return axiosClient.post(ENDPOINTS.gip.unassignWorkplace, { applicantId }).then(r => r.data)
 }
 
+// Completing is final -- a GIP applicant only ever goes through the program
+// once, so there's deliberately no reopenAssignment() counterpart.
 export function completeAssignment(applicantId: number) {
   return axiosClient.post(ENDPOINTS.gip.completeAssignment, { applicantId }).then(r => r.data)
-}
-
-export function reopenAssignment(applicantId: number) {
-  return axiosClient.post(ENDPOINTS.gip.reopenAssignment, { applicantId }).then(r => r.data)
 }

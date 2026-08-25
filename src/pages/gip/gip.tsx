@@ -199,7 +199,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [selectedWorkplace, setSelectedWorkplace] = useState<GIPWorkplace | null>(null)
   const [confirmingWorkplace, setConfirmingWorkplace] = useState<GIPWorkplace | null>(null)
   const [viewWorkplaceTarget, setViewWorkplaceTarget] = useState<GIPApplicant | null>(null)
-  const [statusActionConfirm, setStatusActionConfirm] = useState<{ applicant: GIPApplicant; action: 'complete' | 'reopen' } | null>(null)
+  const [completeConfirm, setCompleteConfirm] = useState<GIPApplicant | null>(null)
 
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -324,6 +324,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
     }
   }
 
+  // Completing is final — a GIP applicant can only ever go through the
+  // program once, so unlike an assignment, a completed engagement is never
+  // reopened. It stays on record permanently.
   const handleCompleteAssignment = async (applicantId: number) => {
     if (isAssigning) return
     setIsAssigning(true)
@@ -331,28 +334,11 @@ export default function GIPView({ onBack }: GIPViewProps) {
       await gipApiService.completeAssignment(applicantId)
       await refreshProfiles()
       await refreshWorkplaces()
-      setStatusActionConfirm(null)
+      setCompleteConfirm(null)
       setResultModal({ isOpen: true, type: 'success', title: 'Completed', message: 'Applicant has been marked as completed.' })
     } catch (e: unknown) {
-      setStatusActionConfirm(null)
+      setCompleteConfirm(null)
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as completed.') })
-    } finally {
-      setIsAssigning(false)
-    }
-  }
-
-  const handleReopenAssignment = async (applicantId: number) => {
-    if (isAssigning) return
-    setIsAssigning(true)
-    try {
-      await gipApiService.reopenAssignment(applicantId)
-      await refreshProfiles()
-      await refreshWorkplaces()
-      setStatusActionConfirm(null)
-      setResultModal({ isOpen: true, type: 'success', title: 'Reopened', message: 'Assignment has been reopened.' })
-    } catch (e: unknown) {
-      setStatusActionConfirm(null)
-      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to reopen assignment.') })
     } finally {
       setIsAssigning(false)
     }
@@ -570,7 +556,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 </div>
                 <button onClick={() => setViewWorkplaceTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
               </div>
-              <div className="p-6">
+              <div className="p-6 space-y-3">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
@@ -582,17 +568,19 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                     <div><span className="text-gray-400">Address:</span> {currentWorkplace.deploymentLocation || '—'}</div>
-                    <div><span className="text-gray-400">Currently Assigned:</span> {currentWorkplace.assignedCount}</div>
                     <div><span className="text-gray-400">Allowance:</span> {currentWorkplace.allowance ? `₱${currentWorkplace.allowance}/mo` : '—'}</div>
-                    {/* This applicant's own dates -- not the workplace's, since
-                        the workplace no longer has a period of its own. */}
-                    {viewWorkplaceTarget.assignmentHistory[0]?.assignedDate && (
-                      <div><span className="text-gray-400">Start Date:</span> {fmtDate(viewWorkplaceTarget.assignmentHistory[0].assignedDate)}</div>
-                    )}
-                    {viewWorkplaceTarget.assignmentHistory[0]?.completedDate && (
-                      <div><span className="text-gray-400">End Date:</span> {fmtDate(viewWorkplaceTarget.assignmentHistory[0].completedDate)}</div>
-                    )}
-                    {currentWorkplace.supervisor && <div className="col-span-2"><span className="text-gray-400">Supervisor:</span> {currentWorkplace.supervisor}</div>}
+                    {currentWorkplace.supervisor && <div><span className="text-gray-400">Supervisor:</span> {currentWorkplace.supervisor}</div>}
+                  </div>
+                </div>
+
+                {/* This applicant's own assignment period -- kept separate from
+                    the workplace's own details above, since these dates belong
+                    to this person, not the (reusable, dateless) workplace. */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assignment Period</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div><span className="text-gray-400">Start Date:</span> {viewWorkplaceTarget.assignmentHistory[0]?.assignedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].assignedDate) : '—'}</div>
+                    <div><span className="text-gray-400">End Date:</span> {isCompleted && viewWorkplaceTarget.assignmentHistory[0]?.completedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].completedDate) : '—'}</div>
                   </div>
                 </div>
               </div>
@@ -857,7 +845,6 @@ export default function GIPView({ onBack }: GIPViewProps) {
         if (!applicant) return null
         const hasWorkplaceLink = applicant.assignedWorkplaceId !== null
         const isActive = applicant.status === 'Ongoing'
-        const isCompleted = applicant.status === 'Completed'
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
@@ -875,17 +862,10 @@ export default function GIPView({ onBack }: GIPViewProps) {
               )}
               {isActive && (
                 <button
-                  onClick={() => { setStatusActionConfirm({ applicant, action: 'complete' }); setOpenActionMenuId(null) }}
+                  onClick={() => { setCompleteConfirm(applicant); setOpenActionMenuId(null) }}
                   disabled={!canManage('gip')}
                   className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Mark as Completed</button>
-              )}
-              {isCompleted && (
-                <button
-                  onClick={() => { setStatusActionConfirm({ applicant, action: 'reopen' }); setOpenActionMenuId(null) }}
-                  disabled={!canManage('gip')}
-                  className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                >Reopen Assignment</button>
               )}
               {applicant.status === 'Inactive' && (
                 <button
@@ -901,23 +881,16 @@ export default function GIPView({ onBack }: GIPViewProps) {
         )
       })()}
 
-      {statusActionConfirm && (
+      {completeConfirm && (
         <ConfirmModal
           isOpen={true}
           type="confirm"
-          title={statusActionConfirm.action === 'complete' ? 'Mark as Completed?' : 'Reopen Assignment?'}
-          message={
-            statusActionConfirm.action === 'complete'
-              ? `Mark ${statusActionConfirm.applicant.firstName} ${statusActionConfirm.applicant.lastName}'s internship as completed? This frees up their slot at the assigned workplace/office.`
-              : `Reopen ${statusActionConfirm.applicant.firstName} ${statusActionConfirm.applicant.lastName}'s completed assignment back to Active?`
-          }
-          confirmText={statusActionConfirm.action === 'complete' ? 'Yes, Mark Completed' : 'Yes, Reopen'}
+          title="Mark as Completed?"
+          message={`Mark ${completeConfirm.firstName} ${completeConfirm.lastName}'s internship as completed? This is final and cannot be undone — it becomes a permanent part of their record.`}
+          confirmText="Yes, Mark Completed"
           cancelText="Cancel"
-          onConfirm={() => {
-            if (statusActionConfirm.action === 'complete') handleCompleteAssignment(statusActionConfirm.applicant.id)
-            else handleReopenAssignment(statusActionConfirm.applicant.id)
-          }}
-          onCancel={() => setStatusActionConfirm(null)}
+          onConfirm={() => handleCompleteAssignment(completeConfirm.id)}
+          onCancel={() => setCompleteConfirm(null)}
         />
       )}
     </>

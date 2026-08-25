@@ -292,7 +292,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // GIP's equivalent context is a workplace/office + Coordinator/Supervisor
   // overseeing an extended deployment, not a single-day session run by one
   // facilitator.
-  const GIP_WORKPLACE_COLUMNS = ['Assigned Office', 'Workplace/Office Address', 'Supervisor', 'Allowance', 'Participants']
+  const GIP_WORKPLACE_COLUMNS = ['Assigned Office', 'Workplace/Office Address', 'Supervisor', 'Allowance', 'Interns']
   // SPES Batch List columns — one row per SPES batch. SPES students are deployed
   // to an "Employer" (government office OR private establishment — unlike GIP,
   // which is government-office-only), so that's the accurate label here rather
@@ -525,7 +525,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Workplace/Office Address': w.deploymentLocation || '-',
               'Supervisor': w.supervisor || '-',
               'Allowance': formatCurrency(w.allowance),
-              'Participants': w.assignedCount ?? 0,
+              // All interns ever assigned here (Ongoing + Completed), not just
+              // currently-active ones -- w.assignedCount is Ongoing-only and
+              // used elsewhere (Assign modal) for capacity, which isn't the
+              // question this report answers.
+              'Interns': gipApplicants.filter(a => a.assignedWorkplaceId === w.id).length,
               _batchId: w.id, // not rendered as a column — used to export this workplace's interns
             }))
         }
@@ -1288,7 +1292,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       if (generatedReport.category === 'gip' && generatedReport.gipReportType === 'batches') {
         const rows = generatedReport.data as any[]
         const totalWorkplaces = rows.length
-        const totalParticipants = rows.reduce((sum, r) => sum + (Number(r['Participants']) || 0), 0)
+        const totalInterns = rows.reduce((sum, r) => sum + (Number(r['Interns']) || 0), 0)
         const officeCounts: Record<string, number> = {}
         rows.forEach(r => {
           const office = r['Assigned Office'] || 'Unspecified'
@@ -1298,7 +1302,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           [`${String(generatedReport.categoryName).toUpperCase()} WORKPLACE/OFFICE LIST SUMMARY`], [],
           ['Report Period', generatedReport.periodDetails], [],
           ['Total Workplaces/Offices', totalWorkplaces],
-          ['Total Participants', totalParticipants], [],
+          ['Total Interns', totalInterns], [],
           ['WORKPLACES/OFFICES BY ASSIGNED OFFICE'], ['Assigned Office', 'Workplaces/Offices'],
           ...Object.entries(officeCounts).map(([k, v]) => [k, v]),
         ]
@@ -1589,7 +1593,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const unitSingular = isCdsp ? 'Activity' : livelihoodUnit ? livelihoodUnit.singular : isSkillsActivities ? 'Training' : 'Batch'
         const unitPlural = isCdsp ? 'Activities' : livelihoodUnit ? livelihoodUnit.plural : isSkillsActivities ? 'Trainings' : 'Batches'
         const secondaryCol = isCdsp ? 'Service Type' : isGip ? 'Assigned Office' : isLivelihoodProjects ? 'Program Type' : isSkillsActivities ? 'Training Batch' : 'Employer'
-        const participantsCol = isLivelihoodProjects ? 'Beneficiaries Assigned' : 'Participants'
+        const participantsCol = isLivelihoodProjects ? 'Beneficiaries Assigned' : isGip ? 'Interns' : 'Participants'
         // Livelihood's "by Program Type" breakdown only applies to the combined
         // "All Programs" view -- a specific program's column set has no "Program
         // Type" column at all (see getLivelihoodProjectColumns).
@@ -1621,16 +1625,20 @@ export default function ReportView({ onBack }: ReportViewProps) {
         }
         y += 3
         doc.text(`Total ${unitPlural}: ${totalUnits}`, 14, y)
-        doc.text(`Total ${isLivelihoodProjects ? 'Beneficiaries' : 'Participants'}: ${totalParticipants}`, 90, y); y += 10
+        doc.text(`Total ${isLivelihoodProjects ? 'Beneficiaries' : isGip ? 'Interns' : 'Participants'}: ${totalParticipants}`, 90, y); y += 10
 
-        doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text(`${unitPlural} by Status`, 14, y); y += 6
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        Object.entries(statusCounts).forEach(([k, v]) => {
-          if (y > pageHeight - 20) { doc.addPage(); y = 20 }
-          doc.text(`${k}: ${v}`, 14, y); y += 5
-        })
-        y += 3
+        // Workplaces have no status of their own (see the Excel summary
+        // above) -- skip this breakdown for GIP.
+        if (!isGip) {
+          doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
+          doc.text(`${unitPlural} by Status`, 14, y); y += 6
+          doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
+          Object.entries(statusCounts).forEach(([k, v]) => {
+            if (y > pageHeight - 20) { doc.addPage(); y = 20 }
+            doc.text(`${k}: ${v}`, 14, y); y += 5
+          })
+          y += 3
+        }
 
         if (showSecondaryBreakdown) {
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')

@@ -483,6 +483,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
         case "trainingCourse":
           result = result.filter((a) => (a.trainingCourses ?? "").toLowerCase().includes(value.toLowerCase()));
           break;
+        case "collegeCourse":
+          result = result.filter((a) => (((a.fullFormData?.tertiary as { course?: string })?.course) ?? "").toLowerCase().includes(value.toLowerCase()));
+          break;
       }
     }
 

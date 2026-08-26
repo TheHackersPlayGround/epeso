@@ -166,6 +166,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
     { id: 'education',      label: 'Education',       options: EDUCATION_OPTIONS },
+    { id: 'course',         label: 'Course / Degree', type: 'text' as const },
   ]
 
   const handleAddFilter = (filterId: string) => {
@@ -224,6 +225,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
       if (filterId === 'education') return a.highestEducation === val
+      if (filterId === 'course') return (a.course ?? '').toLowerCase().includes(val.toLowerCase())
       if (filterId === 'age') {
         const age = a.age ?? 0
         if (val === 'Below 20') return age < 20
@@ -706,15 +708,26 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   return (
                     <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                       <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                      <select
-                        value={filterValues[filterId] || ''}
-                        onChange={e => handleFilterValueChange(filterId, e.target.value)}
-                        className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <option value="">All</option>
-                        {filter?.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                      {filter?.type === 'text' ? (
+                        <input
+                          type="text"
+                          value={filterValues[filterId] || ''}
+                          onChange={e => handleFilterValueChange(filterId, e.target.value)}
+                          placeholder="Type to search…"
+                          className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 placeholder:text-blue-400 placeholder:font-normal w-36"
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        <select
+                          value={filterValues[filterId] || ''}
+                          onChange={e => handleFilterValueChange(filterId, e.target.value)}
+                          className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <option value="">All</option>
+                          {filter?.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      )}
                       <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900 transition-colors">
                         <X size={14} />
                       </button>
@@ -743,6 +756,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     {activeFilters.includes('age')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Age</th>}
                     {activeFilters.includes('civilStatus') && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Civil Status</th>}
                     {activeFilters.includes('education')   && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Education</th>}
+                    {activeFilters.includes('course')      && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Course</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Workplace/Office</th>
@@ -764,6 +778,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age ? `${applicant.age} yrs` : '—'}</td>}
                         {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.civilStatus || '—'}</td>}
                         {activeFilters.includes('education')   && <td className="px-4 py-3 text-gray-600">{applicant.highestEducation || '—'}</td>}
+                        {activeFilters.includes('course')      && <td className="px-4 py-3 text-gray-600">{applicant.course || '—'}</td>}
                         <td className="px-4 py-3 text-gray-600">{applicant.barangay}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">

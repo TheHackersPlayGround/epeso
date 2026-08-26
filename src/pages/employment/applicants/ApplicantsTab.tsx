@@ -26,6 +26,7 @@ const AVAILABLE_FILTERS: FilterOption[] = [
     "Elementary Graduate", "High School Graduate", "Senior High School Graduate",
     "Vocational / Technical", "College Graduate", "Post Graduate",
   ]},
+  { id: "collegeCourse", label: "Course in College", type: "text" },
   { id: "employmentStatus", label: "Employment Status", options: ["Employed", "Unemployed"] },
   { id: "language", label: "Language", type: "text" },
   { id: "skills", label: "Skills", type: "text" },
@@ -122,7 +123,7 @@ function getOFWLabel(applicant: Applicant): string {
 // Filters that render their own extra table column. Filters that map to an
 // existing default column (sex, educationalLevel, skills, trainingCourse,
 // jobPreference) are NOT here — they only filter, they don't add a column.
-const COLUMN_FILTER_IDS = ["disability", "civilStatus", "ofw", "4ps", "referredProgram", "barangay", "employmentStatus", "language"];
+const COLUMN_FILTER_IDS = ["disability", "civilStatus", "ofw", "4ps", "referredProgram", "barangay", "employmentStatus", "language", "collegeCourse"];
 
 // Active filters that add a column, in the order they were applied. Header and
 // row cells both iterate this same list so they always line up.
@@ -140,6 +141,7 @@ function renderFilterCell(id: string, a: Applicant): React.ReactNode {
     case "referredProgram":  return (a.fullFormData?.referredProgram as string) || "—";
     case "barangay":         return (a.fullFormData?.barangay as string) || "—";
     case "language":         return a.language || "N/A";
+    case "collegeCourse":    return ((a.fullFormData?.tertiary as { course?: string })?.course) || "—";
     case "employmentStatus":
       return <span className={`px-2 py-0.5 rounded-full text-xs ${getEmploymentStatusClass(a.employmentStatus)}`}>{a.employmentStatus}</span>;
     default: return null;

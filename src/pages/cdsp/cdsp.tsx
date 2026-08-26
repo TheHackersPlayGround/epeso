@@ -170,6 +170,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     { id: 'sex',            label: 'Sex',             options: ['Male', 'Female'] },
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
+    { id: 'course',         label: 'Course / Program', type: 'text' as const },
   ]
 
   const handleAddFilter = (filterId: string) => {
@@ -221,6 +222,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       if (filterId === 'classification') return a.classification.includes(val) || (val === 'Others' && a.classificationOther !== '')
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
+      if (filterId === 'course') return (a.course ?? '').toLowerCase().includes(val.toLowerCase())
       if (filterId === 'age') {
         const age = a.age ?? 0
         if (val === 'Below 20')  return age < 20
@@ -820,10 +822,21 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 return (
                   <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                     <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                    <select value={filterValues[filterId] || ''} onChange={(e) => handleFilterValueChange(filterId, e.target.value)} onClick={(e) => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
-                      <option value="">All</option>
-                      {filter?.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
+                    {filter?.type === 'text' ? (
+                      <input
+                        type="text"
+                        value={filterValues[filterId] || ''}
+                        onChange={(e) => handleFilterValueChange(filterId, e.target.value)}
+                        placeholder="Type to search…"
+                        className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 placeholder:text-blue-400 placeholder:font-normal w-36"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <select value={filterValues[filterId] || ''} onChange={(e) => handleFilterValueChange(filterId, e.target.value)} onClick={(e) => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
+                        <option value="">All</option>
+                        {filter?.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    )}
                     <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900"><X size={14} /></button>
                   </div>
                 )
@@ -849,6 +862,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     {activeFilters.includes('sex')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Sex</th>}
                     {activeFilters.includes('age')         && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Age</th>}
                     {activeFilters.includes('civilStatus') && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Civil Status</th>}
+                    {activeFilters.includes('course')      && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Course</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Service Availed</th>
@@ -867,6 +881,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                       {activeFilters.includes('sex')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.sex || '—'}</td>}
                       {activeFilters.includes('age')         && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.age ? `${applicant.age} yrs` : '—'}</td>}
                       {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.civilStatus || '—'}</td>}
+                      {activeFilters.includes('course')      && <td className="px-4 py-3 text-gray-600">{applicant.course || '—'}</td>}
                       <td className="px-4 py-3 text-gray-600">{applicant.barangay || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">

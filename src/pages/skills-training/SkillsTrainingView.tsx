@@ -13,6 +13,7 @@ import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import * as skillsTrainingService from '../../services/skillsTrainingService'
 import { downloadImportTemplate, importSkillsTrainingApplicants, type ImportResult } from './skillsTrainingImport'
 import ConfirmModal from '../shared/ConfirmModal'
+import JobPlacementModal from '../shared/JobPlacementModal'
 import SkillsTrainingProfileForm, {
   ViewProfilePanel,
   CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, STATUS_OPTIONS, StatusBadge,
@@ -245,6 +246,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [editingProfile, setEditingProfile] = useState<SkillsTrainingProfile | null>(null)
   const [updatingStatusProfile, setUpdatingStatusProfile] = useState<SkillsTrainingProfile | null>(null)
 
+  const [jobPlacementProfile, setJobPlacementProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assigningProfile, setAssigningProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assignSearch, setAssignSearch] = useState('')
   const [assignStep, setAssignStep] = useState<1 | 2>(1)
@@ -537,6 +539,15 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
           profile={updatingStatusProfile}
           onClose={() => setUpdatingStatusProfile(null)}
           onSave={handleUpdateProfileStatus}
+        />
+      )}
+
+      {jobPlacementProfile && (
+        <JobPlacementModal
+          beneficiaryServiceId={jobPlacementProfile.beneficiaryServiceId}
+          applicantName={`${jobPlacementProfile.firstName} ${jobPlacementProfile.lastName}`}
+          canManage={canManage('skills')}
+          onClose={() => setJobPlacementProfile(null)}
         />
       )}
 
@@ -904,8 +915,11 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                         <button
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                            const showAbove = window.innerHeight - rect.bottom < 148
-                            setMenuPos({ top: showAbove ? rect.top - 148 : rect.bottom + 4, right: window.innerWidth - rect.right })
+                            // Base menu is View/Edit/Update Status/Training-button/divider/Delete;
+                            // Record Job Placement adds one more row when training is Completed.
+                            const menuHeight = profile.assignedTrainingStatus === 'Completed' ? 192 : 160
+                            const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
+                            setMenuPos({ top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4, right: window.innerWidth - rect.right })
                             setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
                           }}
                           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -971,6 +985,9 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setAssignViewOnly(false); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Training</button>
                 )
               })()}
+              {profile.assignedTrainingStatus === 'Completed' && (
+                <button onClick={() => { setJobPlacementProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-emerald-600 hover:bg-emerald-50">Record Job Placement</button>
+              )}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: profile.id, name: `${profile.lastName}, ${profile.firstName}` }); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>

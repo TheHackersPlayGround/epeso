@@ -19,6 +19,39 @@ export function deleteBackup(name: string) {
   return axiosClient.delete(`${ENDPOINTS.backup.deleteBackup}/${encodeURIComponent(name)}`).then(r => r.data)
 }
 
+// Overwrites the live database (and uploads/, if the backup has them bundled)
+// with this backup's contents. A safety snapshot is taken automatically on
+// the backend first, but this itself is still destructive to everything
+// created/changed since the chosen backup.
+export function restoreBackup(name: string) {
+  return axiosClient
+    .post<{ status: string; message: string; data: { uploadsRestored: boolean; safetyBackup: string } }>(
+      `${ENDPOINTS.backup.restoreBackup}/${encodeURIComponent(name)}`
+    )
+    .then(r => r.data)
+}
+
+// For when the on-server copy was deleted and the admin only has a .sql/.zip
+// saved externally (USB drive, cloud folder, etc.) -- uploads it, saves it
+// into the server's backups/ folder under a fresh name, then restores from
+// it the same way restoreBackup() does (including the automatic pre-restore
+// safety snapshot).
+export function restoreUpload(file: File) {
+  const form = new FormData()
+  form.append('backupFile', file)
+  // axiosClient sets a blanket 'Content-Type: application/json' default on
+  // every request -- overriding it to undefined here lets the browser set
+  // its own multipart header (with the required boundary=... parameter) for
+  // this one call instead. Without this, PHP's $_FILES ends up empty.
+  return axiosClient
+    .post<{ status: string; message: string; data: { uploadsRestored: boolean; safetyBackup: string } }>(
+      ENDPOINTS.backup.restoreUpload,
+      form,
+      { headers: { 'Content-Type': undefined } }
+    )
+    .then(r => r.data)
+}
+
 // Downloads the backup file as a real browser save (not a tab navigation) —
 // same blob: URL technique used by Documents Tab's download fix, since the
 // file is served from a different origin than the Vite dev server.

@@ -233,10 +233,20 @@ export const ENDPOINTS = {
   reports: {
     summary: '/reports/summary',
   },
+  // Shared across every program module (starting with Skills Training) --
+  // one endpoint set, not a copy per module. See modules/job_placements.php.
+  jobPlacements: {
+    listByApplicant: '/job_placements/listByApplicant',
+    create:          '/job_placements/create',
+    update:          '/job_placements/update',
+    delete:          '/job_placements/delete',
+  },
   backup: {
     listBackups:    '/backup/listBackups',
     createBackup:   '/backup/createBackup',
     downloadBackup: '/backup/downloadBackup',
     deleteBackup:   '/backup/deleteBackup',
+    restoreBackup:  '/backup/restoreBackup',
+    restoreUpload:  '/backup/restoreUpload',
   },
 } as const

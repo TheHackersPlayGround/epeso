@@ -960,9 +960,16 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                             if (!bucket) return <span className="text-gray-400">—</span>
                             const color = AGING_BUCKET_COLORS[bucket]
                             return (
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${color}22`, color }}>
-                                {bucket}
-                              </span>
+                              <div>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${color}22`, color }}>
+                                  {bucket}
+                                </span>
+                                {/* Exact duration alongside the bucket -- the bucket/color stays
+                                    the quick-scan signal (and matches the filter above), this is
+                                    just the precise number for anyone who wants it without opening
+                                    the record. */}
+                                <p className="text-xs text-gray-400 mt-0.5">{relativeSince(profile.lastCompletedDate!)}</p>
+                              </div>
                             )
                           })()}
                         </td>

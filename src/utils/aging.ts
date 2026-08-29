@@ -16,6 +16,7 @@ export function monthsSince(dateStr: string): number {
 export function relativeSince(dateStr: string): string {
   const then = new Date(dateStr.split('T')[0].split(' ')[0])
   const days = Math.floor((Date.now() - then.getTime()) / 86400000)
+  if (days <= 0) return 'less than a day' // "0 days" reads oddly for something completed today
   if (days < 30) return `${days} day${days === 1 ? '' : 's'}`
   const months = monthsSince(dateStr)
   return months <= 0 ? 'less than a month' : `${months} month${months === 1 ? '' : 's'}`

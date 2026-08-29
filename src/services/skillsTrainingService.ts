@@ -49,6 +49,24 @@ export function updateAttendance(data: { activityId: number; beneficiaryServiceI
   return axiosClient.post(ENDPOINTS.skillsTraining.updateAttendance, data).then(r => r.data)
 }
 
+// One training a beneficiary was ever assigned to (present in the array even
+// if they later moved on to another one -- assignments are never deleted).
+export type TrainingHistoryEntry = {
+  activityId: number
+  activityTitle: string
+  batchName: string
+  activityDate: string
+  status: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
+  completedDate: string | null
+  attended: boolean | null
+}
+
+export function listTrainingHistory(beneficiaryServiceId: number) {
+  return axiosClient
+    .get<{ status: string; data: TrainingHistoryEntry[] }>(`${ENDPOINTS.skillsTraining.listTrainingHistory}/${beneficiaryServiceId}`)
+    .then(r => r.data.data ?? [])
+}
+
 export function listQualifications() {
   return axiosClient.get(ENDPOINTS.skillsTraining.listQualifications).then(r => r.data)
 }

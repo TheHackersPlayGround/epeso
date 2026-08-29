@@ -190,6 +190,8 @@ export const ENDPOINTS = {
     addParticipant:           '/skills_training/addParticipant',
     removeParticipant:        '/skills_training/removeParticipant',
     updateAttendance:         '/skills_training/updateAttendance',
+    listTrainingHistory:      '/skills_training/listTrainingHistory',
+    agingReport:              '/skills_training/agingReport',
     listQualifications:       '/skills_training/listQualifications',
     listPurposes:             '/skills_training/listPurposes',
     listProfiles:             '/skills_training/listProfiles',

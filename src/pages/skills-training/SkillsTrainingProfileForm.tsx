@@ -113,6 +113,7 @@ const emptyForm: Omit<SkillsTrainingProfile, 'id'> = {
   desiredQualification: [], qualificationOther: [],
   purposeOfTraining: [], purposeOther: [],
   assignedTrainingId: null, assignedTrainingTitle: '', assignedTrainingStatus: null,
+  lastCompletedTrainingTitle: '', lastCompletedDate: null, placed: false,
   attachedDocuments: [],
   dateApplicationReceived: '', receivedBy: '',
   status: 'Waitlisted',

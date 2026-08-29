@@ -86,3 +86,26 @@ export async function fetchGeneralPesoReport(from: string, to: string, programs:
   )
   return res.data.data
 }
+
+// ── Skills Training Aging Report (live from the backend, not period-scoped —
+// a snapshot of "how long since completion" as of right now) ──
+
+export type SkillsAgingRow = {
+  beneficiaryServiceId: number
+  name: string
+  sex: string
+  lastCompletedTrainingTitle: string
+  completedDate: string
+  placed: boolean
+  jobTitle: string | null
+  employer: string | null
+  dateHired: string | null
+}
+
+// One row per beneficiary who has genuinely completed (status Completed AND
+// attended) at least one Skills Training -- beneficiaries with no real
+// completion aren't included, since there's nothing to measure aging from.
+export async function fetchSkillsAgingReport(): Promise<SkillsAgingRow[]> {
+  const res = await axiosClient.get<{ status: string; data: SkillsAgingRow[] }>(ENDPOINTS.skillsTraining.agingReport)
+  return res.data.data ?? []
+}

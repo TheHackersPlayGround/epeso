@@ -8,12 +8,14 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
+import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS, type AgingBucket } from '../../utils/aging'
 import type { SkillsTrainingProfile, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import * as skillsTrainingService from '../../services/skillsTrainingService'
 import { downloadImportTemplate, importSkillsTrainingApplicants, type ImportResult } from './skillsTrainingImport'
 import ConfirmModal from '../shared/ConfirmModal'
 import JobPlacementModal from '../shared/JobPlacementModal'
+import TrainingHistoryModal from './TrainingHistoryModal'
 import SkillsTrainingProfileForm, {
   ViewProfilePanel,
   CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, STATUS_OPTIONS, StatusBadge,
@@ -247,6 +249,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [updatingStatusProfile, setUpdatingStatusProfile] = useState<SkillsTrainingProfile | null>(null)
 
   const [jobPlacementProfile, setJobPlacementProfile] = useState<SkillsTrainingProfile | null>(null)
+  const [trainingHistoryProfile, setTrainingHistoryProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assigningProfile, setAssigningProfile] = useState<SkillsTrainingProfile | null>(null)
   const [assignSearch, setAssignSearch] = useState('')
   const [assignStep, setAssignStep] = useState<1 | 2>(1)
@@ -284,6 +287,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     { id: 'sex',                 label: 'Sex',                  options: ['Male', 'Female'] },
     { id: 'age',                 label: 'Age',                  options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',         label: 'Civil Status',         options: CIVIL_STATUS_OPTIONS },
+    // Time since their last genuinely completed training (Completed + attended),
+    // for anyone not yet placed -- same buckets as the Aging Report, so this
+    // list and that report are always describing the same thing.
+    { id: 'aging',               label: 'Aging',                options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
 
   const handleAddFilter = (filterId: string) => {
@@ -306,6 +313,13 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     return activity?.service ?? ''
   }
 
+  // null for anyone already Placed, or who has never genuinely completed a
+  // training -- neither belongs in any aging bucket (matches the Aging Report).
+  const agingBucketForProfile = (p: SkillsTrainingProfile): AgingBucket | null => {
+    if (p.placed || !p.lastCompletedDate) return null
+    return agingBucket(monthsSince(p.lastCompletedDate))
+  }
+
   const filteredProfiles = profiles.filter(p => {
     const fullName = `${p.firstName} ${p.lastName} ${p.middleName}`.toLowerCase()
     const matchesSearch = searchQuery === '' ||
@@ -325,6 +339,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         case 'batch': return batchNameForProfile(p) === val
         case 'sex': return p.sex === val
         case 'civilStatus': return p.civilStatus === val
+        case 'aging': return agingBucketForProfile(p) === val
         case 'age': {
           const age = p.age ?? 0
           if (val === 'Below 20') return age < 20
@@ -356,7 +371,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const recordEnd = Math.min(safePage * perPage, sortedProfiles.length)
 
   const trainingStatusBadge = (s: string) =>
-    s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : s === 'Completed' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-600'
+    s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : s === 'Completed' ? 'bg-blue-100 text-blue-700' : s === 'Absent' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-600'
 
   const exportRows = (rows: SkillsTrainingProfile[]) => rows.map(p => ({
     'Last Name': p.lastName, 'First Name': p.firstName, 'Middle Name': p.middleName,
@@ -551,6 +566,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         />
       )}
 
+      {trainingHistoryProfile && (
+        <TrainingHistoryModal
+          beneficiaryServiceId={trainingHistoryProfile.beneficiaryServiceId}
+          applicantName={`${trainingHistoryProfile.firstName} ${trainingHistoryProfile.lastName}`}
+          onClose={() => setTrainingHistoryProfile(null)}
+        />
+      )}
+
       {isImportModalOpen && (
         <SkillsTrainingImportModal
           qualifications={qualificationOptions}
@@ -640,7 +663,12 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   })}
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex flex-col gap-2">
-                  {assigningProfile.assignedTrainingId && (
+                  {/* Only safe to remove a training that hasn't started yet -- once it's
+                      Ongoing/Completed/Cancelled, unassigning would erase attendance/
+                      completion records already tied to that run (mirrors the same
+                      check on the View Assigned Training screen below). */}
+                  {assigningProfile.assignedTrainingId
+                    && activities.find(t => t.id === assigningProfile.assignedTrainingId)?.status === 'Planned' && (
                     <button onClick={handleUnassignTraining} disabled={!canManage('skills') || isAssigning} className="w-full py-2.5 border border-red-200 rounded-lg text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Remove Assigned Activity</button>
                   )}
                   <button onClick={closeAssignModal} className="w-full py-2.5 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm">Cancel</button>
@@ -671,7 +699,15 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   </div>
                   {assigningProfile.assignedTrainingId && assigningProfile.assignedTrainingId !== selectedTraining.id && (
                     <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
-                      This applicant is currently assigned to another training. Assigning will replace the current assignment.
+                      This applicant is currently assigned to <span className="font-semibold">{assigningProfile.assignedTrainingTitle}</span>{' '}
+                      (<span className="font-semibold">{assigningProfile.assignedTrainingStatus}</span>).
+                      Confirming will make this their new current training — their previous one stays in Training History.
+                    </div>
+                  )}
+                  {assigningProfile.lastCompletedDate && monthsSince(assigningProfile.lastCompletedDate) < 6 && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                      Last training completed <span className="font-semibold">{relativeSince(assigningProfile.lastCompletedDate)} ago</span> —
+                      under the usual 6-month gap between trainings. You may still proceed if appropriate.
                     </div>
                   )}
                 </div>
@@ -839,6 +875,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Desired Qualification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Purpose of Training</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Training</th>
+                    {activeFilters.includes('aging')       && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Aging</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
@@ -909,15 +946,36 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
+                      {activeFilters.includes('aging') && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(() => {
+                            // A bare "—" would mean two very different things here --
+                            // "already placed" and "never completed anything" -- so
+                            // Placed gets its own labeled badge instead of collapsing
+                            // both into the same blank dash.
+                            if (profile.placed) {
+                              return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
+                            }
+                            const bucket = agingBucketForProfile(profile)
+                            if (!bucket) return <span className="text-gray-400">—</span>
+                            const color = AGING_BUCKET_COLORS[bucket]
+                            return (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${color}22`, color }}>
+                                {bucket}
+                              </span>
+                            )
+                          })()}
+                        </td>
+                      )}
                       <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={profile.status} /></td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(profile.dateApplicationReceived)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                            // Base menu is View/Edit/Update Status/Training-button/divider/Delete;
+                            // Base menu is View/Edit/Update Status/divider/Training-button/Training History/divider/Delete;
                             // Record Job Placement adds one more row when training is Completed.
-                            const menuHeight = profile.assignedTrainingStatus === 'Completed' ? 192 : 160
+                            const menuHeight = profile.assignedTrainingStatus === 'Completed' ? 232 : 200
                             const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
                             setMenuPos({ top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4, right: window.innerWidth - rect.right })
                             setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
@@ -973,8 +1031,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               <button onClick={() => { setViewingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               <button onClick={() => { setUpdatingStatusProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
+              <div className="my-1 border-t border-gray-100" />
               {(() => {
+                // Only Planned/Ongoing locks the row into "View Assigned Training" --
+                // once it's Completed/Absent/Cancelled, "Assign Training" reappears
+                // so the person can be enrolled into another one (PESO allows
+                // availing more than one training), mirroring CDSP's isCompleted check.
                 const hasActive = !!profile.assignedTrainingId
+                  && (profile.assignedTrainingStatus === 'Planned' || profile.assignedTrainingStatus === 'Ongoing')
                 if (hasActive) {
                   const current = activities.find(t => t.id === profile.assignedTrainingId) ?? null
                   return (
@@ -985,6 +1049,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   <button onClick={() => { setAssigningProfile(profile); setAssignSearch(''); setAssignViewOnly(false); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Training</button>
                 )
               })()}
+              <button onClick={() => { setTrainingHistoryProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Training History</button>
               {profile.assignedTrainingStatus === 'Completed' && (
                 <button onClick={() => { setJobPlacementProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-emerald-600 hover:bg-emerald-50">Record Job Placement</button>
               )}

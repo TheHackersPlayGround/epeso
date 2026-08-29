@@ -7,9 +7,11 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { registerPdfFont, PDF_FONT_FAMILY } from './fonts/registerPdfFont'
 import ConfirmModal from '../shared/ConfirmModal'
-import { fetchEfReport, fetchGeneralPesoReport } from '../../services/reportService'
+import { fetchEfReport, fetchGeneralPesoReport, fetchSkillsAgingReport, type SkillsAgingRow } from '../../services/reportService'
+import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS } from '../../utils/aging'
 import { generatePesoMonthlyReport } from './pesoMonthlyReport'
 import { generateGeneralPesoWorkbook } from './generalPesoReport'
+import { graftAgingCharts, type AgingChartOptions } from './skillsAgingChart'
 import { GENERAL_PESO_PROGRAM_COLORS } from './generalPesoColors'
 import { useCDSP } from '../../contexts/CDSPContext'
 import { useGIP } from '../../contexts/GIPContext'
@@ -84,7 +86,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [gipReportType, setGipReportType] = useState<'participants' | 'batches'>('participants')
   const [spesReportType, setSpesReportType] = useState<'participants' | 'batches'>('participants')
   const [livelihoodReportType, setLivelihoodReportType] = useState<'beneficiaries' | 'projects'>('beneficiaries')
-  const [skillsReportType, setSkillsReportType] = useState<'participants' | 'activities'>('participants')
+  const [skillsReportType, setSkillsReportType] = useState<'participants' | 'activities' | 'aging'>('participants')
+  const [skillsAgingLoading, setSkillsAgingLoading] = useState(false)
   // General PESO Report: which programs to roll up — defaults to all of them
   // (matches the report's previous "always everything" behavior); the user
   // can narrow it down via the "Include Programs" picker.
@@ -172,6 +175,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.text(s.text, x, y)
       x += widths[i]
     })
+  }
+
+  // "#RRGGBB" -> [r, g, b] -- jsPDF-autotable's fillColor/textColor styles take
+  // an RGB triple, not a hex string. Used only for the Aging Report's
+  // "Time Since Completion" cell highlight in the PDF export.
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const n = parseInt(hex.replace('#', ''), 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
   }
 
   // Splits usableWidth across columns proportional to each column's actual
@@ -326,7 +337,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // (SkillsTrainingActivity.service, shown as the training's subtitle/category
   // everywhere else in the app) — there's no separate Counselor/Duration field
   // the way CDSP's sessions have.
-  const SKILLS_TRAINING_ACTIVITY_COLUMNS = ['Training Title', 'Training Batch', 'Date', 'Venue', 'Facilitator', 'Participants', 'Status']
+  // Present/Absent only populate once a training is Completed -- attended is
+  // still mostly unset for a Planned/Ongoing training (see generateData below).
+  const SKILLS_TRAINING_ACTIVITY_COLUMNS = ['Training Title', 'Training Batch', 'Date', 'Venue', 'Facilitator', 'Participants', 'Present', 'Absent', 'Status']
+  // Skills Training Aging Report columns — one row per beneficiary who has
+  // genuinely completed at least one training (status Completed AND attended),
+  // showing how long it's been since and whether a job placement followed.
+  // Not period-filtered -- it's a live snapshot of "how long since completion,"
+  // not a list of things that happened within a chosen date range.
+  const SKILLS_AGING_COLUMNS = ['No.', 'Participant Name', 'Last Completed Training', 'Completed Date',
+    'Time Since Completion', 'Employment Status', 'Job Title', 'Employer', 'Date Hired']
   // General PESO Report columns — one row PER PROGRAM (aggregated server-side
   // from live data), not per-participant, so there's no Sex/Age/Address here.
   // "Activities Conducted" and "Placements" are null (rendered as "-") for
@@ -376,7 +396,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                'Start Date', 'End Date', 'Status', 'Batch', 'Course', 'School Type', 'Civil Status', 'Contact Number',
                'Street/Purok', 'Barangay', 'Address', 'Annual Family Income', 'No. of Dependents', 'Remarks'],
       'skills-training': ['No.', 'Participant Name', 'Sex', 'Age', 'Civil Status', 'Classification', 'Desired Qualification',
-                           'Purpose of Training', 'Assigned Training', 'Date Applied', 'Contact Number', 'Street/Purok',
+                           'Purpose of Training', 'Assigned Training', 'Training Status', 'Date Applied', 'Contact Number', 'Street/Purok',
                            'Barangay', 'Address', 'Status'],
     }
     return map[category] || []
@@ -412,7 +432,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (category === 'skills-training' && skillsReportType === 'activities') return withoutStatus(SKILLS_TRAINING_ACTIVITY_COLUMNS)
     // Skills Training: identity, which training they're assigned to, and period;
     // classification/qualification/purpose/contact/address/status are optional.
-    if (category === 'skills-training') return ['No.', 'Participant Name', 'Sex', 'Age', 'Assigned Training', 'Date Applied']
+    if (category === 'skills-training') return ['No.', 'Participant Name', 'Sex', 'Age', 'Assigned Training', 'Training Status', 'Date Applied']
     // OFW: identity, what they're requesting, employment status, and period;
     // contact/address/referral sub-fields/remarks/status are optional.
     if (category === 'ofw-services') return ['No.', 'OFW Name', 'Sex', 'Type of Request', 'Employment Status', 'Date Filed']
@@ -626,6 +646,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Venue': act.location || '-',
               'Facilitator': act.facilitator || '-',
               'Participants': act.assignedCount ?? act.participants ?? 0,
+              // Only meaningful once Completed -- attended is still mostly unset
+              // for a Planned/Ongoing training, so those show '-' rather than a
+              // misleading 0/0 that looks like "nobody attended" instead of
+              // "attendance hasn't happened yet".
+              'Present': act.status === 'Completed' ? act.presentCount : '-',
+              'Absent': act.status === 'Completed' ? act.absentCount : '-',
               'Status': act.status,
               _activityId: act.id, // not rendered as a column — used to export this training's roster
             }))
@@ -643,6 +669,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Desired Qualification': [...(p.desiredQualification ?? []), ...(p.qualificationOther ?? []).filter(Boolean).map((v: string) => `Others: ${v}`)].join(', ') || '-',
             'Purpose of Training': [...(p.purposeOfTraining ?? []), ...(p.purposeOther ?? []).filter(Boolean).map((v: string) => `Others: ${v}`)].join(', ') || '-',
             'Assigned Training': p.assignedTrainingTitle || '-',
+            'Training Status': p.assignedTrainingStatus || '-',
             'Date Applied': p.dateApplicationReceived || '-',
             'Contact Number': p.contactNumber || '-',
             'Street/Purok': p.streetPurok || '-',
@@ -992,11 +1019,94 @@ export default function ReportView({ onBack }: ReportViewProps) {
     }
   }
 
+  // Skills Training Aging Report — live from the backend (not period-scoped;
+  // see SKILLS_AGING_COLUMNS). "Employment Status" + the day-bucket group a
+  // placed beneficiary as "Placed" regardless of how long ago they finished,
+  // since aging is about people who are STILL waiting, not everyone ever.
+  const handleGenerateSkillsAgingReport = async () => {
+    setSkillsAgingLoading(true)
+    try {
+      const rows = await fetchSkillsAgingReport()
+      // Computed once per row and reused for both the bucket tally below and the
+      // "Time Since Completion" cell's color highlight, so the two never disagree.
+      const rowBucket = (r: SkillsAgingRow) => r.placed ? 'Placed' : agingBucket(monthsSince(r.completedDate))
+      const data = rows.map((r, i) => ({
+        'No.': i + 1,
+        'Participant Name': r.name,
+        'Last Completed Training': r.lastCompletedTrainingTitle,
+        'Completed Date': r.completedDate,
+        'Time Since Completion': r.placed ? '-' : relativeSince(r.completedDate),
+        'Employment Status': r.placed ? 'Placed' : 'Not Yet Placed',
+        'Job Title': r.jobTitle || '-',
+        'Employer': r.employer || '-',
+        'Date Hired': r.dateHired || '-',
+        _agingBucket: rowBucket(r), // not a rendered column -- drives the "Time Since Completion" cell color
+      }))
+      const columns = SKILLS_AGING_COLUMNS
+      const initialColumns: Record<string, boolean> = {}
+      columns.forEach(col => { initialColumns[col] = true })
+      setVisibleColumns(initialColumns)
+      setPreviewPage(1)
+
+      // Fixed bucket order (Placed last) rather than sorted by count, so the
+      // progression from "just finished" to "long overdue" reads left to right.
+      // Seeded to 0 up front so an empty bucket still shows on the chart/breakdown
+      // instead of silently disappearing (matches generateProgramAnalytics's
+      // allGroups seeding for CDSP/Livelihood above).
+      const bucketOrder: string[] = AGING_BUCKET_ORDER
+      const groupMap: Record<string, number> = {}
+      const maleByGroup: Record<string, number> = {}
+      const femaleByGroup: Record<string, number> = {}
+      bucketOrder.forEach(g => { groupMap[g] = 0; maleByGroup[g] = 0; femaleByGroup[g] = 0 })
+      let male = 0, female = 0
+      rows.forEach(r => {
+        const bucket = rowBucket(r)
+        groupMap[bucket] += 1
+        const s = String(r.sex || '').toLowerCase()
+        if (s === 'male') { male++; maleByGroup[bucket] += 1 }
+        else if (s === 'female') { female++; femaleByGroup[bucket] += 1 }
+      })
+      const byGroup = bucketOrder.map(group => ({ group, value: groupMap[group] }))
+      // Per-bucket sex split -- feeds the Excel export's stacked-by-sex native
+      // bar chart (see the Aging Report's Excel export handling below). Not
+      // used by the on-screen/PDF charts, which stay single-series.
+      const byGroupBySex = bucketOrder.map(group => ({ group, male: maleByGroup[group], female: femaleByGroup[group] }))
+      const barChartData = byGroup
+      const totalForPie = rows.length
+      const pieChartData = byGroup
+        .filter(g => g.value > 0)
+        .map(g => ({ group: g.group, value: totalForPie > 0 ? parseFloat(((g.value / totalForPie) * 100).toFixed(1)) : 0, color: AGING_BUCKET_COLORS[g.group] }))
+      const placedCount = groupMap['Placed']
+      const notPlacedCount = rows.length - placedCount
+      const analytics = { total: rows.length, byGroup, byGroupBySex, groupLabel: 'Beneficiaries by Status', male, female, barChartData, pieChartData, placedCount, notPlacedCount }
+
+      setGeneratedReport({
+        category: 'skills-training' as ReportCategory,
+        categoryName: 'Skills Training',
+        skillsReportType: 'aging' as const,
+        programType: '',
+        period: reportPeriod,
+        periodDetails: `As of ${formatLongDate(todayIso)}`,
+        columns,
+        data,
+        analytics,
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the Aging Report.'
+      setInfoModal({ isOpen: true, title: 'Error', message: msg })
+    } finally {
+      setSkillsAgingLoading(false)
+    }
+  }
+
   const handleGenerateReport = () => {
     if (!reportCategory) return
     // Employment Facilitation generates the official PESO/LMI report (live data,
     // downloaded as the 4-sheet .xlsx) rather than the generic on-screen view.
     if (reportCategory === 'employment-facilitation') { handleGeneratePesoReport(); return }
+    // Skills Training's Aging Report needs its own live backend join (job
+    // placements aren't loaded into any context), same shape as General PESO below.
+    if (reportCategory === 'skills-training' && skillsReportType === 'aging') { handleGenerateSkillsAgingReport(); return }
     // General PESO Report aggregates live across every selected program on the
     // backend — it does get an on-screen preview (unlike EF above), so it can't
     // just short-circuit to a download, but it does need its own async fetch.
@@ -1084,16 +1194,23 @@ export default function ReportView({ onBack }: ReportViewProps) {
     resolve(canvas.toDataURL('image/png'))
   })
 
-  const createPieChartImage = (data: any[]): Promise<string> => new Promise(resolve => {
+  // title is optional -- existing callers that don't pass one keep the
+  // original untitled layout unchanged (see createHorizontalBarChartImage above).
+  const createPieChartImage = (data: any[], title?: string): Promise<string> => new Promise(resolve => {
     const canvas = document.createElement('canvas')
     canvas.width = 800; canvas.height = 450
     const ctx = canvas.getContext('2d')!
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 800, 450)
+    const cy = title ? 245 : 225
+    if (title) {
+      ctx.fillStyle = '#1F2937'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'
+      ctx.fillText(title, 400, 30)
+    }
     let angle = -Math.PI / 2
     data.forEach(item => {
       const slice = (item.value / 100) * 2 * Math.PI
-      ctx.beginPath(); ctx.moveTo(250, 225)
-      ctx.arc(250, 225, 150, angle, angle + slice)
+      ctx.beginPath(); ctx.moveTo(250, cy)
+      ctx.arc(250, cy, 150, angle, angle + slice)
       ctx.closePath(); ctx.fillStyle = item.color; ctx.fill()
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke()
       angle += slice
@@ -1102,25 +1219,34 @@ export default function ReportView({ onBack }: ReportViewProps) {
     data.forEach(item => {
       ctx.fillStyle = item.color; ctx.fillRect(450, legendY - 10, 15, 15)
       ctx.fillStyle = '#374151'; ctx.font = '12px Arial'; ctx.textAlign = 'left'
-      ctx.fillText(`${item.program || item.status} - ${item.value.toFixed(1)}%`, 475, legendY + 2)
+      ctx.fillText(`${item.program || item.status || item.group} - ${item.value.toFixed(1)}%`, 475, legendY + 2)
       legendY += 30
     })
     resolve(canvas.toDataURL('image/png'))
   })
 
-  const createHorizontalBarChartImage = (data: any[], _title: string, color: string): Promise<string> => new Promise(resolve => {
+  // title is optional (existing callers pass '' and get the original untitled
+  // layout unchanged) -- when given, it's drawn at the top and the bars shift
+  // down to make room, so the chart image is self-explanatory even viewed on
+  // its own (e.g. pasted elsewhere), not just when its external heading is visible.
+  const createHorizontalBarChartImage = (data: any[], title: string, color: string): Promise<string> => new Promise(resolve => {
     const canvas = document.createElement('canvas')
     canvas.width = 800; canvas.height = 350
     const ctx = canvas.getContext('2d')!
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 800, 350)
+    const topOffset = title ? 34 : 0
+    if (title) {
+      ctx.fillStyle = '#1F2937'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center'
+      ctx.fillText(title, 400, 24)
+    }
     const padding = 60, chartWidth = 800 - padding * 2, barHeight = 35, barSpacing = 15
     const maxValue = Math.max(...data.map(d => d.value), 1)
     data.forEach((item, i) => {
       const bw = (item.value / maxValue) * (chartWidth - 200)
-      const y = padding + i * (barHeight + barSpacing)
+      const y = topOffset + padding + i * (barHeight + barSpacing)
       ctx.fillStyle = color; ctx.fillRect(padding + 200, y, bw, barHeight)
       ctx.fillStyle = '#374151'; ctx.font = '12px Arial'; ctx.textAlign = 'right'
-      ctx.fillText(item.month || item.jobTitle || item.employer, padding + 190, y + barHeight / 2 + 5)
+      ctx.fillText(item.month || item.jobTitle || item.employer || item.group, padding + 190, y + barHeight / 2 + 5)
       ctx.fillStyle = '#1F2937'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'left'
       ctx.fillText(item.value.toString(), padding + 205 + bw, y + barHeight / 2 + 5)
     })
@@ -1140,9 +1266,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (!generatedReport) return
     const filteredData = generatedReport.data.map((row: any) => {
       const f: any = {}
-      Object.keys(row).forEach(k => { if (visibleColumns[k]) f[k] = row[k] })
+      // _agingBucket is a hidden helper (Aging Report only), never a toggleable
+      // column, so it always passes through regardless of visibleColumns.
+      Object.keys(row).forEach(k => { if (visibleColumns[k] || k === '_agingBucket') f[k] = row[k] })
       return f
     })
+    const isAgingReport = generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging'
     // Report-type suffix so the filename alone tells you Participant List vs.
     // Activity/Batch List — without it, e.g. CDSP's two report types produce
     // identically-named files and silently overwrite each other on disk.
@@ -1151,7 +1280,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       generatedReport.category === 'gip'  ? (generatedReport.gipReportType === 'batches' ? 'Workplace_List' : 'Participant_List') :
       generatedReport.category === 'spes' ? (generatedReport.spesReportType === 'batches' ? 'Batch_List' : 'Participant_List') :
       generatedReport.category === 'livelihood' ? (generatedReport.livelihoodReportType === 'projects' ? `${livelihoodUnitLabel(generatedReport.programType).plural.replace('/', '_')}_List` : 'Beneficiary_List') :
-      generatedReport.category === 'skills-training' ? (generatedReport.skillsReportType === 'activities' ? 'Training_List' : 'Participant_List') :
+      generatedReport.category === 'skills-training' ? (generatedReport.skillsReportType === 'activities' ? 'Training_List' : generatedReport.skillsReportType === 'aging' ? 'Aging_Report' : 'Participant_List') :
       ''
     const fileName = [generatedReport.categoryName, reportTypeSuffix, generatedReport.periodDetails]
       .filter(Boolean).join('_').replace(/ /g, '_')
@@ -1169,6 +1298,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const wb = new ExcelJS.Workbook()
       const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
       const BORDERS = { top: THIN, left: THIN, bottom: THIN, right: THIN }
+      // Set below (Aging Report only) once the Summary sheet's "Beneficiaries by
+      // Status" table row positions are known -- consumed after wb.xlsx.writeBuffer()
+      // to graft in real native Excel charts (see skillsAgingChart.ts) in place of
+      // the picture-based charts every other report format still uses.
+      let agingChartOptions: AgingChartOptions | null = null
 
       // Print setup for a report meant to be printed/submitted: Folio ("long", 8.5×13"),
       // landscape, scaled to fit all columns across one page width, header row repeated.
@@ -1186,7 +1320,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
       // A properly-formatted data table: ALL-CAPS, bold, centered header (plain, no
       // fill); bordered cells; auto-fit column widths; frozen header row.
-      const addTable = (ws: ExcelJS.Worksheet, cols: string[], rows: any[]) => {
+      // cellFill is optional -- only the Aging Report uses it, to highlight the
+      // "Time Since Completion" cell with its bucket color (matches the on-screen
+      // table and the chart). Returns a hex color, or undefined for no fill.
+      const addTable = (ws: ExcelJS.Worksheet, cols: string[], rows: any[], cellFill?: (col: string, row: any) => string | undefined) => {
         const header = ws.addRow(cols.map(c => c.toUpperCase()))
         header.height = 20
         header.eachCell(cell => {
@@ -1200,7 +1337,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
           // values (typeof-number guard first, so a legitimate 0 isn't blanked) --
           // otherwise the Excel sheet shows an empty cell where PDF/preview show "-".
           const r = ws.addRow(cols.map(c => { const v = row[c]; return typeof v === 'number' ? v : (v || '-') }))
-          r.eachCell(cell => { cell.border = BORDERS; cell.alignment = { vertical: 'middle' } })
+          r.eachCell((cell, colIdx) => {
+            cell.border = BORDERS; cell.alignment = { vertical: 'middle' }
+            const fillColor = cellFill?.(cols[colIdx - 1], row)
+            if (fillColor) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${fillColor.replace('#', '')}` } }
+              cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
+            }
+          })
         })
         cols.forEach((c, i) => {
           let dataMax = 0
@@ -1225,8 +1369,13 @@ export default function ReportView({ onBack }: ReportViewProps) {
         // matching note on the on-screen summary.
         const hasProgramTypeFilter = ['cdsp', 'livelihood'].includes(generatedReport.category)
         const showBreakdown = !hasProgramTypeFilter || !generatedReport.programType
+        // Skills Training's Participant List and Aging Report both fall into this
+        // same generic Summary sheet, so a bare "SKILLS TRAINING SUMMARY" title
+        // can't tell them apart -- Aging gets its own explicit suffix.
+        const isAgingSummary = generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging'
+        const summaryTitle = `${String(generatedReport.categoryName).toUpperCase()}${isAgingSummary ? ' AGING REPORT' : ''} SUMMARY`
         const aoa: any[][] = [
-          [`${String(generatedReport.categoryName).toUpperCase()} SUMMARY`], [],
+          [summaryTitle], [],
           ...(generatedReport.category === 'cdsp' && cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
           ['Report Period', generatedReport.periodDetails],
           // Program Type filter only applies to CDSP/Livelihood; GIP/SPES have no such filter.
@@ -1236,13 +1385,63 @@ export default function ReportView({ onBack }: ReportViewProps) {
           ['Female', a.female], [],
           ...(showBreakdown ? [[groupHeaderLabel], [groupColHeader, 'Participants'], ...a.byGroup.map((d: any) => [d.group, d.value])] : []),
         ]
+        // Row positions of the table just pushed above -- captured right here,
+        // before anything else is appended, so this can't be thrown off by
+        // whatever gets added after it (e.g. the sex-breakdown table below).
+        const groupTableCategoryStartRow = aoa.length - a.byGroup.length + 1
+        const groupTableSeriesNameRow = groupTableCategoryStartRow - 1
+
+        // Aging Report only: a second small table breaking each bucket down by
+        // sex, feeding the Excel export's stacked-by-sex native bar chart below
+        // (the on-screen/PDF bar charts stay single-series -- this table exists
+        // purely as real cells for that one native chart to read from).
+        if (isAgingSummary) {
+          aoa.push(
+            [], ['BENEFICIARIES BY STATUS AND SEX'], ['Status', 'Male', 'Female'],
+            ...a.byGroupBySex.map((d: any) => [d.group, d.male, d.female]),
+          )
+        }
+        // Same pattern as groupTableCategoryStartRow above, applied at this
+        // later point now that the sex table has actually been appended.
+        const sexTableCategoryStartRow = aoa.length - a.byGroupBySex.length + 1
+
         const ws = wb.addWorksheet('Summary')
         aoa.forEach(r => ws.addRow(r))
         ws.getColumn(1).width = 34; ws.getColumn(2).width = 18
         ws.getRow(1).font = { bold: true, size: 14 }
         const groupHeaderRow = aoa.findIndex(r => r[0] === groupHeaderLabel) + 1
         if (groupHeaderRow > 0) ws.getRow(groupHeaderRow).font = { bold: true }
+        const sexHeaderRow = aoa.findIndex(r => r[0] === 'BENEFICIARIES BY STATUS AND SEX') + 1
+        if (sexHeaderRow > 0) ws.getRow(sexHeaderRow).font = { bold: true }
         applyPrint(ws)
+
+        // Aging Report: REAL native Excel charts (a stacked-by-sex bar chart +
+        // a bucket-distribution pie chart), not pictures -- grafted in after
+        // wb.xlsx.writeBuffer() below, using the exact row positions captured
+        // above, so the charts and the cells they read can't drift out of sync.
+        if (isAgingSummary) {
+          agingChartOptions = {
+            sheetName: 'Summary',
+            categories: a.byGroup.map((d: any) => d.group),
+            pie: {
+              seriesNameRow: groupTableSeriesNameRow,
+              categoryStartRow: groupTableCategoryStartRow,
+              values: a.byGroup.map((d: any) => d.value),
+              colorMap: AGING_BUCKET_COLORS,
+            },
+            sexBar: {
+              categoryStartRow: sexTableCategoryStartRow,
+              maleValues: a.byGroupBySex.map((d: any) => d.male),
+              femaleValues: a.byGroupBySex.map((d: any) => d.female),
+              // A distinct blue from AGING_BUCKET_COLORS.Placed ('#0077BE') --
+              // that blue means "Placed" in the pie chart right next to this
+              // bar, so reusing it here for "Male" would make the same color
+              // mean two different things across the two charts.
+              maleColor: '#1D4ED8',
+              femaleColor: '#EC4899',
+            },
+          }
+        }
       }
 
       // CDSP Activity List summary sheet — activities have no Sex breakdown the
@@ -1434,10 +1633,46 @@ export default function ReportView({ onBack }: ReportViewProps) {
       }
 
       const cols = generatedReport.columns.filter((c: string) => visibleColumns[c])
-      addTable(wb.addWorksheet('Detailed Report'), cols, filteredData)
+      addTable(wb.addWorksheet('Detailed Report'), cols, filteredData,
+        isAgingReport ? (col, row) => col === 'Time Since Completion' ? AGING_BUCKET_COLORS[row._agingBucket] : undefined : undefined)
+
+      // Aging Report only: alongside the combined Detailed Report above, split
+      // out a "Placed" and "Not Yet Placed" sheet -- each keeps only the columns
+      // that are actually meaningful for that group (a placed row never needs
+      // Time Since Completion; an unplaced row never has a Job Title/Employer/
+      // Date Hired yet), and "No." is renumbered fresh within each sheet rather
+      // than carrying over gaps from the combined list.
+      if (isAgingReport) {
+        const buildAgingSubsheet = (sheetName: string, wantedCols: string[], filterFn: (row: any) => boolean, colored: boolean) => {
+          const subsetCols = wantedCols.filter(c => visibleColumns[c])
+          // Filters against the full (unfiltered-by-visibility) data, not
+          // filteredData -- if the user had hidden the "Employment Status"
+          // column via the Columns menu, filteredData wouldn't have it at all,
+          // which would silently make both subsheets come up empty.
+          const subsetRows = (generatedReport.data as any[])
+            .filter(filterFn)
+            .map((row: any, i: number) => ({ ...row, 'No.': i + 1 }))
+          addTable(wb.addWorksheet(sheetName), ['No.', ...subsetCols], subsetRows,
+            colored ? (col, row) => col === 'Time Since Completion' ? AGING_BUCKET_COLORS[row._agingBucket] : undefined : undefined)
+        }
+        buildAgingSubsheet(
+          'Placed',
+          ['Participant Name', 'Last Completed Training', 'Completed Date', 'Job Title', 'Employer', 'Date Hired'],
+          (row: any) => row['Employment Status'] === 'Placed',
+          false,
+        )
+        buildAgingSubsheet(
+          'Not Yet Placed',
+          ['Participant Name', 'Last Completed Training', 'Completed Date', 'Time Since Completion'],
+          (row: any) => row['Employment Status'] === 'Not Yet Placed',
+          true,
+        )
+      }
 
       const buf = await wb.xlsx.writeBuffer()
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const blob = agingChartOptions
+        ? await graftAgingCharts(buf, agingChartOptions)
+        : new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `${fileName}.xlsx`
@@ -1527,6 +1762,24 @@ export default function ReportView({ onBack }: ReportViewProps) {
         doc.addPage(); y = 20
         doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Detailed Employment Facilitation Report', 14, y); y += 6
+
+      } else if (generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging' && generatedReport.analytics) {
+        const a = generatedReport.analytics
+        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
+        doc.text(`Total Beneficiaries: ${a.total}`, 14, y)
+        doc.text(`Placed: ${a.placedCount}`, 90, y)
+        doc.text(`Not Yet Placed: ${a.notPlacedCount}`, 140, y); y += 10
+        doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text('Beneficiaries by Status', 14, y); y += 6
+        doc.addImage(await createHorizontalBarChartImage(a.barChartData, '', '#0077BE'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
+        if (a.pieChartData.length > 0) {
+          doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
+          doc.text('Status Distribution', 14, y); y += 6
+          doc.addImage(await createPieChartImage(a.pieChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5556); y += usableWidth * 0.5556 + 2
+        }
+        doc.addPage(); y = 20
+        doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text('Detailed Report', 14, y); y += 6
 
       } else if (['cdsp', 'gip', 'spes', 'livelihood'].includes(generatedReport.category) && generatedReport.analytics) {
         // Matches the Summary sheet in the Excel export — General PESO and
@@ -1669,6 +1922,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       // shares always sum to exactly usableWidth, so the table still can't overflow.
       const columnWidths = computeColumnWidths(doc, visibleCols, bodyRows, usableWidth, tableFontSize + 1, tableFontSize)
       const columnStyles = Object.fromEntries(visibleCols.map((_: string, i: number) => [i, { cellWidth: columnWidths[i] }]))
+      const agingTimeColIdx = isAgingReport ? visibleCols.indexOf('Time Since Completion') : -1
       autoTable(doc, {
         startY: y,
         head: [visibleCols],
@@ -1680,6 +1934,18 @@ export default function ReportView({ onBack }: ReportViewProps) {
         tableWidth: usableWidth,
         columnStyles,
         styles: { overflow: 'linebreak', font: PDF_FONT_FAMILY },
+        // Aging Report only: color the "Time Since Completion" cell by its bucket,
+        // matching the on-screen table and Excel export.
+        didParseCell: agingTimeColIdx < 0 ? undefined : (data) => {
+          if (data.section !== 'body' || data.column.index !== agingTimeColIdx) return
+          const bucket = filteredData[data.row.index]?._agingBucket
+          const color = bucket && AGING_BUCKET_COLORS[bucket]
+          if (color) {
+            data.cell.styles.fillColor = hexToRgb(color)
+            data.cell.styles.textColor = 255
+            data.cell.styles.fontStyle = 'bold'
+          }
+        },
       })
       doc.save(`${fileName}.pdf`)
     }
@@ -2396,10 +2662,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
               <div className="relative">
-                <select value={skillsReportType} onChange={e => setSkillsReportType(e.target.value as 'participants' | 'activities')}
+                <select value={skillsReportType} onChange={e => setSkillsReportType(e.target.value as 'participants' | 'activities' | 'aging')}
                   className="appearance-none w-full pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
                   <option value="participants">Participant List</option>
                   <option value="activities">Training List</option>
+                  <option value="aging">Aging Report</option>
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>
@@ -2420,6 +2687,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
             </div>
           )}
 
+          {/* Aging Report is a live snapshot ("how long since completion, as of
+              today"), not a list of things that happened within a chosen date
+              range -- so the period picker doesn't apply and would be misleading. */}
+          {!(reportCategory === 'skills-training' && skillsReportType === 'aging') && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Select Report Period</label>
             <div className="grid grid-cols-4 gap-4">
@@ -2465,13 +2736,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </>}
             </div>
           </div>
+          )}
 
           <div className="flex justify-end pt-2">
             <button onClick={handleGenerateReport}
-              disabled={!reportCategory || pesoLoading || generalPesoLoading || (reportCategory === 'general-peso' && selectedGeneralPrograms.length === 0)}
+              disabled={!reportCategory || pesoLoading || generalPesoLoading || skillsAgingLoading || (reportCategory === 'general-peso' && selectedGeneralPrograms.length === 0)}
               className="px-5 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#0066A3] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
-              {(pesoLoading || generalPesoLoading) ? <Loader2 size={16} className="animate-spin" /> : <BarChart2 size={16} />}
-              {(pesoLoading || generalPesoLoading) ? 'Generating…' : 'Generate Report'}
+              {(pesoLoading || generalPesoLoading || skillsAgingLoading) ? <Loader2 size={16} className="animate-spin" /> : <BarChart2 size={16} />}
+              {(pesoLoading || generalPesoLoading || skillsAgingLoading) ? 'Generating…' : 'Generate Report'}
             </button>
           </div>
         </div>
@@ -2634,12 +2906,83 @@ export default function ReportView({ onBack }: ReportViewProps) {
         </div>
       )}
 
+      {/* Skills Training Aging Analytics — same two-panel bar+pie layout as
+          General PESO's chart above, applied to the day-since-completion buckets. */}
+      {generatedReport?.category === 'skills-training' && generatedReport.skillsReportType === 'aging' && generatedReport.analytics && (
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
+            <BarChart2 size={20} className="text-[#0077BE]" />
+            Aging Analytics
+          </h3>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border border-gray-200 p-4">
+              <p className="text-sm text-gray-500 m-0">Placed</p>
+              <p className="text-2xl font-bold text-emerald-600 m-0 mt-1">{generatedReport.analytics.placedCount}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-4">
+              <p className="text-sm text-gray-500 m-0">Not Yet Placed</p>
+              <p className="text-2xl font-bold text-amber-600 m-0 mt-1">{generatedReport.analytics.notPlacedCount}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Beneficiaries by Status</h4>
+              <div className="space-y-3">
+                {generatedReport.analytics.barChartData.map((item: any, i: number) => {
+                  const max = Math.max(...generatedReport.analytics.barChartData.map((d: any) => d.value), 1)
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-700">{item.group}</span>
+                        <span className="font-medium text-gray-800">{item.value}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="h-2 rounded-full" style={{ width: `${(item.value / max) * 100}%`, backgroundColor: '#0077BE' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Status Distribution</h4>
+              {generatedReport.analytics.pieChartData.length === 0 ? (
+                <p className="text-sm text-gray-400">No beneficiaries to chart.</p>
+              ) : (<>
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-48 h-48">
+                  <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                    {generatedReport.analytics.pieChartData.reduce((acc: any[], item: any, i: number) => {
+                      const prev = generatedReport.analytics.pieChartData.slice(0, i).reduce((s: number, x: any) => s + x.value, 0)
+                      const s = (prev / 100) * 2 * Math.PI, e = ((prev + item.value) / 100) * 2 * Math.PI
+                      acc.push(<path key={i} d={`M 50 50 L ${50 + 50 * Math.cos(s)} ${50 + 50 * Math.sin(s)} A 50 50 0 ${item.value > 50 ? 1 : 0} 1 ${50 + 50 * Math.cos(e)} ${50 + 50 * Math.sin(e)} Z`} fill={item.color} stroke="white" strokeWidth="0.5" />)
+                      return acc
+                    }, [])}
+                  </svg>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {generatedReport.analytics.pieChartData.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-gray-700">{item.group}</span>
+                    <span className="ml-auto font-medium text-gray-800">{item.value.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+              </>)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Participant-program Summary (General PESO / CDSP / GIP / SPES / Livelihood / Skills Training / OFW) */}
       {generatedReport && ['general-peso', 'cdsp', 'gip', 'spes', 'livelihood', 'skills-training', 'ofw-services'].includes(generatedReport.category) && generatedReport.analytics && (
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
             <BarChart2 size={20} className="text-[#0077BE]" />
-            {generatedReport.categoryName} Summary
+            {generatedReport.categoryName}
+            {generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging' ? ' Aging Report' : ''} Summary
           </h3>
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
@@ -2656,8 +2999,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
           {/* Breakdown by program is only meaningful when viewing all programs — with a
               specific Program Type selected, every other program would show a
               misleading "0" (it wasn't queried, not actually empty) and the sole
-              remaining bar just repeats the Total above. */}
-          {(!['cdsp', 'livelihood'].includes(generatedReport.category) || !generatedReport.programType) && (<>
+              remaining bar just repeats the Total above. The Aging Report skips
+              this breakdown entirely -- its own "Aging Analytics" card above
+              already shows the identical bucket breakdown plus a pie chart, so
+              repeating it here would just be the same bar list twice in a row. */}
+          {(!['cdsp', 'livelihood'].includes(generatedReport.category) || !generatedReport.programType)
+            && !(generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging') && (<>
           <h4 className="text-sm font-medium text-gray-700 mb-3">{generatedReport.analytics.groupLabel}</h4>
           {generatedReport.analytics.byGroup.length === 0 ? (
             <p className="text-sm text-gray-400">No participants in the selected period.</p>
@@ -2799,9 +3146,25 @@ export default function ReportView({ onBack }: ReportViewProps) {
                           </td>
                         )
                       })()}
-                      {generatedReport.columns.filter((col: string) => visibleColumns[col]).map((col: string) => (
-                        <td key={col} className="px-6 py-3 text-sm text-gray-800 whitespace-nowrap">{typeof row[col] === 'number' ? row[col] : (row[col] || '-')}</td>
-                      ))}
+                      {generatedReport.columns.filter((col: string) => visibleColumns[col]).map((col: string) => {
+                        // Aging Report only: color the "Time Since Completion" cell by
+                        // its bucket (matches the chart's colors) so severity is visible
+                        // without reading the value.
+                        const isAgingCell = generatedReport.category === 'skills-training'
+                          && generatedReport.skillsReportType === 'aging' && col === 'Time Since Completion' && row._agingBucket
+                        const agingColor = isAgingCell ? AGING_BUCKET_COLORS[row._agingBucket] : undefined
+                        return (
+                          <td key={col} className="px-6 py-3 text-sm whitespace-nowrap">
+                            {agingColor ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${agingColor}22`, color: agingColor }}>
+                                {row[col] || '-'}
+                              </span>
+                            ) : (
+                              <span className="text-gray-800">{typeof row[col] === 'number' ? row[col] : (row[col] || '-')}</span>
+                            )}
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))
                   : (

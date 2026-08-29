@@ -37,7 +37,10 @@ export interface SkillsTrainingProfile {
   purposeOther: string[]
   assignedTrainingId: number | null
   assignedTrainingTitle: string
-  assignedTrainingStatus: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled' | null
+  assignedTrainingStatus: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Absent' | null
+  lastCompletedTrainingTitle: string
+  lastCompletedDate: string | null
+  placed: boolean
   dateApplicationReceived: string
   receivedBy: string
   status: 'Pending' | 'Accepted' | 'Waitlisted' | 'Rejected'
@@ -64,6 +67,10 @@ export interface SkillsTrainingActivity {
   facilitator: string
   participants: number | null
   assignedCount: number
+  // Only meaningful once status is 'Completed' -- attended is still mostly
+  // unset for a Planned/Ongoing training, so these read 0/0 until then.
+  presentCount: number
+  absentCount: number
   status: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
 }
 

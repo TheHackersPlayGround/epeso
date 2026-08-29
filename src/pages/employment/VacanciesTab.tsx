@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Download } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
@@ -220,7 +220,23 @@ function StatusBadge({ status }: { status: Vacancy['status'] }) {
 
 function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = Math.max(8, showAbove ? menuAnchor.top - height - 4 : Math.min(menuAnchor.bottom + 4, window.innerHeight - height - 8))
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openMenuId, menuAnchor])
   const highlightRowRef = useRef<HTMLTableRowElement | null>(null)
 
   useEffect(() => {
@@ -233,13 +249,12 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
       return
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuHeight = 140
-    const margin = 8
-    const spaceBelow = window.innerHeight - rect.bottom
-    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
-    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
-    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
-    setMenuPos({ top, right: window.innerWidth - rect.right })
+    const right = window.innerWidth - rect.right
+    // Provisional placement below the button; the layout effect corrects
+    // this to the menu's real measured height right after it mounts, before
+    // paint.
+    setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+    setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
   }
 
@@ -338,6 +353,7 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
+            ref={menuRef}
             style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
             className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >

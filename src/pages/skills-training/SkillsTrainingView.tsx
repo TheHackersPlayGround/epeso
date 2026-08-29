@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import ReactDOM from 'react-dom'
 import {
@@ -273,7 +273,23 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [errorModal, setErrorModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
 
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess (even a conditionally-adjusted one) drifts stale
+  // every time a menu item is added or removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openActionMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = showAbove ? Math.max(8, menuAnchor.top - height - 4) : menuAnchor.bottom + 4
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openActionMenuId, menuAnchor])
 
   const qualificationOptions = qualifications.filter(q => q.name !== 'Other').map(q => q.name)
   const purposeOptions = purposes.filter(p => p.name !== 'Other').map(p => p.name)
@@ -385,8 +401,41 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     'Date Applied': p.dateApplicationReceived,
   }))
 
+  // Column order/names here must match skillsTrainingImport.ts's expected
+  // headers exactly (Import does a header-name lookup via get()/norm(), not
+  // positional) -- this is what makes an exported .xlsx directly
+  // re-importable later (e.g. after moving to a different device), unlike
+  // the human-readable CSV/exportRows() below which uses a combined
+  // Address and different header names purely for display.
+  const IMPORT_COMPATIBLE_HEADERS = [
+    'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
+    'Contact Number', 'Province', 'City / Municipality', 'Barangay', 'Street / Purok #',
+    'Classification (comma-separated)',
+    'Desired Qualification (comma-separated)',
+    'Purpose of Training (comma-separated)',
+    'Date Applied (MM/DD/YYYY)', 'Received By', 'Status',
+    // Display-only from here on -- Import looks up columns by the names
+    // above and ignores anything else, so these extra ones are safe.
+    'Age', 'Assigned Training',
+  ]
+
+  const exportRowsForImport = (rows: SkillsTrainingProfile[]) => rows.map(p => [
+    p.lastName, p.firstName, p.middleName, p.sex, p.birthdate, p.civilStatus,
+    p.contactNumber, p.province, p.cityMunicipality, p.barangay, p.streetPurok,
+    [...p.classification, ...p.classificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
+    [...p.desiredQualification, ...p.qualificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
+    [...p.purposeOfTraining, ...p.purposeOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
+    p.dateApplicationReceived, p.receivedBy, p.status,
+    p.age, p.assignedTrainingTitle,
+  ])
+
   const exportToExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(exportRows(filteredProfiles))
+    // Row 1 is left blank on purpose: the Import parser always skips the
+    // physical first row (range: 1), since the downloadable Template has a
+    // merged section-label band there. Real headers go on row 2, matching
+    // where Import actually looks for them.
+    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...exportRowsForImport(filteredProfiles)]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Skills Training')
     XLSX.writeFile(wb, `SkillsTraining_${new Date().toISOString().split('T')[0]}.xlsx`)
@@ -980,11 +1029,12 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                         <button
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                            // Base menu is View/Edit/Update Status/divider/Training-button/Training History/divider/Delete;
-                            // Record Job Placement adds one more row when training is Completed.
-                            const menuHeight = profile.assignedTrainingStatus === 'Completed' ? 232 : 200
-                            const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-                            setMenuPos({ top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4, right: window.innerWidth - rect.right })
+                            const right = window.innerWidth - rect.right
+                            // Provisional placement below the button; the layout
+                            // effect corrects this to the menu's real measured
+                            // height right after it mounts, before paint.
+                            setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+                            setMenuPos({ top: rect.bottom + 4, right })
                             setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
                           }}
                           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -1034,7 +1084,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
         return ReactDOM.createPortal(
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
-            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+            <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }} className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
               <button onClick={() => { setViewingProfile(profile); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
               <button onClick={() => { setUpdatingStatusProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>

@@ -52,6 +52,22 @@ export function restoreUpload(file: File) {
     .then(r => r.data)
 }
 
+export interface RestoreProgress {
+  step: number
+  total: number
+  label: string
+  done: boolean
+  error: string | null
+}
+
+// Polled on an interval while a restore request is in flight, since that
+// request itself is a single blocking call with no way to stream progress
+// back mid-request. The backend writes its current step to a file as it
+// goes; this just reads it.
+export function getRestoreProgress() {
+  return axiosClient.get<{ status: string; data: RestoreProgress }>(ENDPOINTS.backup.restoreProgress).then(r => r.data.data)
+}
+
 // Downloads the backup file as a real browser save (not a tab navigation) —
 // same blob: URL technique used by Documents Tab's download fix, since the
 // file is served from a different origin than the Vite dev server.

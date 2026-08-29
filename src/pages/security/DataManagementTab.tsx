@@ -24,12 +24,33 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
   const [typedName, setTypedName] = useState('')
   const [isRestoring, setIsRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ step: number; total: number; label: string } | null>(null)
   const matches = typedName === displayName
+  const aliveRef = useRef(true)
+  useEffect(() => () => { aliveRef.current = false }, [])
 
   const handleRestore = async () => {
     if (!matches || isRestoring) return
     setIsRestoring(true)
     setError(null)
+    // Starting state before the first poll response arrives -- avoids
+    // briefly showing a stale "done" reading left over from a previous
+    // restore's progress file.
+    setProgress({ step: 0, total: 1, label: 'Starting…' })
+
+    // The restore itself is one long blocking request with no way to stream
+    // progress back mid-request, so a separate interval polls a small
+    // status endpoint the backend updates as it goes through each real step
+    // (safety snapshot, reset schema, reload data, restore files).
+    const pollId = window.setInterval(async () => {
+      try {
+        const p = await backupService.getRestoreProgress()
+        if (aliveRef.current) setProgress({ step: p.step, total: p.total, label: p.label })
+      } catch {
+        // transient poll failure -- next tick will retry, nothing to show
+      }
+    }, 600)
+
     try {
       const res = target.kind === 'existing'
         ? await backupService.restoreBackup(target.name)
@@ -38,9 +59,12 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to restore this backup.')
     } finally {
-      setIsRestoring(false)
+      window.clearInterval(pollId)
+      if (aliveRef.current) setIsRestoring(false)
     }
   }
+
+  const percent = progress ? Math.min(100, Math.round((progress.step / progress.total) * 100)) : 0
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
@@ -71,6 +95,21 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent disabled:opacity-50"
         />
         {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+
+        {isRestoring && progress && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span>{progress.label}</span>
+              <span className="font-medium">{percent}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-600 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} disabled={isRestoring}

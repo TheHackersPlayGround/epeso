@@ -1,6 +1,6 @@
 // ─── Types & constants ─────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
 import { canManage } from "../../../utils/permissions";
 import TablePagination from "../shared/TablePagination";
@@ -200,7 +200,23 @@ function getFilterLabel(filterId: string): string {
 
 function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer, onShowHistory, onDelete }: ApplicantsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (openMenuId === null || !menuAnchor || !menuRef.current) return;
+    const height = menuRef.current.getBoundingClientRect().height;
+    const spaceBelow = window.innerHeight - menuAnchor.bottom;
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height;
+    const top = Math.max(8, showAbove ? menuAnchor.top - height - 4 : Math.min(menuAnchor.bottom + 4, window.innerHeight - height - 8));
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right });
+  }, [openMenuId, menuAnchor]);
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     // Toggling closed — no need to recompute position.
@@ -210,17 +226,12 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
     }
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    // Approx. height of the 5-item menu (each item ~33px + 8px vertical padding).
-    const menuHeight = 175;
-    const margin = 8;
-    const spaceBelow = window.innerHeight - rect.bottom;
-
-    // Prefer opening below the trigger; flip above when there isn't room.
-    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4;
-    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
-    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
-
-    setMenuPos({ top, right: window.innerWidth - rect.right });
+    const right = window.innerWidth - rect.right;
+    // Provisional placement below the trigger; the layout effect corrects
+    // this to the menu's real measured height right after it mounts, before
+    // paint.
+    setMenuAnchor({ top: rect.top, bottom: rect.bottom, right });
+    setMenuPos({ top: rect.bottom + 4, right });
     setOpenMenuId(id);
   }
 
@@ -270,6 +281,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
+            ref={menuRef}
             style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
             className="w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >

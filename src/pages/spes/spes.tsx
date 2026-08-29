@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
@@ -204,7 +204,23 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openActionMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = showAbove ? Math.max(8, menuAnchor.top - height - 4) : menuAnchor.bottom + 4
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openActionMenuId, menuAnchor])
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [deleteConfirm, setDeleteConfirm] = useState<SPESApplicant | null>(null)
 
@@ -336,20 +352,41 @@ export default function SPESView({ onBack }: SPESViewProps) {
     }
   }
 
+  // Column order/names here must match spesImport.ts's expected headers
+  // exactly (Import looks columns up by name via get()/norm(), not
+  // position) -- this is what makes an exported .xlsx directly
+  // re-importable later (e.g. after moving to a different device). Note
+  // spesImport.ts's address header is "Municipality/City" (no spaces),
+  // different from CDSP/GIP's "City / Municipality" -- must match this
+  // module's own importer exactly, not the others'.
+  const IMPORT_COMPATIBLE_HEADERS = [
+    'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
+    'Contact Number', 'Email',
+    'Province', 'Municipality/City', 'Barangay', 'Street / Purok #',
+    'Classification (comma-separated)', 'Classification, if Other',
+    'School Name', 'School Type', 'Grade / Year Level', 'Course / Program',
+    'Annual Family Income', 'Number of Dependents',
+    'Date Applied (MM/DD/YYYY)', 'Received By', 'Remarks',
+    // Display-only from here -- Import ignores anything it doesn't recognize.
+    'Age', 'Assigned Batch', 'Status',
+  ]
+
   const exportToExcel = () => {
-    const data = filtered.map(a => ({
-      'Last Name': a.lastName, 'First Name': a.firstName, 'Middle Name': a.middleName,
-      'Sex': a.sex, 'Birthdate': a.birthdate, 'Age': a.age, 'Civil Status': a.civilStatus,
-      'Contact Number': a.contactNumber, 'Email': a.email,
-      'Barangay': a.barangay, 'City / Municipality': a.cityMunicipality, 'Province': a.province,
-      'School Name': a.schoolName, 'School Type': a.schoolType,
-      'Grade / Year Level': a.gradeYearLevel, 'Course': a.course,
-      'Annual Family Income': a.annualFamilyIncome, 'Number of Dependents': a.numberOfDependents,
-      'Assigned Batch': batchNameFor(a),
-      'Status': deriveStatus(a, spesBatches), 'Remarks': a.remarks,
-      'Date Received': a.dateApplicationReceived, 'Received By': a.receivedBy,
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
+    const rows = filtered.map(a => [
+      a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
+      a.contactNumber, a.email,
+      a.province, a.cityMunicipality, a.barangay, a.streetPurok,
+      a.classification.join(', '), a.classificationOther,
+      a.schoolName, a.schoolType, a.gradeYearLevel, a.course,
+      a.annualFamilyIncome, a.numberOfDependents,
+      a.dateApplicationReceived, a.receivedBy, a.remarks,
+      a.age, batchNameFor(a), deriveStatus(a, spesBatches),
+    ])
+    // Row 1 is left blank: Import always skips the physical first row
+    // (range: 1), since the downloadable Template has a merged
+    // section-label band there. Real headers go on row 2.
+    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'SPES Applicants')
     XLSX.writeFile(wb, `SPES_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
@@ -839,12 +876,12 @@ export default function SPESView({ onBack }: SPESViewProps) {
                           <button
                             onClick={e => {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                              const menuHeight = 140
-                              const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-                              setMenuPos({
-                                top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-                                right: window.innerWidth - rect.right,
-                              })
+                              const right = window.innerWidth - rect.right
+                              // Provisional placement below the button; the layout
+                              // effect corrects this to the menu's real measured
+                              // height right after it mounts, before paint.
+                              setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+                              setMenuPos({ top: rect.bottom + 4, right })
                               setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)
                             }}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -896,6 +933,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div
+              ref={menuRef}
               style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
               className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
             >

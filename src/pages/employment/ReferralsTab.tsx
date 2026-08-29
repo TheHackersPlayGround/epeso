@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import type { Referral } from '../../contexts/EmploymentContext'
@@ -235,7 +235,23 @@ const EXTRA_COLUMNS: Record<string, { label: string; get: (r: Referral) => strin
 function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, onRemove }: ReferralsTableProps) {
   const extraCols = activeFilters.filter(f => f in EXTRA_COLUMNS)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = Math.max(8, showAbove ? menuAnchor.top - height - 4 : Math.min(menuAnchor.bottom + 4, window.innerHeight - height - 8))
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openMenuId, menuAnchor])
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     if (openMenuId === id) {
@@ -243,13 +259,12 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
       return
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuHeight = 80
-    const margin = 8
-    const spaceBelow = window.innerHeight - rect.bottom
-    let top = spaceBelow < menuHeight + margin ? rect.top - menuHeight - 4 : rect.bottom + 4
-    // Clamp so the menu is never cut off by the top or bottom edge of the viewport.
-    top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin))
-    setMenuPos({ top, right: window.innerWidth - rect.right })
+    const right = window.innerWidth - rect.right
+    // Provisional placement below the trigger; the layout effect corrects
+    // this to the menu's real measured height right after it mounts, before
+    // paint.
+    setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+    setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
   }
 
@@ -337,6 +352,7 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} />
           <div
+            ref={menuRef}
             style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 16px)' }}
             className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >

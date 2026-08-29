@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import {
   Search, Plus, ChevronDown, ChevronRight, ChevronLeft, X, Download, Upload,
@@ -606,7 +606,23 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = showAbove ? Math.max(8, menuAnchor.top - height - 4) : menuAnchor.bottom + 4
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openMenuId, menuAnchor])
   const [viewingBeneficiary, setViewingBeneficiary] = useState<DILEEPApplicant | null>(null)
   const [editingBeneficiary, setEditingBeneficiary] = useState<DILEEPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -672,12 +688,12 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const menuHeight = 170
-    const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-    setMenuPos({
-      top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    })
+    const right = window.innerWidth - rect.right
+    // Provisional placement below the button; the layout effect corrects
+    // this to the menu's real measured height right after it mounts, before
+    // paint.
+    setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+    setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(openMenuId === id ? null : id)
   }
 
@@ -785,8 +801,56 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     }))
   }
 
+  // Column order/names here must match dilpImport.ts's / tupadImport.ts's
+  // expected headers exactly (Import looks columns up by name via
+  // get()/norm(), not position) -- this is what makes an exported .xlsx
+  // directly re-importable later, unlike buildExportRows() above which is a
+  // 6-column summary for quick viewing. DILP and TUPAD have different field
+  // sets (DILP has Email/Classification/4Ps, TUPAD doesn't), so each gets
+  // its own header list and row shape.
+  const DILP_IMPORT_HEADERS = [
+    'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
+    'Contact Number', 'Email Address',
+    'Beneficiary Classification', 'Classification, if Others', '4Ps Beneficiary?', 'Year Graduated / Exited',
+    'Province', 'City / Municipality', 'Barangay', 'Street / Purok',
+    'Date Applied (MM/DD/YYYY)', 'Received By', 'Remarks',
+    'Age', 'Assigned Project', 'Status',
+  ]
+  const TUPAD_IMPORT_HEADERS = [
+    'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
+    'Contact Number',
+    'Province', 'City / Municipality', 'Barangay', 'Street / Purok',
+    'Date Applied (MM/DD/YYYY)', 'Received By', 'Remarks',
+    'Age', 'Assigned Project', 'Status',
+  ]
+
+  function buildImportCompatibleRows(): (string | number)[][] {
+    if (isDILP) {
+      return (filtered as DILPApplicant[]).map(b => [
+        b.lastName, b.firstName, b.middleName, b.nameExtension, b.sex, b.birthdate, b.civilStatus,
+        b.contactNumber, b.email,
+        b.beneficiaryClassification, b.beneficiaryClassificationOther, b.is4PsBeneficiary ? 'Yes' : 'No', b.yearGraduated4Ps,
+        b.province, b.cityMunicipality, b.barangay, b.streetPurok,
+        b.dateApplied, b.receivedBy, b.remarks,
+        b.age, b.assignedProjectName, b.status,
+      ])
+    }
+    return (filtered as TUPADApplicant[]).map(b => [
+      b.lastName, b.firstName, b.middleName, b.nameExtension, b.sex, b.birthdate, b.civilStatus,
+      b.contactNumber,
+      b.province, b.cityMunicipality, b.barangay, b.streetPurok,
+      b.dateApplied, b.receivedBy, b.remarks,
+      b.age, b.assignedProjectName, b.status,
+    ])
+  }
+
   function handleExportExcel() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
+    // Row 1 is left blank: Import always skips the physical first row
+    // (range: 1), since the downloadable Template has a merged
+    // section-label band there. Real headers go on row 2.
+    const headers = isDILP ? DILP_IMPORT_HEADERS : TUPAD_IMPORT_HEADERS
+    const aoa = [[], headers, ...buildImportCompatibleRows()]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, programLabel)
     XLSX.writeFile(wb, `${programLabel}_beneficiaries.xlsx`)
@@ -1142,8 +1206,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
           <>
             <div className="fixed inset-0 z-[200]" onClick={closeMenu} />
             <div
-              style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-              className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1"
+              ref={menuRef}
+              style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
+              className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[201] py-1 overflow-y-auto"
             >
               <button onClick={() => { setViewingBeneficiary(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingBeneficiary(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>

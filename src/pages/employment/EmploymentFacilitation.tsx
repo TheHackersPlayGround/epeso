@@ -616,8 +616,125 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     }));
   }
 
+  // Column order/names here must match applicantImport.ts's expected headers
+  // exactly (Import looks columns up by name via get()/norm(), not
+  // position) -- this is what makes an exported .xlsx directly
+  // re-importable later (e.g. after moving to a different device), unlike
+  // buildExportRows() above which is a flat 14-field summary for quick
+  // viewing (combined Address/Education, no work history etc).
+  //
+  // applicantImport.ts scans repeating sections (Job Preference, Language,
+  // Graduate Study, Training, Eligibility, Professional License, Work
+  // Experience) dynamically by column index -- "N" can be any number, not
+  // just the template's default 1-3 -- so instead of hardcoding those
+  // defaults, the column count for each section here is sized to whichever
+  // applicant in this export actually has the most entries, so nobody's
+  // 4th+ work experience/job preference/etc silently gets left out.
+  function buildImportCompatibleColumns() {
+    const fds = filteredApplicants.map((a) => (a.fullFormData as ApplicantFormData | undefined));
+    const maxOf = (get: (fd: ApplicantFormData) => number, min: number) =>
+      Math.max(min, ...fds.map((fd) => (fd ? get(fd) : 0)));
+
+    return {
+      jobPrefRows: maxOf((fd) => fd.jobPreferences.length, 3),
+      langRows: maxOf((fd) => fd.languages.length, 3),
+      gradRows: maxOf((fd) => fd.graduateStudies.length, 1),
+      trainingRows: maxOf((fd) => fd.trainings.length, 1),
+      eligRows: maxOf((fd) => fd.eligibilities.length, 3),
+      licRows: maxOf((fd) => fd.professionalLicenses.length, 3),
+      workExpRows: maxOf((fd) => fd.workExperiences.length, 3),
+    };
+  }
+
+  function buildImportCompatibleHeaders(counts: ReturnType<typeof buildImportCompatibleColumns>) {
+    const repeat = (n: number, make: (i: number) => string[]) =>
+      Array.from({ length: n }, (_, i) => make(i + 1)).flat();
+
+    return [
+      // I. Personal Information
+      'Surname', 'First Name', 'Middle Name', 'Suffix', 'Date of Birth (MM/DD/YYYY)', 'Sex', 'Religion',
+      'Civil Status', 'Height (cm)', 'House No./Street', 'Province', 'Municipality/City', 'Barangay',
+      'Has Disability?', 'Disability Types', 'Disability (Other) Detail', 'TIN', 'Contact Number', 'Email',
+      'Employment Status', 'Employment Type', 'Self-Employment Type', 'Self-Employment (Other)',
+      'Months Looking For Work', 'Unemployment Reason', 'Unemployment Reason (Other)',
+      'An OFW?', 'OFW Country', 'A Former OFW?', 'Former OFW Country', 'Former OFW Return Date (MM/DD/YYYY)',
+      'A 4Ps Beneficiary?', 'Household ID No.',
+      // II. Job Preference
+      'Employment Type Preference',
+      ...repeat(counts.jobPrefRows, (i) => [`Preferred Occupation ${i}`, `Preferred Local City ${i}`, `Preferred Overseas Country ${i}`]),
+      // III. Language / Dialect Proficiency
+      ...repeat(counts.langRows, (i) => [`Language ${i}`, `Language ${i} - Read`, `Language ${i} - Write`, `Language ${i} - Speak`, `Language ${i} - Understand`]),
+      // IV. Educational Background
+      'Currently In School?',
+      'Elementary - School Name', 'Elementary - Graduated?', 'Elementary - Year Graduated', 'Elementary - Level Reached', 'Elementary - Year Last Attended',
+      'Secondary - School Name', 'Secondary - Type', 'Secondary - Senior High Strand', 'Secondary - Graduated?', 'Secondary - Year Graduated', 'Secondary - Level Reached', 'Secondary - Year Last Attended',
+      'Tertiary - School Name', 'Tertiary - Course/Degree', 'Tertiary - Graduated?', 'Tertiary - Year Graduated', 'Tertiary - Level Reached', 'Tertiary - Year Last Attended',
+      ...repeat(counts.gradRows, (i) => [`Graduate Study ${i} - School Name`, `Graduate Study ${i} - Course`, `Graduate Study ${i} - Graduated?`, `Graduate Study ${i} - Year Graduated`, `Graduate Study ${i} - Level Reached`, `Graduate Study ${i} - Year Last Attended`]),
+      // V. Technical/Vocational and Other Training
+      ...repeat(counts.trainingRows, (i) => [`Training ${i} - Course`, `Training ${i} - Hours`, `Training ${i} - Institution`, `Training ${i} - Skills Acquired`, `Training ${i} - Certificate Received`]),
+      // VI. Eligibility / Professional License
+      ...repeat(counts.eligRows, (i) => [`Eligibility ${i} - Name`, `Eligibility ${i} - Date Taken (MM/DD/YYYY)`]),
+      ...repeat(counts.licRows, (i) => [`Professional License ${i} - Name`, `Professional License ${i} - Valid Until (MM/DD/YYYY)`]),
+      // VII. Work Experience
+      ...repeat(counts.workExpRows, (i) => [`Work Experience ${i} - Company Name`, `Work Experience ${i} - Company City`, `Work Experience ${i} - Position`, `Work Experience ${i} - Months`, `Work Experience ${i} - Status`]),
+      // VIII. Other Skills Acquired Without Certificate
+      'Other Skills (comma-separated)',
+      // IX. Referred Program
+      'Referred Program', 'Referred Program (Other)',
+      // Display-only from here -- Import ignores anything it doesn't recognize.
+      'Age', 'Skills Summary',
+    ];
+  }
+
+  function buildImportCompatibleRows(counts: ReturnType<typeof buildImportCompatibleColumns>) {
+    const pad = <T,>(arr: T[], n: number): (T | undefined)[] => Array.from({ length: n }, (_, i) => arr[i]);
+
+    return filteredApplicants.map((a) => {
+      const fd = a.fullFormData as ApplicantFormData | undefined;
+      if (!fd) return [] as (string | number)[];
+
+      const jobPrefRows = pad(fd.jobPreferences, counts.jobPrefRows).flatMap((j) => [j?.occupation ?? '', j?.localCity ?? '', j?.overseasCountry ?? '']);
+      const langRows = pad(fd.languages, counts.langRows).flatMap((l) => [l?.language ?? '', l?.read ? 'Yes' : '', l?.write ? 'Yes' : '', l?.speak ? 'Yes' : '', l?.understand ? 'Yes' : '']);
+      const gradRows = pad(fd.graduateStudies, counts.gradRows).flatMap((g) => [g?.schoolName ?? '', g?.course ?? '', g?.graduated ?? '', g?.yearGraduated ?? '', g?.levelReached ?? '', g?.yearLastAttended ?? '']);
+      const trainingRows = pad(fd.trainings, counts.trainingRows).flatMap((t) => [t?.course ?? '', t?.hoursOfTraining ?? '', t?.institution ?? '', t?.skillsAcquired ?? '', t?.certificateReceived ?? '']);
+      const eligRows = pad(fd.eligibilities, counts.eligRows).flatMap((e) => [e?.eligibility ?? '', e?.dateTaken ?? '']);
+      const licRows = pad(fd.professionalLicenses, counts.licRows).flatMap((l) => [l?.license ?? '', l?.validUntil ?? '']);
+      const workExpRows = pad(fd.workExperiences, counts.workExpRows).flatMap((w) => [w?.companyName ?? '', w?.companyCity ?? '', w?.position ?? '', w?.numberOfMonths ?? '', w?.status ?? '']);
+
+      return [
+        fd.surname, fd.firstName, fd.middleName, fd.suffix, fd.dateOfBirth, fd.sex, fd.religion,
+        fd.civilStatus, fd.height, fd.houseNo, fd.province, fd.municipality, fd.barangay,
+        fd.hasDisability.length > 0 ? 'Yes' : 'No', fd.hasDisability.join(', '), fd.disabilityOther, fd.tin, fd.contactNumber, fd.email,
+        fd.employmentStatus, fd.employmentType, fd.selfEmploymentType, fd.selfEmploymentOther,
+        fd.monthsLookingForWork, fd.unemploymentReason, fd.unemploymentReasonOther,
+        fd.isOFW, fd.ofwCountry, fd.isFormerOFW, fd.formerOFWCountry, fd.formerOFWReturnDate,
+        fd.is4PsBeneficiary, fd.householdIdNo,
+        fd.jobPrefEmploymentType.join(', '),
+        ...jobPrefRows,
+        ...langRows,
+        fd.currentlyInSchool,
+        fd.elementary.schoolName, fd.elementary.graduated, fd.elementary.yearGraduated, fd.elementary.levelReached, fd.elementary.yearLastAttended,
+        fd.secondary.schoolName, fd.secondary.type, fd.secondary.seniorHighStrand, fd.secondary.graduated, fd.secondary.yearGraduated, fd.secondary.levelReached, fd.secondary.yearLastAttended,
+        fd.tertiary.schoolName, fd.tertiary.course, fd.tertiary.graduated, fd.tertiary.yearGraduated, fd.tertiary.levelReached, fd.tertiary.yearLastAttended,
+        ...gradRows,
+        ...trainingRows,
+        ...eligRows,
+        ...licRows,
+        ...workExpRows,
+        [...fd.otherSkills, ...fd.otherSkillsSpecify.filter(Boolean)].join(', '),
+        fd.referredProgram, fd.referredProgramOther,
+        a.age, a.skills,
+      ] as (string | number)[]
+    })
+  }
+
   function handleExportExcel() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows());
+    const counts = buildImportCompatibleColumns();
+    // Row 1 is left blank: Import always skips the physical first row
+    // (range: 1), since the downloadable Template has a merged
+    // section-label band there. Real headers go on row 2.
+    const aoa = [[], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Applicants");
     XLSX.writeFile(wb, "applicants.xlsx");

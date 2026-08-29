@@ -250,5 +250,6 @@ export const ENDPOINTS = {
     deleteBackup:   '/backup/deleteBackup',
     restoreBackup:  '/backup/restoreBackup',
     restoreUpload:  '/backup/restoreUpload',
+    restoreProgress: '/backup/restoreProgress',
   },
 } as const

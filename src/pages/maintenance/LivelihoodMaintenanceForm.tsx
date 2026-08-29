@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
@@ -229,7 +229,23 @@ export default function LivelihoodMaintenanceForm() {
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (openMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = showAbove ? Math.max(8, menuAnchor.top - height - 4) : menuAnchor.bottom + 4
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openMenuId, menuAnchor])
 
   // Confirm modals
   const [statusConfirm, setStatusConfirm] = useState<{
@@ -912,8 +928,9 @@ export default function LivelihoodMaintenanceForm() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
               <div
-                style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
-                className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1"
+                ref={menuRef}
+                style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
+                className="w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
               >
                 <button
                   onClick={() => { fillFormFromProject(a); setSelectedProject(a); setAction('view_project'); setOpenMenuId(null) }}
@@ -1049,11 +1066,12 @@ export default function LivelihoodMaintenanceForm() {
                       <button
                         onClick={e => {
                           const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                          const menuH = 240
-                          const top = window.innerHeight - rect.bottom < menuH + 8
-                            ? rect.top - menuH - 4
-                            : rect.bottom + 4
-                          setMenuPos({ top, right: window.innerWidth - rect.right })
+                          const right = window.innerWidth - rect.right
+                          // Provisional placement below the button; the layout
+                          // effect corrects this to the menu's real measured
+                          // height right after it mounts, before paint.
+                          setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+                          setMenuPos({ top: rect.bottom + 4, right })
                           setOpenMenuId(openMenuId === a.id ? null : a.id)
                         }}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"

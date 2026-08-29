@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import ConfirmModal from '../shared/ConfirmModal'
+import JobPlacementModal from '../shared/JobPlacementModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
   Upload, Download, ChevronDown, MoreHorizontal,
@@ -207,7 +208,25 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
+  // anchor is set immediately on click (button's own position); pos is the
+  // menu's actual final placement, corrected by measuring the menu's real
+  // rendered height once it mounts (see the layout effect below) -- a
+  // hardcoded height guess drifts stale every time a menu item is added or
+  // removed, which is exactly what cut this menu off after "Record Job
+  // Placement" made it taller than the old guess assumed.
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [jobPlacementApplicant, setJobPlacementApplicant] = useState<GIPApplicant | null>(null)
+
+  useLayoutEffect(() => {
+    if (openActionMenuId === null || !menuAnchor || !menuRef.current) return
+    const height = menuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - menuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && menuAnchor.top > height
+    const top = showAbove ? Math.max(8, menuAnchor.top - height - 4) : menuAnchor.bottom + 4
+    setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
+  }, [openActionMenuId, menuAnchor])
 
   const filtered = applicants.filter(a => {
     const fullName = `${a.lastName} ${a.firstName} ${a.middleName}`.toLowerCase()
@@ -353,20 +372,40 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setAssignSearch('')
   }
 
+  // Column order/names here must match gipImport.ts's expected headers
+  // exactly (Import looks columns up by name via get()/norm(), not
+  // position) -- this is what makes an exported .xlsx directly
+  // re-importable later (e.g. after moving to a different device), unlike
+  // the human-readable CSV below which drops Province/City for brevity.
+  const IMPORT_COMPATIBLE_HEADERS = [
+    'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
+    'Contact Number', 'Email',
+    'Province', 'City / Municipality', 'Barangay', 'Street / Purok #',
+    'Classification (comma-separated)', 'Classification, if Other',
+    'Highest Educational Attainment', 'School / University', 'Strand', 'Course / Degree', 'Year Level', 'Year Graduated',
+    'Date Applied (MM/DD/YYYY)', 'Received By', 'Remarks',
+    // Display-only from here -- Import ignores anything it doesn't recognize.
+    'Age', 'Assigned Workplace/Office', 'Status',
+  ]
+
   const exportToExcel = () => {
-    const data = filtered.map(a => {
+    const rows = filtered.map(a => {
       const workplace = gipWorkplaces.find(w => w.id === a.assignedWorkplaceId)
-      return {
-        'Last Name': a.lastName, 'First Name': a.firstName, 'Middle Name': a.middleName,
-        'Sex': a.sex, 'Birthdate': a.birthdate, 'Age': a.age, 'Civil Status': a.civilStatus,
-        'Contact': a.contactNumber, 'Email': a.email, 'Barangay': a.barangay,
-        'Classification': a.classification.join(', '),
-        'Education': a.highestEducation, 'School': a.schoolName, 'Course': a.course,
-        'Assigned Workplace/Office': workplace?.workplaceName ?? '',
-        'Status': deriveStatus(a), 'Remarks': a.remarks,
-      }
+      return [
+        a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
+        a.contactNumber, a.email,
+        a.province, a.cityMunicipality, a.barangay, a.streetPurok,
+        a.classification.join(', '), a.classificationOther,
+        a.highestEducation, a.schoolName, a.strand, a.course, a.yearLevel, a.yearGraduated,
+        a.dateApplicationReceived, a.receivedBy, a.remarks,
+        a.age, workplace?.workplaceName ?? '', deriveStatus(a),
+      ]
     })
-    const ws = XLSX.utils.json_to_sheet(data)
+    // Row 1 is left blank: Import always skips the physical first row
+    // (range: 1), since the downloadable Template has a merged
+    // section-label band there. Real headers go on row 2.
+    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'GIP Applicants')
     XLSX.writeFile(wb, `GIP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
@@ -805,12 +844,12 @@ export default function GIPView({ onBack }: GIPViewProps) {
                           <button
                             onClick={e => {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                              const menuHeight = 160
-                              const showAbove = window.innerHeight - rect.bottom < menuHeight + 8
-                              setMenuPos({
-                                top: showAbove ? rect.top - menuHeight - 4 : rect.bottom + 4,
-                                right: window.innerWidth - rect.right,
-                              })
+                              const right = window.innerWidth - rect.right
+                              // Provisional placement below the button; the layout
+                              // effect corrects this to the menu's real measured
+                              // height right after it mounts, before paint.
+                              setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+                              setMenuPos({ top: rect.bottom + 4, right })
                               setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)
                             }}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -864,6 +903,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div
+              ref={menuRef}
               style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }}
               className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
             >
@@ -889,6 +929,12 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Assign Workplace/Office</button>
               )}
+              {applicant.status === 'Completed' && (
+                <button
+                  onClick={() => { setJobPlacementApplicant(applicant); setOpenActionMenuId(null) }}
+                  className="w-full px-3 py-2 text-left text-xs text-emerald-600 hover:bg-emerald-50"
+                >Record Job Placement</button>
+              )}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { setDeleteConfirm({ open: true, id: applicant.id }); setOpenActionMenuId(null) }} disabled={!canManage('gip')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
             </div>
@@ -906,6 +952,15 @@ export default function GIPView({ onBack }: GIPViewProps) {
           cancelText="Cancel"
           onConfirm={() => handleCompleteAssignment(completeConfirm.id)}
           onCancel={() => setCompleteConfirm(null)}
+        />
+      )}
+
+      {jobPlacementApplicant && (
+        <JobPlacementModal
+          beneficiaryServiceId={jobPlacementApplicant.beneficiaryServiceId}
+          applicantName={`${jobPlacementApplicant.firstName} ${jobPlacementApplicant.lastName}`}
+          canManage={canManage('gip')}
+          onClose={() => setJobPlacementApplicant(null)}
         />
       )}
     </>

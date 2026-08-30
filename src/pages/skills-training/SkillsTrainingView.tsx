@@ -753,7 +753,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       Confirming will make this their new current training — their previous one stays in Training History.
                     </div>
                   )}
-                  {assigningProfile.lastCompletedDate && monthsSince(assigningProfile.lastCompletedDate) < 6 && (
+                  {/* Only relevant when actually confirming a NEW assignment -- in
+                      assignViewOnly mode this screen just shows the training the
+                      applicant is already in, with no "proceed" action to warn about. */}
+                  {!assignViewOnly && assigningProfile.lastCompletedDate && monthsSince(assigningProfile.lastCompletedDate) < 6 && (
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                       Last training completed <span className="font-semibold">{relativeSince(assigningProfile.lastCompletedDate)} ago</span> —
                       under the usual 6-month gap between trainings. You may still proceed if appropriate.

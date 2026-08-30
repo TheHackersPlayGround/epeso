@@ -7,6 +7,7 @@ export interface CDSPAssignment {
   activityTitle: string
   assignedDate: string
   completedDate?: string | null
+  attended: boolean | null
 }
 
 export interface CDSPSavedDocument {
@@ -50,6 +51,10 @@ export interface CDSPApplicant {
   serviceAvailed: string
   assignedActivity: string
   assignedActivityId: number | null
+  assignedActivityStatus: 'Planned' | 'Ongoing' | 'Completed' | 'Absent' | null
+  lastCompletedActivityTitle: string
+  lastCompletedDate: string | null
+  placed: boolean
   assignmentHistory: CDSPAssignment[]
   yearLevel: string
   dateApplicationReceived: string

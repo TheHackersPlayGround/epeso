@@ -1,7 +1,10 @@
-// Grafts the Aging Report's bar+pie charts into an already-built ExcelJS
+// Grafts an Aging Report's bar+pie charts into an already-built ExcelJS
 // workbook as REAL native Excel chart objects -- not the static picture
 // createHorizontalBarChartImage/createPieChartImage produce for the PDF
-// export and (previously) for this same Excel export.
+// export and (previously) for this same Excel export. Despite the filename
+// (this started as Skills Training's own module), everything here is
+// generic -- fully parameterized via AgingChartOptions -- and is shared
+// as-is by the CDSP Aging Report too.
 //
 // ExcelJS has no API for native chart objects at all (it can only embed
 // static images), so this works entirely below that layer: it takes the
@@ -80,6 +83,12 @@ async function findSheetPath(mainZip: JSZip, sheetName: string): Promise<string>
 
 export type AgingChartOptions = {
   sheetName: string // the worksheet both source tables live on (e.g. 'Summary')
+  // 1-indexed row where ALL text content on the sheet ends -- i.e. aoa.length
+  // at the point every table (pie's, sex bar's, and anything appended after,
+  // like CDSP's sub-service breakdown) has actually been written. The charts
+  // are positioned below THIS, not just below the pie/sex tables' own ranges,
+  // so anything appended after those two doesn't end up hidden underneath them.
+  contentEndRow: number
   categories: string[] // bucket labels in order, e.g. ['0-1 month', ..., 'Placed']
   // The "BENEFICIARIES BY STATUS" table -- feeds the pie chart.
   pie: {
@@ -149,14 +158,13 @@ export async function graftAgingCharts(mainBuffer: ArrayBuffer, opts: AgingChart
   pie = setStrCache(pie, categories)
   pie = setNumCache(pie, opts.pie.values)
   pie = setPieColors(pie, categories, opts.pie.colorMap)
-  pie = setPieShowPercent(pie)
+  pie = setPieShowPercent(pie, opts.pie.values)
   pie = setChartTitle(pie, 'Status Distribution')
 
   // ── Reposition the two charts: stacked full-width below the tables, not
   // side-by-side in the template's own narrower two-column layout ──
   let drawing = await readTemplatePart(TEMPLATE_PARTS.drawing)
-  const lowestDataRow = Math.max(lastCategoryRow, sexLastRow)
-  const barFromRow = lowestDataRow + 1 // 0-indexed row two below the lowest 1-indexed data row of either table
+  const barFromRow = opts.contentEndRow + 1 // 0-indexed row two below the sheet's actual last text row
   const barToRow = barFromRow + 15
   const pieFromRow = barToRow + 2
   const pieToRow = pieFromRow + 15

@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx'
 import { useCDSP } from '../../contexts/CDSPContext'
 import type { CDSPApplicant, CdspActivity } from '../../contexts/CDSPContext'
 import { canManage } from '../../utils/permissions'
+import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS, type AgingBucket } from '../../utils/aging'
 import * as cdspApiService from '../../services/cdspService'
 import CDSPProfileForm, {
   ViewApplicantPanel, CDSP_SEED_SERVICES,
@@ -147,6 +148,7 @@ interface CDSPViewProps {
 function activityStatusBadge(status: string) {
   if (status === 'Ongoing')   return 'bg-green-100 text-green-700'
   if (status === 'Completed') return 'bg-blue-100 text-blue-700'
+  if (status === 'Absent')    return 'bg-orange-100 text-orange-700'
   return 'bg-yellow-100 text-yellow-700'
 }
 
@@ -172,7 +174,18 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
     { id: 'course',         label: 'Course / Program', type: 'text' as const },
+    // Time since their last genuinely completed activity (Completed + attended),
+    // for anyone not yet placed -- same buckets as the Aging Report, so this
+    // list and that report are always describing the same thing.
+    { id: 'aging',          label: 'Aging',           options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
+
+  // null for anyone already Placed, or who has never genuinely completed an
+  // activity -- neither belongs in any aging bucket (matches the Aging Report).
+  const agingBucketForApplicant = (a: CDSPApplicant): AgingBucket | null => {
+    if (a.placed || !a.lastCompletedDate) return null
+    return agingBucket(monthsSince(a.lastCompletedDate))
+  }
 
   const handleAddFilter = (filterId: string) => {
     if (!activeFilters.includes(filterId)) {
@@ -246,6 +259,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
       if (filterId === 'course') return (a.course ?? '').toLowerCase().includes(val.toLowerCase())
+      if (filterId === 'aging') return agingBucketForApplicant(a) === val
       if (filterId === 'age') {
         const age = a.age ?? 0
         if (val === 'Below 20')  return age < 20
@@ -524,6 +538,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         const statusColor = (s?: string) =>
           s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
           s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
+          s === 'Absent'    ? 'bg-orange-100 text-orange-700 border border-orange-200' :
           'bg-amber-100 text-amber-700 border border-amber-200'
         const visibleHistory = (a.assignmentHistory ?? []).filter(entry => {
           const act = cdspActivities.find(x => x.id === entry.activityId)
@@ -555,7 +570,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     {[...visibleHistory].reverse().map((entry, i) => {
                       const act = cdspActivities.find(x => x.id === entry.activityId)
                       const isCurrent = a.assignedActivityId === entry.activityId
-                      const entryStatus = act?.status ?? 'Planned'
+                      const rawStatus = act?.status ?? 'Planned'
+                      // An activity marked Completed only counts as completed for this
+                      // person if they actually attended -- mirrors assignedActivityStatus.
+                      const entryStatus = (rawStatus === 'Completed' && entry.attended === false) ? 'Absent' : rawStatus
                       return (
                         <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
                           <div className="min-w-0 flex-1">
@@ -733,6 +751,12 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                   <Row label="Counselor" value={selectedActivity.counselor} />
                   <Row label="Session Duration" value={selectedActivity.sessionDuration} />
                 </div>
+                {assignTarget.lastCompletedDate && monthsSince(assignTarget.lastCompletedDate) < 6 && (
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    Last activity completed <span className="font-semibold">{relativeSince(assignTarget.lastCompletedDate)} ago</span> —
+                    under the usual 6-month gap between activities. You may still proceed if appropriate.
+                  </div>
+                )}
               </div>
 
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
@@ -923,6 +947,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Service Availed</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Activity</th>
+                    {activeFilters.includes('aging')       && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Aging</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
@@ -953,16 +978,39 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded whitespace-nowrap text-xs">{applicant.serviceAvailed || '—'}</span>
                       </td>
                       <td className="px-4 py-3">
-                        {applicant.assignedActivity ? (() => {
-                          const act = cdspActivities.find(a => a.id === applicant.assignedActivityId)
-                          return (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-sm text-gray-800 line-clamp-1">{applicant.assignedActivity}</span>
-                              {act && <span className={`self-start px-1.5 py-0.5 rounded-full text-xs font-medium ${activityStatusBadge(act.status)}`}>{act.status}</span>}
-                            </div>
-                          )
-                        })() : <span className="text-gray-400 text-xs italic">Not assigned</span>}
+                        {applicant.assignedActivity ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm text-gray-800 line-clamp-1">{applicant.assignedActivity}</span>
+                            {applicant.assignedActivityStatus && (
+                              <span className={`self-start px-1.5 py-0.5 rounded-full text-xs font-medium ${activityStatusBadge(applicant.assignedActivityStatus)}`}>{applicant.assignedActivityStatus}</span>
+                            )}
+                          </div>
+                        ) : <span className="text-gray-400 text-xs italic">Not assigned</span>}
                       </td>
+                      {activeFilters.includes('aging') && (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(() => {
+                            // A bare "—" would mean two very different things here --
+                            // "already placed" and "never completed anything" -- so
+                            // Placed gets its own labeled badge instead of collapsing
+                            // both into the same blank dash.
+                            if (applicant.placed) {
+                              return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
+                            }
+                            const bucket = agingBucketForApplicant(applicant)
+                            if (!bucket) return <span className="text-gray-400">—</span>
+                            const color = AGING_BUCKET_COLORS[bucket]
+                            return (
+                              <div>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${color}22`, color }}>
+                                  {bucket}
+                                </span>
+                                <p className="text-xs text-gray-400 mt-0.5">{relativeSince(applicant.lastCompletedDate!)}</p>
+                              </div>
+                            )
+                          })()}
+                        </td>
+                      )}
                       <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={getEffectiveStatus(applicant, cdspActivities)} /></td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -1022,17 +1070,23 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find((a) => a.id === openActionMenuId)
         if (!applicant) return null
-        const assignedAct = applicant.assignedActivityId
-          ? cdspActivities.find(a => a.id === applicant.assignedActivityId)
-          : null
-        const isCompleted = assignedAct?.status === 'Completed'
+        // Only Planned/Ongoing locks the row into "View Assigned Activity" --
+        // once it's Completed/Absent, "Assign Activity" reappears so the person
+        // can be enrolled into another one (PESO allows availing more than one
+        // CDSP activity), mirroring the same fix made for Skills Training.
+        // Uses assignedActivityStatus (attendance-aware, from cdspBuildProfile)
+        // rather than looking the activity up by id -- an activity marked
+        // Completed only counts as completed for someone who actually attended.
+        const hasActive = !!applicant.assignedActivityId
+          && (applicant.assignedActivityStatus === 'Planned' || applicant.assignedActivityStatus === 'Ongoing')
+        const isCompleted = applicant.assignedActivityStatus === 'Completed'
         return (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenActionMenuId(null)} />
             <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, maxHeight: 'calc(100vh - 24px)' }} className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto">
               <button onClick={() => { setViewingApplicant(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
               <button onClick={() => { setEditingApplicant(applicant); setOpenActionMenuId(null) }} disabled={!canManage('cdsp')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-              {applicant.assignedActivity && !isCompleted
+              {hasActive
                 ? <button onClick={() => { setViewingAssignedFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50">View Assigned Activity</button>
                 : <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} disabled={!canManage('cdsp')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Activity</button>
               }

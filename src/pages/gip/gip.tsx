@@ -17,6 +17,7 @@ import GIPProfileForm, {
   deriveStatus, StatusBadge, CLASSIFICATION_OPTIONS, EDUCATION_OPTIONS, CIVIL_STATUS_OPTIONS,
 } from './GIPProfileForm'
 import { downloadImportTemplate, importGipApplicants, type ImportResult } from './gipImport'
+import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS, type AgingBucket } from '../../utils/aging'
 
 interface GIPViewProps {
   onBack: () => void
@@ -168,7 +169,18 @@ export default function GIPView({ onBack }: GIPViewProps) {
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
     { id: 'education',      label: 'Education',       options: EDUCATION_OPTIONS },
     { id: 'course',         label: 'Course / Degree', type: 'text' as const },
+    // Time since their internship's completion, for anyone not yet placed --
+    // same buckets as the Aging Report, so this list and that report are
+    // always describing the same thing.
+    { id: 'aging',          label: 'Aging',           options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
+
+  // null for anyone still Ongoing/Inactive, or already Placed -- neither
+  // belongs in any aging bucket (matches the Aging Report).
+  const agingBucketForApplicant = (a: GIPApplicant): AgingBucket | null => {
+    if (a.placed || !a.lastCompletedDate) return null
+    return agingBucket(monthsSince(a.lastCompletedDate))
+  }
 
   const handleAddFilter = (filterId: string) => {
     if (!activeFilters.includes(filterId)) {
@@ -245,6 +257,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
       if (filterId === 'civilStatus') return a.civilStatus === val
       if (filterId === 'education') return a.highestEducation === val
       if (filterId === 'course') return (a.course ?? '').toLowerCase().includes(val.toLowerCase())
+      if (filterId === 'aging') return agingBucketForApplicant(a) === val
       if (filterId === 'age') {
         const age = a.age ?? 0
         if (val === 'Below 20') return age < 20
@@ -799,6 +812,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Barangay</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Classification</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Assigned Workplace/Office</th>
+                    {activeFilters.includes('aging')       && <th className="px-4 py-4 text-left text-white whitespace-nowrap">Aging</th>}
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Status</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Date Applied</th>
                     <th className="px-4 py-4 text-left text-white whitespace-nowrap">Actions</th>
@@ -836,6 +850,30 @@ export default function GIPView({ onBack }: GIPViewProps) {
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
+                        {activeFilters.includes('aging') && (
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {(() => {
+                              // A bare "—" would mean two very different things here --
+                              // "already placed" and "hasn't completed their internship
+                              // yet" -- so Placed gets its own labeled badge instead of
+                              // collapsing both into the same blank dash.
+                              if (applicant.placed) {
+                                return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
+                              }
+                              const bucket = agingBucketForApplicant(applicant)
+                              if (!bucket) return <span className="text-gray-400">—</span>
+                              const color = AGING_BUCKET_COLORS[bucket]
+                              return (
+                                <div>
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${color}22`, color }}>
+                                    {bucket}
+                                  </span>
+                                  <p className="text-xs text-gray-400 mt-0.5">{relativeSince(applicant.lastCompletedDate!)}</p>
+                                </div>
+                              )
+                            })()}
+                          </td>
+                        )}
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={derivedStatus} />
                         </td>

@@ -48,6 +48,9 @@ export interface GIPApplicant {
   yearGraduated: string
   assignedWorkplaceId: number | null
   assignmentHistory: GIPAssignmentHistory[]
+  lastCompletedWorkplaceTitle: string | null
+  lastCompletedDate: string | null
+  placed: boolean
   attachedDocuments: GIPSavedDocument[]
   dateApplicationReceived: string
   receivedBy: string

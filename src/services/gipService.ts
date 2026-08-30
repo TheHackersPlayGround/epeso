@@ -46,3 +46,7 @@ export function unassignWorkplace(applicantId: number) {
 export function completeAssignment(applicantId: number) {
   return axiosClient.post(ENDPOINTS.gip.completeAssignment, { applicantId }).then(r => r.data)
 }
+
+export function agingReport() {
+  return axiosClient.get(ENDPOINTS.gip.agingReport).then(r => r.data)
+}

@@ -94,6 +94,7 @@ export type SkillsAgingRow = {
   beneficiaryServiceId: number
   name: string
   sex: string
+  trainingsCompleted: number
   lastCompletedTrainingTitle: string
   completedDate: string
   placed: boolean
@@ -107,5 +108,56 @@ export type SkillsAgingRow = {
 // completion aren't included, since there's nothing to measure aging from.
 export async function fetchSkillsAgingReport(): Promise<SkillsAgingRow[]> {
   const res = await axiosClient.get<{ status: string; data: SkillsAgingRow[] }>(ENDPOINTS.skillsTraining.agingReport)
+  return res.data.data ?? []
+}
+
+// ── CDSP Aging Report (live from the backend, not period-scoped) ──
+// Unlike Skills Training, CDSP has sub-services (Career Coaching /
+// Pre-Employment Coaching / Labor Employment for Graduating Students), so
+// each row also carries which one the beneficiary is enrolled under.
+
+export type CdspAgingRow = {
+  beneficiaryServiceId: number
+  name: string
+  sex: string
+  subService: string
+  activitiesCompleted: number
+  lastCompletedActivityTitle: string
+  completedDate: string
+  placed: boolean
+  jobTitle: string | null
+  employer: string | null
+  dateHired: string | null
+}
+
+// One row per beneficiary who has genuinely completed (status Completed AND
+// attended) at least one CDSP activity -- beneficiaries with no real
+// completion aren't included, since there's nothing to measure aging from.
+export async function fetchCdspAgingReport(): Promise<CdspAgingRow[]> {
+  const res = await axiosClient.get<{ status: string; data: CdspAgingRow[] }>(ENDPOINTS.cdsp.agingReport)
+  return res.data.data ?? []
+}
+
+// ── GIP Aging Report (live from the backend, not period-scoped) ──
+// GIP is one-shot -- an applicant only ever goes through the program once --
+// so unlike Skills Training/CDSP there's no "trainings/activities completed"
+// count worth showing here; it would always just be 1.
+
+export type GipAgingRow = {
+  beneficiaryServiceId: number
+  name: string
+  sex: string
+  lastCompletedWorkplaceTitle: string
+  completedDate: string
+  placed: boolean
+  jobTitle: string | null
+  employer: string | null
+  dateHired: string | null
+}
+
+// One row per applicant whose internship is Completed -- anyone still
+// Ongoing/Inactive isn't included, since there's nothing to measure aging from.
+export async function fetchGipAgingReport(): Promise<GipAgingRow[]> {
+  const res = await axiosClient.get<{ status: string; data: GipAgingRow[] }>(ENDPOINTS.gip.agingReport)
   return res.data.data ?? []
 }

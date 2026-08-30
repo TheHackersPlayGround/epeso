@@ -83,9 +83,20 @@ export function setBarColor(chartXml: string, color = '0077BE'): string {
 // hand. A <c:numFmt> is also inserted (schema requires it, if present, before
 // the show* flags) so Excel prints one decimal place (31.6%) instead of its
 // default whole-number rounding.
-export function setPieShowPercent(chartXml: string): string {
+//
+// values (the same array fed into the pie's cell range/cache) drives one more
+// thing: a 0-value category collapses to a zero-degree slice, so its "0.0%"
+// label has nowhere of its own to sit and stacks directly on top of whichever
+// slice happens to start at that same angle. Per-point <c:dLbl> overrides
+// with <c:delete val="1"/> suppress the label for just those points -- CT_DLbls'
+// schema requires these individual overrides to come BEFORE the group-level
+// numFmt/show* settings, so they're inserted first.
+export function setPieShowPercent(chartXml: string, values?: number[]): string {
+  const deletedLabels = (values ?? [])
+    .map((v, i) => (v === 0 ? `<c:dLbl><c:idx val="${i}"/><c:delete val="1"/></c:dLbl>` : ''))
+    .join('')
   return chartXml
-    .replace('<c:dLbls>', '<c:dLbls><c:numFmt formatCode="0.0%" sourceLinked="0"/>')
+    .replace('<c:dLbls>', () => `<c:dLbls>${deletedLabels}<c:numFmt formatCode="0.0%" sourceLinked="0"/>`)
     .replace('<c:showPercent val="0"/>', '<c:showPercent val="1"/>')
 }
 

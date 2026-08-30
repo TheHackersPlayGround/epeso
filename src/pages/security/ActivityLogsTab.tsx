@@ -69,7 +69,12 @@ function formatTimestamp(ts: string): string {
 // they won't appear here until they do.
 type RecycleBinItem = RecycleBinRecord
 
-// Days left before the (display-only) 30-day window elapses, from the real date.
+// Days left before the 30-day retention window elapses. This used to be
+// display-only -- now each module's backend actually enforces it too (see
+// {module}PurgeExpired(), called from {module}ListDeleted(): the next time
+// anyone loads this recycle bin, anything past 30 days for a given module
+// is hard-deleted before the remaining list is returned). Keep this number
+// in sync with RECYCLE_BIN_RETENTION_DAYS in core/helpers.php.
 function getDaysRemaining(deletedAt: string): number {
   const deleted = new Date(deletedAt)
   const diff = Math.floor((Date.now() - deleted.getTime()) / (1000 * 60 * 60 * 24))
@@ -197,7 +202,12 @@ export default function ActivityLogsTab() {
     }
   }, [])
 
-  useEffect(() => { reloadLogs() }, [reloadLogs])
+  // Re-fetches every time this tab becomes active, not just once on mount --
+  // a Recycle Bin action (restore/purge/empty) writes a new activity log
+  // entry on the backend, but switching back to the Logs tab from Bin
+  // previously showed the stale list from whenever the page first loaded,
+  // only ever catching up on a full page refresh.
+  useEffect(() => { if (subTab === 'logs') reloadLogs() }, [subTab, reloadLogs])
 
   const reloadBin = useCallback(async () => {
     setBinLoading(true)
@@ -210,7 +220,14 @@ export default function ActivityLogsTab() {
     }
   }, [])
 
+  // Loads once on mount -- recycleBin.length feeds the count badge on the
+  // "Recycle Bin" nav button itself, which is visible even while sitting on
+  // the Logs tab, so this can't wait for the Bin tab to actually be opened.
   useEffect(() => { reloadBin() }, [reloadBin])
+  // On top of that: refetch every time the Bin tab specifically becomes
+  // active, so a deletion made elsewhere (another module's list, another
+  // browser tab) shows up here without needing a full page refresh.
+  useEffect(() => { if (subTab === 'bin') reloadBin() }, [subTab, reloadBin])
 
   const handleExportLogs = () => {
     const rows = filteredLogs.map(l => ({
@@ -320,28 +337,69 @@ export default function ActivityLogsTab() {
     }
   }
 
+  // Two-pass empty: try every item WITHOUT force first, exactly like a
+  // single-item Purge would. An EF applicant with placement/referral
+  // history, or a Documents folder with leftover recycle-bin files, gets
+  // blocked by the backend instead of silently force-deleted — those are
+  // left untouched and reported back in one aggregate follow-up warning
+  // (naming exactly what extra data would be lost), rather than either
+  // skipping the warning entirely (the old bug: "Empty Bin"'s generic
+  // message never mentioned this) or nagging once per blocked item.
+  const runEmptyBinPass = async (items: RecycleBinItem[], force: boolean) => {
+    type PurgeDetail = { code?: string; placements?: number; referrals?: number; count?: number }
+    const blocked: { item: RecycleBinItem; detail: PurgeDetail }[] = []
+    let failed = 0
+
+    for (const item of items) {
+      try {
+        await purgeRecord(item.recordType, item.id, force)
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? (err as Error & { detail?: PurgeDetail }).detail : undefined
+        if (!force && (detail?.code === 'has_history' || detail?.code === 'has_files')) {
+          blocked.push({ item, detail })
+        } else {
+          failed++
+        }
+      }
+    }
+
+    await reloadBin()
+
+    if (blocked.length > 0) {
+      const lines = blocked.map(({ item, detail }) => {
+        if (detail.code === 'has_history') {
+          const parts: string[] = []
+          if (detail.placements) parts.push(`${detail.placements} placement${detail.placements !== 1 ? 's' : ''}`)
+          if (detail.referrals) parts.push(`${detail.referrals} referral${detail.referrals !== 1 ? 's' : ''}`)
+          return `• "${item.name}" — has ${parts.join(' and ')}`
+        }
+        const count = detail.count ?? 0
+        return `• "${item.name}" — still has ${count} file${count !== 1 ? 's' : ''} in the Recycle Bin`
+      })
+      setConfirmModal({
+        isOpen: true, type: 'confirm', title: 'Some Items Carry Extra History',
+        message: `${blocked.length} item${blocked.length !== 1 ? 's' : ''} also carry extra data that would be permanently lost too:\n\n${lines.join('\n')}\n\nDelete ${blocked.length !== 1 ? 'them' : 'it'} anyway? This cannot be undone.`,
+        confirmText: 'Yes, Delete Everything', cancelText: 'Leave These For Now',
+        onConfirm: () => runEmptyBinPass(blocked.map(b => b.item), true),
+      })
+      return
+    }
+
+    if (failed > 0) {
+      showError(`${failed} item${failed !== 1 ? 's' : ''} could not be deleted. Please try again.`)
+      return
+    }
+
+    setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: closeModal })
+  }
+
   const handleEmptyBin = () => {
     if (recycleBin.length === 0) return
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Empty Recycle Bin',
       message: `Permanently delete all ${recycleBin.length} item(s) in the recycle bin?\n\nThis action CANNOT be undone.`,
       confirmText: 'Yes, Empty Bin', cancelText: 'Cancel',
-      onConfirm: async () => {
-        try {
-          // No bulk endpoint — purge each record, then reload once. Force
-          // straight away: "Empty Bin" already carries an unambiguous
-          // delete-everything-permanently confirmation, so an EF applicant
-          // with placement/referral history shouldn't silently survive it.
-          for (const item of recycleBin) {
-            await purgeRecord(item.recordType, item.id, true)
-          }
-          await reloadBin()
-          setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: closeModal })
-        } catch {
-          await reloadBin()
-          showError('Some items could not be deleted. Please try again.')
-        }
-      },
+      onConfirm: () => runEmptyBinPass(recycleBin, false),
     })
   }
 

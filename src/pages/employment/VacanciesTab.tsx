@@ -5,9 +5,6 @@ import type { Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
 import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
 import { listEmployers } from '../../services/employerService'
-import { listApplicants } from '../../services/applicantService'
-import { createReferral } from '../../services/referralService'
-import { useReferralGuard } from '../../utils/referralGuard'
 import ConfirmModal from '../shared/ConfirmModal'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
@@ -204,7 +201,6 @@ type VacanciesTableProps = {
   activeFilters: string[]
   onView: (v: Vacancy) => void
   onEdit: (v: Vacancy) => void
-  onMatch: (v: Vacancy) => void
   onToggleStatus: (id: number, currentStatus: Vacancy['status']) => void
   isFiltered: boolean
   highlightId?: number | null
@@ -218,7 +214,7 @@ function StatusBadge({ status }: { status: Vacancy['status'] }) {
   )
 }
 
-function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
+function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is set immediately on click (button's own position); pos is the
   // menu's actual final placement, corrected by measuring the menu's real
@@ -359,7 +355,6 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onMatch, onT
           >
             <button onClick={() => { onView(menuVacancy); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
-            <button onClick={() => { onMatch(menuVacancy); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Match</button>
             {(menuVacancy.manualStatus ?? menuVacancy.status) === 'Open' ? (
               <button
                 onClick={handleConfirmClose}
@@ -457,105 +452,6 @@ function ViewVacancyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () 
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Match Applicants Modal ────────────────────────────────────────────────────
-
-type SimpleApplicant = { id: number; name: string; skills: string; education: string }
-
-function MatchApplicantsModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () => void }) {
-  const [applicants, setApplicants] = useState<SimpleApplicant[]>([])
-  const [loadingApplicants, setLoadingApplicants] = useState(true)
-  const [referred, setReferred] = useState<Set<number>>(new Set())
-  const [referralError, setReferralError] = useState(false)
-  const { confirmReferralOk, referralGuardModal } = useReferralGuard()
-
-  useEffect(() => {
-    listApplicants()
-      .then(list => setApplicants(list.map(a => ({ id: a.id, name: a.name, skills: a.skills ?? '', education: a.education ?? '' }))))
-      .catch(() => {})
-      .finally(() => setLoadingApplicants(false))
-  }, [])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Match Applicants</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Vacancy: {vacancy.jobTitle} at {vacancy.employer}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-4 flex flex-col gap-4 overflow-y-auto">
-          <p className="text-sm text-gray-600">
-            Select an applicant below to refer them to this vacancy.
-          </p>
-
-          {loadingApplicants ? (
-            <p className="text-sm text-gray-400 text-center py-8">Loading applicants…</p>
-          ) : applicants.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No applicants found.</p>
-          ) : (
-            applicants.map(applicant => (
-              <div key={applicant.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                <div className="flex-1 min-w-0 pr-4">
-                  <p className="text-sm font-semibold text-gray-800">{applicant.name}</p>
-                  {applicant.skills && (
-                    <p className="text-sm text-gray-500 mt-0.5">Skills: {applicant.skills}</p>
-                  )}
-                  {applicant.education && (
-                    <p className="text-sm text-gray-500">Education: {applicant.education}</p>
-                  )}
-                </div>
-                <button
-                  onClick={async () => {
-                    if (referred.has(applicant.id)) return
-                    if (!(await confirmReferralOk(applicant.id, vacancy.id, applicant.name))) return
-                    try {
-                      await createReferral(applicant.id, vacancy.id)
-                      setReferred(prev => new Set(prev).add(applicant.id))
-                    } catch {
-                      setReferralError(true)
-                    }
-                  }}
-                  disabled={referred.has(applicant.id)}
-                  className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    referred.has(applicant.id)
-                      ? 'bg-green-100 text-green-700 cursor-default'
-                      : 'bg-brand-blue text-white hover:bg-brand-blue-dark'
-                  }`}
-                >
-                  {referred.has(applicant.id) ? 'Referred' : 'Refer'}
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="flex justify-end px-6 py-4 border-t border-gray-200">
-          <button onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
-            Close
-          </button>
-        </div>
-      </div>
-      <ConfirmModal
-        isOpen={referralGuardModal.isOpen} type="confirm" confirmVariant="brand"
-        title="Possible duplicate referral" message={referralGuardModal.message}
-        confirmText="Yes, refer again" cancelText="Cancel"
-        onConfirm={referralGuardModal.onConfirm} onCancel={referralGuardModal.onCancel}
-      />
-      <ConfirmModal
-        isOpen={referralError} type="error" title="Error"
-        message="Failed to create referral. The applicant may already be referred to this vacancy."
-        confirmText="OK" onConfirm={() => setReferralError(false)} onCancel={() => setReferralError(false)}
-      />
     </div>
   )
 }
@@ -1007,7 +903,6 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   const [showAddModal, setShowAddModal] = useState(false)
   const [viewingVacancy, setViewingVacancy] = useState<Vacancy | null>(null)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
-  const [matchingVacancy, setMatchingVacancy] = useState<Vacancy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -1191,7 +1086,6 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
           activeFilters={activeFilters}
           onView={setViewingVacancy}
           onEdit={setEditingVacancy}
-          onMatch={setMatchingVacancy}
           onToggleStatus={handleToggleStatus}
           isFiltered={searchQuery.trim() !== '' || activeFilters.length > 0}
           highlightId={highlightedVacancyId}
@@ -1207,9 +1101,6 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
 
       {viewingVacancy && (
         <ViewVacancyModal vacancy={viewingVacancy} onClose={() => setViewingVacancy(null)} />
-      )}
-      {matchingVacancy && (
-        <MatchApplicantsModal vacancy={matchingVacancy} onClose={() => setMatchingVacancy(null)} />
       )}
       {editingVacancy && (
         <EditVacancyModal

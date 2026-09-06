@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, Briefcase, Plus } from 'lucide-react';
+import { X, Briefcase } from 'lucide-react';
 import ConfirmModal from '../../shared/ConfirmModal';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
@@ -27,7 +27,6 @@ interface EmployerFormData {
   province: string;
   provinceId: number | null;
   region: string;
-  jobOpenings: Array<{ jobName: string; slots: string }>;
   status: string;
   dateRegistered: string;
   remarks: string;
@@ -39,7 +38,7 @@ interface EditEmployerSidebarProps {
   onClose: () => void;
 }
 
-type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'jobOpenings' | 'registration';
+type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'registration';
 
 export default function EditEmployerSidebar({ initialData, onSave, onClose }: EditEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');
@@ -55,11 +54,8 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
     { id: 'companyInfo' as Section, label: 'Company information' },
     { id: 'contactPerson' as Section, label: 'Contact person' },
     { id: 'companyAddress' as Section, label: 'Company address' },
-    { id: 'jobOpenings' as Section, label: 'Job openings' },
     { id: 'registration' as Section, label: 'Registration details' },
   ];
-
-  const totalJobOpenings = formData.jobOpenings.reduce((sum, j) => sum + (parseInt(j.slots) || 0), 0);
 
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation();
 
@@ -319,57 +315,6 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                 />
                 <ErrMsg k="barangay" />
               </div>
-            </div>
-          </div>
-        );
-
-      case 'jobOpenings':
-        return (
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">JOB OPENINGS</h3>
-            <div>
-              <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase font-semibold">
-                Number of Job Openings: {totalJobOpenings}
-              </label>
-              <p className="text-xs text-gray-500 mb-3">Automatically calculated from total available slots.</p>
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-3 text-sm font-semibold">Positions Available</label>
-              <div className="border border-gray-300 rounded overflow-hidden">
-                <div className="grid grid-cols-2 bg-gray-200 border-b border-gray-300">
-                  <div className="px-4 py-2 font-bold text-xs">NAME OF JOB</div>
-                  <div className="px-4 py-2 font-bold text-xs border-l border-gray-300">NUMBER OF AVAILABLE SLOTS</div>
-                </div>
-                {formData.jobOpenings.map((job, idx) => (
-                  <div key={idx} className="grid grid-cols-2 border-b border-gray-300 last:border-b-0">
-                    <div className="p-2">
-                      <input type="text" value={job.jobName}
-                        onChange={e => {
-                          const jobs = [...formData.jobOpenings];
-                          jobs[idx] = { ...jobs[idx], jobName: e.target.value };
-                          setFormData(prev => ({ ...prev, jobOpenings: jobs }));
-                        }}
-                        placeholder="e.g., Customer Service Representative"
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm" />
-                    </div>
-                    <div className="p-2 border-l border-gray-300">
-                      <input type="number" value={job.slots}
-                        onChange={e => {
-                          const jobs = [...formData.jobOpenings];
-                          jobs[idx] = { ...jobs[idx], slots: e.target.value };
-                          setFormData(prev => ({ ...prev, jobOpenings: jobs }));
-                        }}
-                        placeholder="e.g., 5"
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button type="button"
-                onClick={() => setFormData(prev => ({ ...prev, jobOpenings: [...prev.jobOpenings, { jobName: '', slots: '' }] }))}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark transition-colors text-sm mt-3">
-                <Plus size={16} /> Add Row
-              </button>
             </div>
           </div>
         );

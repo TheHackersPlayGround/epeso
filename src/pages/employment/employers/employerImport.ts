@@ -412,7 +412,6 @@ export async function importEmployers(
         province:   provinceName,
         provinceId,
         region:     get(row, "Region"),
-        jobOpenings: [],
         status,
         dateRegistered,
         remarks: get(row, "Remarks"),

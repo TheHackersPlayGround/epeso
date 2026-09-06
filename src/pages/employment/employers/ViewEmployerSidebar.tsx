@@ -19,7 +19,6 @@ interface EmployerFormData {
   city: string;
   province: string;
   region: string;
-  jobOpenings: Array<{ jobName: string; slots: string }>;
   status: string;
   dateRegistered: string;
   remarks: string;
@@ -30,7 +29,7 @@ interface ViewEmployerSidebarProps {
   onClose: () => void;
 }
 
-type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'jobOpenings' | 'registration';
+type Section = 'companyInfo' | 'contactPerson' | 'companyAddress' | 'registration';
 
 export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSidebarProps) {
   const [activeSection, setActiveSection] = useState<Section>('companyInfo');

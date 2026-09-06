@@ -71,8 +71,6 @@ interface ApplicantFormData {
   currentlyInSchool: string;
   elementary: {
     schoolName: string;
-    schoolCity: string;
-    schoolProvince: string;
     graduated: string;
     yearGraduated: string;
     levelReached: string;
@@ -80,8 +78,6 @@ interface ApplicantFormData {
   };
   secondary: {
     schoolName: string;
-    schoolCity: string;
-    schoolProvince: string;
     type: string;
     seniorHighStrand: string;
     graduated: string;
@@ -91,8 +87,6 @@ interface ApplicantFormData {
   };
   tertiary: {
     schoolName: string;
-    schoolCity: string;
-    schoolProvince: string;
     course: string;
     graduated: string;
     yearGraduated: string;
@@ -101,8 +95,6 @@ interface ApplicantFormData {
   };
   graduateStudies: Array<{
     schoolName: string;
-    schoolCity: string;
-    schoolProvince: string;
     course: string;
     graduated: string;
     yearGraduated: string;
@@ -383,7 +375,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const addGraduateStudyRow = () => {
     setFormData({
       ...formData,
-      graduateStudies: [...formData.graduateStudies, { schoolName: '', schoolCity: '', schoolProvince: '', course: '', graduated: '', yearGraduated: '', levelReached: '', yearLastAttended: '' }]
+      graduateStudies: [...formData.graduateStudies, { schoolName: '', course: '', graduated: '', yearGraduated: '', levelReached: '', yearLastAttended: '' }]
     });
   };
 

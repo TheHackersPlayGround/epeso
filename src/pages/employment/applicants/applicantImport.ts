@@ -724,7 +724,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
     const yearLastAttended = get(row, `Graduate Study ${i} - Year Last Attended`);
     if (!schoolName && !course && !graduated && !yearGraduated && !levelReached && !yearLastAttended) continue;
     graduateStudies.push({
-      schoolName, schoolCity: "", schoolProvince: "",
+      schoolName,
       course, graduated, yearGraduated, levelReached, yearLastAttended,
     });
   }

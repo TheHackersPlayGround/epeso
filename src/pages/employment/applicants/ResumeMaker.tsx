@@ -61,8 +61,6 @@ export interface ApplicantData {
   currentlyInSchool: string;
   elementary: {
     schoolName?: string;
-    schoolCity?: string;
-    schoolProvince?: string;
     graduated: string;
     yearGraduated: string;
     levelReached: string;
@@ -70,8 +68,6 @@ export interface ApplicantData {
   };
   secondary: {
     schoolName?: string;
-    schoolCity?: string;
-    schoolProvince?: string;
     type: string;
     seniorHighStrand: string;
     graduated: string;
@@ -81,8 +77,6 @@ export interface ApplicantData {
   };
   tertiary: {
     schoolName?: string;
-    schoolCity?: string;
-    schoolProvince?: string;
     course: string;
     graduated: string;
     yearGraduated: string;
@@ -91,8 +85,6 @@ export interface ApplicantData {
   };
   graduateStudies: Array<{
     schoolName?: string;
-    schoolCity?: string;
-    schoolProvince?: string;
     course: string;
     graduated: string;
     yearGraduated: string;

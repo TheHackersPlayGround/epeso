@@ -28,7 +28,6 @@ interface EmployerFormData {
   province: string;
   provinceId: number | null;
   region: string;
-  jobOpenings: Array<{ jobName: string; slots: string }>;
   status: string;
   dateRegistered: string;
   remarks: string;
@@ -66,7 +65,6 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     province: '',
     provinceId: null,
     region: '',
-    jobOpenings: [{ jobName: '', slots: '' }],
     status: 'Active',
     dateRegistered: new Date().toISOString().split('T')[0],
     remarks: '',

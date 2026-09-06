@@ -222,6 +222,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const defaultFormData: ApplicantFormData = createDefaultApplicantFormData();
   const [formData, setFormData] = useState<ApplicantFormData>(() => {
     const merged = { ...defaultFormData, ...initialData };
+    // An applicant with no saved job preferences yet should still start with
+    // the same blank rows the Add Applicant form shows, not an empty table.
+    if (!merged.jobPreferences || merged.jobPreferences.length === 0) {
+      merged.jobPreferences = defaultFormData.jobPreferences;
+    }
     // Guard: old saved data may have otherSkillsSpecify as a plain string
     if (!Array.isArray(merged.otherSkillsSpecify)) {
       merged.otherSkillsSpecify = merged.otherSkillsSpecify
@@ -2261,16 +2266,16 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
       </div>
 
       {/* Job Preference */}
-      {(formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0 || formData.jobPreferences.some(p => p.occupation)) && (
+      {(formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0 || formData.jobPreferences.some(p => p.occupation || p.localCity || p.overseasCountry)) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">II. Job Preference</h4>
           <div className="text-sm space-y-1">
             {formData.jobPrefEmploymentType.length > 0 && <div><span className="font-semibold">Type:</span> {formData.jobPrefEmploymentType.join(', ')}</div>}
             {formData.jobPrefWorkLocation.length > 0 && <div><span className="font-semibold">Location:</span> {formData.jobPrefWorkLocation.join(', ')}</div>}
-            {formData.jobPreferences.filter(p => p.occupation).map((pref, idx) => (
+            {formData.jobPreferences.filter(p => p.occupation || p.localCity || p.overseasCountry).map((pref, idx) => (
               <div key={idx}>
                 {(idx > 0 || formData.jobPrefEmploymentType.length > 0 || formData.jobPrefWorkLocation.length > 0) && <hr className="border-t border-gray-300 my-2" />}
-                <div><span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}</div>
+                {pref.occupation && <div><span className="font-semibold">Occupation {idx + 1}:</span> {pref.occupation}</div>}
                 {pref.localCity && <div><span className="font-semibold">Local:</span> {pref.localCity}</div>}
                 {pref.overseasCountry && <div><span className="font-semibold">Overseas:</span> {pref.overseasCountry}</div>}
               </div>

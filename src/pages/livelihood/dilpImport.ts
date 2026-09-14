@@ -22,7 +22,7 @@ import {
   searchBarangaysByCity,
   type LocationOption,
 } from '../../services/locationService'
-import { createProfile } from '../../services/dilpService'
+import { importProfilesBulk } from '../../services/dilpService'
 
 const SEX_OPTIONS = ['Male', 'Female']
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
@@ -394,17 +394,22 @@ export async function importDilpApplicants(
 
   const dataRows = rows.filter(({ data }) => !isEmptyRow(data) && !isExampleRow(data))
   const total = dataRows.length
-  const failed: ImportRowError[] = []
-  let succeeded = 0
   const caches = makeCaches()
+
+  // All-or-nothing import: resolve every row locally first (address lookups
+  // etc.) without writing anything. If any row can't be resolved, nothing is
+  // sent to the backend at all.
+  const meta: { sheetRow: number; name: string }[] = []
+  const payloads: Record<string, unknown>[] = []
+  const failed: ImportRowError[] = []
 
   for (let i = 0; i < dataRows.length; i++) {
     const { sheetRow, data } = dataRows[i]
     const name = [get(data, 'First Name'), get(data, 'Last Name')].filter(Boolean).join(' ') || '(unnamed)'
     try {
       const payload = await rowToPayload(data, caches)
-      await createProfile(payload)
-      succeeded++
+      meta.push({ sheetRow, name })
+      payloads.push(payload)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unexpected error.'
@@ -413,5 +418,53 @@ export async function importDilpApplicants(
     onProgress?.(i + 1, total)
   }
 
-  return { total, succeeded, failed }
+  if (failed.length > 0) {
+    return { total, succeeded: 0, failed }
+  }
+  if (payloads.length === 0) {
+    return { total, succeeded: 0, failed: [] }
+  }
+
+  // Every row resolved locally — hand the whole batch to the backend, which
+  // writes it inside a single DB transaction: all rows land, or none do.
+  try {
+    await importProfilesBulk(payloads)
+    return { total, succeeded: total, failed: [] }
+  } catch (err) {
+    const detail = (err as { detail?: unknown }).detail
+
+    if (detail && typeof detail === 'object' && Array.isArray((detail as { errors?: unknown }).errors)) {
+      const errs = (detail as { errors: { row: number; error: string }[] }).errors
+      return {
+        total,
+        succeeded: 0,
+        failed: errs.map(({ row, error }) => ({
+          row: meta[row]?.sheetRow ?? row,
+          name: meta[row]?.name ?? '(unknown)',
+          error,
+        })),
+      }
+    }
+
+    if (detail && typeof detail === 'object' && typeof (detail as { failedIndex?: unknown }).failedIndex === 'number') {
+      const { failedIndex, reason } = detail as { failedIndex: number; reason?: string }
+      const m = meta[failedIndex]
+      return {
+        total,
+        succeeded: 0,
+        failed: [{
+          row: m?.sheetRow ?? failedIndex + FIRST_DATA_ROW,
+          name: m?.name ?? '(unknown)',
+          error: reason ?? (err instanceof Error ? err.message : 'Import failed.'),
+        }],
+      }
+    }
+
+    const message = err instanceof Error ? err.message : 'Import failed. No records were saved.'
+    return {
+      total,
+      succeeded: 0,
+      failed: [{ row: meta[0]?.sheetRow ?? FIRST_DATA_ROW, name: '(entire file)', error: message }],
+    }
+  }
 }

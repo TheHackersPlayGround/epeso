@@ -7,7 +7,9 @@
 //      headers sit in row 2. Enum fields render as in-cell dropdowns.
 //   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
 //      locationService (cascade: province -> city -> barangay), build a valid
-//      ApplicantFormData per row, and POST it through createApplicant.
+//      ApplicantFormData per row, and submit the whole batch through
+//      importApplicantsBulk in one all-or-nothing transaction: if any row is
+//      invalid or fails to insert, none of the rows are saved.
 //
 // Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
 // ExcelJS.
@@ -21,7 +23,7 @@ import {
   searchAllCities,
   type LocationOption,
 } from "../../../services/locationService";
-import { createApplicant } from "../../../services/applicantService";
+import { importApplicantsBulk } from "../../../services/applicantService";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import { createDefaultApplicantFormData } from "./applicantDefaults";
 
@@ -516,59 +518,79 @@ async function resolveBarangay(cityId: number, name: string, caches: ResolveCach
 
 type ResolvedAddress = { province: LocationOption; city: LocationOption; barangay: LocationOption };
 
+// Returns the resolved address, or the list of problems found (never both) --
+// callers accumulate these alongside their own field errors so a row reports
+// everything wrong with it in one pass instead of stopping at the first issue.
 async function resolveAddress(
   provinceName: string,
   cityName: string,
   barangayName: string,
   caches: ResolveCaches,
-): Promise<ResolvedAddress> {
-  if (!provinceName) throw new Error("Province is required.");
-  if (!cityName) throw new Error("Municipality/City is required.");
-  if (!barangayName) throw new Error("Barangay is required.");
+): Promise<{ result: ResolvedAddress | null; errors: string[] }> {
+  const missing: string[] = [];
+  if (!provinceName) missing.push("Province is required.");
+  if (!cityName) missing.push("Municipality/City is required.");
+  if (!barangayName) missing.push("Barangay is required.");
+  if (missing.length) return { result: null, errors: missing };
 
   const province = await resolveProvince(provinceName, caches);
-  if (!province) throw new Error(`Province "${provinceName}" was not found in the location dataset.`);
+  if (!province) return { result: null, errors: [`Province "${provinceName}" was not found in the location dataset.`] };
 
   const city = await resolveCity(province.id, cityName, caches);
-  if (!city) throw new Error(`City/Municipality "${cityName}" was not found in ${province.name}.`);
+  if (!city) return { result: null, errors: [`City/Municipality "${cityName}" was not found in ${province.name}.`] };
 
   const barangay = await resolveBarangay(city.id, barangayName, caches);
-  if (!barangay) throw new Error(`Barangay "${barangayName}" was not found in ${city.name}.`);
+  if (!barangay) return { result: null, errors: [`Barangay "${barangayName}" was not found in ${city.name}.`] };
 
-  return { province, city, barangay };
+  return { result: { province, city, barangay }, errors: [] };
 }
 
 // ─── Row -> ApplicantFormData ────────────────────────────────────────────────
 
 async function rowToFormData(row: Row, caches: ResolveCaches): Promise<ApplicantFormData> {
+  // Collect every problem with the row instead of stopping at the first one,
+  // so a re-upload can fix everything at once rather than one field per try.
+  const errors: string[] = [];
+
   const surname = get(row, "Surname");
   const firstName = get(row, "First Name");
-  if (!surname) throw new Error("Surname is required.");
-  if (!firstName) throw new Error("First Name is required.");
+  if (!surname) errors.push("Surname is required.");
+  if (!firstName) errors.push("First Name is required.");
 
   const dobRaw = get(row, "Date of Birth (MM/DD/YYYY)");
-  if (!dobRaw) throw new Error("Date of Birth is required.");
-  const dateOfBirth = toIsoDate(dobRaw);
-  if (!dateOfBirth) throw new Error(`Date of Birth "${dobRaw}" is not a valid date (use MM/DD/YYYY).`);
+  let dateOfBirth = "";
+  if (!dobRaw) {
+    errors.push("Date of Birth is required.");
+  } else {
+    const parsed = toIsoDate(dobRaw);
+    if (!parsed) errors.push(`Date of Birth "${dobRaw}" is not a valid date (use MM/DD/YYYY).`);
+    else dateOfBirth = parsed;
+  }
 
   const sex = get(row, "Sex");
-  if (!SEX_OPTIONS.includes(sex)) throw new Error(`Sex must be one of: ${SEX_OPTIONS.join(", ")}.`);
+  if (!SEX_OPTIONS.includes(sex)) errors.push(`Sex must be one of: ${SEX_OPTIONS.join(", ")}.`);
 
   const civilStatus = get(row, "Civil Status");
   if (!CIVIL_STATUS_OPTIONS.includes(civilStatus)) {
-    throw new Error(`Civil Status must be one of: ${CIVIL_STATUS_OPTIONS.join(", ")}.`);
+    errors.push(`Civil Status must be one of: ${CIVIL_STATUS_OPTIONS.join(", ")}.`);
   }
 
   const contactNumber = get(row, "Contact Number");
-  if (!contactNumber) throw new Error("Contact Number is required.");
+  if (!contactNumber) errors.push("Contact Number is required.");
 
-  const addr = await resolveAddress(
+  const addrResolution = await resolveAddress(
     get(row, "Province"),
     get(row, "Municipality/City"),
     get(row, "Barangay"),
     caches,
   );
+  errors.push(...addrResolution.errors);
 
+  if (errors.length > 0) {
+    throw new Error(errors.join(" "));
+  }
+
+  const addr = addrResolution.result!;
   const fd = createDefaultApplicantFormData();
 
   // Names + identity.
@@ -876,17 +898,22 @@ export async function importApplicants(
 
   const dataRows = rows.filter(({ data }) => !isEmptyRow(data) && !isExampleRow(data));
   const total = dataRows.length;
-  const failed: ImportRowError[] = [];
-  let succeeded = 0;
   const caches = makeCaches();
+
+  // All-or-nothing import: first resolve every row (address lookups etc.)
+  // without writing anything. If any row can't be resolved, nothing is sent
+  // to the backend at all.
+  const meta: { sheetRow: number; name: string }[] = [];
+  const payloads: ApplicantFormData[] = [];
+  const failed: ImportRowError[] = [];
 
   for (let i = 0; i < dataRows.length; i++) {
     const { sheetRow, data } = dataRows[i];
     const name = [get(data, "First Name"), get(data, "Surname")].filter(Boolean).join(" ") || "(unnamed)";
     try {
       const fd = await rowToFormData(data, caches);
-      await createApplicant(fd);
-      succeeded++;
+      meta.push({ sheetRow, name });
+      payloads.push(fd);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : typeof err === "string" ? err : "Unexpected error.";
@@ -895,5 +922,53 @@ export async function importApplicants(
     onProgress?.(i + 1, total);
   }
 
-  return { total, succeeded, failed };
+  if (failed.length > 0) {
+    return { total, succeeded: 0, failed };
+  }
+  if (payloads.length === 0) {
+    return { total, succeeded: 0, failed: [] };
+  }
+
+  // Every row resolved locally — hand the whole batch to the backend, which
+  // writes it inside a single DB transaction: all rows land, or none do.
+  try {
+    await importApplicantsBulk(payloads);
+    return { total, succeeded: total, failed: [] };
+  } catch (err) {
+    const detail = (err as { detail?: unknown }).detail;
+
+    if (detail && typeof detail === "object" && Array.isArray((detail as { errors?: unknown }).errors)) {
+      const errs = (detail as { errors: { row: number; error: string }[] }).errors;
+      return {
+        total,
+        succeeded: 0,
+        failed: errs.map(({ row, error }) => ({
+          row: meta[row]?.sheetRow ?? row,
+          name: meta[row]?.name ?? "(unknown)",
+          error,
+        })),
+      };
+    }
+
+    if (detail && typeof detail === "object" && typeof (detail as { failedIndex?: unknown }).failedIndex === "number") {
+      const { failedIndex, reason } = detail as { failedIndex: number; reason?: string };
+      const m = meta[failedIndex];
+      return {
+        total,
+        succeeded: 0,
+        failed: [{
+          row: m?.sheetRow ?? failedIndex + FIRST_DATA_ROW,
+          name: m?.name ?? "(unknown)",
+          error: reason ?? (err instanceof Error ? err.message : "Import failed."),
+        }],
+      };
+    }
+
+    const message = err instanceof Error ? err.message : "Import failed. No records were saved.";
+    return {
+      total,
+      succeeded: 0,
+      failed: [{ row: meta[0]?.sheetRow ?? FIRST_DATA_ROW, name: "(entire file)", error: message }],
+    };
+  }
 }

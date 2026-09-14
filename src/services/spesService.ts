@@ -29,6 +29,16 @@ export function createProfile(data: Record<string, unknown>) {
   return axiosClient.post(ENDPOINTS.spes.createProfile, data).then(r => r.data)
 }
 
+// All-or-nothing batch create: the backend validates every row and writes
+// the whole batch in one DB transaction; if any row fails, nothing is saved.
+export async function importProfilesBulk(rows: Record<string, unknown>[]): Promise<{ ids: number[] }> {
+  const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
+    ENDPOINTS.spes.importProfilesBulk,
+    { rows },
+  )
+  return { ids: res.data.data.ids }
+}
+
 export function updateProfile(id: number, data: Record<string, unknown>) {
   return axiosClient.put(`${ENDPOINTS.spes.updateProfile}/${id}`, data).then(r => r.data)
 }

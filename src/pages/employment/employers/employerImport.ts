@@ -16,7 +16,8 @@ import {
   searchBarangaysByCity,
   type LocationOption,
 } from "../../../services/locationService";
-import { createEmployer } from "../../../services/employerService";
+import { importEmployersBulk } from "../../../services/employerService";
+import type { Employer } from "../../../contexts/EmploymentContext";
 
 // ─── Shared result type ───────────────────────────────────────────────────────
 
@@ -316,25 +317,27 @@ export async function importEmployers(
   const nonEmpty = dataRows.filter((r) => (r as unknown[]).some((c) => String(c ?? "").trim()));
   const total = nonEmpty.length;
 
-  let succeeded = 0;
   const failed: ImportResult["failed"] = [];
+  const meta: { rowNum: number; name: string }[] = [];
+  const payloads: Omit<Employer, "id">[] = [];
   const caches = makeCaches();
+  let processed = 0;
 
+  // All-or-nothing import: resolve every row locally first (address lookups
+  // etc.) without writing anything. If any row can't be resolved, nothing is
+  // sent to the backend at all.
   for (let i = 0; i < dataRows.length; i++) {
     const raw = dataRows[i] as unknown[];
     if (!raw.some((c) => String(c ?? "").trim())) continue;
 
     const rowNum = headerRowIdx + 3 + i; // 1-based spreadsheet row
     const row = parseRow(raw);
+    processed++;
 
     const companyName = get(row, "Company Name");
-    if (!companyName) {
-      failed.push({ row: rowNum, name: "(unknown)", error: "Company Name is required." });
-      onProgress?.(succeeded + failed.length, total);
-      continue;
-    }
+    const errors: string[] = [];
+    if (!companyName) errors.push("Company Name is required.");
 
-    // Validate other required fields
     const tinNumber         = get(row, "TIN Number");
     const contactPersonName = get(row, "Contact Person Name");
     const contactNumber     = get(row, "Contact Number");
@@ -352,33 +355,34 @@ export async function importEmployers(
       !cityName          && "City/Municipality",
       !barangayName      && "Barangay",
     ].filter(Boolean) as string[];
+    if (missing.length) errors.push(`Missing required fields: ${missing.join(", ")}.`);
 
-    if (missing.length) {
-      failed.push({ row: rowNum, name: companyName, error: `Missing required fields: ${missing.join(", ")}.` });
-      onProgress?.(succeeded + failed.length, total);
-      continue;
-    }
-
-    // Resolve address IDs
+    // Resolve address IDs (only attempted when all three names are present).
     let provinceId: number | null = null;
     let cityId:     number | null = null;
     let barangayId: number | null = null;
 
-    try {
-      const province = await resolveProvince(provinceName, caches);
-      if (!province) throw new Error(`Province "${provinceName}" was not found in the location dataset.`);
-      provinceId = province.id;
+    if (provinceName && cityName && barangayName) {
+      try {
+        const province = await resolveProvince(provinceName, caches);
+        if (!province) throw new Error(`Province "${provinceName}" was not found in the location dataset.`);
+        provinceId = province.id;
 
-      const city = await resolveCity(provinceId, cityName, caches);
-      if (!city) throw new Error(`City/Municipality "${cityName}" was not found in ${province.name}.`);
-      cityId = city.id;
+        const city = await resolveCity(provinceId, cityName, caches);
+        if (!city) throw new Error(`City/Municipality "${cityName}" was not found in ${province.name}.`);
+        cityId = city.id;
 
-      const barangay = await resolveBarangay(cityId, barangayName, caches);
-      if (!barangay) throw new Error(`Barangay "${barangayName}" was not found in ${city.name}.`);
-      barangayId = barangay.id;
-    } catch (err) {
-      failed.push({ row: rowNum, name: companyName, error: err instanceof Error ? err.message : "Address lookup failed." });
-      onProgress?.(succeeded + failed.length, total);
+        const barangay = await resolveBarangay(cityId, barangayName, caches);
+        if (!barangay) throw new Error(`Barangay "${barangayName}" was not found in ${city.name}.`);
+        barangayId = barangay.id;
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : "Address lookup failed.");
+      }
+    }
+
+    if (errors.length > 0) {
+      failed.push({ row: rowNum, name: companyName || "(unknown)", error: errors.join(" ") });
+      onProgress?.(processed, total);
       continue;
     }
 
@@ -390,40 +394,83 @@ export async function importEmployers(
     const statusRaw = get(row, "Status");
     const status = (STATUS_OPTIONS.includes(statusRaw) ? statusRaw : "Active") as "Active" | "Inactive";
 
-    try {
-      await createEmployer({
-        companyName,
-        industry:         get(row, "Industry"),
-        industryOther:    get(row, "Industry (if Other)"),
-        companySize:      get(row, "Company Size"),
-        businessType:     get(row, "Business Type"),
-        yearsInOperation: get(row, "Years in Operation"),
-        tinNumber,
-        contactPersonName,
-        position:         get(row, "Position"),
-        contactNumber,
-        email:            get(row, "Email"),
-        buildingNo:       get(row, "Building No."),
-        street,
-        barangay:   barangayName,
-        barangayId,
-        city:       cityName,
-        cityId,
-        province:   provinceName,
-        provinceId,
-        region:     get(row, "Region"),
-        status,
-        dateRegistered,
-        remarks: get(row, "Remarks"),
-      });
-      succeeded++;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save employer.";
-      failed.push({ row: rowNum, name: companyName, error: msg });
-    }
+    meta.push({ rowNum, name: companyName });
+    payloads.push({
+      companyName,
+      industry:         get(row, "Industry"),
+      industryOther:    get(row, "Industry (if Other)"),
+      companySize:      get(row, "Company Size"),
+      businessType:     get(row, "Business Type"),
+      yearsInOperation: get(row, "Years in Operation"),
+      tinNumber,
+      contactPersonName,
+      position:         get(row, "Position"),
+      contactNumber,
+      email:            get(row, "Email"),
+      buildingNo:       get(row, "Building No."),
+      street,
+      barangay:   barangayName,
+      barangayId,
+      city:       cityName,
+      cityId,
+      province:   provinceName,
+      provinceId,
+      region:     get(row, "Region"),
+      status,
+      dateRegistered,
+      remarks: get(row, "Remarks"),
+    });
 
-    onProgress?.(succeeded + failed.length, total);
+    onProgress?.(processed, total);
   }
 
-  return { total, succeeded, failed };
+  if (failed.length > 0) {
+    return { total, succeeded: 0, failed };
+  }
+  if (payloads.length === 0) {
+    return { total, succeeded: 0, failed: [] };
+  }
+
+  // Every row resolved locally — hand the whole batch to the backend, which
+  // writes it inside a single DB transaction: all rows land, or none do.
+  try {
+    await importEmployersBulk(payloads);
+    return { total, succeeded: total, failed: [] };
+  } catch (err) {
+    const detail = (err as { detail?: unknown }).detail;
+
+    if (detail && typeof detail === "object" && Array.isArray((detail as { errors?: unknown }).errors)) {
+      const errs = (detail as { errors: { row: number; error: string }[] }).errors;
+      return {
+        total,
+        succeeded: 0,
+        failed: errs.map(({ row, error }) => ({
+          row: meta[row]?.rowNum ?? row,
+          name: meta[row]?.name ?? "(unknown)",
+          error,
+        })),
+      };
+    }
+
+    if (detail && typeof detail === "object" && typeof (detail as { failedIndex?: unknown }).failedIndex === "number") {
+      const { failedIndex, reason } = detail as { failedIndex: number; reason?: string };
+      const m = meta[failedIndex];
+      return {
+        total,
+        succeeded: 0,
+        failed: [{
+          row: m?.rowNum ?? failedIndex,
+          name: m?.name ?? "(unknown)",
+          error: reason ?? (err instanceof Error ? err.message : "Import failed."),
+        }],
+      };
+    }
+
+    const message = err instanceof Error ? err.message : "Import failed. No records were saved.";
+    return {
+      total,
+      succeeded: 0,
+      failed: [{ row: meta[0]?.rowNum ?? headerRowIdx + 3, name: "(entire file)", error: message }],
+    };
+  }
 }

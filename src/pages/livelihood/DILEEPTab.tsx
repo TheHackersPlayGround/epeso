@@ -140,7 +140,11 @@ function DileepImportModal({
             <DileepImportResultView result={result} />
           ) : (
             <>
-              <button onClick={() => { void (isDILP ? downloadDilpTemplate() : downloadTupadTemplate()) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+              <div>
+                <button onClick={() => { void (isDILP ? downloadDilpTemplate() : downloadTupadTemplate()) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+                <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
+              </div>
+
               <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
                 <Upload size={28} className="mx-auto text-gray-400 mb-2" />
                 <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
@@ -199,6 +203,9 @@ function DileepImportResultView({ result }: { result: DileepImportResult }) {
         <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
       ) : (
         <div className="mt-1">
+          <p className="text-xs text-gray-500 mb-2">
+            No records were imported — records are imported together as one batch, so if any row fails, none of them are saved. Fix the row{result.failed.length !== 1 ? 's' : ''} below and re-upload the file.
+          </p>
           <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
           <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
             {result.failed.map((f) => (

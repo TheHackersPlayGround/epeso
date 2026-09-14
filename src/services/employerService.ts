@@ -17,6 +17,16 @@ export async function createEmployer(data: Omit<Employer, 'id'>): Promise<number
   return res.data.data.id
 }
 
+// All-or-nothing batch create: the backend validates every row and writes the
+// whole batch in one DB transaction; if any row fails, nothing is saved.
+export async function importEmployersBulk(rows: Omit<Employer, 'id'>[]): Promise<{ ids: number[] }> {
+  const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
+    ENDPOINTS.employment.importEmployersBulk,
+    { rows },
+  )
+  return { ids: res.data.data.ids }
+}
+
 export async function updateEmployer(id: number, data: Omit<Employer, 'id'>): Promise<void> {
   await axiosClient.post(`${ENDPOINTS.employment.updateEmployer}/${id}`, data)
 }

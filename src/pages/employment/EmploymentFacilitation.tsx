@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, X, ChevronDown, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
 import type { Applicant } from "./applicants/ApplicantsTab";
@@ -218,7 +218,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
       setResult(res);
       if (res.succeeded > 0) onImported();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx or .csv.");
+      setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.");
     } finally {
       setIsImporting(false);
       setProgress(null);
@@ -226,61 +226,58 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold text-gray-800">Import Applicants</h3>
-          <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600 transition-colors text-lg">✕</button>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <p className="text-gray-800 font-semibold">Import Applicants</p>
+          <button onClick={onClose} aria-label="Close import modal" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
 
-        <div className="overflow-y-auto">
+        <div className="p-6 space-y-4 overflow-y-auto">
           {result ? (
             <ImportResultView result={result} />
           ) : (
             <>
-              <label className={`block border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 text-gray-400 hover:border-brand-blue"}`}>
+              <div>
+                <button type="button" onClick={() => { void downloadImportTemplate(); }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+                <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
+              </div>
+
+              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 hover:border-brand-blue hover:bg-blue-50"}`}>
                 <input
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.xls"
                   className="hidden"
                   disabled={isImporting}
                   onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
                 />
-                <p className="text-4xl mb-3">📂</p>
+                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
                 {file ? (
-                  <p className="text-base font-medium text-brand-blue break-all">{file.name}</p>
+                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
                 ) : (
                   <>
-                    <p className="text-base font-medium text-gray-600">Click to upload or drag & drop</p>
-                    <p className="text-sm mt-1">Excel (.xlsx) or CSV files</p>
+                    <p className="text-sm text-gray-600 break-all">Click to upload or drag and drop</p>
+                    <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
                   </>
                 )}
               </label>
 
-              <p className="text-sm text-gray-400 mt-4 text-center">
-                Download the{" "}
-                <button type="button" onClick={() => { void downloadImportTemplate(); }} className="text-brand-blue cursor-pointer hover:underline">template file</button>{" "}
-                to ensure correct column format.
-              </p>
-
-              {error && <p className="text-red-500 text-sm mt-3 text-center">{error}</p>}
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
               {isImporting && progress && (
-                <p className="text-sm text-gray-600 mt-3 text-center">
-                  Importing {progress.done} of {progress.total}…
-                </p>
+                <p className="text-sm text-gray-600 text-center">Importing {progress.done} of {progress.total}…</p>
               )}
             </>
           )}
         </div>
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
           {result ? (
-            <button onClick={onClose} className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-base hover:bg-brand-blue-dark transition-colors">Done</button>
+            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
           ) : (
             <>
-              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2.5 border border-gray-300 rounded-lg text-base text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-base hover:bg-brand-blue-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
                 {isImporting ? "Importing…" : "Import"}
               </button>
             </>
@@ -311,6 +308,9 @@ function ImportResultView({ result }: { result: ImportResult }) {
         <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? "s" : ""} imported successfully.</p>
       ) : (
         <div className="mt-1">
+          <p className="text-xs text-gray-500 mb-2">
+            No records were imported — records are imported together as one batch, so if any row fails, none of them are saved. Fix the row{result.failed.length !== 1 ? "s" : ""} below and re-upload the file.
+          </p>
           <p className="text-xs font-semibold text-gray-600 mb-1">Rows that could not be imported:</p>
           <ul className="space-y-1 max-h-48 overflow-y-auto text-xs">
             {result.failed.map((f) => (
@@ -412,7 +412,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(ITEMS_PER_PAGE);
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('');
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('');
 
   // ── Derived data ──────────────────────────────────────────────────
   const filteredApplicants = useMemo(() => {
@@ -489,7 +489,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       }
     }
 
-    if (sortOrder) {
+    if (sortOrder === 'dateApplied_newest') {
+      result = [...result].sort((a, b) => (b.dateApplicationReceived ?? '').localeCompare(a.dateApplicationReceived ?? ''));
+    } else if (sortOrder === 'dateApplied_oldest') {
+      result = [...result].sort((a, b) => (a.dateApplicationReceived ?? '').localeCompare(b.dateApplicationReceived ?? ''));
+    } else if (sortOrder) {
       // name is "Lastname, Firstname M. Suffix" (see employment.php's $name
       // build) — split on the comma rather than whitespace, since a surname
       // can itself contain spaces (e.g. "Dela Cruz").
@@ -730,10 +734,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
   function handleExportExcel() {
     const counts = buildImportCompatibleColumns();
-    // Row 1 is left blank: Import always skips the physical first row
-    // (range: 1), since the downloadable Template has a merged
-    // section-label band there. Real headers go on row 2.
-    const aoa = [[], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
+    // Row 1 just carries a plain label: Import always skips the physical
+    // first row (range: 1), since the downloadable Template has a merged
+    // section-label band there. Real headers go on row 2 -- this label is
+    // only so the row doesn't look like a formatting mistake when opened.
+    const aoa = [["Applicants Export"], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Applicants");

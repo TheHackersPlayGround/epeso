@@ -20,6 +20,7 @@ export type Applicant = {
   // Refer-action lock state computed by the backend from referrals/placements:
   // 'Refer' = free, 'Referred' = live referral, 'Hired' = active placement.
   referralState?: 'Refer' | 'Referred' | 'Hired';
+  dateApplicationReceived?: string;
   fullFormData?: Record<string, unknown>;
 };
 

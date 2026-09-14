@@ -64,6 +64,17 @@ export async function createApplicant(formData: ApplicantFormData): Promise<numb
   return res.data.data.id
 }
 
+// POST /api/employment/importApplicantsBulk -> all-or-nothing batch create.
+// The backend validates every row and writes the whole batch in one DB
+// transaction; if any row fails, nothing is saved.
+export async function importApplicantsBulk(rows: ApplicantFormData[]): Promise<{ ids: number[] }> {
+  const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
+    ENDPOINTS.employment.importApplicantsBulk,
+    { rows },
+  )
+  return { ids: res.data.data.ids }
+}
+
 // POST /api/employment/updateApplicant/{id}
 export async function updateApplicant(id: number, formData: ApplicantFormData): Promise<void> {
   await axiosClient.post(`${ENDPOINTS.employment.updateApplicant}/${id}`, formData)

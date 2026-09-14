@@ -367,7 +367,7 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
 
 // ─── Search bar ────────────────────────────────────────────────────────────────
 
-type SortOrderType = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | '';
+type SortOrderType = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | '';
 
 type ApplicantsSearchBarProps = {
   searchQuery: string;
@@ -419,6 +419,8 @@ function ApplicantsSearchBar({
           <option value="firstName_desc">First Name DSC</option>
           <option value="lastName_asc">Last Name ASC</option>
           <option value="lastName_desc">Last Name DSC</option>
+          <option value="dateApplied_newest">Date Applied (Latest)</option>
+          <option value="dateApplied_oldest">Date Applied (Oldest)</option>
         </select>
         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>

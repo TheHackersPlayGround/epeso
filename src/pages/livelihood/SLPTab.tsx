@@ -19,6 +19,11 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The applicant list reload is deferred until the modal actually closes --
+  // triggering it while the modal is still open would flip the page's shared
+  // `loading` flag, which unmounts this whole modal (and its success message)
+  // before the user ever sees it.
+  const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
     setFile(f)
@@ -35,7 +40,7 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
     try {
       const res = await importSlpApplicants(file, (done, total) => setProgress({ done, total }))
       setResult(res)
-      if (res.succeeded > 0) onImported()
+      if (res.succeeded > 0) setNeedsRefresh(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read the file. Make sure it's a valid .xlsx file.")
     } finally {
@@ -44,12 +49,17 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
     }
   }
 
+  function handleClose() {
+    if (needsRefresh) onImported()
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <p className="text-gray-800 font-semibold">Import SLP Applicants</p>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
 
         <div className="p-6 space-y-4 overflow-y-auto">
@@ -85,10 +95,10 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
 
         <div className="flex gap-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
           {result ? (
-            <button onClick={onClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
+            <button onClick={handleClose} className="flex-1 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">Done</button>
           ) : (
             <>
-              <button onClick={onClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
+              <button onClick={handleClose} disabled={isImporting} className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>
               <button onClick={handleImport} disabled={!file || isImporting} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark disabled:opacity-50 disabled:cursor-not-allowed">
                 {isImporting ? 'Importing…' : 'Import'}
               </button>
@@ -602,18 +612,18 @@ type ViewAssignedProjectModalProps = {
   onClose: () => void
 }
 
+function ViewAssignedProjectModalRow({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
+      <span className="text-xs text-gray-500 font-medium w-32 flex-shrink-0">{label}</span>
+      <span className="text-xs text-gray-900 font-semibold text-right">{value || '-'}</span>
+    </div>
+  )
+}
+
 function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, onClose }: ViewAssignedProjectModalProps) {
   const project = projects.find(p => p.id === beneficiary.assignedSlpProjectId) ?? null
   const canChange = project?.status === 'Planned'
-
-  function Row({ label, value }: { label: string; value?: string }) {
-    return (
-      <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
-        <span className="text-xs text-gray-500 font-medium w-32 flex-shrink-0">{label}</span>
-        <span className="text-xs text-gray-900 font-semibold text-right">{value || '-'}</span>
-      </div>
-    )
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -653,12 +663,12 @@ function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, o
               </div>
 
               <div>
-                <Row label="Description" value={project.description} />
-                <Row label="Date Started" value={project.dateStarted} />
-                <Row label="Location" value={project.location} />
-                {project.facilitator && <Row label="Facilitator" value={project.facilitator} />}
-                {project.assistanceAmount && <Row label="Assistance Amount" value={`₱${Number(project.assistanceAmount).toLocaleString()}`} />}
-                {project.dateReleased && <Row label="Date Released" value={project.dateReleased} />}
+                <ViewAssignedProjectModalRow label="Description" value={project.description} />
+                <ViewAssignedProjectModalRow label="Date Started" value={project.dateStarted} />
+                <ViewAssignedProjectModalRow label="Location" value={project.location} />
+                {project.facilitator && <ViewAssignedProjectModalRow label="Facilitator" value={project.facilitator} />}
+                {project.assistanceAmount && <ViewAssignedProjectModalRow label="Assistance Amount" value={`₱${Number(project.assistanceAmount).toLocaleString()}`} />}
+                {project.dateReleased && <ViewAssignedProjectModalRow label="Date Released" value={project.dateReleased} />}
               </div>
 
               {beneficiary.assignmentHistory.length > 1 && (

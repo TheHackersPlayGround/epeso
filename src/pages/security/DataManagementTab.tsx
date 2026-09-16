@@ -27,7 +27,16 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
   const [progress, setProgress] = useState<{ step: number; total: number; label: string } | null>(null)
   const matches = typedName === displayName
   const aliveRef = useRef(true)
-  useEffect(() => () => { aliveRef.current = false }, [])
+  useEffect(() => {
+    // Re-arm on every mount, not just once at construction -- React's Strict
+    // Mode deliberately mounts every component twice in development (mount,
+    // cleanup, mount again) to catch missing-cleanup bugs. Without resetting
+    // this to true here, that harmless double-mount would permanently flip
+    // it to false via the very first cleanup, silently discarding every
+    // future progress update for the rest of this component's real life.
+    aliveRef.current = true
+    return () => { aliveRef.current = false }
+  }, [])
 
   const handleRestore = async () => {
     if (!matches || isRestoring) return

@@ -1,7 +1,7 @@
 // ─── Types & constants ─────────────────────────────────────────────────────────
 
 import { useState, useRef, useLayoutEffect } from "react";
-import { MoreHorizontal, Search, Plus, ChevronDown, X } from "lucide-react";
+import { MoreHorizontal, Search, Plus, ChevronDown, X, Loader2 } from "lucide-react";
 import { canManage } from "../../../utils/permissions";
 import TablePagination from "../shared/TablePagination";
 import type { Applicant } from "../../../contexts/EmploymentContext";
@@ -38,26 +38,6 @@ const AVAILABLE_FILTERS: FilterOption[] = [
 ];
 
 export const ITEMS_PER_PAGE = 10;
-
-// ─── Skeleton ──────────────────────────────────────────────────────────────────
-
-const SKELETON_ROW_COUNT = 6;
-
-function ApplicantsSkeleton() {
-  return (
-    <>
-      {Array.from({ length: SKELETON_ROW_COUNT }).map((_, rowIdx) => (
-        <tr key={rowIdx} className="border-b border-gray-100">
-          {Array.from({ length: 8 }).map((_, colIdx) => (
-            <td key={colIdx} className="px-4 py-3">
-              <div className="h-4 bg-gray-200 rounded animate-pulse" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
-  );
-}
 
 // ─── Empty state ───────────────────────────────────────────────────────────────
 
@@ -183,7 +163,6 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
 type ApplicantsTableProps = {
   applicants: Applicant[];
   activeFilters: string[];
-  isLoading: boolean;
   isFiltered: boolean;
   onView: (applicant: Applicant) => void;
   onEdit: (applicant: Applicant) => void;
@@ -198,7 +177,7 @@ function getFilterLabel(filterId: string): string {
   return AVAILABLE_FILTERS.find((f) => f.id === filterId)?.label ?? filterId;
 }
 
-function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onView, onEdit, onRefer, onShowHistory, onDelete }: ApplicantsTableProps) {
+function ApplicantsTable({ applicants, activeFilters, isFiltered, onView, onEdit, onRefer, onShowHistory, onDelete }: ApplicantsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   // anchor is set immediately on click (button's own position); pos is the
   // menu's actual final placement, corrected by measuring the menu's real
@@ -259,9 +238,7 @@ function ApplicantsTable({ applicants, activeFilters, isLoading, isFiltered, onV
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <ApplicantsSkeleton />
-            ) : applicants.length === 0 ? (
+            {applicants.length === 0 ? (
               <ApplicantsEmptyState isFiltered={isFiltered} />
             ) : (
               applicants.map((applicant) => (
@@ -465,24 +442,18 @@ function ApplicantsSearchBar({
 // ─── Toolbar ───────────────────────────────────────────────────────────────────
 
 type ApplicantsToolbarProps = {
-  isExportDropdownOpen: boolean;
   onAddApplicant: () => void;
   onImportClick: () => void;
   onExportExcel: () => void;
-  onExportCsv: () => void;
-  onToggleExportDropdown: () => void;
-  onCloseExportDropdown: () => void;
+  isExporting: boolean;
   onShowResumeMaker: () => void;
 };
 
 function ApplicantsToolbar({
-  isExportDropdownOpen,
   onAddApplicant,
   onImportClick,
   onExportExcel,
-  onExportCsv,
-  onToggleExportDropdown,
-  onCloseExportDropdown,
+  isExporting,
   onShowResumeMaker,
 }: ApplicantsToolbarProps) {
   return (
@@ -512,39 +483,21 @@ function ApplicantsToolbar({
           Import
         </button>
 
-        <div className="relative">
-          <button
-            onClick={onToggleExportDropdown}
-            aria-expanded={isExportDropdownOpen}
-            aria-haspopup="menu"
-            aria-label="Export applicants"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
-          >
+        <button
+          onClick={onExportExcel}
+          disabled={isExporting}
+          aria-label="Export applicants as Excel"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+        >
+          {isExporting ? (
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          ) : (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 8l4-4m0 0l4 4m-4-4v12" />
             </svg>
-            Export
-            <ChevronDown size={14} />
-          </button>
-
-          {isExportDropdownOpen && (
-            <>
-              <div className="fixed inset-0 z-10" aria-hidden="true" onClick={onCloseExportDropdown} />
-              <ul role="menu" className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[170px] py-1">
-                <li role="menuitem">
-                  <button onClick={onExportExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                    Export as Excel
-                  </button>
-                </li>
-                <li role="menuitem">
-                  <button onClick={onExportCsv} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                    Export as CSV
-                  </button>
-                </li>
-              </ul>
-            </>
           )}
-        </div>
+          {isExporting ? "Exporting…" : "Export"}
+        </button>
       </div>
 
       <button
@@ -571,7 +524,6 @@ type ApplicantsTabProps = {
   searchQuery: string;
   currentPage: number;
   isFilterDropdownOpen: boolean;
-  isExportDropdownOpen: boolean;
   isFiltered: boolean;
   onAddApplicant: () => void;
   onEditApplicant: (a: Applicant) => void;
@@ -589,10 +541,8 @@ type ApplicantsTabProps = {
   onAddFilter: (id: string) => void;
   onRemoveFilter: (id: string) => void;
   onFilterValueChange: (id: string, v: string) => void;
-  onToggleExportDropdown: () => void;
-  onCloseExportDropdown: () => void;
   onExportExcel: () => void;
-  onExportCsv: () => void;
+  isExporting: boolean;
   onPageChange: (page: number) => void;
   perPage: number;
   onPerPageChange: (n: number) => void;
@@ -606,7 +556,6 @@ export default function ApplicantsTab({
   searchQuery,
   currentPage,
   isFilterDropdownOpen,
-  isExportDropdownOpen,
   isFiltered,
   onAddApplicant,
   onEditApplicant,
@@ -624,10 +573,8 @@ export default function ApplicantsTab({
   onAddFilter,
   onRemoveFilter,
   onFilterValueChange,
-  onToggleExportDropdown,
-  onCloseExportDropdown,
   onExportExcel,
-  onExportCsv,
+  isExporting,
   onPageChange,
   perPage,
   onPerPageChange,
@@ -636,13 +583,10 @@ export default function ApplicantsTab({
     <div className="flex flex-col gap-5">
       <div className="bg-white rounded-xl shadow-md p-3">
         <ApplicantsToolbar
-          isExportDropdownOpen={isExportDropdownOpen}
           onAddApplicant={onAddApplicant}
           onImportClick={onImportClick}
           onExportExcel={onExportExcel}
-          onExportCsv={onExportCsv}
-          onToggleExportDropdown={onToggleExportDropdown}
-          onCloseExportDropdown={onCloseExportDropdown}
+          isExporting={isExporting}
           onShowResumeMaker={onShowResumeMaker}
         />
       </div>
@@ -676,7 +620,6 @@ export default function ApplicantsTab({
         <ApplicantsTable
           applicants={paginatedApplicants}
           activeFilters={activeFilters}
-          isLoading={false}
           isFiltered={isFiltered}
           onView={onViewApplicant}
           onEdit={onEditApplicant}

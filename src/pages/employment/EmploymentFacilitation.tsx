@@ -393,6 +393,7 @@ function toApplicantData(a: Applicant): ApplicantData {
 export default function EmploymentFacilitation({ onBack }: EmploymentFacilitationProps) {
   // ── Applicant state (source of truth = the database) ──
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [isLoadingApplicants, setIsLoadingApplicants] = useState(true);
   const [deleteApplicantConfirm, setDeleteApplicantConfirm] = useState<Applicant | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean; type: 'success' | 'error'; title: string; message: string
@@ -409,7 +410,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(ITEMS_PER_PAGE);
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('');
@@ -528,9 +529,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // made in the Referrals/Placements tabs.
   useEffect(() => {
     if (activeTab === "applicants") {
-      reloadApplicants().catch(() => {
-        console.warn('Failed to load applicants from the server.');
-      });
+      reloadApplicants()
+        .catch(() => {
+          console.warn('Failed to load applicants from the server.');
+        })
+        .finally(() => setIsLoadingApplicants(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -607,25 +610,10 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   }
 
   // ── Export handlers ───────────────────────────────────────────────
-  function buildExportRows() {
-    return filteredApplicants.map((a) => ({
-      Name: a.name, Age: a.age, Sex: a.gender,
-      "Educational Background": a.education, Skills: a.skills,
-      "Employment Status": a.employmentStatus, "Contact Number": a.contactNumber,
-      Email: a.email, Address: a.address, "Civil Status": a.civilStatus ?? "",
-      "Has Disability": a.hasDisability ? "Yes" : "No",
-      OFW: a.isOFW ? "Active OFW" : a.isFormerOFW ? "Former OFW" : "Not OFW",
-      "4Ps Beneficiary": a.is4PsBeneficiary ? "Yes" : "No",
-      "Job Preference": a.jobPreference ?? "", Language: a.language ?? "",
-    }));
-  }
-
   // Column order/names here must match applicantImport.ts's expected headers
   // exactly (Import looks columns up by name via get()/norm(), not
   // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device), unlike
-  // buildExportRows() above which is a flat 14-field summary for quick
-  // viewing (combined Address/Education, no work history etc).
+  // re-importable later (e.g. after moving to a different device).
   //
   // applicantImport.ts scans repeating sections (Job Preference, Language,
   // Graduate Study, Training, Eligibility, Professional License, Work
@@ -732,31 +720,26 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     })
   }
 
-  function handleExportExcel() {
-    const counts = buildImportCompatibleColumns();
-    // Row 1 just carries a plain label: Import always skips the physical
-    // first row (range: 1), since the downloadable Template has a merged
-    // section-label band there. Real headers go on row 2 -- this label is
-    // only so the row doesn't look like a formatting mistake when opened.
-    const aoa = [["Applicants Export"], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Applicants");
-    XLSX.writeFile(wb, "applicants.xlsx");
-    setIsExportDropdownOpen(false);
-  }
-
-  function handleExportCsv() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows());
-    const csv = XLSX.utils.sheet_to_csv(ws);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "applicants.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    setIsExportDropdownOpen(false);
+  async function handleExportExcel() {
+    setIsExporting(true);
+    // Let the "Exporting..." state actually paint before the synchronous
+    // build/write below blocks the main thread -- without this yield, React
+    // never gets a chance to repaint between the two setIsExporting calls.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      const counts = buildImportCompatibleColumns();
+      // Row 1 just carries a plain label: Import always skips the physical
+      // first row (range: 1), since the downloadable Template has a merged
+      // section-label band there. Real headers go on row 2 -- this label is
+      // only so the row doesn't look like a formatting mistake when opened.
+      const aoa = [["Applicants Export"], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Applicants");
+      XLSX.writeFile(wb, "applicants.xlsx");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   if (isResumeMakerOpen) {
@@ -806,7 +789,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       {/* Tab content */}
       <div className="p-6">
         {activeTab === "applicants" && (
-          (isAddModalOpen || editingApplicant) ? (
+          isLoadingApplicants ? (
+            <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+              Loading applicants…
+            </div>
+          ) : (isAddModalOpen || editingApplicant) ? (
             <AddApplicantSidebar
               onClose={handleCloseSidebar}
               onSave={handleSaveApplicant}
@@ -827,7 +814,6 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               searchQuery={searchQuery}
               currentPage={currentPage}
               isFilterDropdownOpen={isFilterDropdownOpen}
-              isExportDropdownOpen={isExportDropdownOpen}
               isFiltered={isFiltered}
               onAddApplicant={() => setIsAddModalOpen(true)}
               onEditApplicant={setEditingApplicant}
@@ -845,29 +831,36 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onAddFilter={handleAddFilter}
               onRemoveFilter={handleRemoveFilter}
               onFilterValueChange={handleFilterValueChange}
-              onToggleExportDropdown={() => setIsExportDropdownOpen((p) => !p)}
-              onCloseExportDropdown={() => setIsExportDropdownOpen(false)}
               onExportExcel={handleExportExcel}
-              onExportCsv={handleExportCsv}
+              isExporting={isExporting}
               onPageChange={setCurrentPage}
               perPage={perPage}
               onPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
             />
           )
         )}
-        {activeTab === "vacancies" && (
+        {/* Vacancies/Referrals/Placements/Employers stay mounted and are only
+            hidden via CSS -- conditionally rendering them (like Applicants'
+            content above) would unmount+remount on every tab switch, resetting
+            their local data and loading state and forcing a fresh fetch (and
+            a "Loading..." flash) every single time the user revisits a tab. */}
+        <div className={activeTab === "vacancies" ? "" : "hidden"}>
           <VacanciesTab
             focusVacancyId={pendingVacancyId}
             onFocusHandled={() => setPendingVacancyId(null)}
           />
-        )}
-        {activeTab === "referrals" && <ReferralsTab />}
-        {activeTab === "placements" && (
+        </div>
+        <div className={activeTab === "referrals" ? "" : "hidden"}>
+          <ReferralsTab />
+        </div>
+        <div className={activeTab === "placements" ? "" : "hidden"}>
           <PlacementsTab
             onNavigateToVacancy={(id) => { setActiveTab("vacancies"); setPendingVacancyId(id); }}
           />
-        )}
-        {activeTab === "employers" && <EmployersTab />}
+        </div>
+        <div className={activeTab === "employers" ? "" : "hidden"}>
+          <EmployersTab />
+        </div>
       </div>
 
       {/* Overlay panels */}

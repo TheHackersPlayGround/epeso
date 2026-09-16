@@ -162,7 +162,7 @@ function activityStatusBadge(status: string) {
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
-  const { applicants, activities: cdspActivities, services: svcList, refreshProfiles, refreshActivities } = useCDSP()
+  const { applicants, activities: cdspActivities, services: svcList, loading, refreshProfiles, refreshActivities } = useCDSP()
   const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -217,7 +217,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [viewingApplicant, setViewingApplicant] = useState<CDSPApplicant | null>(null)
   const [assignTarget, setAssignTarget] = useState<CDSPApplicant | null>(null)
   const [isAssigning, setIsAssigning] = useState(false)
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
@@ -367,25 +367,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     }
   }
 
-  const exportRows = (rows: CDSPApplicant[]) => rows.map((a) => ({
-    'Last Name': a.lastName, 'First Name': a.firstName, 'Middle Name': a.middleName,
-    'Sex': a.sex, 'Birthdate': a.birthdate, 'Age': a.age, 'Civil Status': a.civilStatus,
-    'Contact Number': a.contactNumber, 'Email': a.email,
-    'Street / Purok #': a.streetPurok, 'Barangay': a.barangay,
-    'City / Municipality': a.cityMunicipality, 'Province': a.province, 'Region': a.region,
-    'Classification': a.classification.join(', '),
-    'Highest Education': a.highestEducation, 'Course': a.course,
-    'Employment Status': a.employmentStatus, 'Occupation': a.currentOccupation,
-    'Service Availed': a.serviceAvailed, 'Assigned Activity': a.assignedActivity,
-    'Status': a.status, 'Remarks': a.remarks,
-    'Date Received': a.dateApplicationReceived, 'Received By': a.receivedBy,
-  }))
-
   // Column order/names here must match cdspImport.ts's expected headers
   // exactly (Import looks columns up by name via get()/norm(), not
   // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device), unlike
-  // exportRows() above which uses different header names purely for display.
+  // re-importable later (e.g. after moving to a different device).
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email',
@@ -399,38 +384,42 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     'Age', 'Assigned Activity', 'Status',
   ]
 
-  const exportToExcel = () => {
-    const rows = filtered.map(a => [
-      a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
-      a.contactNumber, a.email,
-      a.province, a.cityMunicipality, a.barangay, a.streetPurok,
-      a.classification.join(', '), a.classificationOther,
-      a.highestEducation, a.schoolName, a.yearLevel, a.strand, a.course, a.yearGraduated,
-      a.employmentStatus, a.currentOccupation,
-      a.serviceAvailed,
-      a.dateApplicationReceived, a.receivedBy, a.remarks,
-      a.age, a.assignedActivity, a.status,
-    ])
-    // Row 1 is left blank: Import always skips the physical first row
-    // (range: 1), since the downloadable Template has a merged
-    // section-label band there. Real headers go on row 2.
-    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'CDSP Applicants')
-    XLSX.writeFile(wb, `CDSP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
-    setIsExportDropdownOpen(false)
-  }
-  const exportToCSV = () => {
-    const ws = XLSX.utils.json_to_sheet(exportRows(filtered))
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    link.download = `CDSP_Applicants_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    setIsExportDropdownOpen(false)
+  const exportToExcel = async () => {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const rows = filtered.map(a => [
+        a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
+        a.contactNumber, a.email,
+        a.province, a.cityMunicipality, a.barangay, a.streetPurok,
+        a.classification.join(', '), a.classificationOther,
+        a.highestEducation, a.schoolName, a.yearLevel, a.strand, a.course, a.yearGraduated,
+        a.employmentStatus, a.currentOccupation,
+        a.serviceAvailed,
+        a.dateApplicationReceived, a.receivedBy, a.remarks,
+        a.age, a.assignedActivity, a.status,
+      ])
+      // Row 1 is left blank: Import always skips the physical first row
+      // (range: 1), since the downloadable Template has a merged
+      // section-label band there. Real headers go on row 2.
+      const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'CDSP Applicants')
+      XLSX.writeFile(wb, `CDSP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
+    } finally {
+      setIsExporting(false)
+    }
   }
   // ─── Full-page sub-views ────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading CDSP applicants…
+      </div>
+    )
+  }
 
   if (isFormOpen) return <CDSPProfileForm onClose={() => setIsFormOpen(false)} onSave={handleAddSave} mode="add" />
   if (editingApplicant) {
@@ -818,24 +807,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
             <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('cdsp')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
               <Upload size={16} /><span>Import</span>
             </button>
-            <div className="relative">
-              <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
-                <Download size={16} /><span>Export</span><ChevronDown size={14} />
-              </button>
-              {isExportDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
-                  <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <button onClick={exportToExcel} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg text-sm">
-                      <Download size={16} /> Excel (.xlsx)
-                    </button>
-                    <button onClick={exportToCSV} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg border-t border-gray-100 text-sm">
-                      <Download size={16} /> CSV (.csv)
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button onClick={exportToExcel} disabled={isExporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+              {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+            </button>
           </div>
         </div>
 

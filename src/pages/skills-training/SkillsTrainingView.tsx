@@ -247,7 +247,7 @@ function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileSta
 }
 
 export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
-  const { profiles, activities, batches, qualifications, purposes, refreshProfiles, refreshActivities } = useSkillsTraining()
+  const { profiles, activities, batches, qualifications, purposes, loading, refreshProfiles, refreshActivities } = useSkillsTraining()
   const plannedTrainings = activities.filter(t => t.status === 'Planned')
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -272,7 +272,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null; name: string }>({ open: false, id: null, name: '' })
@@ -396,24 +396,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const trainingStatusBadge = (s: string) =>
     s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : s === 'Completed' ? 'bg-blue-100 text-blue-700' : s === 'Absent' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-600'
 
-  const exportRows = (rows: SkillsTrainingProfile[]) => rows.map(p => ({
-    'Last Name': p.lastName, 'First Name': p.firstName, 'Middle Name': p.middleName,
-    'Birthdate': p.birthdate, 'Age': p.age, 'Sex': p.sex, 'Civil Status': p.civilStatus,
-    'Address': [p.streetPurok, p.barangay, p.cityMunicipality, p.province].filter(Boolean).join(', '),
-    'Contact #': p.contactNumber,
-    'Classification': [...p.classification, ...p.classificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
-    'Desired Qualification': [...p.desiredQualification, ...p.qualificationOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
-    'Purpose of Training': [...p.purposeOfTraining, ...p.purposeOther.filter(Boolean).map(v => `Others: ${v}`)].join(', '),
-    'Assigned Training': p.assignedTrainingTitle, 'Status': p.status,
-    'Date Applied': p.dateApplicationReceived,
-  }))
-
   // Column order/names here must match skillsTrainingImport.ts's expected
   // headers exactly (Import does a header-name lookup via get()/norm(), not
   // positional) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device), unlike
-  // the human-readable CSV/exportRows() below which uses a combined
-  // Address and different header names purely for display.
+  // re-importable later (e.g. after moving to a different device).
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Province', 'City / Municipality', 'Barangay', 'Street / Purok #',
@@ -436,25 +422,22 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     p.age, p.assignedTrainingTitle,
   ])
 
-  const exportToExcel = () => {
-    // Row 1 is left blank on purpose: the Import parser always skips the
-    // physical first row (range: 1), since the downloadable Template has a
-    // merged section-label band there. Real headers go on row 2, matching
-    // where Import actually looks for them.
-    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...exportRowsForImport(filteredProfiles)]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Skills Training')
-    XLSX.writeFile(wb, `SkillsTraining_${new Date().toISOString().split('T')[0]}.xlsx`)
-    setIsExportDropdownOpen(false)
-  }
-  const exportToCSV = () => {
-    const ws = XLSX.utils.json_to_sheet(exportRows(filteredProfiles))
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(new Blob([XLSX.utils.sheet_to_csv(ws)], { type: 'text/csv;charset=utf-8;' }))
-    link.download = `SkillsTraining_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    setIsExportDropdownOpen(false)
+  const exportToExcel = async () => {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      // Row 1 is left blank on purpose: the Import parser always skips the
+      // physical first row (range: 1), since the downloadable Template has a
+      // merged section-label band there. Real headers go on row 2, matching
+      // where Import actually looks for them.
+      const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...exportRowsForImport(filteredProfiles)]
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Skills Training')
+      XLSX.writeFile(wb, `SkillsTraining_${new Date().toISOString().split('T')[0]}.xlsx`)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   const closeAssignModal = () => {
@@ -537,6 +520,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       setErrorModal({ open: true, message: errMsg(e, 'Failed to update status.') })
       throw e // keep the Update Status modal open so the user can retry
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading Skills Training profiles…
+      </div>
+    )
   }
 
   if (isFormOpen) {
@@ -829,20 +820,10 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('skills')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
                 <Upload size={16} /><span>Import</span>
               </button>
-              <div className="relative">
-                <button onClick={() => setIsExportDropdownOpen(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm">
-                  <Download size={16} /><span>Export</span><ChevronDown size={14} />
-                </button>
-                {isExportDropdownOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
-                    <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                      <button onClick={exportToExcel} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg text-sm"><Download size={16} /> Excel (.xlsx)</button>
-                      <button onClick={exportToCSV} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg border-t border-gray-100 text-sm"><Download size={16} /> CSV (.csv)</button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <button onClick={exportToExcel} disabled={isExporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-xl transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+                {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+              </button>
             </div>
           </div>
 

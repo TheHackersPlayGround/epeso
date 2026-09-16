@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import ConfirmModal from '../../shared/ConfirmModal'
-import { Search, Plus, ChevronDown, X, MoreHorizontal, Upload } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, MoreHorizontal, Upload, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import type { Employer } from '../../../contexts/EmploymentContext'
 import { canManage } from '../../../utils/permissions'
@@ -282,14 +282,11 @@ function EmployersSearchBar({ searchQuery, activeFilters, availableFilters, isFi
 type ToolbarProps = {
   onAdd: () => void
   onImport: () => void
-  isExportOpen: boolean
-  onToggleExport: () => void
-  onCloseExport: () => void
   onExportExcel: () => void
-  onExportCsv: () => void
+  isExporting: boolean
 }
 
-function EmployersToolbar({ onAdd, onImport, isExportOpen, onToggleExport, onCloseExport, onExportExcel, onExportCsv }: ToolbarProps) {
+function EmployersToolbar({ onAdd, onImport, onExportExcel, isExporting }: ToolbarProps) {
   return (
     <div className="flex gap-2">
       <button onClick={onAdd} disabled={!canManage('employment')}
@@ -304,33 +301,17 @@ function EmployersToolbar({ onAdd, onImport, isExportOpen, onToggleExport, onClo
         </svg>
         Import
       </button>
-      <div className="relative">
-        <button onClick={onToggleExport} aria-expanded={isExportOpen}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
+      <button onClick={onExportExcel} disabled={isExporting}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+        {isExporting ? (
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+        ) : (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 8l4-4m0 0l4 4m-4-4v12" />
           </svg>
-          Export
-          <ChevronDown size={14} />
-        </button>
-        {isExportOpen && (
-          <>
-            <div className="fixed inset-0 z-10" aria-hidden="true" onClick={onCloseExport} />
-            <ul role="menu" className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[170px] py-1">
-              <li role="menuitem">
-                <button onClick={onExportExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                  Export as Excel
-                </button>
-              </li>
-              <li role="menuitem">
-                <button onClick={onExportCsv} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">
-                  Export as CSV
-                </button>
-              </li>
-            </ul>
-          </>
         )}
-      </div>
+        {isExporting ? 'Exporting…' : 'Export'}
+      </button>
     </div>
   )
 }
@@ -477,7 +458,7 @@ export default function EmployersTab() {
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
-  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedEmployer, setSelectedEmployer] = useState<Employer | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -614,57 +595,33 @@ export default function EmployersTab() {
     )
   }
 
-  function handleExportExcel() {
-    const rows = filtered.map(e => ({
-      'Company Name': e.companyName,
-      'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
-      'Company Size': e.companySize,
-      'Business Type': e.businessType,
-      'Years in Operation': e.yearsInOperation,
-      'TIN Number': e.tinNumber,
-      'Contact Person': e.contactPersonName,
-      'Position': e.position,
-      'Contact Number': e.contactNumber,
-      'Email': e.email,
-      'Address': [e.buildingNo, e.street, e.barangay, e.city, e.province, e.region].filter(Boolean).join(', '),
-      'Status': e.status,
-      'Date Registered': e.dateRegistered,
-      'Remarks': e.remarks,
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Employers')
-    XLSX.writeFile(wb, 'employers.xlsx')
-    setIsExportOpen(false)
-  }
-
-  function handleExportCsv() {
-    const rows = filtered.map(e => ({
-      'Company Name': e.companyName,
-      'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
-      'Company Size': e.companySize,
-      'Business Type': e.businessType,
-      'Years in Operation': e.yearsInOperation,
-      'TIN Number': e.tinNumber,
-      'Contact Person': e.contactPersonName,
-      'Position': e.position,
-      'Contact Number': e.contactNumber,
-      'Email': e.email,
-      'Address': [e.buildingNo, e.street, e.barangay, e.city, e.province, e.region].filter(Boolean).join(', '),
-      'Status': e.status,
-      'Date Registered': e.dateRegistered,
-      'Remarks': e.remarks,
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'employers.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-    setIsExportOpen(false)
+  async function handleExportExcel() {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const rows = filtered.map(e => ({
+        'Company Name': e.companyName,
+        'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
+        'Company Size': e.companySize,
+        'Business Type': e.businessType,
+        'Years in Operation': e.yearsInOperation,
+        'TIN Number': e.tinNumber,
+        'Contact Person': e.contactPersonName,
+        'Position': e.position,
+        'Contact Number': e.contactNumber,
+        'Email': e.email,
+        'Address': [e.buildingNo, e.street, e.barangay, e.city, e.province, e.region].filter(Boolean).join(', '),
+        'Status': e.status,
+        'Date Registered': e.dateRegistered,
+        'Remarks': e.remarks,
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Employers')
+      XLSX.writeFile(wb, 'employers.xlsx')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -673,11 +630,8 @@ export default function EmployersTab() {
         <EmployersToolbar
           onAdd={() => setShowAdd(true)}
           onImport={() => setIsImportModalOpen(true)}
-          isExportOpen={isExportOpen}
-          onToggleExport={() => setIsExportOpen(p => !p)}
-          onCloseExport={() => setIsExportOpen(false)}
           onExportExcel={handleExportExcel}
-          onExportCsv={handleExportCsv}
+          isExporting={isExporting}
         />
       </div>
 

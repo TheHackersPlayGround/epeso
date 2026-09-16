@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
-import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import ConfirmModal from '../shared/ConfirmModal'
 import { canManage } from '../../utils/permissions'
@@ -131,7 +131,7 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
 }
 
 export default function OFWView({ onBack }: OFWViewProps) {
-  const { profiles, refreshProfiles } = useOFW()
+  const { profiles, loading, refreshProfiles } = useOFW()
 
   // View / edit / delete modals
   const [showAddForm, setShowAddForm] = useState(false)
@@ -161,7 +161,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const menuRef = useRef<HTMLDivElement | null>(null)
 
   // Export dropdown
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   const closeMenu = useCallback(() => setOpenMenuId(null), [])
 
@@ -323,50 +323,43 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const recordEnd = Math.min(safePage * perPage, sorted.length)
 
   // ── Export ────────────────────────────────────────────────────
-  const exportToExcel = () => {
-    const data = filtered.map(p => ({
-      'Reference #': p.referenceNumber,
-      'Name': p.name,
-      'Contact Number': p.contactNumber,
-      'Email': p.email,
-      'Address': p.address,
-      'Barangay': p.barangay,
-      'Municipality': p.municipality,
-      'Province': p.province,
-      'Date Filed': p.dateFiled,
-      'Employment Status': p.employmentStatus,
-      'Type of Request': p.typeOfRequest.join(', '),
-      'Status': p.status,
-      'Remarks': p.remarks,
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'OFW Profiles')
-    XLSX.writeFile(wb, `OFW_Profiles_${new Date().toISOString().split('T')[0]}.xlsx`)
-    setIsExportDropdownOpen(false)
-  }
-
-  const exportToCSV = () => {
-    const data = filtered.map(p => ({
-      'Reference #': p.referenceNumber,
-      'Name': p.name,
-      'Contact Number': p.contactNumber,
-      'Barangay': p.barangay,
-      'Date Filed': p.dateFiled,
-      'Employment Status': p.employmentStatus,
-      'Status': p.status,
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `OFW_Profiles_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    setIsExportDropdownOpen(false)
+  const exportToExcel = async () => {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const data = filtered.map(p => ({
+        'Reference #': p.referenceNumber,
+        'Name': p.name,
+        'Contact Number': p.contactNumber,
+        'Email': p.email,
+        'Address': p.address,
+        'Barangay': p.barangay,
+        'Municipality': p.municipality,
+        'Province': p.province,
+        'Date Filed': p.dateFiled,
+        'Employment Status': p.employmentStatus,
+        'Type of Request': p.typeOfRequest.join(', '),
+        'Status': p.status,
+        'Remarks': p.remarks,
+      }))
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'OFW Profiles')
+      XLSX.writeFile(wb, `OFW_Profiles_${new Date().toISOString().split('T')[0]}.xlsx`)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // ── Early returns ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading OFW profiles…
+      </div>
+    )
+  }
+
   if (showAddForm) {
     return (
       <AddOFWRequestForm
@@ -419,27 +412,14 @@ export default function OFWView({ onBack }: OFWViewProps) {
             >
               <Plus size={16} /><span>Add Profile</span>
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm"
-              >
-                <Download size={16} /><span>Export</span><ChevronDown size={14} />
-              </button>
-              {isExportDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
-                  <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <button onClick={exportToExcel} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg text-sm">
-                      <Download size={16} /> Excel (.xlsx)
-                    </button>
-                    <button onClick={exportToCSV} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg border-t border-gray-100 text-sm">
-                      <Download size={16} /> CSV (.csv)
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              onClick={exportToExcel}
+              disabled={isExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+            >
+              {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+            </button>
           </div>
         </div>
 

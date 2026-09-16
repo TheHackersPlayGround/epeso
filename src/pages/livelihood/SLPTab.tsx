@@ -903,7 +903,7 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SLPTab() {
-  const { applicants, projects, refreshProfiles, refreshProjects } = useSLP()
+  const { applicants, projects, loading, refreshProfiles, refreshProjects } = useSLP()
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -915,7 +915,7 @@ export default function SLPTab() {
   const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<SLPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
-  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
@@ -1045,21 +1045,10 @@ export default function SLPTab() {
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
-  function buildExportRows() {
-    return filtered.map(b => ({
-      'Name': formatDisplayName(b),
-      'Contact Number': b.contactNumber ?? '',
-      'Barangay': b.barangay ?? '',
-      'SLP Track': b.slpTrack ?? '',
-      'Status': b.status,
-    }))
-  }
-
   // Column order/names here must match slpImport.ts's expected headers
   // exactly (Import looks columns up by name via get()/norm(), not
   // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device), unlike
-  // buildExportRows() above which is a 5-column summary for quick viewing.
+  // re-importable later (e.g. after moving to a different device).
   const IMPORT_COMPATIBLE_HEADERS = [
     'SLP Participant ID Number', 'Participant Type', 'Eligibility Type', 'Referring Party (if Referral)',
     'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
@@ -1089,27 +1078,29 @@ export default function SLPTab() {
     ])
   }
 
-  function handleExportExcel() {
-    // Row 1 is left blank: Import always skips the physical first row
-    // (range: 1), since the downloadable Template has a merged
-    // section-label band there. Real headers go on row 2.
-    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...buildImportCompatibleRows()]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'SLP')
-    XLSX.writeFile(wb, 'slp_beneficiaries.xlsx')
+  async function handleExportExcel() {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      // Row 1 is left blank: Import always skips the physical first row
+      // (range: 1), since the downloadable Template has a merged
+      // section-label band there. Real headers go on row 2.
+      const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...buildImportCompatibleRows()]
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'SLP')
+      XLSX.writeFile(wb, 'slp_beneficiaries.xlsx')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
-  function handleExportCsv() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'slp_beneficiaries.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading SLP beneficiaries…
+      </div>
+    )
   }
 
   if (isAddOpen) {
@@ -1202,34 +1193,14 @@ export default function SLPTab() {
           Import
         </button>
 
-        <div className="relative">
-          <button
-            onClick={() => setIsExportOpen(o => !o)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
-          >
-            <Download size={16} />
-            Export
-          </button>
-          {isExportOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setIsExportOpen(false)} />
-              <div className="absolute left-0 top-full mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-                <button
-                  onClick={() => { handleExportExcel(); setIsExportOpen(false) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                >
-                  Export as Excel
-                </button>
-                <button
-                  onClick={() => { handleExportCsv(); setIsExportOpen(false) }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Export as CSV
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <button
+          onClick={handleExportExcel}
+          disabled={isExporting}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+        >
+          {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          {isExporting ? 'Exporting…' : 'Export'}
+        </button>
         </div>
       </div>
 

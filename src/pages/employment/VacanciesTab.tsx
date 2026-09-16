@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import * as XLSX from 'xlsx'
-import { Search, Plus, ChevronDown, X, MoreHorizontal, Download } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, MoreHorizontal, Download, Loader2 } from 'lucide-react'
 import type { Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
 import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
@@ -27,15 +27,12 @@ type VacanciesSearchBarProps = {
   searchQuery: string
   activeFilters: string[]
   isFilterOpen: boolean
-  isExportOpen: boolean
   onSearchChange: (v: string) => void
   onToggleFilter: () => void
   onCloseFilter: () => void
   onAddFilter: (id: string) => void
-  onToggleExport: () => void
-  onCloseExport: () => void
   onExportExcel: () => void
-  onExportCsv: () => void
+  isExporting: boolean
 }
 
 function VacanciesSearchBar({
@@ -43,15 +40,12 @@ function VacanciesSearchBar({
   searchQuery,
   activeFilters,
   isFilterOpen,
-  isExportOpen,
   onSearchChange,
   onToggleFilter,
   onCloseFilter,
   onAddFilter,
-  onToggleExport,
-  onCloseExport,
   onExportExcel,
-  onExportCsv,
+  isExporting,
 }: VacanciesSearchBarProps) {
   const unselected = AVAILABLE_FILTERS.filter((f) => !activeFilters.includes(f.id))
 
@@ -109,35 +103,14 @@ function VacanciesSearchBar({
         )}
       </div>
 
-      <div className="relative">
-        <button
-          onClick={onToggleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm"
-        >
-          <Download size={16} />
-          Export
-          <ChevronDown size={14} className="text-white" />
-        </button>
-        {isExportOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={onCloseExport} />
-            <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-              <button
-                onClick={() => { onExportExcel(); onCloseExport() }}
-                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
-              >
-                Export as Excel
-              </button>
-              <button
-                onClick={() => { onExportCsv(); onCloseExport() }}
-                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Export as CSV
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      <button
+        onClick={onExportExcel}
+        disabled={isExporting}
+        className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+      >
+        {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+        {isExporting ? 'Exporting…' : 'Export'}
+      </button>
     </div>
   )
 }
@@ -905,7 +878,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
-  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [highlightedVacancyId, setHighlightedVacancyId] = useState<number | null>(null)
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean; type: 'success' | 'error'; title: string; message: string
@@ -965,18 +938,17 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     }))
   }
 
-  function handleExportExcel() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
-    XLSX.writeFile(wb, 'vacancies.xlsx')
-  }
-
-  function handleExportCsv() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
-    XLSX.writeFile(wb, 'vacancies.csv')
+  async function handleExportExcel() {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const ws = XLSX.utils.json_to_sheet(buildExportRows())
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
+      XLSX.writeFile(wb, 'vacancies.xlsx')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   async function handleAddVacancy(data: Omit<Vacancy, 'id'>) {
@@ -1058,15 +1030,12 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
             searchQuery={searchQuery}
             activeFilters={activeFilters}
             isFilterOpen={isFilterOpen}
-            isExportOpen={isExportOpen}
             onSearchChange={(v) => setSearchQuery(v)}
             onToggleFilter={() => setIsFilterOpen((o) => !o)}
             onCloseFilter={() => setIsFilterOpen(false)}
             onAddFilter={handleAddFilter}
-            onToggleExport={() => setIsExportOpen((o) => !o)}
-            onCloseExport={() => setIsExportOpen(false)}
             onExportExcel={handleExportExcel}
-            onExportCsv={handleExportCsv}
+            isExporting={isExporting}
           />
 
           {activeFilters.length > 0 && (

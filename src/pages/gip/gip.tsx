@@ -158,7 +158,7 @@ function errMsg(e: unknown, fallback: string) {
 // ─── Main GIPView ──────────────────────────────────────────────────────────────
 
 export default function GIPView({ onBack }: GIPViewProps) {
-  const { applicants, gipWorkplaces, refreshProfiles, refreshWorkplaces } = useGIP()
+  const { applicants, gipWorkplaces, loading, refreshProfiles, refreshWorkplaces } = useGIP()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -222,7 +222,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [viewWorkplaceTarget, setViewWorkplaceTarget] = useState<GIPApplicant | null>(null)
   const [completeConfirm, setCompleteConfirm] = useState<GIPApplicant | null>(null)
 
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
@@ -395,8 +395,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   // Column order/names here must match gipImport.ts's expected headers
   // exactly (Import looks columns up by name via get()/norm(), not
   // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device), unlike
-  // the human-readable CSV below which drops Province/City for brevity.
+  // re-importable later (e.g. after moving to a different device).
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email',
@@ -408,48 +407,33 @@ export default function GIPView({ onBack }: GIPViewProps) {
     'Age', 'Assigned Workplace/Office', 'Status',
   ]
 
-  const exportToExcel = () => {
-    const rows = filtered.map(a => {
-      const workplace = gipWorkplaces.find(w => w.id === a.assignedWorkplaceId)
-      return [
-        a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
-        a.contactNumber, a.email,
-        a.province, a.cityMunicipality, a.barangay, a.streetPurok,
-        a.classification.join(', '), a.classificationOther,
-        a.highestEducation, a.schoolName, a.strand, a.course, a.yearLevel, a.yearGraduated,
-        a.dateApplicationReceived, a.receivedBy, a.remarks,
-        a.age, workplace?.workplaceName ?? '', deriveStatus(a),
-      ]
-    })
-    // Row 1 is left blank: Import always skips the physical first row
-    // (range: 1), since the downloadable Template has a merged
-    // section-label band there. Real headers go on row 2.
-    const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'GIP Applicants')
-    XLSX.writeFile(wb, `GIP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
-    setIsExportDropdownOpen(false)
-  }
-
-  const exportToCSV = () => {
-    const data = filtered.map(a => {
-      const workplace = gipWorkplaces.find(w => w.id === a.assignedWorkplaceId)
-      return {
-        'Last Name': a.lastName, 'First Name': a.firstName,
-        'Barangay': a.barangay,
-        'Assigned Workplace/Office': workplace?.workplaceName ?? '',
-        'Status': deriveStatus(a),
-      }
-    })
-    const ws = XLSX.utils.json_to_sheet(data)
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `GIP_Applicants_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    setIsExportDropdownOpen(false)
+  const exportToExcel = async () => {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const rows = filtered.map(a => {
+        const workplace = gipWorkplaces.find(w => w.id === a.assignedWorkplaceId)
+        return [
+          a.lastName, a.firstName, a.middleName, a.sex, a.birthdate, a.civilStatus,
+          a.contactNumber, a.email,
+          a.province, a.cityMunicipality, a.barangay, a.streetPurok,
+          a.classification.join(', '), a.classificationOther,
+          a.highestEducation, a.schoolName, a.strand, a.course, a.yearLevel, a.yearGraduated,
+          a.dateApplicationReceived, a.receivedBy, a.remarks,
+          a.age, workplace?.workplaceName ?? '', deriveStatus(a),
+        ]
+      })
+      // Row 1 is left blank: Import always skips the physical first row
+      // (range: 1), since the downloadable Template has a merged
+      // section-label band there. Real headers go on row 2.
+      const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'GIP Applicants')
+      XLSX.writeFile(wb, `GIP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   const closeAssignModal = () => {
@@ -458,6 +442,14 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setSelectedWorkplace(null)
     setAssignSearch('')
     setConfirmingWorkplace(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Loading GIP applicants…
+      </div>
+    )
   }
 
   if (isFormOpen) return <GIPProfileForm initial={emptyForm} mode="add" onSave={handleAddSave} onClose={() => setIsFormOpen(false)} />
@@ -686,20 +678,10 @@ export default function GIPView({ onBack }: GIPViewProps) {
             <button onClick={() => setIsImportModalOpen(true)} disabled={!canManage('gip')} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
               <Upload size={16} /><span>Import</span>
             </button>
-            <div className="relative">
-              <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm">
-                <Download size={16} /><span>Export</span><ChevronDown size={14} />
-              </button>
-              {isExportDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsExportDropdownOpen(false)} />
-                  <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <button onClick={exportToExcel} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"><Download size={16} /> Excel (.xlsx)</button>
-                    <button onClick={exportToCSV} className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg border-t border-gray-100"><Download size={16} /> CSV (.csv)</button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button onClick={exportToExcel} disabled={isExporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+              {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+            </button>
           </div>
         </div>
 

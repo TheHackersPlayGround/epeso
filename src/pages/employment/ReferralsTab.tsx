@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
-import { Search, Plus, ChevronDown, X, Download, MoreHorizontal } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Download, MoreHorizontal, Loader2 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import type { Referral } from '../../contexts/EmploymentContext'
 import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
@@ -43,7 +43,7 @@ type ReferralsSearchBarProps = {
   onAddFilter: (id: string) => void
   onSortChange: (v: SortOrder) => void
   onExportExcel: () => void
-  onExportCsv: () => void
+  isExporting: boolean
 }
 
 function ReferralsSearchBar({
@@ -58,9 +58,8 @@ function ReferralsSearchBar({
   onAddFilter,
   onSortChange,
   onExportExcel,
-  onExportCsv,
+  isExporting,
 }: ReferralsSearchBarProps) {
-  const [isExportOpen, setIsExportOpen] = useState(false)
   const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
 
   return (
@@ -127,36 +126,14 @@ function ReferralsSearchBar({
       </div>
 
       {/* Export */}
-      <div className="relative">
-        <button
-          onClick={() => setIsExportOpen(o => !o)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm font-medium"
-        >
-          <Download size={16} />
-          Export
-          <ChevronDown size={14} />
-        </button>
-
-        {isExportOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setIsExportOpen(false)} />
-            <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-              <button
-                onClick={() => { onExportExcel(); setIsExportOpen(false) }}
-                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-              >
-                Export as Excel
-              </button>
-              <button
-                onClick={() => { onExportCsv(); setIsExportOpen(false) }}
-                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Export as CSV
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      <button
+        onClick={onExportExcel}
+        disabled={isExporting}
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+      >
+        {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+        {isExporting ? 'Exporting…' : 'Export'}
+      </button>
     </div>
   )
 }
@@ -463,6 +440,7 @@ export default function ReferralsTab() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
@@ -554,23 +532,17 @@ export default function ReferralsTab() {
     }))
   }
 
-  function handleExportExcel() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Referrals')
-    XLSX.writeFile(wb, 'referrals.xlsx')
-  }
-
-  function handleExportCsv() {
-    const ws = XLSX.utils.json_to_sheet(buildExportRows())
-    const csv = XLSX.utils.sheet_to_csv(ws)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'referrals.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+  async function handleExportExcel() {
+    setIsExporting(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const ws = XLSX.utils.json_to_sheet(buildExportRows())
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Referrals')
+      XLSX.writeFile(wb, 'referrals.xlsx')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -617,7 +589,7 @@ export default function ReferralsTab() {
     [filtered, currentPage, perPage],
   )
 
-  if (loading) return <div className="bg-white rounded-xl shadow-md p-8 text-center text-gray-500">Loading referrals…</div>
+  if (loading) return <div className="flex items-center justify-center py-24 text-gray-400 text-sm">Loading referrals…</div>
 
   return (
     <div className="flex flex-col gap-5">
@@ -635,7 +607,7 @@ export default function ReferralsTab() {
             onAddFilter={handleAddFilter}
             onSortChange={setSortOrder}
             onExportExcel={handleExportExcel}
-            onExportCsv={handleExportCsv}
+            isExporting={isExporting}
           />
 
           {activeFilters.length > 0 && (

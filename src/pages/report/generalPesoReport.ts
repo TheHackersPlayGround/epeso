@@ -13,6 +13,7 @@
 // the official PESO/LMI report's charts.
 import JSZip from 'jszip'
 import { GENERAL_PESO_PROGRAM_COLORS } from './generalPesoColors'
+import { setChartTitle } from './xlsxChartPatch'
 import type { GeneralPesoProgramRow } from '../../services/reportService'
 
 const templateUrl = new URL('./general_peso_template.xlsx', import.meta.url).href
@@ -134,11 +135,15 @@ export async function generateGeneralPesoWorkbook(
   zip.file(SHEET_CHARTDATA, chartData)
 
   // ── Charts: shrink the range AND rebuild the cached values to match ──
+  // Titles match the Word export's own chart captions exactly (see
+  // wordReport.ts) -- the template's charts otherwise fall back to their
+  // auto-generated title (the series name, "Participants" for both).
   let bar = await zip.file(CHART_BAR)!.async('string')
   bar = setChartRange(bar, lastRow)
   bar = setStrCache(bar, names)
   bar = setNumCache(bar, counts)
   bar = setBarColor(bar)
+  bar = setChartTitle(bar, 'Program Participation Summary')
   zip.file(CHART_BAR, bar)
 
   let pie = await zip.file(CHART_PIE)!.async('string')
@@ -147,10 +152,15 @@ export async function generateGeneralPesoWorkbook(
   pie = setNumCache(pie, counts)
   pie = setPieColors(pie, names)
   pie = setPieShowPercent(pie)
+  pie = setChartTitle(pie, 'Program Distribution')
   zip.file(CHART_PIE, pie)
 
   // ── Report sheet: period + headline stats ──
   let report = await zip.file(SHEET_REPORT)!.async('string')
+  // The template (authored by hand in real Excel) had gridlines turned off
+  // for this sheet -- every other sheet/report in this app shows them, so
+  // turn them back on rather than leaving this one sheet inconsistent.
+  report = report.replace('showGridLines="0"', 'showGridLines="1"')
   report = setCell(report, 'B3', periodDetails, false)
   report = setCell(report, 'B5', analytics.total, true)
   report = setCell(report, 'B6', analytics.male, true)
@@ -181,6 +191,8 @@ export async function generateGeneralPesoWorkbook(
   const link = document.createElement('a')
   link.href = url
   link.download = `${fileName}.xlsx`
+  link.style.display = 'none'
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(url) }, 100)
 }

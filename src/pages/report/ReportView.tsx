@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
-import * as XLSX from 'xlsx'
 import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -11,6 +10,7 @@ import { fetchEfReport, fetchGeneralPesoReport, fetchSkillsAgingReport, type Ski
 import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS } from '../../utils/aging'
 import { generatePesoMonthlyReport } from './pesoMonthlyReport'
 import { generateGeneralPesoWorkbook } from './generalPesoReport'
+import { generateWordReport, generateWordRoster } from './wordReport'
 import { graftAgingCharts, type AgingChartOptions } from './skillsAgingChart'
 import { GENERAL_PESO_PROGRAM_COLORS } from './generalPesoColors'
 import { useCDSP } from '../../contexts/CDSPContext'
@@ -198,6 +198,38 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
   }
 
+  // Forces every cell in every worksheet of an ExcelJS workbook to Times New
+  // Roman, matching the Word/PDF exports -- applied as a final pass instead of
+  // adding `name: EXCEL_FONT_NAME` to each individual cell.font assignment
+  // above, since most data cells never set a font at all (inheriting ExcelJS's
+  // Calibri default) and would otherwise be missed. Spreads the cell's
+  // existing font (bold/color/size/etc.) rather than replacing it, so this
+  // only ever changes the family, never anything already styled. NOT used by
+  // the PESO/LMI Monthly Report (pesoMonthlyReport.ts) or the General PESO
+  // Report (generalPesoReport.ts) -- both patch a hand-authored Excel template
+  // directly rather than building a fresh ExcelJS.Workbook, so their font
+  // comes from the template file itself, not from code.
+  const EXCEL_FONT_NAME = 'Times New Roman'
+  const applyExcelFont = (wb: ExcelJS.Workbook) => {
+    wb.eachSheet(ws => {
+      ws.eachRow({ includeEmpty: true }, row => {
+        row.eachCell({ includeEmpty: true }, cell => {
+          cell.font = { ...cell.font, name: EXCEL_FONT_NAME }
+          // A cell.value of the form { richText: [...] } (the roster info
+          // lines' bold-label/plain-value blocks) carries its own font per
+          // run, which overrides the cell-level font above for that run --
+          // the cell-level change alone left these still rendering in
+          // ExcelJS's Calibri default even after the fix above.
+          const v = cell.value as unknown
+          if (v && typeof v === 'object' && Array.isArray((v as { richText?: unknown }).richText)) {
+            const runs = (v as { richText: { font?: Partial<ExcelJS.Font>; text: string }[] }).richText
+            cell.value = { richText: runs.map(run => ({ ...run, font: { ...run.font, name: EXCEL_FONT_NAME } })) }
+          }
+        })
+      })
+    })
+  }
+
   // Splits usableWidth across columns proportional to each column's actual
   // rendered text width (header vs. longest value, measured via the doc's own
   // font metrics) instead of a raw character count. A character-count heuristic
@@ -230,11 +262,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // Attendees/Interns/Students) — same title + centered info-block + table
   // shape as the ExcelJS version, on the same Folio paper as the main report.
   // Landscape, since these rosters run 7-8 columns wide.
+  // cellFill is optional -- only the Skills Training roster's Attendance
+  // column uses it (green/red by Present/Absent). Returns a hex color, or
+  // undefined for no fill, given the 0-based column index (these rosters are
+  // plain arrays, not keyed objects, so there's no column name to match on).
   const buildRosterPdf = (
     title: string,
     infoLines: { label: string; value: string | number }[][],
     headerLabels: string[],
     rows: (string | number)[][],
+    cellFill?: (colIndex: number, row: (string | number)[]) => string | undefined,
   ): jsPDF => {
     const doc = new jsPDF({ orientation: 'landscape', format: [FOLIO_MM[1], FOLIO_MM[0]] })
     registerPdfFont(doc)
@@ -258,39 +295,28 @@ export default function ReportView({ onBack }: ReportViewProps) {
       head: [headerLabels],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [0, 119, 190], textColor: 255, fontStyle: 'bold', fontSize: 9, font: PDF_FONT_FAMILY },
-      bodyStyles: { fontSize: 8, font: PDF_FONT_FAMILY },
+      // Plain white header with bold black text and black borders throughout,
+      // matching the main report export's table styling.
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 9, font: PDF_FONT_FAMILY },
+      bodyStyles: { fontSize: 8, font: PDF_FONT_FAMILY, textColor: [0, 0, 0] },
       margin: { left: 14, right: 14 },
       tableWidth: usableWidth,
       columnStyles,
-      styles: { overflow: 'linebreak', font: PDF_FONT_FAMILY },
+      styles: { overflow: 'linebreak', font: PDF_FONT_FAMILY, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      didParseCell: !cellFill ? undefined : (data) => {
+        if (data.section !== 'body') return
+        const color = cellFill(data.column.index, rows[data.row.index])
+        if (color) {
+          data.cell.styles.fillColor = hexToRgb(color)
+          data.cell.styles.textColor = 255
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
     })
 
     return doc
   }
 
-  // Shared CSV builder for the per-activity/batch roster exports. CSV has no
-  // styling — no bold, no merged/centered cells — so the info lines flatten to
-  // plain "Label: Value" text rows above the header instead of the Excel/PDF
-  // versions' formatted block; still gives a flat, importable file for anyone
-  // who wants raw data instead of a formatted document. Uses SheetJS (already
-  // used for the main report's CSV export) so values like "Last, First" names
-  // get proper CSV quoting instead of a raw comma-joined string breaking columns.
-  const buildRosterCsv = (
-    title: string,
-    infoLines: { label: string; value: string | number }[][],
-    headerLabels: string[],
-    rows: (string | number)[][],
-  ): string => {
-    const aoa: (string | number)[][] = [
-      [title], [],
-      ...infoLines.map(parts => [parts.map(p => `${p.label}${p.value}`).join('   ')]),
-      [],
-      headerLabels,
-      ...rows,
-    ]
-    return XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(aoa))
-  }
 
   // "Address" column (CDSP/GIP/SPES participant lists) — an ordinary extra
   // column alongside Street/Purok and Barangay (not a replacement for them),
@@ -395,6 +421,31 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (pt === 'DILEEP (DILP)' || pt === 'DILEEP (TUPAD)' || pt === 'SLP') return { singular: 'Project', plural: 'Projects' }
     return { singular: 'Project/Intervention', plural: 'Projects/Interventions' }
   }
+
+  // Full set of possible statuses for each Activity/Batch/Project/Training
+  // List's "X BY STATUS" breakdown -- pre-seeded at 0 so a status with no
+  // matching rows still shows up as its own row (e.g. "Planned: 0"), the same
+  // way the Participant List's own "by Program Type" breakdown pre-seeds
+  // every program via generateProgramAnalytics's allGroups. Deliberately not
+  // one shared list across every category -- each record type's own status
+  // enum differs (CDSP/SPES/TUPAD/CLPEP never have "Cancelled"; DILP/SLP/
+  // Skills Training do), so each list only names statuses that record type
+  // can genuinely have.
+  const CDSP_SESSION_STATUSES = ['Planned', 'Ongoing', 'Completed']
+  const SPES_BATCH_STATUSES = ['Planned', 'Ongoing', 'Completed']
+  const SKILLS_ACTIVITY_STATUSES = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+  // Livelihood's specific-program views use that program's own status set;
+  // the combined "All Programs" view mixes all four record types together,
+  // so it needs the union of every one of them instead.
+  const LIVELIHOOD_PROJECT_STATUSES: Record<string, string[]> = {
+    'DILEEP (DILP)': ['Planned', 'Ongoing', 'Completed', 'Cancelled'],
+    'DILEEP (TUPAD)': ['Planned', 'Ongoing', 'Completed'],
+    'SLP': ['Planned', 'Ongoing', 'Completed', 'Cancelled'],
+    'CLPEP': ['Planned', 'Ongoing', 'Completed'],
+  }
+  const LIVELIHOOD_ALL_PROJECT_STATUSES = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+  const getLivelihoodProjectStatuses = (programType: string): string[] =>
+    LIVELIHOOD_PROJECT_STATUSES[programType] ?? LIVELIHOOD_ALL_PROJECT_STATUSES
 
   const getReportColumns = (category: ReportCategory): string[] => {
     if (category === 'cdsp' && cdspReportType === 'sessions') return CDSP_SESSION_COLUMNS
@@ -961,7 +1012,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // General PESO Report — cross-program summary pulled LIVE from the backend
   // (/reports/summary), scoped to whichever programs the user picked in the
   // "Include Programs" selector. Unlike Employment Facilitation, this DOES get
-  // an on-screen preview (a per-program table + the usual Excel/CSV/PDF export
+  // an on-screen preview (a per-program table + the usual Excel/PDF export
   // menu) — only the Excel format is special-cased later, to carry a real
   // native chart instead of the generic ExcelJS table.
   const handleGenerateGeneralPesoReport = async () => {
@@ -1444,12 +1495,23 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // (e.g. "Career Development and Services Program (CDSP)"), matching the naming
   // convention used on the CDSP page itself — sourced from the `services` table
   // rather than hardcoded, so it stays correct if the program name ever changes.
+  // Spelled-out full program names for the categories whose display name
+  // elsewhere in the app (their own module page header) is otherwise just the
+  // bare abbreviation -- matches the exact wording gip.tsx/spes.tsx already
+  // use, so the report doesn't introduce a name found nowhere else in the app.
+  // Every other category (Livelihood, Skills Training, OFW Services, General
+  // PESO Report, Employment Facilitation) already IS its full descriptive
+  // name, not an abbreviation, so there's nothing to spell out for those.
+  const FULL_PROGRAM_NAMES: Partial<Record<ReportCategory, string>> = {
+    gip: 'Government Internship Program (GIP)',
+    spes: 'Special Program for Employment of Students (SPES)',
+  }
   const reportDisplayTitle = (categoryId: string, shortName?: string): string => {
     if (categoryId === 'cdsp' && cdspProgramInfo) return `${cdspProgramInfo.name} (${cdspProgramInfo.code})`
-    return shortName ?? ''
+    return FULL_PROGRAM_NAMES[categoryId as ReportCategory] ?? shortName ?? ''
   }
 
-  const handleExport = async (format: 'excel' | 'csv' | 'pdf') => {
+  const handleExport = async (format: 'excel' | 'pdf' | 'word') => {
     if (!generatedReport) return
     const filteredData = generatedReport.data.map((row: any) => {
       const f: any = {}
@@ -1559,8 +1621,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
         // it once a specific program is already selected avoids a redundant single
         // 100% bar. For Aging, byGroup means the aging BUCKETS instead, which stay
         // meaningful (and are what the native chart reads from) no matter which
-        // sub-service is selected -- so Aging always shows it.
-        const showBreakdown = isAgingReport || !hasProgramTypeFilter || !generatedReport.programType
+        // sub-service is selected -- so Aging always shows it. General PESO Report
+        // never shows it -- its Detailed Report IS one row per program already
+        // (Program / Participants / Male / Female / ...), so this would just repeat
+        // the same Program/Participants pair as its own extra table.
+        const showBreakdown = generatedReport.category !== 'general-peso' && (isAgingReport || !hasProgramTypeFilter || !generatedReport.programType)
         // Skills Training's/CDSP's Participant List and Aging Report both fall into
         // this same generic Summary sheet, so a bare "SKILLS TRAINING SUMMARY" /
         // "CDSP SUMMARY" title can't tell them apart -- Aging gets its own explicit suffix.
@@ -1569,6 +1634,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const aoa: any[][] = [
           [summaryTitle], [],
           ...(generatedReport.category === 'cdsp' && cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
+          // Unlike PDF/Word, Excel has no separate masthead outside this
+          // Summary sheet -- this row is the only place Report Period appears
+          // at all here, so (unlike those two) it's never actually redundant
+          // and always stays. (General PESO Report's own Excel export doesn't
+          // even reach this shared block -- it's built by a separate function
+          // in generalPesoReport.ts that patches its own hand-authored template.)
           ['Report Period', generatedReport.periodDetails],
           // Program Type filter only applies to CDSP/Livelihood; GIP/SPES have no such filter.
           ...(hasProgramTypeFilter ? [['Program Type', generatedReport.programType || (generatedReport.category === 'cdsp' ? cdspPrograms : livelihoodPrograms).join(', ')]] : []), [],
@@ -1587,17 +1658,22 @@ export default function ReportView({ onBack }: ReportViewProps) {
         // sex, feeding the Excel export's stacked-by-sex native bar chart below
         // (the on-screen/PDF bar charts stay single-series -- this table exists
         // purely as real cells for that one native chart to read from).
+        // sexTableCategoryStartRow only has meaning once the sex table above has
+        // actually been pushed (Aging Report only -- a.byGroupBySex doesn't even
+        // exist on a plain Participant/Activity/Batch List's analytics), so it's
+        // computed inside this same guard rather than unconditionally below.
+        let sexTableCategoryStartRow = 0
         if (isAgingSummary) {
           aoa.push(
             [], ['BENEFICIARIES BY STATUS AND SEX'], ['Status', 'Male', 'Female'],
             ...a.byGroupBySex.map((d: any) => [d.group, d.male, d.female]),
           )
+          // Same pattern as groupTableCategoryStartRow above, applied at this
+          // later point now that the sex table has actually been appended -- MUST
+          // be captured here, before anything else (e.g. the sub-service table
+          // below) appends further and throws off aoa.length.
+          sexTableCategoryStartRow = aoa.length - a.byGroupBySex.length + 1
         }
-        // Same pattern as groupTableCategoryStartRow above, applied at this
-        // later point now that the sex table has actually been appended -- MUST
-        // be captured here, before anything else (e.g. the sub-service table
-        // below) appends further and throws off aoa.length.
-        const sexTableCategoryStartRow = aoa.length - a.byGroupBySex.length + 1
         // CDSP Aging only: a plain text breakdown by sub-service (Career Coaching /
         // Pre-Employment Coaching / Labor Employment for Graduating Students) --
         // only meaningful with "All Programs" selected, same rule as showBreakdown
@@ -1666,6 +1742,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const totalActivities = rows.length
         const totalParticipants = rows.reduce((sum, r) => sum + (Number(r['Participants']) || 0), 0)
         const statusCounts: Record<string, number> = {}
+        CDSP_SESSION_STATUSES.forEach(s => { statusCounts[s] = 0 })
         const serviceCounts: Record<string, number> = {}
         rows.forEach(r => {
           const status = r['Status'] || 'Unspecified'
@@ -1735,6 +1812,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const totalBatches = rows.length
         const totalParticipants = rows.reduce((sum, r) => sum + (Number(r['Participants']) || 0), 0)
         const statusCounts: Record<string, number> = {}
+        SPES_BATCH_STATUSES.forEach(s => { statusCounts[s] = 0 })
         const employerCounts: Record<string, number> = {}
         rows.forEach(r => {
           const status = r['Status'] || 'Unspecified'
@@ -1774,6 +1852,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const totalProjects = rows.length
         const totalBeneficiaries = rows.reduce((sum, r) => sum + (Number(r['Beneficiaries Assigned']) || 0), 0)
         const statusCounts: Record<string, number> = {}
+        getLivelihoodProjectStatuses(generatedReport.programType).forEach(s => { statusCounts[s] = 0 })
         rows.forEach(r => {
           const status = r['Status'] || 'Unspecified'
           statusCounts[status] = (statusCounts[status] || 0) + 1
@@ -1817,6 +1896,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const totalTrainings = rows.length
         const totalParticipants = rows.reduce((sum, r) => sum + (Number(r['Participants']) || 0), 0)
         const statusCounts: Record<string, number> = {}
+        SKILLS_ACTIVITY_STATUSES.forEach(s => { statusCounts[s] = 0 })
         const batchCounts: Record<string, number> = {}
         rows.forEach(r => {
           const status = r['Status'] || 'Unspecified'
@@ -1889,6 +1969,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         )
       }
 
+      applyExcelFont(wb)
       const buf = await wb.xlsx.writeBuffer()
       const blob = agingChartOptions
         ? await graftAgingCharts(buf, agingChartOptions)
@@ -1896,17 +1977,190 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `${fileName}.xlsx`
+      link.style.display = 'none'
+      document.body.appendChild(link)
       link.click()
-      URL.revokeObjectURL(link.href)
+      setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
 
-    } else if (format === 'csv') {
-      // CSV is a flat, single-table format — unlike Excel it has no sheets/tabs to
-      // hold a separate summary, so it exports just the detailed data table.
-      const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(filteredData))
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    } else if (format === 'word') {
+      const isCdspSessions = generatedReport.category === 'cdsp' && generatedReport.cdspReportType === 'sessions'
+      const isGipBatches = generatedReport.category === 'gip' && generatedReport.gipReportType === 'batches'
+      const isSpesBatches = generatedReport.category === 'spes' && generatedReport.spesReportType === 'batches'
+      const isLivelihoodProjects = generatedReport.category === 'livelihood' && generatedReport.livelihoodReportType === 'projects'
+      const isSkillsActivities = generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'activities'
+
+      let summaryAoa: (string | number)[][] | undefined
+      const chartImages: { dataUrl: string; aspect: number; label: string }[] = []
+
+      // Same participant-program summary the Excel Summary sheet builds (see
+      // above) -- rebuilt fresh here since Word renders it as paragraphs/tables
+      // rather than worksheet rows, but it reads the exact same `analytics`
+      // object so the two exports can never disagree on the numbers.
+      if (generatedReport.analytics && ['cdsp', 'gip', 'spes', 'livelihood', 'skills-training', 'ofw-services', 'general-peso'].includes(generatedReport.category)) {
+        const a = generatedReport.analytics
+        const groupHeaderLabel = a.groupLabel.toUpperCase()
+        const groupColHeader = a.groupLabel.replace(/^Participants by /i, '').replace(/^Beneficiaries by /i, '')
+        const hasProgramTypeFilter = ['cdsp', 'livelihood'].includes(generatedReport.category)
+        // General PESO Report never shows this breakdown -- its Detailed Report
+        // IS one row per program already, so the table would just repeat the
+        // same Program/Participants pair as its own extra table.
+        const showBreakdown = generatedReport.category !== 'general-peso' && (isAgingReport || !hasProgramTypeFilter || !generatedReport.programType)
+        const isAgingSummary = isAgingReport
+        const summaryTitle = `${String(generatedReport.categoryName).toUpperCase()}${isAgingSummary ? ' AGING REPORT' : ''} SUMMARY`
+        const aoa: (string | number)[][] = [
+          [summaryTitle], [],
+          ...(generatedReport.category === 'cdsp' && cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
+          // Every category's Word export already shows "Report Period: X" in the
+          // masthead above this Summary section (see the "Report Period: " run
+          // right after the title in generateWordReport), so this row would
+          // always just repeat it -- left out entirely rather than only for
+          // General PESO Report.
+          ...(hasProgramTypeFilter ? [['Program Type', generatedReport.programType || (generatedReport.category === 'cdsp' ? cdspPrograms : livelihoodPrograms).join(', ')]] : []), [],
+          ['Total Participants', a.total],
+          ['Male', a.male],
+          ['Female', a.female], [],
+          ...(showBreakdown ? [[groupHeaderLabel], [groupColHeader, 'Participants'], ...a.byGroup.map((d: any) => [d.group, d.value])] : []),
+        ]
+        if (isAgingSummary) {
+          aoa.push([], ['BENEFICIARIES BY STATUS AND SEX'], ['Status', 'Male', 'Female'], ...a.byGroupBySex.map((d: any) => [d.group, d.male, d.female]))
+        }
+        if (isAgingSummary && generatedReport.category === 'cdsp' && !generatedReport.programType && a.byGroupBySubService?.length > 0) {
+          aoa.push([], ['BENEFICIARIES BY SUB-SERVICE'], ['Sub-Service', 'Participants'], ...a.byGroupBySubService.map((d: any) => [d.group, d.value]))
+        }
+        summaryAoa = aoa
+
+        // Chart images mirror exactly what the PDF export embeds for these same
+        // two cases (see the PDF branch below) -- same helper functions, same
+        // fixed aspect ratios (derived from each chart canvas's own fixed size).
+        if (generatedReport.category === 'general-peso') {
+          chartImages.push({ dataUrl: await createBarChartImage(a.barChartData), aspect: 0.5, label: 'Program Participation Summary' })
+          chartImages.push({ dataUrl: await createPieChartImage(a.pieChartData), aspect: 0.5556, label: 'Program Distribution' })
+        } else if (isAgingSummary) {
+          chartImages.push({ dataUrl: await createHorizontalBarChartImage(a.barChartData, '', '#0077BE'), aspect: 0.4375, label: 'Beneficiaries by Status' })
+          if (a.pieChartData?.length > 0) chartImages.push({ dataUrl: await createPieChartImage(a.pieChartData), aspect: 0.5556, label: 'Status Distribution' })
+        }
+      }
+
+      // CDSP Activity List / GIP Workplace List / SPES Batch List / Livelihood
+      // Project List / Skills Training Activity List summaries -- same counts
+      // as each category's own Excel Summary sheet block above, rebuilt fresh
+      // for the same reason as the participant summary above.
+      if (isCdspSessions) {
+        const rows = generatedReport.data as any[]
+        const statusCounts: Record<string, number> = {}
+        CDSP_SESSION_STATUSES.forEach(s => { statusCounts[s] = 0 })
+        const serviceCounts: Record<string, number> = {}
+        rows.forEach(r => {
+          statusCounts[r['Status'] || 'Unspecified'] = (statusCounts[r['Status'] || 'Unspecified'] || 0) + 1
+          serviceCounts[r['Service Type'] || 'Unspecified'] = (serviceCounts[r['Service Type'] || 'Unspecified'] || 0) + 1
+        })
+        summaryAoa = [
+          [`${String(generatedReport.categoryName).toUpperCase()} ACTIVITY LIST SUMMARY`], [],
+          ...(cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
+          // Word's masthead already shows "Report Period: X" above this Summary.
+          ['Program Type', generatedReport.programType || cdspPrograms.join(', ')], [],
+          ['Total Activities', rows.length],
+          ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
+          ['ACTIVITIES BY STATUS'], ['Status', 'Activities'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ['ACTIVITIES BY SERVICE TYPE'], ['Service Type', 'Activities'], ...Object.entries(serviceCounts).map(([k, v]) => [k, v]),
+        ]
+      } else if (isGipBatches) {
+        const rows = generatedReport.data as any[]
+        const officeCounts: Record<string, number> = {}
+        rows.forEach(r => { officeCounts[r['Assigned Office'] || 'Unspecified'] = (officeCounts[r['Assigned Office'] || 'Unspecified'] || 0) + 1 })
+        summaryAoa = [
+          [`${String(generatedReport.categoryName).toUpperCase()} WORKPLACE/OFFICE LIST SUMMARY`], [],
+          ['Total Workplaces/Offices', rows.length],
+          ['Total Interns', rows.reduce((s, r) => s + (Number(r['Interns']) || 0), 0)], [],
+          ['WORKPLACES/OFFICES BY ASSIGNED OFFICE'], ['Assigned Office', 'Workplaces/Offices'], ...Object.entries(officeCounts).map(([k, v]) => [k, v]),
+        ]
+      } else if (isSpesBatches) {
+        const rows = generatedReport.data as any[]
+        const statusCounts: Record<string, number> = {}
+        SPES_BATCH_STATUSES.forEach(s => { statusCounts[s] = 0 })
+        const employerCounts: Record<string, number> = {}
+        rows.forEach(r => {
+          statusCounts[r['Status'] || 'Unspecified'] = (statusCounts[r['Status'] || 'Unspecified'] || 0) + 1
+          employerCounts[r['Employer'] || 'Unspecified'] = (employerCounts[r['Employer'] || 'Unspecified'] || 0) + 1
+        })
+        summaryAoa = [
+          [`${String(generatedReport.categoryName).toUpperCase()} BATCH LIST SUMMARY`], [],
+          ['Total Batches', rows.length],
+          ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
+          ['BATCHES BY STATUS'], ['Status', 'Batches'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ['BATCHES BY EMPLOYER'], ['Employer', 'Batches'], ...Object.entries(employerCounts).map(([k, v]) => [k, v]),
+        ]
+      } else if (isLivelihoodProjects) {
+        const rows = generatedReport.data as any[]
+        const unit = livelihoodUnitLabel(generatedReport.programType)
+        const statusCounts: Record<string, number> = {}
+        getLivelihoodProjectStatuses(generatedReport.programType).forEach(s => { statusCounts[s] = 0 })
+        rows.forEach(r => { statusCounts[r['Status'] || 'Unspecified'] = (statusCounts[r['Status'] || 'Unspecified'] || 0) + 1 })
+        const showProgramBreakdown = !generatedReport.programType
+        const programCounts: Record<string, number> = {}
+        if (showProgramBreakdown) rows.forEach(r => { programCounts[r['Program Type'] || 'Unspecified'] = (programCounts[r['Program Type'] || 'Unspecified'] || 0) + 1 })
+        summaryAoa = [
+          [`${String(generatedReport.categoryName).toUpperCase()} ${unit.singular.toUpperCase()} LIST SUMMARY`], [],
+          ['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')], [],
+          [`Total ${unit.plural}`, rows.length],
+          ['Total Beneficiaries Assigned', rows.reduce((s, r) => s + (Number(r['Beneficiaries Assigned']) || 0), 0)], [],
+          [`${unit.plural.toUpperCase()} BY STATUS`], ['Status', 'Count'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]),
+          ...(showProgramBreakdown ? [[], [`${unit.plural.toUpperCase()} BY PROGRAM TYPE`], ['Program Type', 'Count'], ...Object.entries(programCounts).map(([k, v]) => [k, v])] : []),
+        ]
+      } else if (isSkillsActivities) {
+        const rows = generatedReport.data as any[]
+        const statusCounts: Record<string, number> = {}
+        SKILLS_ACTIVITY_STATUSES.forEach(s => { statusCounts[s] = 0 })
+        const batchCounts: Record<string, number> = {}
+        rows.forEach(r => {
+          statusCounts[r['Status'] || 'Unspecified'] = (statusCounts[r['Status'] || 'Unspecified'] || 0) + 1
+          batchCounts[r['Training Batch'] || 'Unspecified'] = (batchCounts[r['Training Batch'] || 'Unspecified'] || 0) + 1
+        })
+        summaryAoa = [
+          [`${String(generatedReport.categoryName).toUpperCase()} TRAINING LIST SUMMARY`], [],
+          ['Total Trainings', rows.length],
+          ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
+          ['TRAININGS BY STATUS'], ['Status', 'Trainings'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ['TRAININGS BY TRAINING BATCH'], ['Training Batch', 'Trainings'], ...Object.entries(batchCounts).map(([k, v]) => [k, v]),
+        ]
+      }
+
+      // Aging Report: same "Placed" / "Not Yet Placed" split as the Excel
+      // export's own two subsheets, built from the same field-based filters.
+      let extraTables: { title: string; columns: string[]; rows: Record<string, any>[]; cellFill?: (col: string, row: any) => string | undefined }[] | undefined
+      // Colors the "Time Since Completion" cell by its aging bucket -- same
+      // highlight Excel/PDF already apply to that column.
+      const agingCellFill = (col: string, row: any) => col === 'Time Since Completion' ? AGING_BUCKET_COLORS[row._agingBucket] : undefined
+      if (isAgingReport) {
+        const isCdspAging = generatedReport.category === 'cdsp'
+        const isGipAging = generatedReport.category === 'gip'
+        const lastCompletedCol = isCdspAging ? 'Last Completed Activity' : isGipAging ? 'Last Completed Workplace/Office' : 'Last Completed Training'
+        const extraCols = isCdspAging ? ['Sub-Service', 'Activities Completed'] : isGipAging ? [] : ['Trainings Completed']
+        const buildSubset = (wantedCols: string[], filterFn: (row: any) => boolean) => {
+          const subsetCols = wantedCols.filter(c => visibleColumns[c])
+          const subsetRows = (generatedReport.data as any[]).filter(filterFn).map((row: any, i: number) => ({ ...row, 'No.': i + 1 }))
+          return { columns: ['No.', ...subsetCols], rows: subsetRows }
+        }
+        const placed = buildSubset(['Participant Name', ...extraCols, lastCompletedCol, 'Completed Date', 'Job Title', 'Employer', 'Date Hired'], (row: any) => row['Employment Status'] === 'Placed')
+        const notPlaced = buildSubset(['Participant Name', ...extraCols, lastCompletedCol, 'Completed Date', 'Time Since Completion'], (row: any) => row['Employment Status'] === 'Not Yet Placed')
+        extraTables = [
+          { title: 'Placed', columns: placed.columns, rows: placed.rows },
+          { title: 'Not Yet Placed', columns: notPlaced.columns, rows: notPlaced.rows, cellFill: agingCellFill },
+        ]
+      }
+
+      const cols = generatedReport.columns.filter((c: string) => visibleColumns[c])
+      const blob = await generateWordReport({
+        title: reportDisplayTitle(generatedReport.category, generatedReport.categoryName) || generatedReport.categoryName,
+        periodDetails: generatedReport.periodDetails,
+        summaryAoa,
+        chartImages: chartImages.length > 0 ? chartImages : undefined,
+        detailed: { title: 'Detailed Report', columns: cols, rows: filteredData, cellFill: isAgingReport ? agingCellFill : undefined },
+        extraTables,
+      })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `${fileName}.csv`
+      link.download = `${fileName}.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -1916,10 +2170,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
       // Wide tables (many visible columns) don't fit a Folio portrait page, so
       // switch to landscape whenever the columns need more room than portrait
       // can offer (usable width = page width minus 14mm margin on each side).
+      // General PESO Report only has 6 columns (narrow enough for portrait by
+      // that measure alone), but it's always forced to landscape regardless --
+      // the Excel and Word exports are unconditionally landscape, and this one
+      // also carries two side-by-side charts that need the extra width.
       const visibleColsForOrientation = generatedReport.columns.filter((c: string) => visibleColumns[c])
       const MIN_COL_WIDTH_MM = 22
       const orientation: 'portrait' | 'landscape' =
-        visibleColsForOrientation.length * MIN_COL_WIDTH_MM > FOLIO_MM[0] - 28 ? 'landscape' : 'portrait'
+        generatedReport.category === 'general-peso' || visibleColsForOrientation.length * MIN_COL_WIDTH_MM > FOLIO_MM[0] - 28 ? 'landscape' : 'portrait'
       const format: [number, number] = orientation === 'landscape' ? [FOLIO_MM[1], FOLIO_MM[0]] : FOLIO_MM
       const doc = new jsPDF({ orientation, format })
       registerPdfFont(doc)
@@ -1928,6 +2186,27 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const centerX = pageWidth / 2
       const usableWidth = pageWidth - 28 // 14mm margin on each side
       let y = 20
+      // Draws a plain bordered table for a run of "label: value" or "category:
+      // count" rows -- mirrors the Word export's own conversion of these same
+      // rows into small tables (see aoaToElements in wordReport.ts) so the PDF
+      // summary sections look the same instead of being plain unbordered text
+      // lines. An optional bold header row (white background, black text, same
+      // as the Detailed Report table below) is used for the breakdown tables.
+      // Returns the y position just below the table jspdf-autotable drew.
+      const drawSummaryTable = (rows: (string | number)[][], startY: number, head?: (string | number)[]): number => {
+        autoTable(doc, {
+          startY,
+          head: head ? [head] : undefined,
+          body: rows,
+          theme: 'grid',
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 10, font: PDF_FONT_FAMILY },
+          bodyStyles: { textColor: [0, 0, 0] },
+          styles: { font: PDF_FONT_FAMILY, fontSize: 10, lineColor: [0, 0, 0], lineWidth: 0.1, cellPadding: 2 },
+          margin: { left: 14, right: 14 },
+          tableWidth: usableWidth,
+        })
+        return ((doc as any).lastAutoTable?.finalY ?? startY) + 6
+      }
       // Title shows the spelled-out program name alongside its abbreviation for CDSP
       // (e.g. "Career Development and Services Program (CDSP)") — long titles get a
       // smaller font and wrap across lines instead of running off the page edge.
@@ -1936,22 +2215,36 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.setFontSize(titleFontSize); doc.setFont(PDF_FONT_FAMILY, 'bold')
       const titleLines = doc.splitTextToSize(pdfTitle, usableWidth)
       titleLines.forEach((line: string) => { doc.text(line, centerX, y, { align: 'center' }); y += titleFontSize * 0.5 })
-      y += 4
+      y += 1
       doc.setFontSize(11); doc.setFont(PDF_FONT_FAMILY, 'normal')
       doc.text(`Report Period: ${generatedReport.periodDetails}`, centerX, y, { align: 'center' }); y += 15
 
       if (generatedReport.category === 'general-peso' && generatedReport.analytics) {
         const a = generatedReport.analytics
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        doc.text(`Total Participants: ${a.total}`, 14, y)
-        doc.text(`Male: ${a.male}`, 90, y)
-        doc.text(`Female: ${a.female}`, 140, y); y += 10
+        y = drawSummaryTable([['Total Participants', a.total], ['Male', a.male], ['Female', a.female]], y)
+        y += 10
+
+        // Side by side at half width each, same as the Aging Report's charts
+        // below -- a full-width chart (sized proportionally to usableWidth)
+        // used to fit fine back when this report was portrait, but forcing
+        // landscape for paper-size parity made usableWidth much wider and the
+        // page itself much shorter, so the old full-width stacked bar+pie no
+        // longer fit: the pie chart was being drawn past the bottom edge of
+        // the page and never appearing in the output at all.
+        const chartGap = 8
+        const halfWidth = (usableWidth - chartGap) / 2
+        const chartsBlockHeight = 6 + halfWidth * 0.5556
+        if (y + chartsBlockHeight > pageHeight - 20) { doc.addPage(); y = 20 }
+        const pieX = 14 + halfWidth + chartGap
+        const labelY = y
         doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text('Program Participation Summary', 14, y); y += 6
-        doc.addImage(await createBarChartImage(generatedReport.analytics.barChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5); y += usableWidth * 0.5 + 2
-        doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text('Program Distribution', 14, y); y += 6
-        doc.addImage(await createPieChartImage(generatedReport.analytics.pieChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5556); y += usableWidth * 0.5556 + 2
+        doc.text('Program Participation Summary', 14 + halfWidth / 2, labelY, { align: 'center' })
+        doc.text('Program Distribution', pieX + halfWidth / 2, labelY, { align: 'center' })
+        y += 6
+        doc.addImage(await createBarChartImage(a.barChartData), 'PNG', 14, y, halfWidth, halfWidth * 0.5)
+        doc.addImage(await createPieChartImage(a.pieChartData), 'PNG', pieX, y, halfWidth, halfWidth * 0.5556)
+        y += halfWidth * 0.5556 + 12
+
         doc.addPage(); y = 20
         doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Detailed Report', 14, y); y += 6
@@ -1960,12 +2253,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const s = generatedReport.analytics.summary
         doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Labor Market Information Summary', 14, y); y += 6
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        doc.text(`Total Applicants: ${s.totalApplicants}`, 14, y)
-        doc.text(`Total Vacancies: ${s.totalVacancies}`, 75, y)
-        doc.text(`Total Referrals: ${s.totalReferrals}`, 136, y); y += 5
-        doc.text(`Total Placements: ${s.totalPlacements}`, 14, y)
-        doc.text(`Placement Rate: ${s.placementRate}%`, 75, y); y += 10
+        y = drawSummaryTable([
+          ['Total Applicants', s.totalApplicants], ['Total Vacancies', s.totalVacancies],
+          ['Total Referrals', s.totalReferrals], ['Total Placements', s.totalPlacements],
+          ['Placement Rate', `${s.placementRate}%`],
+        ], y)
         doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Placements Per Month', 14, y); y += 6
         doc.addImage(await createHorizontalBarChartImage(generatedReport.analytics.placementsPerMonth, '', '#10B981'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
@@ -1984,28 +2276,68 @@ export default function ReportView({ onBack }: ReportViewProps) {
         doc.text('Detailed Employment Facilitation Report', 14, y); y += 6
 
       } else if (isAgingReport && generatedReport.analytics) {
+        // Matches the Excel/Word Summary exactly (same fields, same order) --
+        // this branch used to build its own bare-bones summary (just a Total/
+        // Placed/Not Yet Placed table) instead of reusing that shape, so it was
+        // missing the Program/Report Period/Program Type info table and the
+        // Status / Status-and-Sex breakdown tables Excel/Word both show.
         const a = generatedReport.analytics
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        doc.text(`Total Beneficiaries: ${a.total}`, 14, y)
-        doc.text(`Placed: ${a.placedCount}`, 90, y)
-        doc.text(`Not Yet Placed: ${a.notPlacedCount}`, 140, y); y += 10
-        doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text('Beneficiaries by Status', 14, y); y += 6
-        doc.addImage(await createHorizontalBarChartImage(a.barChartData, '', '#0077BE'), 'PNG', 14, y, usableWidth, usableWidth * 0.4375); y += usableWidth * 0.4375 + 2
-        if (a.pieChartData.length > 0) {
-          doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
-          doc.text('Status Distribution', 14, y); y += 6
-          doc.addImage(await createPieChartImage(a.pieChartData), 'PNG', 14, y, usableWidth, usableWidth * 0.5556); y += usableWidth * 0.5556 + 2
-        }
-        // CDSP Aging only, "All Programs" only -- matches the Excel Summary sheet's
-        // own "BENEFICIARIES BY SUB-SERVICE" table.
+        const hasProgramTypeFilter = generatedReport.category === 'cdsp'
+        doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text(`${String(generatedReport.categoryName).toUpperCase()} AGING REPORT SUMMARY`, 14, y); y += 8
+
+        // The masthead above already shows "Report Period: X" for every
+        // category, so it's left out of this info table entirely.
+        const infoRows: (string | number)[][] = []
+        if (generatedReport.category === 'cdsp' && cdspProgramInfo) infoRows.push(['Program', reportDisplayTitle('cdsp')])
+        if (hasProgramTypeFilter) infoRows.push(['Program Type', generatedReport.programType || cdspPrograms.join(', ')])
+        if (infoRows.length > 0) y = drawSummaryTable(infoRows, y)
+        y = drawSummaryTable([['Total Participants', a.total], ['Male', a.male], ['Female', a.female]], y)
+
+        const groupColHeader = a.groupLabel.replace(/^Participants by /i, '').replace(/^Beneficiaries by /i, '')
+        y += 4
+        doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text(a.groupLabel.toUpperCase(), 14, y); y += 3
+        y = drawSummaryTable(a.byGroup.map((d: any) => [d.group, d.value]), y, [groupColHeader, 'Participants'])
+
+        y += 4
+        doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text('BENEFICIARIES BY STATUS AND SEX', 14, y); y += 3
+        y = drawSummaryTable(a.byGroupBySex.map((d: any) => [d.group, d.male, d.female]), y, ['Status', 'Male', 'Female'])
+
+        // CDSP Aging only, "All Programs" only -- matches the Excel/Word Summary's
+        // own "BENEFICIARIES BY SUB-SERVICE" table. Drawn here, before the page
+        // break below, so it stays part of the summary page instead of
+        // splitting the charts across two pages the way it used to.
         if (generatedReport.category === 'cdsp' && !generatedReport.programType && a.byGroupBySubService?.length > 0) {
+          y += 4
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-          doc.text('Beneficiaries by Sub-Service', 14, y); y += 6
-          doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-          a.byGroupBySubService.forEach((d: any) => { doc.text(`${d.group}: ${d.value}`, 14, y); y += 5 })
-          y += 3
+          doc.text('BENEFICIARIES BY SUB-SERVICE', 14, y); y += 3
+          y = drawSummaryTable(a.byGroupBySubService.map((d: any) => [d.group, d.value]), y, ['Sub-Service', 'Participants'])
         }
+
+        // Side by side at half width each instead of full-width stacked -- a
+        // full-width chart image used to be tall enough on its own to spill
+        // the second chart onto a third page. Only break to a new page if the
+        // summary above didn't leave enough room for both charts, rather than
+        // always forcing one -- an unconditional break was landing the charts
+        // on page 3 once the fuller summary above (added for Excel/Word parity)
+        // pushed past a full page on its own.
+        const chartGap = 8
+        const halfWidth = (usableWidth - chartGap) / 2
+        const chartsBlockHeight = 6 + halfWidth * 0.5556
+        if (y + chartsBlockHeight > pageHeight - 20) { doc.addPage(); y = 20 }
+        const pieX = 14 + halfWidth + chartGap
+        const labelY = y
+        doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
+        doc.text('Beneficiaries by Status', 14 + halfWidth / 2, labelY, { align: 'center' })
+        if (a.pieChartData.length > 0) doc.text('Status Distribution', pieX + halfWidth / 2, labelY, { align: 'center' })
+        y += 6
+        doc.addImage(await createHorizontalBarChartImage(a.barChartData, '', '#0077BE'), 'PNG', 14, y, halfWidth, halfWidth * 0.4375)
+        if (a.pieChartData.length > 0) {
+          doc.addImage(await createPieChartImage(a.pieChartData), 'PNG', pieX, y, halfWidth, halfWidth * 0.5556)
+        }
+
         doc.addPage(); y = 20
         doc.setFontSize(14); doc.setFont(PDF_FONT_FAMILY, 'bold')
         doc.text('Detailed Report', 14, y); y += 6
@@ -2017,33 +2349,28 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const a = generatedReport.analytics
         const hasProgramTypeFilter = ['cdsp', 'livelihood'].includes(generatedReport.category)
         doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text(`${generatedReport.categoryName} Summary`, 14, y); y += 8
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        if (generatedReport.category === 'cdsp' && cdspProgramInfo) {
-          doc.text(`Program: ${reportDisplayTitle('cdsp')}`, 14, y); y += 5
-        }
-        doc.text(`Report Period: ${generatedReport.periodDetails}`, 14, y); y += 5
+        doc.text(`${String(generatedReport.categoryName).toUpperCase()} SUMMARY`, 14, y); y += 8
+
+        // The masthead above already shows "Report Period: X" for every
+        // category, so it's left out of this info table entirely.
+        const infoRows: (string | number)[][] = []
+        if (generatedReport.category === 'cdsp' && cdspProgramInfo) infoRows.push(['Program', reportDisplayTitle('cdsp')])
         // Program Type filter only applies to CDSP/Livelihood; GIP/SPES have no such filter.
         if (hasProgramTypeFilter) {
           const progList = generatedReport.category === 'cdsp' ? cdspPrograms : livelihoodPrograms
-          doc.text(`Program Type: ${generatedReport.programType || progList.join(', ')}`, 14, y); y += 5
+          infoRows.push(['Program Type', generatedReport.programType || progList.join(', ')])
         }
-        y += 3
-        doc.text(`Total Participants: ${a.total}`, 14, y)
-        doc.text(`Male: ${a.male}`, 90, y)
-        doc.text(`Female: ${a.female}`, 140, y); y += 10
+        if (infoRows.length > 0) y = drawSummaryTable(infoRows, y)
+        y = drawSummaryTable([['Total Participants', a.total], ['Male', a.male], ['Female', a.female]], y)
 
         // Breakdown by program is only meaningful when viewing all programs — see
-        // matching note on the on-screen summary and Excel/CSV exports.
+        // matching note on the on-screen summary and Excel/Word export.
         if (!hasProgramTypeFilter || !generatedReport.programType) {
+          y += 4
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-          doc.text(a.groupLabel, 14, y); y += 6
-          doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-          a.byGroup.forEach((d: any) => {
-            if (y > pageHeight - 20) { doc.addPage(); y = 20 } // long lists (e.g. many Assigned Offices) paginate instead of running off the page
-            doc.text(`${d.group}: ${d.value}`, 14, y); y += 5
-          })
-          y += 3
+          doc.text(a.groupLabel.toUpperCase(), 14, y); y += 3
+          const groupColHeader = a.groupLabel.replace(/^Participants by /i, '').replace(/^Beneficiaries by /i, '')
+          y = drawSummaryTable(a.byGroup.map((d: any) => [d.group, d.value]), y, [groupColHeader, 'Participants'])
         }
 
         doc.addPage(); y = 20
@@ -2083,6 +2410,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const totalUnits = rows.length
         const totalParticipants = rows.reduce((sum, r) => sum + (Number(r[participantsCol]) || 0), 0)
         const statusCounts: Record<string, number> = {}
+        // GIP has no status breakdown at all (skipped below via !isGip), so its
+        // seed list is moot -- left empty rather than naming a status set it
+        // doesn't have.
+        const statusList = isCdsp ? CDSP_SESSION_STATUSES
+          : isLivelihoodProjects ? getLivelihoodProjectStatuses(generatedReport.programType)
+          : isSkillsActivities ? SKILLS_ACTIVITY_STATUSES
+          : isGip ? [] : SPES_BATCH_STATUSES
+        statusList.forEach(s => { statusCounts[s] = 0 })
         const secondaryCounts: Record<string, number> = {}
         rows.forEach(r => {
           const status = r['Status'] || 'Unspecified'
@@ -2094,43 +2429,33 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
 
         doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-        doc.text(`${generatedReport.categoryName} ${unitSingular} List Summary`, 14, y); y += 8
-        doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-        if (isCdsp && cdspProgramInfo) {
-          doc.text(`Program: ${reportDisplayTitle('cdsp')}`, 14, y); y += 5
-        }
-        doc.text(`Report Period: ${generatedReport.periodDetails}`, 14, y); y += 5
-        if (isCdsp) {
-          doc.text(`Program Type: ${generatedReport.programType || cdspPrograms.join(', ')}`, 14, y); y += 5
-        } else if (isLivelihoodProjects) {
-          doc.text(`Program Type: ${generatedReport.programType || livelihoodPrograms.join(', ')}`, 14, y); y += 5
-        }
-        y += 3
-        doc.text(`Total ${unitPlural}: ${totalUnits}`, 14, y)
-        doc.text(`Total ${isLivelihoodProjects ? 'Beneficiaries' : isGip ? 'Interns' : 'Participants'}: ${totalParticipants}`, 90, y); y += 10
+        doc.text(`${String(generatedReport.categoryName).toUpperCase()} ${unitSingular.toUpperCase()} LIST SUMMARY`, 14, y); y += 8
 
-        // Workplaces have no status of their own (see the Excel summary
+        // The masthead above already shows "Report Period: X" for every
+        // category, so it's left out of this info table entirely.
+        const infoRows: (string | number)[][] = []
+        if (isCdsp && cdspProgramInfo) infoRows.push(['Program', reportDisplayTitle('cdsp')])
+        if (isCdsp) infoRows.push(['Program Type', generatedReport.programType || cdspPrograms.join(', ')])
+        else if (isLivelihoodProjects) infoRows.push(['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')])
+        if (infoRows.length > 0) y = drawSummaryTable(infoRows, y)
+
+        const totalsLabel = isLivelihoodProjects ? 'Beneficiaries' : isGip ? 'Interns' : 'Participants'
+        y = drawSummaryTable([[`Total ${unitPlural}`, totalUnits], [`Total ${totalsLabel}`, totalParticipants]], y)
+
+        // Workplaces have no status of their own (see the Excel/Word summary
         // above) -- skip this breakdown for GIP.
         if (!isGip) {
+          y += 4
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-          doc.text(`${unitPlural} by Status`, 14, y); y += 6
-          doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-          Object.entries(statusCounts).forEach(([k, v]) => {
-            if (y > pageHeight - 20) { doc.addPage(); y = 20 }
-            doc.text(`${k}: ${v}`, 14, y); y += 5
-          })
-          y += 3
+          doc.text(`${unitPlural.toUpperCase()} BY STATUS`, 14, y); y += 3
+          y = drawSummaryTable(Object.entries(statusCounts), y, ['Status', unitPlural])
         }
 
         if (showSecondaryBreakdown) {
+          y += 4
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
-          doc.text(`${unitPlural} by ${secondaryCol}`, 14, y); y += 6
-          doc.setFontSize(10); doc.setFont(PDF_FONT_FAMILY, 'normal')
-          Object.entries(secondaryCounts).forEach(([k, v]) => {
-            if (y > pageHeight - 20) { doc.addPage(); y = 20 }
-            doc.text(`${k}: ${v}`, 14, y); y += 5
-          })
-          y += 3
+          doc.text(`${unitPlural.toUpperCase()} BY ${secondaryCol.toUpperCase()}`, 14, y); y += 3
+          y = drawSummaryTable(Object.entries(secondaryCounts), y, [secondaryCol, unitPlural])
         }
 
         doc.addPage(); y = 20
@@ -2157,12 +2482,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
         head: [visibleCols],
         body: bodyRows,
         theme: 'grid',
-        headStyles: { fillColor: [0, 119, 190], textColor: 255, fontStyle: 'bold', fontSize: tableFontSize + 1, font: PDF_FONT_FAMILY },
-        bodyStyles: { fontSize: tableFontSize, font: PDF_FONT_FAMILY },
+        // Plain white header with bold black text and black borders throughout,
+        // matching the Word export's table styling.
+        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: tableFontSize + 1, font: PDF_FONT_FAMILY },
+        bodyStyles: { fontSize: tableFontSize, font: PDF_FONT_FAMILY, textColor: [0, 0, 0] },
         margin: { left: 14, right: 14 },
         tableWidth: usableWidth,
         columnStyles,
-        styles: { overflow: 'linebreak', font: PDF_FONT_FAMILY },
+        styles: { overflow: 'linebreak', font: PDF_FONT_FAMILY, lineColor: [0, 0, 0], lineWidth: 0.1 },
         // Aging Report only: color the "Time Since Completion" cell by its bucket,
         // matching the on-screen table and Excel export.
         didParseCell: agingTimeColIdx < 0 ? undefined : (data) => {
@@ -2183,12 +2510,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   // Downloads the participant roster for a single CDSP session (Activity List
   // row-level action) — mirrors PESO's own convention of context-before-data
-  // with an activity-info header block above the table. Excel uses ExcelJS
-  // (not the plain CSV/xlsx-utils path used elsewhere) specifically so the
-  // Contact Number column can be forced to a text cell type — a plain CSV/SheetJS
-  // roundtrip auto-detects long digit strings as numbers, which Excel then
-  // displays in scientific notation (e.g. "9.88E+08") once reopened.
-  const handleExportSessionRoster = async (activityId: number, format: 'excel' | 'pdf' | 'csv') => {
+  // with an activity-info header block above the table. Excel uses ExcelJS so
+  // the Contact Number column can be forced to a text cell type — otherwise
+  // Excel auto-detects long digit strings as numbers and displays them in
+  // scientific notation (e.g. "9.88E+08") once reopened.
+  const handleExportSessionRoster = async (activityId: number, format: 'excel' | 'pdf' | 'word') => {
     const activity = cdspActivities.find(act => act.id === activityId)
     if (!activity) return
     const roster = cdspApplicants
@@ -2221,19 +2547,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.save(`CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`)
       return
     }
-    if (format === 'csv') {
-      const csv = buildRosterCsv('CDSP PARTICIPANT LIST', infoLines, headerLabels, roster)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    if (format === 'word') {
+      const blob = await generateWordRoster('CDSP PARTICIPANT LIST', infoLines, headerLabels, roster)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.csv`
+      link.download = `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
       return
     }
-
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Attendees')
     const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
@@ -2286,13 +2610,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
       ws.getColumn(i + 1).width = Math.min(Math.max(maxLen + 2, 10), 40)
     })
 
+    applyExcelFont(wb)
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
   // Downloads the intern list for a single GIP workplace/office (Workplace
@@ -2301,7 +2628,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // Excel), adapted to workplace/intern terminology: a workplace info block
   // (Assigned Office, Workplace/Office Address, Coordinator, Supervisor, Allowance)
   // instead of an activity info block (Venue, Facilitator, Counselor).
-  const handleExportBatchInterns = async (workplaceId: number, format: 'excel' | 'pdf' | 'csv') => {
+  const handleExportBatchInterns = async (workplaceId: number, format: 'excel' | 'pdf' | 'word') => {
     const workplace = gipWorkplaces.find(w => w.id === workplaceId)
     if (!workplace) return
     const interns = gipApplicants
@@ -2335,19 +2662,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.save(`GIP_Interns_${safeName}_${exportDate}.pdf`)
       return
     }
-    if (format === 'csv') {
-      const csv = buildRosterCsv('GIP INTERN LIST', infoLines, headerLabels, interns)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    if (format === 'word') {
+      const blob = await generateWordRoster('GIP INTERN LIST', infoLines, headerLabels, interns)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `GIP_Interns_${safeName}_${exportDate}.csv`
+      link.download = `GIP_Interns_${safeName}_${exportDate}.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
       return
     }
-
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Interns')
     const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
@@ -2391,13 +2716,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
       ws.getColumn(i + 1).width = Math.min(Math.max(maxLen + 2, 10), 40)
     })
 
+    applyExcelFont(wb)
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `GIP_Interns_${safeName}_${exportDate}.xlsx`
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
   // Downloads the student list for a single SPES batch (Batch List row-level
@@ -2405,7 +2733,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // SPES's own batch shape: Employer instead of Assigned Office, Coordinator
   // (a real SPES field, unlike GIP's), Total Slots/Funding Source instead
   // of Supervisor/Allowance (SPES has no per-batch allowance field).
-  const handleExportBatchStudents = async (batchId: number, format: 'excel' | 'pdf' | 'csv') => {
+  const handleExportBatchStudents = async (batchId: number, format: 'excel' | 'pdf' | 'word') => {
     const batch = spesBatches.find(b => b.id === batchId)
     if (!batch) return
     const students = spesApplicants
@@ -2440,19 +2768,17 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.save(`SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.pdf`)
       return
     }
-    if (format === 'csv') {
-      const csv = buildRosterCsv('SPES STUDENT LIST', infoLines, headerLabels, students)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    if (format === 'word') {
+      const blob = await generateWordRoster('SPES STUDENT LIST', infoLines, headerLabels, students)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.csv`
+      link.download = `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
       return
     }
-
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Students')
     const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
@@ -2496,13 +2822,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
       ws.getColumn(i + 1).width = Math.min(Math.max(maxLen + 2, 10), 40)
     })
 
+    applyExcelFont(wb)
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.xlsx`
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
   // Shared ExcelJS roster workbook builder (title + centered info block + bordered
@@ -2518,6 +2847,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
     headerLabels: string[],
     rows: (string | number)[][],
     textColIndex?: number,
+    // Only the Skills Training roster's Attendance column uses this (green/red
+    // by Present/Absent) -- same 0-based-index shape as buildRosterPdf's.
+    cellFill?: (colIndex: number, row: (string | number)[]) => string | undefined,
   ): ExcelJS.Workbook => {
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet(sheetName)
@@ -2553,7 +2885,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
     })
     rows.forEach(r => {
       const row = ws.addRow(r)
-      row.eachCell(cell => { cell.border = BORDERS; cell.alignment = { vertical: 'middle' } })
+      row.eachCell((cell, colIdx) => {
+        cell.border = BORDERS; cell.alignment = { vertical: 'middle' }
+        const fillColor = cellFill?.(colIdx - 1, r)
+        if (fillColor) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${fillColor.replace('#', '')}` } }
+          cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
+        }
+      })
       if (textColIndex) row.getCell(textColIndex).numFmt = '@'
     })
     headerLabels.forEach((label, i) => {
@@ -2562,6 +2901,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       ws.getColumn(i + 1).width = Math.min(Math.max(maxLen + 2, 10), 40)
     })
 
+    applyExcelFont(wb)
     return wb
   }
 
@@ -2571,7 +2911,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // (unlike those three, which each belong to a single context) since DILP/TUPAD/
   // SLP/CLPEP each have their own id sequence -- project id 1 could be a DILP
   // project, a TUPAD project, an SLP project, and a CLPEP intervention all at once.
-  const handleExportProjectBeneficiaries = async (projectId: number, program: string, format: 'excel' | 'pdf' | 'csv') => {
+  const handleExportProjectBeneficiaries = async (projectId: number, program: string, format: 'excel' | 'pdf' | 'word') => {
     let projectTitle: string
     let unit = 'Project'
     let infoLines: { label: string; value: string | number }[][]
@@ -2649,34 +2989,34 @@ export default function ReportView({ onBack }: ReportViewProps) {
       doc.save(`Livelihood_${safeTitle}_Beneficiaries.pdf`)
       return
     }
-    if (format === 'csv') {
-      const csv = buildRosterCsv(title, infoLines, headerLabels, roster)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    if (format === 'word') {
+      const blob = await generateWordRoster(title, infoLines, headerLabels, roster)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `Livelihood_${safeTitle}_Beneficiaries.csv`
+      link.download = `Livelihood_${safeTitle}_Beneficiaries.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
       return
     }
-
     const wb = buildRosterWorkbook('Beneficiaries', title, infoLines, headerLabels, roster, 6)
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `Livelihood_${safeTitle}_Beneficiaries.xlsx`
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
   // Downloads the participant list for a single Skills Training activity
   // (Training List row-level action) -- same shape/technique as
   // handleExportSessionRoster, adapted to Skills Training's own fields (no
   // separate Highest Education/Employment Status the way CDSP's roster has).
-  const handleExportTrainingParticipants = async (activityId: number, format: 'excel' | 'pdf' | 'csv') => {
+  const handleExportTrainingParticipants = async (activityId: number, format: 'excel' | 'pdf' | 'word') => {
     const activity = skillsActivities.find(act => act.id === activityId)
     if (!activity) return
     const participants = skillsProfiles
@@ -2688,12 +3028,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
         p.age || '-',
         p.contactNumber || '-',
         p.civilStatus || '-',
+        // Only meaningful once the training itself is Completed -- attendance
+        // isn't taken yet for a Planned/Ongoing training, so this would
+        // otherwise misleadingly show everyone as "Present" by default.
+        activity.status === 'Completed' ? (p.assignedTrainingStatus === 'Absent' ? 'Absent' : 'Present') : '-',
       ])
     if (participants.length === 0) {
       setInfoModal({ isOpen: true, title: 'No Participants', message: 'This training has no participants assigned yet.' })
       return
     }
-    const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'Civil Status']
+    const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'Civil Status', 'Attendance']
     const infoLines: { label: string; value: string | number }[][] = [
       [{ label: 'Training: ', value: activity.title || '-' }],
       [{ label: 'Training Batch: ', value: activity.service || '-' }],
@@ -2702,33 +3046,39 @@ export default function ReportView({ onBack }: ReportViewProps) {
       [{ label: 'Total Participants: ', value: participants.length }],
     ]
     const safeTitle = (activity.title || 'Training').replace(/[^a-z0-9]+/gi, '_')
+    // Attendance is the last column -- green for Present, red for Absent
+    // (same palette AGING_BUCKET_COLORS already uses for its own green/red
+    // buckets), no fill for the "-" placeholder before a training is Completed.
+    const attendanceColIndex = headerLabels.length - 1
+    const attendanceCellFill = (colIndex: number, row: (string | number)[]) =>
+      colIndex === attendanceColIndex ? (row[attendanceColIndex] === 'Present' ? '#10B981' : row[attendanceColIndex] === 'Absent' ? '#EF4444' : undefined) : undefined
 
     if (format === 'pdf') {
-      const doc = buildRosterPdf('SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants)
+      const doc = buildRosterPdf('SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants, attendanceCellFill)
       doc.save(`SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`)
       return
     }
-    if (format === 'csv') {
-      const csv = buildRosterCsv('SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    if (format === 'word') {
+      const blob = await generateWordRoster('SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants, attendanceCellFill)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.csv`
+      link.download = `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.docx`
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
       return
     }
-
-    const wb = buildRosterWorkbook('Participants', 'SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants, 5)
+    const wb = buildRosterWorkbook('Participants', 'SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants, 5, attendanceCellFill)
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
   const handleCategoryChange = (category: string) => {
@@ -3308,7 +3658,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const isSkillsActivities = generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'activities'
         const showRowAction = isCdspSessions || isGipBatches || isSpesBatches || isLivelihoodProjects || isSkillsActivities
         const rowExportLabel = isCdspSessions ? 'Export Attendees' : isGipBatches ? 'Export Interns' : isSpesBatches ? 'Export Students' : isLivelihoodProjects ? 'Export Beneficiaries' : 'Export Trainees'
-        const runRowExport = (fmt: 'excel' | 'pdf' | 'csv') => {
+        const runRowExport = (fmt: 'excel' | 'pdf' | 'word') => {
           if (rowExportMenuId === null) return
           if (isCdspSessions) handleExportSessionRoster(rowExportMenuId, fmt)
           else if (isGipBatches) handleExportBatchInterns(rowExportMenuId, fmt)
@@ -3356,7 +3706,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                   <div className="fixed inset-0 z-40" onClick={() => setIsExportMenuOpen(false)} />
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-1">
                     <button onClick={() => handleExport('excel')} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50">Excel (.xlsx)</button>
-                    <button onClick={() => handleExport('csv')} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50">CSV (.csv)</button>
+                    <button onClick={async () => await handleExport('word')} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50">Word (.docx)</button>
                     <button onClick={async () => await handleExport('pdf')} className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50">PDF (.pdf)</button>
                   </div>
                 </>}
@@ -3388,7 +3738,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                               onClick={e => {
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                                 const dropdownW = 144 // w-36
-                                const dropdownH = 124 // 3 options: Excel/CSV/PDF
+                                const dropdownH = 124 // 3 options: Excel/Word/PDF
                                 const left = Math.min(rect.left, window.innerWidth - dropdownW - 8)
                                 const spaceBelow = window.innerHeight - rect.bottom - 8
                                 const top = spaceBelow >= dropdownH ? rect.bottom + 4 : rect.top - dropdownH - 4
@@ -3486,7 +3836,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               className="w-36 bg-white rounded-lg shadow-xl border border-gray-200 z-50 py-1"
             >
               <button onClick={() => runRowExport('excel')} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Excel (.xlsx)</button>
-              <button onClick={() => runRowExport('csv')} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">CSV (.csv)</button>
+              <button onClick={() => runRowExport('word')} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">Word (.docx)</button>
               <button onClick={() => runRowExport('pdf')} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">PDF (.pdf)</button>
             </div>
           </>

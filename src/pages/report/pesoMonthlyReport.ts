@@ -250,6 +250,8 @@ export async function generatePesoMonthlyReport(data: EfMonthlyReport, periodLab
   const link = document.createElement('a')
   link.href = url
   link.download = `PESO LMI Report - ${periodLabel}.xlsx`
+  link.style.display = 'none'
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(url) }, 100)
 }

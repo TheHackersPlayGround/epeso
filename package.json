@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.18.1",
+    "docx": "^9.7.1",
     "docx-preview": "^0.3.7",
     "exceljs": "^4.4.0",
     "html2canvas-pro": "^2.2.0",

@@ -5,7 +5,6 @@ import {
   FileSpreadsheet, Folder, ChevronRight, Grid3x3, List,
 } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
-import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
 import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
 import { useDocuments, IMAGE_TYPES } from '../../contexts/DocumentsContext'
@@ -20,11 +19,6 @@ interface DocumentsViewProps {
 }
 
 type SortKey = 'date' | 'name' | 'type' | 'size'
-
-interface ExcelData {
-  sheetNames: string[]
-  sheets: Record<string, string[][]>
-}
 
 // Hoisted to module scope rather than defined inside DocumentsView — if it
 // were a component defined inline in the render body, every re-render (e.g.
@@ -99,13 +93,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const [docxPreview, setDocxPreview] = useState<{ isOpen: boolean; fileName: string; fileUrl: string }>({ isOpen: false, fileName: '', fileUrl: '' })
   const docxContainerRef = useRef<HTMLDivElement>(null)
 
-  // Excel preview
-  const [excelPreview, setExcelPreview] = useState<{ isOpen: boolean; fileName: string }>({ isOpen: false, fileName: '' })
-
   // Image / generic file preview
   const [filePreview, setFilePreview] = useState<{ isOpen: boolean; fileName: string; fileUrl: string; type: string }>({ isOpen: false, fileName: '', fileUrl: '', type: '' })
-  const [excelData, setExcelData] = useState<ExcelData | null>(null)
-  const [currentSheetIndex, setCurrentSheetIndex] = useState(0)
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const getChildFolders = (parentId: string) => folders.filter(f => f.parentId === parentId)
@@ -343,7 +332,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       try {
         const blob = await (await fetch(url)).blob()
         await renderAsync(blob, container, undefined, {
-          className: 'docx-wrapper', inWrapper: true, breakPages: true,
+          inWrapper: true, breakPages: true,
           ignoreWidth: false, ignoreHeight: false, ignoreFonts: false,
           ignoreLastRenderedPageBreak: false, experimental: true, trimXmlDeclaration: true,
         })
@@ -353,28 +342,14 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     })()
   }, [docxPreview.isOpen, docxPreview.fileUrl])
 
-  const renderExcel = async (fileUrl: string) => {
-    try {
-      const ab = await (await fetch(fileUrl)).arrayBuffer()
-      const wb = XLSX.read(ab, { type: 'array' })
-      const sheets: Record<string, string[][]> = {}
-      wb.SheetNames.forEach(name => {
-        sheets[name] = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], { header: 1 })
-      })
-      setExcelData({ sheetNames: wb.SheetNames, sheets })
-    } catch {
-      setErrorModal({ open: true, message: 'Unable to preview this Excel file. Please download it to view.' })
-    }
-  }
-
-  const handleViewFile = async (file: FileItem) => {
+  const handleViewFile = (file: FileItem) => {
     if (!file.fileUrl) return
     if (file.type === 'docx' || file.type === 'doc') {
       setDocxPreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl })
     } else if (file.type === 'xls' || file.type === 'xlsx') {
-      setCurrentSheetIndex(0)
-      setExcelPreview({ isOpen: true, fileName: file.name })
-      await renderExcel(file.fileUrl)
+      // Deliberately not previewed: a browser rendering can't match how the
+      // spreadsheet actually looks in Excel, so send people to the download.
+      setErrorModal({ open: true, message: 'Unable to preview this Excel file. Please download it to view.' })
     } else {
       setFilePreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl, type: file.type })
     }
@@ -491,8 +466,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   return (
     <>
       <style>{`
-        .docx-preview-container .docx-wrapper { background: #d1d5db; padding: 24px; display: flex; flex-direction: column; align-items: center; }
-        .docx-preview-container section.docx { box-shadow: 0 2px 8px rgba(0,0,0,.2); margin-bottom: 20px; }
+        .docx-preview-container .docx-wrapper { background: transparent; padding: 0; align-items: flex-start; }
+        .docx-preview-container .docx-wrapper > section.docx { box-shadow: 0 2px 8px rgba(0,0,0,.2); margin: 0 auto 20px; }
       `}</style>
 
       {/* Confirm modals */}
@@ -691,7 +666,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       {/* DOCX Preview Modal */}
       {docxPreview.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <div>
                 <p className="text-lg font-semibold text-gray-800">{docxPreview.fileName}</p>
@@ -699,57 +674,11 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
               </div>
               <button onClick={() => setDocxPreview({ isOpen: false, fileName: '', fileUrl: '' })} className="p-2 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-500" /></button>
             </div>
-            <div className="flex-1 overflow-auto bg-gray-100 p-6">
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
               <div ref={docxContainerRef} className="docx-preview-container" />
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end flex-shrink-0">
               <button onClick={() => setDocxPreview({ isOpen: false, fileName: '', fileUrl: '' })} className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Excel Preview Modal */}
-      {excelPreview.isOpen && excelData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <div>
-                <p className="text-lg font-semibold text-gray-800">{excelPreview.fileName}</p>
-                <p className="text-sm text-gray-500 mt-0.5">Spreadsheet Preview</p>
-              </div>
-              <button onClick={() => { setExcelPreview({ isOpen: false, fileName: '' }); setExcelData(null); setCurrentSheetIndex(0) }} className="p-2 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-500" /></button>
-            </div>
-            {excelData.sheetNames.length > 1 && (
-              <div className="px-6 py-3 border-b border-gray-200 flex gap-2 overflow-x-auto flex-shrink-0">
-                {excelData.sheetNames.map((name, i) => (
-                  <button key={i} onClick={() => setCurrentSheetIndex(i)}
-                    className="px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors"
-                    style={currentSheetIndex === i ? { backgroundColor: BRAND, color: 'white' } : { backgroundColor: '#f3f4f6', color: '#374151' }}>
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex-1 overflow-auto bg-gray-100 p-6">
-              <div className="bg-white shadow-lg overflow-auto">
-                <table className="border-collapse w-full text-sm">
-                  <tbody>
-                    {(excelData.sheets[excelData.sheetNames[currentSheetIndex]] ?? []).map((row, ri) => (
-                      <tr key={ri} className={ri === 0 ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}>
-                        {(row as string[]).map((cell, ci) => (
-                          <td key={ci} className="px-3 py-2 border border-gray-200 whitespace-nowrap min-w-[80px]">
-                            {cell ?? ''}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end flex-shrink-0">
-              <button onClick={() => { setExcelPreview({ isOpen: false, fileName: '' }); setExcelData(null); setCurrentSheetIndex(0) }} className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Close</button>
             </div>
           </div>
         </div>

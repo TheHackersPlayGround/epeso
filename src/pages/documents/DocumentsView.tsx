@@ -346,11 +346,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     if (!file.fileUrl) return
     if (file.type === 'docx' || file.type === 'doc') {
       setDocxPreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl })
-    } else if (file.type === 'xls' || file.type === 'xlsx') {
-      // Deliberately not previewed: a browser rendering can't match how the
-      // spreadsheet actually looks in Excel, so send people to the download.
-      setErrorModal({ open: true, message: 'Unable to preview this Excel file. Please download it to view.' })
     } else {
+      // xls/xlsx are deliberately not previewed (a browser rendering can't match
+      // how the spreadsheet looks in Excel), so they land on this modal's
+      // "Preview not available" state with its Download button.
       setFilePreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl, type: file.type })
     }
   }
@@ -628,12 +627,15 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             <div className="flex items-center justify-between bg-white rounded-t-xl px-6 py-4 flex-shrink-0">
               <p className="text-gray-800 font-semibold text-base truncate pr-4">{filePreview.fileName}</p>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => handleDownloadFile({ fileUrl: filePreview.fileUrl, name: filePreview.fileName } as FileItem)}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-                >
-                  <Download size={16} /> Download
-                </button>
+                {/* The "no preview" state already has its own Download File button in the body. */}
+                {(filePreview.type === 'pdf' || (IMAGE_TYPES as string[]).includes(filePreview.type)) && (
+                  <button
+                    onClick={() => handleDownloadFile({ fileUrl: filePreview.fileUrl, name: filePreview.fileName } as FileItem)}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    <Download size={16} /> Download
+                  </button>
+                )}
                 <button
                   onClick={() => setFilePreview({ isOpen: false, fileName: '', fileUrl: '', type: '' })}
                   className="p-2 hover:bg-gray-100 rounded-lg"
@@ -649,9 +651,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
               ) : (IMAGE_TYPES as string[]).includes(filePreview.type) ? (
                 <img src={filePreview.fileUrl} alt={filePreview.fileName} className="max-w-full max-h-[70vh] object-contain rounded shadow-lg" />
               ) : (
-                <div className="text-center text-white">
-                  <File size={48} className="mx-auto mb-3 text-gray-400" />
-                  <p className="text-gray-300 mb-4">Preview not available for this file type.</p>
+                <div className="text-center text-white py-10 px-6">
+                  <File size={48} className="mx-auto mb-5 text-gray-400" />
+                  <p className="text-gray-300 text-base">Preview not available for this file type.</p>
+                  <p className="text-gray-400 text-sm mt-2 mb-7">Please download the file first to view it.</p>
                   <button onClick={() => handleDownloadFile({ fileUrl: filePreview.fileUrl, name: filePreview.fileName } as FileItem)}
                     className="px-6 py-2.5 text-white rounded-lg text-sm" style={{ backgroundColor: BRAND }}>
                     Download File

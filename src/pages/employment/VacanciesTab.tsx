@@ -1,10 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Download, Loader2 } from 'lucide-react'
-import type { Vacancy } from '../../contexts/EmploymentContext'
+import { useEmployment, type Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
-import { listVacancies, createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
-import { listEmployers } from '../../services/employerService'
+import { createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
 import ConfirmModal from '../shared/ConfirmModal'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
@@ -866,9 +865,13 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   focusVacancyId?: number | null
   onFocusHandled?: () => void
 } = {}) {
-  const [vacancies, setVacancies] = useState<Vacancy[]>([])
-  const [employers, setEmployers] = useState<EmployerOption[]>([])
-  const [loading, setLoading] = useState(true)
+  // Vacancies and the employer dropdown options both come from
+  // EmploymentProvider (shared with the other tabs and kept across visits to
+  // this module) -- see the refresh calls below for how a change here reaches
+  // the tabs it can affect.
+  const { vacancies, employers: allEmployers, loading: listLoading, loadFailed, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
+  const employers = useMemo<EmployerOption[]>(() => allEmployers.map(e => ({ id: e.id, companyName: e.companyName })), [allEmployers])
+  const loading = listLoading.vacancies || listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
@@ -884,15 +887,13 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     isOpen: boolean; type: 'success' | 'error'; title: string; message: string
   }>({ isOpen: false, type: 'success', title: '', message: '' })
 
+  // Same error this tab always showed when its own initial fetch failed --
+  // the fetch itself now happens in the provider, which just reports it.
   useEffect(() => {
-    Promise.all([listVacancies(), listEmployers()])
-      .then(([vacs, emps]) => {
-        setVacancies(vacs)
-        setEmployers(emps.map(e => ({ id: e.id, companyName: e.companyName })))
-      })
-      .catch(() => setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load vacancies.' }))
-      .finally(() => setLoading(false))
-  }, [])
+    if (loadFailed.vacancies || loadFailed.employers) {
+      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load vacancies.' })
+    }
+  }, [loadFailed.vacancies, loadFailed.employers])
 
   function handleAddFilter(id: string) {
     setActiveFilters((prev) => [...prev, id])
@@ -913,8 +914,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       // Reload so the derived fields (effective status, remaining) recompute — a
       // toggle can flip manual intent without changing effective status (e.g. a
       // full vacancy stays Closed), so an optimistic single-field update is unsafe.
-      const fresh = await listVacancies()
-      setVacancies(fresh)
+      await refreshVacancies()
       setConfirmModal({
         isOpen: true, type: 'success', title: 'Status Updated',
         message: currentStatus === 'Open' ? 'The vacancy has been closed.' : 'The vacancy has been re-opened.',
@@ -954,8 +954,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   async function handleAddVacancy(data: Omit<Vacancy, 'id'>) {
     try {
       await createVacancy(data)
-      const fresh = await listVacancies()
-      setVacancies(fresh)
+      await refreshVacancies()
       setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'Vacancy has been successfully added to the system.' })
       setShowAddModal(false)
     } catch (err: unknown) {
@@ -1079,8 +1078,10 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
           onSave={async updated => {
             try {
               await updateVacancy(updated.id, updated)
-              const fresh = await listVacancies()
-              setVacancies(fresh)
+              await refreshVacancies()
+              // Referrals and placements display this vacancy's job title/employer.
+              void refreshReferrals()
+              void refreshPlacements()
               setConfirmModal({ isOpen: true, type: 'success', title: 'Success!', message: 'Vacancy has been successfully updated.' })
               setEditingVacancy(null)
             } catch (err: unknown) {

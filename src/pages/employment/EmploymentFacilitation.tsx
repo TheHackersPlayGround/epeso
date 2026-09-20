@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ArrowLeft, X, ChevronDown, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
 import type { Applicant } from "./applicants/ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./applicants/ApplicantsTab";
-import { listApplicants, createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
-import { listVacancies } from "../../services/vacancyService";
+import { createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { createReferral } from "../../services/referralService";
+import { useEmployment } from "../../contexts/EmploymentContext";
 import { useReferralGuard } from "../../utils/referralGuard";
 import ConfirmModal from "../shared/ConfirmModal";
 import ApplicantsTab from "./applicants/ApplicantsTab";
@@ -47,7 +47,13 @@ type ReferApplicantPanelProps = {
 type VacancyOption = { id: number; jobTitle: string; employer: string; vacanciesCount: number }
 
 function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
-  const [vacancies, setVacancies] = useState<VacancyOption[]>([])
+  const { vacancies: allVacancies, refreshVacancies, refreshReferrals, refreshApplicants } = useEmployment()
+  const vacancies = useMemo<VacancyOption[]>(() => allVacancies.filter(v => v.status === 'Open').map(v => ({
+    id: v.id,
+    jobTitle: v.jobTitle,
+    employer: v.employer,
+    vacanciesCount: v.vacanciesCount,
+  })), [allVacancies])
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<{ id: number; label: string } | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -56,16 +62,9 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   const [error, setError] = useState("")
   const { confirmReferralOk, referralGuardModal } = useReferralGuard()
 
-  useEffect(() => {
-    listVacancies().then(all => {
-      setVacancies(all.filter(v => v.status === 'Open').map(v => ({
-        id: v.id,
-        jobTitle: v.jobTitle,
-        employer: v.employer,
-        vacanciesCount: v.vacanciesCount,
-      })))
-    }).catch(() => { /* vacancies unavailable — leave empty */ })
-  }, [])
+  // The options come straight from the shared list; this silently re-syncs it
+  // each time the panel opens so the "N slots" counts are current.
+  useEffect(() => { void refreshVacancies() }, [refreshVacancies])
 
   const filtered = vacancies.filter(v =>
     `${v.jobTitle} ${v.employer}`.toLowerCase().includes(search.toLowerCase())
@@ -85,6 +84,10 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
     try {
       await createReferral(applicant.id, selected.id)
       setReferred(true)
+      // A new referral changes this applicant's Refer/Referred state and adds a
+      // row to the Referrals tab -- both live in the shared lists now.
+      void refreshApplicants()
+      void refreshReferrals()
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error ? err.message : ''
@@ -391,19 +394,16 @@ function toApplicantData(a: Applicant): ApplicantData {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function EmploymentFacilitation({ onBack }: EmploymentFacilitationProps) {
-  // ── Applicant state (source of truth = the database) ──
-  const [applicants, setApplicants] = useState<Applicant[]>([]);
-  const [isLoadingApplicants, setIsLoadingApplicants] = useState(true);
+  // ── Applicant state (source of truth = the database, held by EmploymentProvider) ──
+  const {
+    applicants, loading: listLoading,
+    refreshApplicants, refreshReferrals, refreshPlacements, refreshVacancies, refreshIfStale,
+  } = useEmployment();
+  const isLoadingApplicants = listLoading.applicants;
   const [deleteApplicantConfirm, setDeleteApplicantConfirm] = useState<Applicant | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean; type: 'success' | 'error'; title: string; message: string
   }>({ isOpen: false, type: 'success', title: '', message: '' });
-
-  // Reload the Employment Facilitation applicants from the backend.
-  async function reloadApplicants() {
-    const data = await listApplicants();
-    setApplicants(data);
-  }
 
   // ── Search / filter / pagination state ────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -524,19 +524,20 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // set by PlacementsTab, consumed (and cleared) by VacanciesTab.
   const [pendingVacancyId, setPendingVacancyId] = useState<number | null>(null);
 
-  // Load applicants on mount and whenever the user returns to the Applicants tab,
-  // so the computed referralState (Refer/Referred/Hired) reflects status changes
-  // made in the Referrals/Placements tabs.
+  // The lists are held by EmploymentProvider, so entering this module shows
+  // them immediately. Both refreshes below are silent (no spinner):
+  //  - on entering the module, revalidate everything if the provider's copy is
+  //    older than 30 s (catches other staff members' changes);
+  //  - on RETURNING to the Applicants tab, re-fetch applicants so the computed
+  //    referralState (Refer/Referred/Hired) reflects status changes made in the
+  //    Referrals/Placements tabs. (Those tabs also refresh it themselves after
+  //    every change; this is the safety net.)
+  useEffect(() => { void refreshIfStale(); }, [refreshIfStale]);
+  const isFirstTabRun = useRef(true);
   useEffect(() => {
-    if (activeTab === "applicants") {
-      reloadApplicants()
-        .catch(() => {
-          console.warn('Failed to load applicants from the server.');
-        })
-        .finally(() => setIsLoadingApplicants(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+    if (isFirstTabRun.current) { isFirstTabRun.current = false; return; }
+    if (activeTab === "applicants") void refreshApplicants();
+  }, [activeTab, refreshApplicants]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingApplicant, setEditingApplicant] = useState<Applicant | null>(null);
   const [viewingApplicant, setViewingApplicant] = useState<Applicant | null>(null);
@@ -555,7 +556,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     } else {
       await createApplicant(formData);
     }
-    await reloadApplicants();
+    await refreshApplicants();
+    // An edit can rename the applicant, and referrals/placements show that name.
+    if (editingApplicant) { void refreshReferrals(); void refreshPlacements(); }
   }
 
   function handleDeleteApplicant(applicant: Applicant) {
@@ -568,7 +571,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     setDeleteApplicantConfirm(null);
     try {
       await deleteApplicant(applicant.id);
-      await reloadApplicants();
+      await refreshApplicants();
+      // Their referrals/placements go with them, which also frees vacancy slots.
+      void refreshReferrals(); void refreshPlacements(); void refreshVacancies();
       setConfirmModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The applicant has been deleted and moved to the recycle bin.' });
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
@@ -865,7 +870,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
       {/* Overlay panels */}
       {referringApplicant && (
-        <ReferApplicantPanel applicant={referringApplicant} onClose={() => { setReferringApplicant(null); reloadApplicants().catch(() => {}); }} />
+        <ReferApplicantPanel applicant={referringApplicant} onClose={() => setReferringApplicant(null)} />
       )}
       {historyApplicant && (
         <EmploymentHistoryPanel applicant={historyApplicant} onClose={() => setHistoryApplicant(null)} />
@@ -873,7 +878,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       {isImportModalOpen && (
         <ImportModal
           onClose={() => setIsImportModalOpen(false)}
-          onImported={() => { reloadApplicants().catch(() => {}); }}
+          onImported={() => { void refreshApplicants(); }}
         />
       )}
     </div>

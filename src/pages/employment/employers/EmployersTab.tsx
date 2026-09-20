@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import ConfirmModal from '../../shared/ConfirmModal'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Upload, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import type { Employer } from '../../../contexts/EmploymentContext'
+import { useEmployment, type Employer } from '../../../contexts/EmploymentContext'
 import { canManage } from '../../../utils/permissions'
-import { listEmployers, createEmployer, updateEmployer, deleteEmployer } from '../../../services/employerService'
+import { createEmployer, updateEmployer, deleteEmployer } from '../../../services/employerService'
 import { downloadImportTemplate, importEmployers, type ImportResult } from './employerImport'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
@@ -462,8 +462,11 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
 // ─── EmployersTab ──────────────────────────────────────────────────────────────
 
 export default function EmployersTab() {
-  const [employers, setEmployers] = useState<Employer[]>([])
-  const [loading, setLoading] = useState(true)
+  // The list lives in EmploymentProvider (shared with the other tabs and
+  // kept across visits to this module) -- see the refresh calls below for
+  // how a change here reaches the tabs it can affect.
+  const { employers, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
+  const loading = listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
@@ -480,12 +483,11 @@ export default function EmployersTab() {
 
   const availableFilters = STATIC_FILTERS
 
+  // Same error this tab always showed when its own initial fetch failed --
+  // the fetch itself now happens in the provider, which just reports it.
   useEffect(() => {
-    listEmployers()
-      .then(setEmployers)
-      .catch(() => setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load employers.' }))
-      .finally(() => setLoading(false))
-  }, [])
+    if (loadFailed.employers) setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load employers.' })
+  }, [loadFailed.employers])
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
@@ -516,16 +518,16 @@ export default function EmployersTab() {
   // itself via onClose, and surfaces any thrown error in its own catch.
   async function handleAdd(data: Omit<Employer, 'id'>) {
     await createEmployer(data)
-    const fresh = await listEmployers()
-    setEmployers(fresh)
+    await refreshEmployers()
   }
 
   async function handleEdit(data: Omit<Employer, 'id'>) {
     if (!selectedEmployer) return
     try {
       await updateEmployer(selectedEmployer.id, data)
-      const fresh = await listEmployers()
-      setEmployers(fresh)
+      await refreshEmployers()
+      // Vacancies, referrals and placements all display the employer's name.
+      void refreshVacancies(); void refreshReferrals(); void refreshPlacements()
       setSelectedEmployer(null)
       setSidebarMode(null)
       setResultModal({ isOpen: true, type: 'success', title: 'Changes Saved!', message: 'Employer information has been successfully updated.' })
@@ -547,6 +549,7 @@ export default function EmployersTab() {
     try {
       await deleteEmployer(id)
       setEmployers(prev => prev.filter(e => e.id !== id))
+      void refreshVacancies()
       setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The employer has been deleted and moved to the recycle bin.' })
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
@@ -692,9 +695,7 @@ export default function EmployersTab() {
       {isImportModalOpen && (
         <EmployerImportModal
           onClose={() => setIsImportModalOpen(false)}
-          onImported={() => {
-            listEmployers().then(setEmployers).catch(() => {})
-          }}
+          onImported={() => { void refreshEmployers() }}
         />
       )}
       <ConfirmModal

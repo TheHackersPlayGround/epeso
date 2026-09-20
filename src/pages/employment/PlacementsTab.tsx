@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import { canManage } from '../../utils/permissions'
-import type { Placement } from '../../contexts/EmploymentContext'
+import { useEmployment, type Placement } from '../../contexts/EmploymentContext'
 import {
-  listPlacements,
   updatePlacement,
   updatePlacementStatus,
   listPromotions,
@@ -833,8 +832,11 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
 export default function PlacementsTab({ onNavigateToVacancy }: {
   onNavigateToVacancy?: (id: number) => void
 } = {}) {
-  const [placements, setPlacements] = useState<Placement[]>([])
-  const [loading, setLoading] = useState(true)
+  // The list lives in EmploymentProvider (shared with the other tabs and
+  // kept across visits to this module) -- see the refresh calls below for
+  // how a change here reaches the tabs it can affect.
+  const { placements, setPlacements, loading: listLoading, refreshPlacements, refreshApplicants, refreshVacancies } = useEmployment()
+  const loading = listLoading.placements
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -848,15 +850,6 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
   const [updatingPlacement, setUpdatingPlacement] = useState<Placement | null>(null)
   const [promotingPlacement, setPromotingPlacement] = useState<Placement | null>(null)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
-
-  async function reload() {
-    const data = await listPlacements()
-    setPlacements(data)
-  }
-
-  useEffect(() => {
-    reload().finally(() => setLoading(false))
-  }, [])
 
   const availableFilters: FilterOption[] = useMemo(() => {
     const employers = [...new Set(placements.map(p => p.employer).filter(Boolean))].sort()
@@ -893,6 +886,10 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     }
 
     setPlacements(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+    // A status change here frees (or fills) a vacancy slot and flips the
+    // applicant's Hired state -- both shared lists.
+    void refreshApplicants()
+    void refreshVacancies()
     setResultModal({ isOpen: true, type: 'success', title: 'Placement Updated', message: 'The placement details have been updated successfully.' })
   }
 
@@ -909,6 +906,8 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     }
 
     setPlacements(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p))
+    void refreshApplicants()
+    void refreshVacancies()
 
     // Customised confirmation per status.
     const notes: Record<Placement['status'], { title: string; text: string }> = {
@@ -935,7 +934,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
 
     // currentJobTitle is computed server-side (latest promotion join), so a
     // local optimistic merge can't reproduce it correctly — reload instead.
-    await reload()
+    await refreshPlacements()
 
     setResultModal({ isOpen: true, type: 'success', title: 'Promotion Recorded', message: `${name} has been promoted to ${input.newJobTitle}.` })
   }

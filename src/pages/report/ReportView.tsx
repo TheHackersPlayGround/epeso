@@ -22,9 +22,7 @@ import { useDILP } from '../../contexts/DILPContext'
 import { useTUPAD } from '../../contexts/TUPADContext'
 import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
-import type { Referral, Placement } from '../../contexts/EmploymentContext'
-import { listReferrals } from '../../services/referralService'
-import { listPlacements } from '../../services/placementService'
+import { useEmployment } from '../../contexts/EmploymentContext'
 
 interface ReportViewProps {
   onBack: () => void
@@ -69,15 +67,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const { applicants: slpApplicants, projects: slpProjects } = useSLP()
   const { applicants: clpepApplicants, interventions: clpepInterventions } = useCLPEP()
 
-  // Employment Facilitation has no shared Context (see EmploymentContext.tsx —
-  // it's types-only), so referrals/placements are fetched directly here,
-  // unlike every other category above which reads from an already-live Context.
-  const [efReferrals, setEfReferrals] = useState<Referral[]>([])
-  const [efPlacements, setEfPlacements] = useState<Placement[]>([])
-  useEffect(() => {
-    listReferrals().then(setEfReferrals).catch(() => {})
-    listPlacements().then(setEfPlacements).catch(() => {})
-  }, [])
+  // Employment Facilitation's referrals/placements come from the same
+  // app-level provider every category above uses.
+  const { referrals: efReferrals, placements: efPlacements } = useEmployment()
 
   const [infoModal, setInfoModal] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' })
   const [reportCategory, setReportCategory] = useState<ReportCategory | ''>('')

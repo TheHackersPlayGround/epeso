@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
 import { Search, Plus, ChevronDown, X, Download, MoreHorizontal, Loader2 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
-import type { Referral } from '../../contexts/EmploymentContext'
-import { listReferrals, updateReferralStatus, deleteReferral } from '../../services/referralService'
+import { useEmployment, type Referral } from '../../contexts/EmploymentContext'
+import { updateReferralStatus, deleteReferral } from '../../services/referralService'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { canManage } from '../../utils/permissions'
@@ -435,8 +435,11 @@ function UpdateStatusModal({ referral, onClose, onSave }: UpdateStatusModalProps
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReferralsTab() {
-  const [referrals, setReferrals] = useState<Referral[]>([])
-  const [loading, setLoading] = useState(true)
+  // The list lives in EmploymentProvider (shared with the other tabs and
+  // kept across visits to this module) -- see the refresh calls below for
+  // how a change here reaches the tabs it can affect.
+  const { referrals, setReferrals, loading: listLoading, refreshApplicants, refreshPlacements, refreshVacancies } = useEmployment()
+  const loading = listLoading.referrals
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -447,15 +450,6 @@ export default function ReferralsTab() {
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
-
-  async function reload() {
-    const data = await listReferrals()
-    setReferrals(data)
-  }
-
-  useEffect(() => {
-    reload().finally(() => setLoading(false))
-  }, [])
 
   const availableFilters: FilterOption[] = useMemo(() => {
     const employers = [...new Set(referrals.map(r => r.employer).filter(Boolean))].sort()
@@ -482,6 +476,7 @@ export default function ReferralsTab() {
     try {
       await deleteReferral(id)
       setReferrals(prev => prev.filter(r => r.id !== id))
+      void refreshApplicants() // the applicant may be free to refer again
       setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: 'The referral has been removed.' })
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
@@ -505,9 +500,16 @@ export default function ReferralsTab() {
     if (newStatus === 'Hired') {
       // Hired referrals are removed from the list (they become placements)
       setReferrals(prev => prev.filter(r => r.id !== id))
+      // ...which means a new row in Placements and one fewer open slot on the
+      // vacancy -- both are shared lists now, so refresh them here instead of
+      // relying on a fresh fetch the next time the module is entered.
+      void refreshPlacements()
+      void refreshVacancies()
     } else {
       setReferrals(prev => prev.map(r => r.id === id ? { ...r, status: newStatus as Referral['status'] } : r))
     }
+    // Every status change can flip the applicant's Refer/Referred/Hired state.
+    void refreshApplicants()
 
     // Customised confirmation per status.
     const notes: Record<ReferralStatusOption, { title: string; text: string }> = {

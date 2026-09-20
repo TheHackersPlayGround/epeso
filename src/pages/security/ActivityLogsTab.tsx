@@ -17,6 +17,7 @@ import { useCLPEP } from '../../contexts/CLPEPContext'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import { useOFW } from '../../contexts/OFWContext'
 import { useDocuments } from '../../contexts/DocumentsContext'
+import { useEmployment } from '../../contexts/EmploymentContext'
 
 interface ActivityLog {
   id: number
@@ -136,6 +137,7 @@ export default function ActivityLogsTab() {
   const { refreshProfiles: refreshSkillsTrainingProfiles, refreshBatches: refreshSkillsTrainingBatches, refreshActivities: refreshSkillsTrainingActivities } = useSkillsTraining()
   const { refreshProfiles: refreshOfwProfiles } = useOFW()
   const { refreshFolders: refreshDocumentsFolders, refreshDocuments: refreshDocumentsDocuments } = useDocuments()
+  const { refreshAll: refreshEmploymentAll } = useEmployment()
   const [subTab, setSubTab] = useState<'logs' | 'bin'>('logs')
 
   const [logs,        setLogs]        = useState<ActivityLog[]>([])
@@ -250,6 +252,10 @@ export default function ActivityLogsTab() {
   // table is already up to date the moment the user navigates back to it,
   // no manual page refresh needed.
   const refreshModuleFor = async (recordType: RecycleBinItem['recordType']) => {
+    // EF's lists live in EmploymentProvider now too. A restored applicant,
+    // employer or referral can bring related rows back with it, so refresh all
+    // five lists rather than guessing which ones.
+    if (recordType === 'applicant' || recordType === 'employer' || recordType === 'referral') await refreshEmploymentAll()
     if (recordType === 'gipApplicant') await refreshGipProfiles()
     if (recordType === 'gipWorkplace') await refreshGipWorkplaces()
     if (recordType === 'cdspApplicant') await refreshCdspProfiles()

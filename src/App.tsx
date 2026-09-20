@@ -27,6 +27,7 @@ import { DILPProvider } from './contexts/DILPContext'
 import { TUPADProvider } from './contexts/TUPADContext'
 import { SLPProvider } from './contexts/SLPContext'
 import { CLPEPProvider } from './contexts/CLPEPContext'
+import { EmploymentProvider } from './contexts/EmploymentContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import ConfirmModal from './pages/shared/ConfirmModal'
 import './styles/App.css'
@@ -321,9 +322,11 @@ export default function App() {
                     <TUPADProvider>
                       <SLPProvider>
                         <CLPEPProvider>
-                          <DocumentsProvider>
-                            <AppContent onLogout={handleLogout} />
-                          </DocumentsProvider>
+                          <EmploymentProvider>
+                            <DocumentsProvider>
+                              <AppContent onLogout={handleLogout} />
+                            </DocumentsProvider>
+                          </EmploymentProvider>
                         </CLPEPProvider>
                       </SLPProvider>
                     </TUPADProvider>

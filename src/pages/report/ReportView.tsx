@@ -316,8 +316,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // "Full Address" — Province/Region are deliberately left out since a single
   // PESO office serves one jurisdiction, so those would just repeat the same
   // text on every row, and a partial address shouldn't claim to be complete.
-  const formatAddress = (a: { streetPurok?: string; barangay?: string; cityMunicipality?: string }): string => {
-    const parts = [a.streetPurok, a.barangay, a.cityMunicipality].filter(Boolean)
+  const formatAddress = (a: { streetPurok?: string; barangay?: string; cityMunicipality?: string; province?: string }): string => {
+    const parts = [a.streetPurok, a.barangay, a.cityMunicipality, a.province].filter(Boolean)
     return parts.length > 0 ? parts.join(', ') : '-'
   }
 
@@ -326,6 +326,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // same way instead of some showing "₱20,000" and others a raw "20000".
   const formatCurrency = (value?: string | number | null): string =>
     value ? `₱${Number(value).toLocaleString()}` : '-'
+
+  // Strips the time-of-day off a value that may come back as a plain
+  // "YYYY-MM-DD" or a full "YYYY-MM-DD HH:MM:SS[.ffffff]" timestamp (Postgres
+  // `timestamp` columns like workplace_assigned_at, unlike the `date` columns
+  // most other report fields read from) -- so every date column in a report
+  // reads the same regardless of which column type backs it.
+  const dateOnly = (value?: string | null): string =>
+    value ? value.split('T')[0].split(' ')[0] : '-'
 
   // CDSP Activity List columns — one row per activity/session, not per participant.
   const CDSP_SESSION_COLUMNS = ['Activity Title', 'Service Type', 'Date', 'Venue', 'Facilitator', 'Counselor', 'Duration', 'Participants', 'Status']
@@ -448,23 +456,23 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const map: Record<ReportCategory, string[]> = {
       'general-peso': GENERAL_PESO_COLUMNS,
       'employment-facilitation': ['Applicant Name', 'Employer', 'Job Title', 'Referral Status', 'Placement Status', 'Employment Type', 'Date Referred', 'Date Hired'],
-      'ofw-services': ['No.', 'OFW Name', 'Sex', 'Civil Status', 'Contact Number', 'Email', 'Address', 'Barangay', 'Municipality',
+      'ofw-services': ['No.', 'OFW Name', 'Sex', 'Civil Status', 'Contact Number', 'Email', 'Address', 'Barangay',
                         'Type of Request', 'Employment Status', 'Desired Position', 'Type of Skill', 'Agencies',
                         'Date Filed', 'Status', 'Remarks'],
-      'cdsp': ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Applied', 'Highest Education',
+      'cdsp': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Highest Education',
                'Employment Status', 'School', 'Course / Program', 'Strand', 'Current Occupation', 'Civil Status',
-               'Contact Number', 'Street/Purok', 'Barangay', 'Address', 'Status', 'Remarks'],
-      'livelihood': ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Program Type', 'Date Applied', 'Civil Status',
-                     'Contact Number', 'Street/Purok', 'Barangay', 'Address', 'Assigned Project/Intervention',
+               'Date Applied', 'Contact Number', 'Barangay', 'Address', 'Status', 'Remarks'],
+      'livelihood': ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Civil Status',
+                     'Date Applied', 'Contact Number', 'Barangay', 'Address', 'Assigned Project/Intervention',
                      'Assistance Amount', 'Release Date', 'Status', 'Remarks'],
-      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
+      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
               'Start Date', 'End Date', 'Status', 'School Name', 'Course', 'Strand', 'Civil Status',
-              'Contact Number', 'Street/Purok', 'Barangay', 'Address', 'Supervisor', 'Allowance', 'Remarks'],
-      'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location',
+              'Contact Number', 'Barangay', 'Address', 'Supervisor', 'Allowance', 'Remarks'],
+      'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location',
                'Start Date', 'End Date', 'Status', 'Batch', 'Course', 'School Type', 'Civil Status', 'Contact Number',
-               'Street/Purok', 'Barangay', 'Address', 'Annual Family Income', 'No. of Dependents', 'Remarks'],
-      'skills-training': ['No.', 'Participant Name', 'Sex', 'Age', 'Civil Status', 'Classification', 'Desired Qualification',
-                           'Purpose of Training', 'Assigned Training', 'Training Status', 'Date Applied', 'Contact Number', 'Street/Purok',
+               'Barangay', 'Address', 'Annual Family Income', 'No. of Dependents', 'Remarks'],
+      'skills-training': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Civil Status', 'Classification', 'Desired Qualification',
+                           'Purpose of Training', 'Assigned Training', 'Training Status', 'Date Applied', 'Contact Number',
                            'Barangay', 'Address', 'Status'],
     }
     return map[category] || []
@@ -481,29 +489,31 @@ export default function ReportView({ onBack }: ReportViewProps) {
     // GIP Workplace/Office List: few columns, all useful — show all by default.
     if (category === 'gip' && gipReportType === 'batches') return withoutStatus(GIP_WORKPLACE_COLUMNS)
     // CDSP: the fields that matter for a career-development report are on by default;
-    // the rest (contact, address, occupation, civil status, status, remarks) are optional.
-    if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Program Type', 'Date Applied', 'Highest Education', 'Employment Status']
+    // the rest (date applied, occupation, civil status, status, remarks) are optional.
+    if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Highest Education', 'Employment Status', 'Contact Number', 'Address']
     // GIP: interns deployed to government offices — identity, education, deployment office and period.
     // (Status is optional, matching CDSP.)
-    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Start Date', 'End Date']
+    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Start Date', 'End Date', 'Contact Number', 'Address']
     // SPES Batch List: few columns, all useful — show all by default.
     if (category === 'spes' && spesReportType === 'batches') return withoutStatus(SPES_BATCH_COLUMNS)
     // SPES: working students — identity, school/year level, employer and period.
     // (Status is optional, matching CDSP.)
-    if (category === 'spes') return ['No.', 'Participant Name', 'Sex', 'Age', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location', 'Start Date', 'End Date']
+    if (category === 'spes') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location', 'Start Date', 'End Date', 'Contact Number', 'Address']
     // Livelihood Project/Intervention List: few columns, all useful — show all by default.
     if (category === 'livelihood' && livelihoodReportType === 'projects') return withoutStatus(getLivelihoodProjectColumns())
     // Livelihood: identity, which of the four sub-programs, and the assistance
-    // details PESO cares about most; address/contact/remarks/status are optional.
-    if (category === 'livelihood') return ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Program Type', 'Date Applied']
+    // details PESO cares about most; date applied/civil status/remarks/status
+    // are optional.
+    if (category === 'livelihood') return ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Contact Number', 'Address']
     // Skills Training Activity List: few columns, all useful — show all by default.
     if (category === 'skills-training' && skillsReportType === 'activities') return withoutStatus(SKILLS_TRAINING_ACTIVITY_COLUMNS)
     // Skills Training: identity, which training they're assigned to, and period;
-    // classification/qualification/purpose/contact/address/status are optional.
-    if (category === 'skills-training') return ['No.', 'Participant Name', 'Sex', 'Age', 'Assigned Training', 'Training Status', 'Date Applied']
+    // date applied/classification/qualification/purpose/status are optional.
+    if (category === 'skills-training') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Assigned Training', 'Training Status', 'Contact Number', 'Address']
     // OFW: identity, what they're requesting, employment status, and period;
-    // contact/address/referral sub-fields/remarks/status are optional.
-    if (category === 'ofw-services') return ['No.', 'OFW Name', 'Sex', 'Type of Request', 'Employment Status', 'Date Filed']
+    // referral sub-fields/remarks/status are optional. (No Birthdate column exists
+    // yet for OFW -- see note where this function is called from.)
+    if (category === 'ofw-services') return ['No.', 'OFW Name', 'Sex', 'Type of Request', 'Employment Status', 'Date Filed', 'Contact Number', 'Address']
     return withoutStatus(getReportColumns(category))
   }
 
@@ -588,6 +598,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Date Applied': a.dateApplicationReceived || '-',
               'Status': a.status,
               'Age': a.age || '-',
+              'Birthdate': a.birthdate || '-',
               'Civil Status': a.civilStatus || '-',
               'Highest Education': a.highestEducation || '-',
               'School': a.schoolName || '-',
@@ -596,7 +607,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Employment Status': a.employmentStatus || '-',
               'Current Occupation': a.currentOccupation || '-',
               'Contact Number': a.contactNumber || '-',
-              'Street/Purok': a.streetPurok || '-',
               'Barangay': a.barangay || '-',
               'Address': formatAddress(a),
               'Remarks': a.remarks || '-',
@@ -632,18 +642,23 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
               'Sex': a.sex || '-',
               'Age': a.age || '-',
+              'Birthdate': a.birthdate || '-',
               'Highest Education': a.highestEducation || '-',
               'Assigned Office': workplace?.workplaceName || '-',
               'Workplace/Office Address': workplace?.deploymentLocation || '-',
-              'Start Date': history?.assignedDate || '-',
-              'End Date': history?.completedDate || '-',
+              // workplace_assigned_at/workplace_completed_at are timestamps (they
+              // also record the time of day the status change happened), unlike
+              // every other date column here which is a plain date -- keep only
+              // the date part so this column matches the rest instead of showing
+              // "2026-08-09 22:25:55.419333".
+              'Start Date': dateOnly(history?.assignedDate),
+              'End Date': dateOnly(history?.completedDate),
               'Status': a.status,
               'School Name': a.schoolName || '-',
               'Course': a.course || '-',
               'Strand': a.strand || '-',
               'Civil Status': a.civilStatus || '-',
               'Contact Number': a.contactNumber || '-',
-              'Street/Purok': a.streetPurok || '-',
               'Barangay': a.barangay || '-',
               'Address': formatAddress(a),
               'Supervisor': workplace?.supervisor || '-',
@@ -681,6 +696,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Participant Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
               'Sex': a.sex || '-',
               'Age': a.age || '-',
+              'Birthdate': a.birthdate || '-',
               'School Name': a.schoolName || '-',
               'Grade/Year Level': a.gradeYearLevel || '-',
               'Employer': batch?.employer || '-',
@@ -693,7 +709,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'School Type': a.schoolType || '-',
               'Civil Status': a.civilStatus || '-',
               'Contact Number': a.contactNumber || '-',
-              'Street/Purok': a.streetPurok || '-',
               'Barangay': a.barangay || '-',
               'Address': formatAddress(a),
               'Annual Family Income': formatCurrency(a.annualFamilyIncome),
@@ -732,6 +747,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Participant Name': `${p.lastName}, ${p.firstName}${p.middleName ? ' ' + p.middleName : ''}`.trim(),
             'Sex': p.sex || '-',
             'Age': p.age || '-',
+            'Birthdate': p.birthdate || '-',
             'Civil Status': p.civilStatus || '-',
             'Classification': [...(p.classification ?? []), ...(p.classificationOther ?? []).filter(Boolean).map((v: string) => `Others: ${v}`)].join(', ') || '-',
             'Desired Qualification': [...(p.desiredQualification ?? []), ...(p.qualificationOther ?? []).filter(Boolean).map((v: string) => `Others: ${v}`)].join(', ') || '-',
@@ -740,7 +756,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Training Status': p.assignedTrainingStatus || '-',
             'Date Applied': p.dateApplicationReceived || '-',
             'Contact Number': p.contactNumber || '-',
-            'Street/Purok': p.streetPurok || '-',
             'Barangay': p.barangay || '-',
             'Address': formatAddress(p),
             'Status': p.status,
@@ -764,7 +779,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 'Type of Project': p.typeOfProject || '-',
                 'Program Component': p.programComponent || '-',
                 'Way of Implementation': p.wayOfImplementation || '-',
-                'Location': formatAddress({ streetPurok: p.streetPurok, barangay: p.barangay, cityMunicipality: p.cityMunicipality }),
+                'Location': formatAddress({ streetPurok: p.streetPurok, barangay: p.barangay, cityMunicipality: p.cityMunicipality, province: p.province }),
                 'Assistance Amount': formatCurrency(p.assistanceAmount),
                 'Release Date': p.dateReleased || '-',
                 'Beneficiaries Assigned': p.assignedCount ?? 0,
@@ -836,7 +851,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               ...p, _program: 'DILEEP (DILP)', _name: p.projectName,
               _category: [p.typeOfProject, p.programComponent].filter(Boolean).join(' - '),
               _desc: '-', _date: p.dateReleased,
-              _location: formatAddress({ streetPurok: p.streetPurok, barangay: p.barangay, cityMunicipality: p.cityMunicipality }),
+              _location: formatAddress({ streetPurok: p.streetPurok, barangay: p.barangay, cityMunicipality: p.cityMunicipality, province: p.province }),
               _facilitator: '-',
             })),
             ...tupadProjects.map(p => ({
@@ -897,11 +912,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Beneficiary Name': `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
             'Sex': a.sex || '-',
             'Age': a.age || '-',
+            'Birthdate': a.birthdate || '-',
             'Program Type': a._program,
             'Date Applied': a.dateApplied || '-',
             'Civil Status': a.civilStatus || '-',
             'Contact Number': a.contactNumber || '-',
-            'Street/Purok': a.streetPurok || '-',
             'Barangay': a.barangay || '-',
             'Address': formatAddress(a),
             'Assigned Project/Intervention': a._projectName || '-',
@@ -923,9 +938,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Civil Status': p.civilStatus || '-',
             'Contact Number': p.contactNumber || '-',
             'Email': p.email || '-',
-            'Address': p.address || '-',
+            'Address': formatAddress({ streetPurok: p.address, barangay: p.barangay, cityMunicipality: p.municipality, province: p.province }),
             'Barangay': p.barangay || '-',
-            'Municipality': p.municipality || '-',
             'Type of Request': p.typeOfRequest.join(', '),
             'Employment Status': p.employmentStatus,
             'Desired Position': p.desiredPosition || '-',

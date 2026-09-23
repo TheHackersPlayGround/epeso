@@ -149,7 +149,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
-  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''>('')
+  const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateFiled_newest' | 'dateFiled_oldest' | ''>('')
   const [activeFilters, setActiveFilters] = useState<FilterKey[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
@@ -310,6 +310,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
     const statusDiff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
     if (statusDiff !== 0) return statusDiff
     if (!sortOrder) return 0
+    if (sortOrder === 'dateFiled_newest') return (b.dateFiled || '').localeCompare(a.dateFiled || '')
+    if (sortOrder === 'dateFiled_oldest') return (a.dateFiled || '').localeCompare(b.dateFiled || '')
     const parts = (n: string) => n.trim().split(/\s+/)
     const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
     const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
@@ -445,6 +447,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
               <option value="firstName_desc">First Name DSC</option>
               <option value="lastName_asc">Last Name ASC</option>
               <option value="lastName_desc">Last Name DSC</option>
+              <option value="dateFiled_newest">Date Filed (Latest)</option>
+              <option value="dateFiled_oldest">Date Filed (Oldest)</option>
             </select>
             <div className="relative" ref={filterDropdownRef}>
               <button

@@ -387,7 +387,6 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                   <p className="text-sm font-bold tracking-wide" style={{ color: '#0077BE' }}>FOR PESO OFFICE ONLY</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <Field label="Date Applied" value={profile.dateApplicationReceived} />
                   <Field label="Received By" value={profile.receivedBy} />
                 </div>
                 <div>
@@ -688,10 +687,6 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                   <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-5">
-                  <div>
-                    <label className={lbl}>Date Applied</label>
-                    <DatePicker className={inp} value={form.dateApplicationReceived ?? ''} onChange={value => set({ dateApplicationReceived: value })} />
-                  </div>
                   <div>
                     <label className={lbl}>Received By</label>
                     <input className={inp} placeholder="Name of receiving officer" value={form.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />

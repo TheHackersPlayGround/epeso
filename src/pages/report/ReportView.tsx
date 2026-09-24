@@ -929,7 +929,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
       case 'ofw-services':
         return ofwProfiles
-          // Period filter on the date the request was filed
+          // Period filter on the Date Filed from the paper request form -- OFW's
+          // only date (date_applied on the backend just mirrors it)
           .filter(p => inSelectedPeriod(p.dateFiled))
           .map((p, i) => ({
             'No.': i + 1,

@@ -48,7 +48,6 @@ export interface OFWProfile {
   // Livelihood ELPOR form attachments, keyed by form name (e.g. "ELPOR Form A")
   elporFiles?: Record<string, OFWSavedAttachment>
   // PESO Office Only
-  dateApplicationReceived?: string
   receivedBy?: string
   attachedDocuments?: OFWSavedAttachment[]
 }

@@ -55,7 +55,7 @@ const emptyOFWForm: Omit<OFWProfile, 'id'> = {
   inquirySpecify: '', otherProgramSpecify: '',
   owwaWelfareFile: null,
   elporFiles: {},
-  dateApplicationReceived: '', receivedBy: '',
+  receivedBy: '',
   attachedDocuments: [],
 }
 
@@ -546,10 +546,6 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
-                <div>
-                  <label className={lbl}>Date Applied</label>
-                  <DatePicker className={inp} value={formData.dateApplicationReceived ?? ''} onChange={value => set({ dateApplicationReceived: value })} />
-                </div>
                 <div>
                   <label className={lbl}>Received By</label>
                   <input className={inp} placeholder="Name of receiving officer" value={formData.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />

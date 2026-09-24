@@ -538,7 +538,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-brand-blue">
-                    {['Reference No.', 'Name', 'Contact Number', 'Address', 'Date Filed', 'Employment Status', 'Type of Request', 'Status', 'Actions'].map(col => (
+                    {['Reference No.', 'Name', 'Contact Number', 'Address', 'Employment Status', 'Type of Request', 'Status', 'Date Filed', 'Actions'].map(col => (
                       <th key={col} className="px-4 py-4 text-left text-white whitespace-nowrap">{col}</th>
                     ))}
                   </tr>
@@ -554,7 +554,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
                           {profile.barangay}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.employmentStatus}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px]">
                         <span className="block truncate" title={profile.typeOfRequest.join(', ')}>
@@ -574,6 +573,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge status={profile.status} />
                       </td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => openMenu(e, profile.id)}

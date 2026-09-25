@@ -281,7 +281,11 @@ export default function SPESMaintenanceForm({
     if (!form.batchName.trim())          errors.push({ field: 'batchName', message: 'Batch Name is required.', focus: scrollTo(batchNameRef) })
     if (!form.programStartDate)          errors.push({ field: 'programStartDate', message: 'Program Start Date is required.', focus: scrollTo(programStartDateRef) })
     if (!form.programEndDate)            errors.push({ field: 'programEndDate', message: 'Program End Date is required.', focus: scrollTo(programEndDateRef) })
-    if (!form.availableSlots.trim())     errors.push({ field: 'availableSlots', message: 'Available Slots is required.', focus: scrollTo(availableSlotsRef) })
+    if (!form.availableSlots.trim()) {
+      errors.push({ field: 'availableSlots', message: 'Available Slots is required.', focus: scrollTo(availableSlotsRef) })
+    } else if (!/^\d+$/.test(form.availableSlots.trim()) || Number(form.availableSlots) < 1) {
+      errors.push({ field: 'availableSlots', message: 'Available Slots must be a whole number of at least 1.', focus: scrollTo(availableSlotsRef) })
+    }
     if (!form.employer.trim())           errors.push({ field: 'employer', message: 'Participating Employer / Agency is required.', focus: scrollTo(employerRef) })
     if (!form.deploymentLocation.trim()) errors.push({ field: 'deploymentLocation', message: 'Deployment Location is required.', focus: scrollTo(deploymentLocationRef) })
     if (!coordinator) {

@@ -888,8 +888,6 @@ export default function LivelihoodMaintenanceForm() {
             <option value="Planned">Planned</option>
             <option value="Ongoing">Ongoing</option>
             <option value="Completed">Completed</option>
-            <option value="Pending">Pending</option>
-            <option value="Released">Released</option>
           </select>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />

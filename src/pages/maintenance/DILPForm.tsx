@@ -51,7 +51,7 @@ const inputCls = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:out
 const labelCls = 'block text-sm text-gray-700 mb-1.5'
 const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-brand-blue mb-4'
 
-const STATUS_OPTIONS: DILPFormData['status'][] = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+const STATUS_OPTIONS: DILPFormData['status'][] = ['Planned', 'Ongoing', 'Completed']
 
 // Display-only comma formatting for the Assistance Amount input -- the
 // underlying value stays a plain numeric string (no commas), matching what

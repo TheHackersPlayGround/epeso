@@ -5,6 +5,7 @@ import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
+import { useFieldValidation, type ValidationError } from '../../hooks/useFieldValidation'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 
@@ -205,6 +206,13 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   const [cityId, setCityId] = useState<number | null>(null)
 
   const isViewMode = mode === 'view'
+  const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+
+  const lastNameRef = useRef<HTMLInputElement>(null)
+  const firstNameRef = useRef<HTMLInputElement>(null)
+  const sexRef = useRef<HTMLSelectElement>(null)
+  const birthdateWrapRef = useRef<HTMLDivElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -228,22 +236,43 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     if (currentStep > 1) setCurrentStep(step => step - 1)
   }
 
+  // Fields on another step aren't mounted until that step renders, so switch
+  // step first and focus once the render has happened.
+  function focusOnStep(step: number, run: () => void) {
+    setCurrentStep(step)
+    setTimeout(run, 50)
+  }
+
   function handleSubmit(event?: React.FormEvent) {
     event?.preventDefault()
-    if (!formData.lastName || !formData.firstName) {
-      alert('Last name and first name are required.')
-      return
+    const errors: ValidationError[] = []
+
+    if (!(formData.lastName ?? '').trim()) {
+      errors.push({ field: 'lastName', message: 'Last Name is required.', focus: () => focusOnStep(1, () => lastNameRef.current?.focus()) })
     }
-    if (!formData.sex || !formData.birthdate) {
-      alert('Sex and birthdate are required.')
-      setCurrentStep(1)
-      return
+    if (!(formData.firstName ?? '').trim()) {
+      errors.push({ field: 'firstName', message: 'First Name is required.', focus: () => focusOnStep(1, () => firstNameRef.current?.focus()) })
+    }
+    if (!formData.sex) {
+      errors.push({ field: 'sex', message: 'Sex is required.', focus: () => focusOnStep(1, () => sexRef.current?.focus()) })
+    }
+    if (!formData.birthdate) {
+      errors.push({
+        field: 'birthdate',
+        message: 'Birthdate is required.',
+        focus: () => focusOnStep(1, () => birthdateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })),
+      })
     }
     if (!formData.barangayId) {
-      alert('Barangay is required.')
-      setCurrentStep(2)
-      return
+      errors.push({
+        field: 'barangay',
+        message: 'Barangay is required (Section II. Address).',
+        focus: () => focusOnStep(2, () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })),
+      })
     }
+
+    if (runValidation(errors)) return
+
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
       .filter(Boolean)
       .join(' ')
@@ -299,24 +328,28 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               Last Name <span className="text-red-500">*</span>
             </label>
             <input
+              ref={lastNameRef}
               id="clpep-lastName"
-              className={inputClass}
+              className={`${inputClass} ${errCls('lastName')}`}
               placeholder="Enter last name"
               value={formData.lastName ?? ''}
-              onChange={e => updateField({ lastName: e.target.value })}
+              onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }}
             />
+            {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
           </div>
           <div>
             <label htmlFor="clpep-firstName" className={labelClass}>
               First Name <span className="text-red-500">*</span>
             </label>
             <input
+              ref={firstNameRef}
               id="clpep-firstName"
-              className={inputClass}
+              className={`${inputClass} ${errCls('firstName')}`}
               placeholder="Enter first name"
               value={formData.firstName ?? ''}
-              onChange={e => updateField({ firstName: e.target.value })}
+              onChange={e => { updateField({ firstName: e.target.value }); clearFieldError('firstName') }}
             />
+            {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
           </div>
           <div>
             <label htmlFor="clpep-middleName" className={labelClass}>Middle Name</label>
@@ -341,16 +374,17 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <div>
+          <div ref={birthdateWrapRef}>
             <label htmlFor="clpep-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
             <DatePicker
               id="clpep-birthdate"
-              className={inputClass}
+              className={`${inputClass} ${errCls('birthdate')}`}
               value={formData.birthdate ?? ''}
-              onChange={handleBirthdate}
+              onChange={value => { handleBirthdate(value); clearFieldError('birthdate') }}
             />
+            {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
           </div>
           <div>
             <label htmlFor="clpep-age" className={labelClass}>Age</label>
@@ -368,15 +402,17 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               Sex <span className="text-red-500">*</span>
             </label>
             <select
+              ref={sexRef}
               id="clpep-sex"
-              className={selectClass}
+              className={`${selectClass} ${errCls('sex')}`}
               value={formData.sex ?? ''}
-              onChange={e => updateField({ sex: e.target.value })}
+              onChange={e => { updateField({ sex: e.target.value }); clearFieldError('sex') }}
             >
               <option value="">Select</option>
               <option>Male</option>
               <option>Female</option>
             </select>
+            {fieldMessage('sex') && <p className="text-red-500 text-xs mt-1">{fieldMessage('sex')}</p>}
           </div>
         </div>
       </div>
@@ -417,7 +453,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               }}
             />
           </div>
-          <div>
+          <div ref={barangayWrapRef}>
             <label className={labelClass}>
               Barangay <span className="text-red-500">*</span>
             </label>
@@ -425,10 +461,12 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               value={formData.barangay ?? ''}
               placeholder={cityId ? 'Search barangay...' : 'Select city first'}
               disabled={isViewMode || !cityId}
+              hasError={!!fieldMessage('barangay')}
               refetchKey={cityId ?? ''}
               fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
-              onSelect={opt => updateField({ barangay: opt.name, barangayId: opt.id })}
+              onSelect={opt => { updateField({ barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
             />
+            {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
           </div>
         </div>
 

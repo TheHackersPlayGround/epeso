@@ -39,7 +39,7 @@ const SLP_TRACKS = [
   'Employment',
 ]
 
-const STATUS_OPTIONS: SLPFormData['status'][] = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+const STATUS_OPTIONS: SLPFormData['status'][] = ['Planned', 'Ongoing', 'Completed']
 
 // Previously-saved attachments (loaded back from the server) don't carry a
 // browser File's MIME type, only a fileName — fall back to the extension so

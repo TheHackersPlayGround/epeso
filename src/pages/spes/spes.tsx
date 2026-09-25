@@ -21,7 +21,7 @@ interface SPESViewProps {
   onBack: () => void
 }
 
-const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Inactive', 'Completed', 'Cancelled']
+const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Inactive', 'Completed']
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -564,11 +564,16 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   </div>
                 )}
               </div>
+              {!canChange && (
+                <p className="px-6 py-3 text-xs text-gray-500 bg-gray-50 border-t border-gray-100 flex-shrink-0">
+                  This batch is already {batch?.status}, so the assignment can no longer be changed or removed. Unassign and Change Batch are only available while the batch is Planned.
+                </p>
+              )}
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                 <button
                   onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)}
                   disabled={!canChange || !canManage('spes')}
-                  title={!canChange ? 'This batch is no longer Open — unassigning would erase the only record of this assignment.' : undefined}
+                  title={!canChange ? 'This batch is no longer Planned — unassigning would erase the only record of this assignment.' : undefined}
                   className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Unassign</button>
                 <button

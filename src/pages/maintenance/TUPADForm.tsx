@@ -90,6 +90,9 @@ export default function TUPADForm({
     if (!formData.title.trim()) {
       errors.push({ field: 'title', message: 'Title / Name is required.', focus: () => titleRef.current?.focus() })
     }
+    if (!formData.date) {
+      errors.push({ field: 'date', message: 'Date is required.', focus: () => document.getElementById('tupad-date')?.focus() })
+    }
     if (facilitator && !NAME_REGEX.test(facilitator)) {
       errors.push({ field: 'facilitator', message: 'Person In Charge / Facilitator must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
     }
@@ -153,14 +156,17 @@ export default function TUPADForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="tupad-date" className={labelCls}>Date</label>
+            <label htmlFor="tupad-date" className={labelCls}>
+              Date <span className="text-red-500">*</span>
+            </label>
             <DatePicker
               id="tupad-date"
-              className={inputCls}
+              className={`${inputCls} ${errCls('date')}`}
               value={formData.date}
               readOnly={isView}
-              onChange={value => field('date', value)}
+              onChange={value => { field('date', value); clearFieldError('date') }}
             />
+            {fieldMessage('date') && <p className="text-red-500 text-xs mt-1">{fieldMessage('date')}</p>}
           </div>
           <div>
             <label htmlFor="tupad-location" className={labelCls}>Location / Venue</label>

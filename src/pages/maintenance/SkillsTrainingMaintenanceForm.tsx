@@ -283,6 +283,10 @@ export default function SkillsTrainingMaintenanceForm() {
   const [zeroParticipantsAlert, setZeroParticipantsAlert] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [deleteBatchConfirm, setDeleteBatchConfirm] = useState<SkillsTrainingBatch | null>(null)
+  const [editingBatch, setEditingBatch] = useState<SkillsTrainingBatch | null>(null)
+  const [editBatchName, setEditBatchName] = useState('')
+  const [editBatchError, setEditBatchError] = useState('')
+  const [isUpdatingBatch, setIsUpdatingBatch] = useState(false)
   const [attendanceIncompleteModal, setAttendanceIncompleteModal] = useState<{ isOpen: boolean; activity: SkillsTrainingActivity | null; unmarked: number }>({ isOpen: false, activity: null, unmarked: 0 })
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -455,6 +459,43 @@ export default function SkillsTrainingMaintenanceForm() {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to add batch.') })
     } finally {
       setIsSavingBatch(false)
+    }
+  }
+
+  const openEditBatch = (b: SkillsTrainingBatch) => {
+    setEditingBatch(b)
+    setEditBatchName(b.batchName)
+    setEditBatchError('')
+  }
+
+  const closeEditBatch = () => {
+    if (isUpdatingBatch) return
+    setEditingBatch(null)
+    setEditBatchError('')
+  }
+
+  const handleUpdateBatch = async () => {
+    if (!editingBatch || isUpdatingBatch) return
+    const name = editBatchName.trim()
+    if (!name) { setEditBatchError('Batch name is required.'); return }
+    if (name === editingBatch.batchName) { setEditingBatch(null); return }
+    if (batches.some(b => b.id !== editingBatch.id && b.batchName.toLowerCase() === name.toLowerCase())) {
+      setEditBatchError('This batch already exists.')
+      return
+    }
+    setIsUpdatingBatch(true)
+    try {
+      await skillsTrainingService.updateBatch(editingBatch.id, { batchName: name })
+      // Trainings and applicants show the batch name by joining on its id, so
+      // they need a reload to pick up the new name too.
+      await Promise.all([refreshBatches(), refreshActivities(), refreshProfiles()])
+      if (trainingBatchFilter === editingBatch.batchName) setTrainingBatchFilter(name)
+      setEditingBatch(null)
+      setResultModal({ isOpen: true, type: 'success', title: 'Batch Updated', message: `The batch has been renamed to ${name}.` })
+    } catch (e) {
+      setEditBatchError(errMsg(e, 'Failed to update batch.'))
+    } finally {
+      setIsUpdatingBatch(false)
     }
   }
 
@@ -991,7 +1032,7 @@ export default function SkillsTrainingMaintenanceForm() {
                   <tr>
                     <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Batch Number</th>
                     <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Trainings Count</th>
-                    <th className="px-6 py-4 w-16 text-center text-sm text-gray-700 font-semibold">Actions</th>
+                    <th className="px-6 py-4 w-28 text-center text-sm text-gray-700 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1009,10 +1050,21 @@ export default function SkillsTrainingMaintenanceForm() {
                           : <span className="text-gray-400 text-sm">None</span>}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button onClick={() => confirmDeleteBatch(b)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openEditBatch(b)}
+                            disabled={!canManage('skills-maintenance')}
+                            title="Edit batch name"
+                            aria-label={`Edit ${b.batchName}`}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-brand-blue transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => confirmDeleteBatch(b)}
+                            title="Delete batch"
+                            aria-label={`Delete ${b.batchName}`}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1037,6 +1089,40 @@ export default function SkillsTrainingMaintenanceForm() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Edit batch name modal ── */}
+      {editingBatch !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-gray-800 m-0 text-lg mb-1">Edit Batch</h3>
+            <p className="text-gray-500 text-sm mb-5">
+              Renaming a batch updates its trainings and applicants too.
+            </p>
+            <label htmlFor="st-edit-batch-name" className={labelCls}>Batch Name <span className="text-red-500">*</span></label>
+            <input
+              id="st-edit-batch-name"
+              type="text"
+              autoFocus
+              value={editBatchName}
+              onChange={e => { setEditBatchName(e.target.value); setEditBatchError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleUpdateBatch()}
+              className={`${inputCls} ${editBatchError ? 'border-red-500 ring-2 ring-red-200' : ''}`}
+            />
+            {editBatchError && <p className="text-red-500 text-xs mt-1">{editBatchError}</p>}
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={closeEditBatch} disabled={isUpdatingBatch}
+                className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleUpdateBatch} disabled={isUpdatingBatch}
+                className="px-5 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                {isUpdatingBatch && <Loader2 size={16} className="animate-spin" />}
+                {isUpdatingBatch ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

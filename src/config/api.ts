@@ -191,6 +191,7 @@ export const ENDPOINTS = {
   skillsTraining: {
     listBatches:              '/skills_training/listBatches',
     createBatch:              '/skills_training/createBatch',
+    updateBatch:              '/skills_training/updateBatch',
     deleteBatch:              '/skills_training/deleteBatch',
     listActivities:           '/skills_training/listActivities',
     createActivity:           '/skills_training/createActivity',

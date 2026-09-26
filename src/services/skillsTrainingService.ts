@@ -9,6 +9,10 @@ export function createBatch(data: { batchName: string; description?: string }) {
   return axiosClient.post(ENDPOINTS.skillsTraining.createBatch, data).then(r => r.data)
 }
 
+export function updateBatch(id: number, data: { batchName: string }) {
+  return axiosClient.put(`${ENDPOINTS.skillsTraining.updateBatch}/${id}`, data).then(r => r.data)
+}
+
 export function deleteBatch(id: number) {
   return axiosClient.delete(`${ENDPOINTS.skillsTraining.deleteBatch}/${id}`).then(r => r.data)
 }

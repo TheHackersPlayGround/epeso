@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
@@ -67,9 +67,11 @@ function StatusBadge({ status }: { status: OFWProfile['status'] }) {
   )
 }
 
+type MenuPos = { top: number; left: number; anchorTop: number; anchorBottom: number }
+
 interface ActionMenuProps {
   profile: OFWProfile
-  pos: { top: number; left: number }
+  pos: MenuPos
   menuRef: React.RefObject<HTMLDivElement | null>
   onView: () => void
   onEdit: () => void
@@ -79,13 +81,27 @@ interface ActionMenuProps {
 }
 
 function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onDelete, onClose }: ActionMenuProps) {
+  // The menu's height changes with the record's status (Approve/Reject vs.
+  // Start Processing vs. Mark as Completed), so a hardcoded guess drifts stale.
+  // Measure the real rendered height right after mount -- before the browser
+  // paints -- and flip above the button (or clamp) when it wouldn't fit below.
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const height = el.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - pos.anchorBottom
+    const showAbove = spaceBelow < height + 8 && pos.anchorTop > height
+    const top = Math.max(8, showAbove ? pos.anchorTop - height - 4 : Math.min(pos.anchorBottom + 4, window.innerHeight - height - 8))
+    el.style.top = `${top}px`
+  }, [pos, menuRef])
+
   return ReactDOM.createPortal(
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
         ref={menuRef}
-        className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52"
-        style={{ top: pos.top, left: pos.left }}
+        className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 overflow-y-auto"
+        style={{ top: pos.top, left: pos.left, maxHeight: 'calc(100vh - 16px)' }}
       >
         <button onClick={() => { onView(); onClose() }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -157,7 +173,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   // Action menu (portal)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
+  const [menuPos, setMenuPos] = useState<MenuPos>({ top: 0, left: 0, anchorTop: 0, anchorBottom: 0 })
   const menuRef = useRef<HTMLDivElement | null>(null)
 
   // Export dropdown
@@ -198,7 +214,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, id: number) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    setMenuPos({ top: rect.bottom + 4, left: rect.right - 208 })
+    setMenuPos({ top: rect.bottom + 4, left: rect.right - 208, anchorTop: rect.top, anchorBottom: rect.bottom })
     setOpenMenuId(prev => (prev === id ? null : id))
   }
 

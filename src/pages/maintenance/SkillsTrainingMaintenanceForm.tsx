@@ -985,19 +985,6 @@ export default function SkillsTrainingMaintenanceForm() {
                 </div>
                 <p className="text-gray-400 text-sm mt-2">Press Enter or click "Add Batch" to save.</p>
               </div>
-
-              {batches.length > 0 && (
-                <div className="pt-2">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Current Batches in Skills Training</p>
-                  <div className="flex flex-wrap gap-2">
-                    {batches.map(b => (
-                      <span key={b.id} className="px-3 py-1.5 border border-brand-blue text-brand-blue rounded-full text-sm">
-                        {b.batchName}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

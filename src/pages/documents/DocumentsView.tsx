@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import {
   ArrowLeft, Upload, FolderPlus, Search, MoreVertical, Download, Eye,
   Edit2, Move, Trash2, X, File, FileText, Image as ImageIcon,
@@ -61,8 +61,20 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const [sortBy, setSortBy] = useState<SortKey>('date')
 
   const [expandedFolders, setExpandedFolders] = useState<string[]>(['root'])
+  // Set right after a folder is created so a one-shot effect can scroll its
+  // row into view once it's actually in the DOM (its ancestors may have just
+  // been expanded in the same update, adding rows above it).
+  const [pendingScrollFolderId, setPendingScrollFolderId] = useState<string | null>(null)
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const [activeFolderMenuId, setActiveFolderMenuId] = useState<string | null>(null)
+  // anchor is the trigger button's own position, set immediately on click;
+  // pos is the menu's final placement, corrected once its real rendered
+  // height is measured (see the layout effect below) -- this is what lets
+  // the menu flip above the row instead of forcing the sidebar's scroll
+  // container to grow when there's no room below.
+  const [folderMenuAnchor, setFolderMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
+  const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const folderMenuRef = useRef<HTMLDivElement>(null)
 
   // Modals – folder
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false)
@@ -97,7 +109,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const [filePreview, setFilePreview] = useState<{ isOpen: boolean; fileName: string; fileUrl: string; type: string }>({ isOpen: false, fileName: '', fileUrl: '', type: '' })
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
-  const getChildFolders = (parentId: string) => folders.filter(f => f.parentId === parentId)
+  const getChildFolders = (parentId: string) =>
+    folders
+      .filter(f => f.parentId === parentId)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
 
   const getFolderItemCount = (folderId: string) => files.filter(f => f.folderId === folderId).length
 
@@ -113,6 +128,44 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
 
   const toggleFolder = (id: string) =>
     setExpandedFolders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  // id itself plus every folder above it up to (and including) root.
+  const getAncestorIds = (id: string): string[] => {
+    const ids: string[] = []
+    let cur: string | null = id
+    while (cur) {
+      ids.push(cur)
+      cur = folders.find(f => f.id === cur)?.parentId ?? null
+    }
+    return ids
+  }
+
+  useEffect(() => {
+    if (!pendingScrollFolderId) return
+    document.getElementById(`folder-row-${pendingScrollFolderId}`)?.scrollIntoView({ block: 'nearest' })
+    setPendingScrollFolderId(null)
+  }, [pendingScrollFolderId, expandedFolders])
+
+  useLayoutEffect(() => {
+    if (activeFolderMenuId === null || !folderMenuAnchor || !folderMenuRef.current) return
+    const height = folderMenuRef.current.getBoundingClientRect().height
+    const spaceBelow = window.innerHeight - folderMenuAnchor.bottom
+    const showAbove = spaceBelow < height + 8 && folderMenuAnchor.top > height
+    const top = Math.max(8, showAbove ? folderMenuAnchor.top - height - 4 : Math.min(folderMenuAnchor.bottom + 4, window.innerHeight - height - 8))
+    setFolderMenuPos(prev => (prev && prev.top === top && prev.right === folderMenuAnchor.right) ? prev : { top, right: folderMenuAnchor.right })
+  }, [activeFolderMenuId, folderMenuAnchor])
+
+  function toggleFolderMenu(e: React.MouseEvent, id: string) {
+    if (activeFolderMenuId === id) {
+      setActiveFolderMenuId(null)
+      return
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const right = window.innerWidth - rect.right
+    setFolderMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
+    setFolderMenuPos({ top: rect.bottom + 4, right })
+    setActiveFolderMenuId(id)
+  }
 
   const getFileIcon = (type: string, size = 40) => {
     switch (type) {
@@ -220,9 +273,14 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     setIsNewFolderModalOpen(false)
     setNewFolderName('')
     try {
-      await documentsService.createFolder({ name, parentId })
+      const result = await documentsService.createFolder({ name, parentId })
       await refreshFolders()
-      setExpandedFolders(prev => [...prev, parentId])
+      const newId = result?.data?.id as string | undefined
+      setExpandedFolders(prev => [...new Set([...prev, ...getAncestorIds(parentId)])])
+      if (newId) {
+        setSelectedFolder(newId)
+        setPendingScrollFolderId(newId)
+      }
       setSuccessModal({ open: true, message: 'Folder created successfully!' })
     } catch (err) {
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to create the folder.' })
@@ -383,7 +441,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       return (
         <div key={folder.id}>
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors relative group"
+            id={`folder-row-${folder.id}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors relative group ${isSelected ? '' : 'hover:bg-gray-100'}`}
             style={{
               paddingLeft: `${12 + level * 16}px`,
               backgroundColor: isSelected ? BRAND : undefined,
@@ -400,27 +459,11 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             <span className="text-sm flex-1">{folder.name}</span>
             <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>{getFolderItemCount(folder.id)}</span>
             <div
-              onClick={e => { e.stopPropagation(); setActiveFolderMenuId(activeFolderMenuId === folder.id ? null : folder.id) }}
+              onClick={e => { e.stopPropagation(); toggleFolderMenu(e, folder.id) }}
               className={`p-1 rounded hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity ${activeFolderMenuId === folder.id ? 'opacity-100' : ''}`}
             >
               <MoreVertical size={14} className={isSelected ? 'text-white' : 'text-gray-600'} />
             </div>
-            {activeFolderMenuId === folder.id && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={e => { e.stopPropagation(); setActiveFolderMenuId(null) }} />
-                <div className="absolute right-2 top-full mt-1 w-40 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20">
-                  <button onClick={e => { e.stopPropagation(); setFolderToEdit(folder); setEditFolderName(folder.name); setIsEditFolderModalOpen(true); setActiveFolderMenuId(null) }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                    <Edit2 size={14} /> Rename
-                  </button>
-                  <div className="border-t border-gray-200 my-1" />
-                  <button onClick={e => { e.stopPropagation(); setActiveFolderMenuId(null); setDeleteFolderConfirm({ open: true, id: folder.id }) }} disabled={!canManage('documents')}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
-                    <Trash2 size={14} /> Delete
-                  </button>
-                </div>
-              </>
-            )}
           </div>
           {hasChildren && isExpanded && renderFolderTree(folder.id, level + 1)}
         </div>
@@ -701,12 +744,37 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar */}
-          <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
-            <div className="p-4">
-              <p className="text-base font-bold text-gray-700 uppercase tracking-wide mb-3">Folders</p>
+          <div className="w-64 bg-white border-r-2 border-gray-300 flex-shrink-0 flex flex-col overflow-hidden">
+            <p className="text-base font-bold text-gray-700 uppercase tracking-wide flex-shrink-0 px-4 pt-4 pb-3">Folders</p>
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
               {renderFolderTree('root')}
             </div>
           </div>
+
+          {activeFolderMenuId !== null && folderMenuPos && (() => {
+            const menuFolder = folders.find(f => f.id === activeFolderMenuId)
+            if (!menuFolder) return null
+            return (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setActiveFolderMenuId(null)} />
+                <div
+                  ref={folderMenuRef}
+                  style={{ position: 'fixed', top: folderMenuPos.top, right: folderMenuPos.right }}
+                  className="w-40 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50"
+                >
+                  <button onClick={() => { setFolderToEdit(menuFolder); setEditFolderName(menuFolder.name); setIsEditFolderModalOpen(true); setActiveFolderMenuId(null) }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Edit2 size={14} /> Rename
+                  </button>
+                  <div className="border-t border-gray-200 my-1" />
+                  <button onClick={() => { setActiveFolderMenuId(null); setDeleteFolderConfirm({ open: true, id: menuFolder.id }) }} disabled={!canManage('documents')}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Main content */}
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -794,9 +862,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
                       </div>
                       <div className="flex flex-col items-center text-center">
                         <div className="mb-3">{getFileIcon(file.type)}</div>
-                        <p className="text-sm font-medium text-gray-800 mb-1 line-clamp-2 w-full">{file.name}</p>
-                        <p className="text-xs text-gray-500">{file.uploadedDate}</p>
-                        <p className="text-xs text-gray-500">{file.size}</p>
+                        <p className="text-sm font-medium text-gray-800 mb-1 line-clamp-2 break-words w-full">{file.name}</p>
+                        <p className="text-xs text-gray-500">{file.uploadedDate} · {file.size} · {file.uploadedBy}</p>
                       </div>
                     </div>
                   ))}

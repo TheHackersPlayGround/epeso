@@ -31,7 +31,7 @@ export function restoreBackup(name: string) {
     .then(r => r.data)
 }
 
-// For when the on-server copy was deleted and the admin only has a .sql/.zip
+// For when the on-server copy was deleted and the admin only has a .zip
 // saved externally (USB drive, cloud folder, etc.) -- uploads it, saves it
 // into the server's backups/ folder under a fresh name, then restores from
 // it the same way restoreBackup() does (including the automatic pre-restore

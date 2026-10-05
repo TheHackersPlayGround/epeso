@@ -168,7 +168,7 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
   const [confirmPassword,     setConfirmPassword]     = useState('')
   const [passwordError,       setPasswordError]       = useState('')
 
-  const inp = 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none text-gray-900 placeholder:text-gray-400'
+  const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none text-gray-900 placeholder:text-gray-400'
 
   // Validate the optional password change (edit only) before handing control to the parent.
   // The new password is passed up so it actually reaches the backend.
@@ -185,30 +185,30 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-          <h3 className="text-gray-800 m-0">{isEdit ? 'Edit User' : 'Add New User'}</h3>
+          <h3 className="text-lg font-semibold text-gray-800 m-0">{isEdit ? 'Edit User' : 'Add New User'}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X size={20} /></button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
           <div>
-            <h4 className="text-gray-700 mb-4">Basic Information</h4>
+            <h4 className="text-base font-semibold text-gray-700 mb-4">Basic Information</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-700 mb-2">First Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                 <input type="text" value={formData.firstName} onChange={e => onFormChange('firstName', e.target.value)} className={inp} placeholder="Enter first name" />
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Last Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                 <input type="text" value={formData.lastName} onChange={e => onFormChange('lastName', e.target.value)} className={inp} placeholder="Enter last name" />
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Username *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
                 <input type="text" value={formData.username} onChange={e => onFormChange('username', e.target.value)} className={inp} placeholder="Enter username" />
               </div>
 
               {!isEdit ? (
                 <div>
-                  <label className="block text-sm text-gray-700 mb-2">Password *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
                   <div className="relative">
                     <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={e => onFormChange('password', e.target.value)} className={`${inp} pr-10`} placeholder="Enter password" />
                     <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" onClick={() => setShowPassword(!showPassword)}>
@@ -218,8 +218,8 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm text-gray-700">Password</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium text-gray-700">Password</label>
                     {!changePassword ? (
                       <button type="button" onClick={() => setChangePassword(true)} className="text-sm text-[#0077BE] hover:text-[#006699] font-medium">Change Password</button>
                     ) : (
@@ -228,7 +228,7 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
                   </div>
                   {!changePassword ? (
                     <div>
-                      <input type="text" value="••••••••••••" disabled className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-400" />
+                      <input type="text" value="••••••••••••" disabled className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-400" />
                       <p className="mt-1.5 text-xs text-gray-400">The password is encrypted and can't be displayed. Click "Change Password" to set a new one.</p>
                     </div>
                   ) : (
@@ -252,14 +252,14 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
               )}
 
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Role {!isEdit && '*'}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role {!isEdit && '*'}</label>
                 <select value={formData.role} onChange={e => onRoleChange(e.target.value)} className={inp}>
                   <option value="Staff">Staff</option>
                   <option value="Administrator">Administrator</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-2">Status {!isEdit && '*'}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status {!isEdit && '*'}</label>
                 {/* New users always start Active; the status can be changed later via Edit. */}
                 <select value={formData.status} onChange={e => onFormChange('status', e.target.value)} disabled={!isEdit}
                   className={`${inp} ${!isEdit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}>
@@ -271,7 +271,7 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
           </div>
 
           <div>
-            <h4 className="text-gray-700 mb-4">Access Control & Permissions</h4>
+            <h4 className="text-base font-semibold text-gray-700 mb-4">Access Control & Permissions</h4>
             {formData.role === 'Administrator' && (
               <div className="mb-3 px-4 py-2.5 rounded-lg bg-purple-50 border border-purple-200 text-xs text-purple-700">
                 Administrators automatically have full access to all modules. Permissions can't be customized for this role.
@@ -309,8 +309,8 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-          <button onClick={handleSubmitClick} className="px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+          <button onClick={handleSubmitClick} className="px-4 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
             {isEdit ? 'Save Changes' : 'Add User'}
           </button>
         </div>
@@ -472,14 +472,14 @@ export default function SystemUsersTab() {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden min-h-[75vh]">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h3 className="text-gray-800 m-0">System Users</h3>
             <span className="text-sm text-gray-400">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found</span>
           </div>
-          <button onClick={handleOpenAddModal} disabled={!canManage('security')} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0077BE]">
-            <UserPlus size={18} />
+          <button onClick={handleOpenAddModal} disabled={!canManage('security')} className="flex items-center gap-2 px-4 py-2 bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0077BE]">
+            <UserPlus size={16} />
             Add User
           </button>
         </div>

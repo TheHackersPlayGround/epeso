@@ -8,7 +8,7 @@ import * as slpService from '../../services/slpService'
 import { useSLP } from '../../contexts/SLPContext'
 import type { SLPApplicant, SLPProject } from '../../contexts/SLPContext'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
-import SLPProfileForm, { EMPTY_SLP_RECORD } from './SLPProfileForm'
+import SLPProfileForm, { EMPTY_SLP_RECORD, ASSESSMENT_RESULT_OPTIONS } from './SLPProfileForm'
 import { downloadImportTemplate, importSlpApplicants, type ImportResult } from './slpImport'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
@@ -363,6 +363,95 @@ function FilterBadges({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ─── Update Assessment Result Modal ───────────────────────────────────────────
+// Quick change of just the Assessment Result, without opening the full Edit
+// form. The server refuses Not Qualified while the beneficiary is still
+// assigned to a Planned project; that message is shown here and the dialog
+// stays open.
+
+type UpdateAssessmentModalProps = {
+  beneficiary: SLPApplicant
+  onClose: () => void
+  onSave: (id: number, assessmentResult: string) => Promise<void>
+}
+
+function UpdateAssessmentModal({ beneficiary, onClose, onSave }: UpdateAssessmentModalProps) {
+  const [selected, setSelected] = useState(beneficiary.assessmentResult || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSave() {
+    if (!selected) { setError('Please select an assessment result.'); return }
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(beneficiary.id, selected)
+    } catch (e: unknown) {
+      setError(errMsg(e, 'Failed to update the assessment result.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Update Assessment Result</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close update assessment result modal"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            Updating assessment result for <span className="font-semibold text-gray-800">{formatDisplayName(beneficiary)}</span>
+          </p>
+
+          <div>
+            <label htmlFor="slp-quick-assessmentResult" className="block text-xs font-semibold uppercase text-gray-700 mb-1">
+              Assessment Result
+            </label>
+            <select
+              id="slp-quick-assessmentResult"
+              value={selected}
+              onChange={e => { setSelected(e.target.value); setError('') }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900"
+            >
+              {!beneficiary.assessmentResult && <option value="">Select result</option>}
+              {ASSESSMENT_RESULT_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          {error && <p className="text-red-500 text-sm m-0">{error}</p>}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -726,11 +815,12 @@ type BeneficiaryTableProps = {
   onView: (b: SLPApplicant) => void
   onEdit: (b: SLPApplicant) => void
   onRemove: (id: number, name: string) => void
+  onUpdateAssessment: (b: SLPApplicant) => void
   onAssignProject: (b: SLPApplicant) => void
   onViewAssignedProject: (b: SLPApplicant) => void
 }
 
-function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onUpdateAssessment, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is set immediately on click (button's own position); pos is the
   // menu's actual final placement, corrected by measuring the menu's real
@@ -898,6 +988,7 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
           >
             <button onClick={() => { onView(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
+            <button onClick={() => { onUpdateAssessment(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Assessment Result</button>
             {menuBeneficiary.projectName
               ? <button onClick={() => { onViewAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
               : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
@@ -922,6 +1013,7 @@ export default function SLPTab() {
   const [viewingBeneficiary, setViewingBeneficiary] = useState<SLPApplicant | null>(null)
   const [editingBeneficiary, setEditingBeneficiary] = useState<SLPApplicant | null>(null)
   const [assigningBeneficiary, setAssigningBeneficiary] = useState<SLPApplicant | null>(null)
+  const [updatingAssessment, setUpdatingAssessment] = useState<SLPApplicant | null>(null)
   const [isAssigning, setIsAssigning] = useState(false)
   const [viewingAssignedProject, setViewingAssignedProject] = useState<SLPApplicant | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -974,6 +1066,15 @@ export default function SLPTab() {
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove beneficiary.') })
     }
+  }
+
+  // Throws on failure so UpdateAssessmentModal can show the server's message
+  // (e.g. "Unassign them from the project first...") and stay open.
+  async function handleUpdateAssessment(id: number, assessmentResult: string) {
+    await slpService.updateAssessmentResult(id, assessmentResult)
+    await refreshProfiles()
+    setUpdatingAssessment(null)
+    setResultModal({ isOpen: true, type: 'success', title: 'Assessment Result Updated', message: `Assessment result set to ${assessmentResult}.` })
   }
 
   async function handleAssignProject(beneficiary: SLPApplicant, projectId: number) {
@@ -1151,6 +1252,14 @@ export default function SLPTab() {
 
   return (
     <div className="space-y-4">
+      {updatingAssessment && (
+        <UpdateAssessmentModal
+          beneficiary={updatingAssessment}
+          onClose={() => setUpdatingAssessment(null)}
+          onSave={handleUpdateAssessment}
+        />
+      )}
+
       {assigningBeneficiary && (
         <AssignProjectModal
           beneficiary={assigningBeneficiary}
@@ -1247,6 +1356,7 @@ export default function SLPTab() {
           onView={setViewingBeneficiary}
           onEdit={setEditingBeneficiary}
           onRemove={handleConfirmRemove}
+          onUpdateAssessment={setUpdatingAssessment}
           onAssignProject={setAssigningBeneficiary}
           onViewAssignedProject={setViewingAssignedProject}
         />

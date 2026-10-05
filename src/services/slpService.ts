@@ -54,3 +54,7 @@ export function assignProject(applicantId: number, projectId: number) {
 export function unassignProject(applicantId: number) {
   return axiosClient.post(ENDPOINTS.slp.unassignProject, { applicantId }).then(r => r.data)
 }
+
+export function updateAssessmentResult(applicantId: number, assessmentResult: string) {
+  return axiosClient.post(ENDPOINTS.slp.updateAssessmentResult, { applicantId, assessmentResult }).then(r => r.data)
+}

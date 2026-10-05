@@ -5,6 +5,7 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { canManage } from '../../utils/permissions'
 import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -369,7 +370,8 @@ export default function SPESMaintenanceForm({
                       className={`${inputCls} ${errCls('availableSlots')}`}
                       placeholder="e.g. 100"
                       value={form.availableSlots}
-                      onChange={e => set('availableSlots', e.target.value)}
+                      onKeyDown={blockNonWholeNumberKeys}
+                      onChange={e => set('availableSlots', keepWholeNumber(e.target.value))}
                     />
                   </Field>
                 )}

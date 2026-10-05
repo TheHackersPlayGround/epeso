@@ -166,6 +166,7 @@ export const ENDPOINTS = {
     deleteProfile:      '/slp/deleteProfile',
     assignProject:      '/slp/assignProject',
     unassignProject:    '/slp/unassignProject',
+    updateAssessmentResult: '/slp/updateAssessmentResult',
     listDeleted:        '/slp/listDeleted',
     restoreRecord:      '/slp/restoreRecord',
     purgeRecord:        '/slp/purgeRecord',

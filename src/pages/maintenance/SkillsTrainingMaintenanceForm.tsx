@@ -10,6 +10,7 @@ import { canManage } from '../../utils/permissions'
 import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import type { SkillsTrainingBatch, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
 import * as skillsTrainingService from '../../services/skillsTrainingService'
+import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -188,12 +189,16 @@ function TrainingForm({
                     )}
                   </div>
                   <div>
-                    <label className={labelCls}>Number of Participants / Beneficiaries</label>
+                    <label className={labelCls}>Number of Participants / Beneficiaries <span className="text-red-500">*</span></label>
                     {isView ? (
                       <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">{form.participants || '—'}</div>
                     ) : (
-                      <input type="number" min="0" value={form.participants} onChange={e => onChange('participants', e.target.value)}
-                        placeholder="Enter number" className={inputCls} />
+                      <>
+                        <input type="number" min="1" value={form.participants} onKeyDown={blockNonWholeNumberKeys}
+                          onChange={e => onChange('participants', keepWholeNumber(e.target.value))}
+                          placeholder="Enter number" className={`${inputCls} ${errors.participants ? 'border-red-400' : ''}`} />
+                        {errors.participants && <p className="text-red-500 text-xs mt-1">{errors.participants}</p>}
+                      </>
                     )}
                   </div>
                 </div>
@@ -271,6 +276,7 @@ export default function SkillsTrainingMaintenanceForm() {
   const [trainingSubView, setTrainingSubView]           = useState<TrainingSubView>('')
   const [selectedTraining, setSelectedTraining]         = useState<SkillsTrainingActivity | null>(null)
   const [editForm, setEditForm]                         = useState(blank)
+  const [editErrors, setEditErrors]                       = useState<Record<string, string>>({})
   const [activityParticipants, setActivityParticipants] = useState<ParticipantRecord[]>([])
   const [loadingParticipants, setLoadingParticipants]   = useState(false)
   const [trainingStatusConfirm, setTrainingStatusConfirm] = useState<{
@@ -348,10 +354,15 @@ export default function SkillsTrainingMaintenanceForm() {
 
   const resetAdd = () => { setAddForm(blank); setAddErrors({}) }
 
+  // Slot count: required, whole number of at least 1 (0 and blank are not allowed).
+  const slotError = (value: string) =>
+    /^\d+$/.test(value.trim()) && Number(value) >= 1 ? '' : 'Number of Participants must be a whole number of at least 1.'
+
   const validateAdd = () => {
     const errs: Record<string, string> = {}
     if (!addForm.selectedBatch) errs.selectedBatch = 'Please select a training batch'
     if (!addForm.title.trim())  errs.title         = 'Title is required'
+    if (slotError(addForm.participants)) errs.participants = slotError(addForm.participants)
     setAddErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -367,7 +378,7 @@ export default function SkillsTrainingMaintenanceForm() {
         date: addForm.date,
         location: addForm.location.trim(),
         facilitator: addForm.facilitator.trim(),
-        participants: addForm.participants ? Number(addForm.participants) : 0,
+        participants: Number(addForm.participants),
       })
       await Promise.all([refreshActivities(), refreshBatches()])
       resetAdd()
@@ -386,6 +397,9 @@ export default function SkillsTrainingMaintenanceForm() {
       setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Title is required.' })
       return
     }
+    const participantsError = slotError(editForm.participants)
+    setEditErrors(participantsError ? { participants: participantsError } : {})
+    if (participantsError) return
     if (editForm.status === 'Ongoing' && (selectedTraining.assignedCount ?? 0) === 0) {
       setZeroParticipantsAlert(true)
       return
@@ -399,7 +413,7 @@ export default function SkillsTrainingMaintenanceForm() {
         date: editForm.date,
         location: editForm.location.trim(),
         facilitator: editForm.facilitator.trim(),
-        participants: editForm.participants ? Number(editForm.participants) : 0,
+        participants: Number(editForm.participants),
         status: editForm.status,
       })
       await Promise.all([refreshActivities(), refreshProfiles(), refreshBatches()])
@@ -732,6 +746,7 @@ export default function SkillsTrainingMaintenanceForm() {
         <TrainingForm
           mode={trainingSubView === 'edit' ? 'edit' : 'view'}
           form={formToUse}
+          errors={editErrors}
           batches={batches}
           onChange={setEdit}
           onSave={handleSaveEdit}

@@ -8,9 +8,9 @@ Every module section follows the same layout: **Required Fields**, **How to Add*
 
 ---
 
-## 1. Security — User Management
+## 1. Security — User Management & Backups
 
-The **System Users** tab (under Security) is where staff accounts are created and managed.
+The **System Users** tab (under Security) is where staff accounts are created and managed. Backups are covered at the end of this section.
 
 ### Roles: Administrator vs Staff
 
@@ -48,6 +48,24 @@ Note: the system won't let you delete the **last remaining Administrator account
 Each of the following can be set to **Viewer** or **Editor** for a Staff account:
 
 Employment Facilitation · CDSP · GIP · SPES · Livelihood · Skills Training · OFW · Documents · Maintenance · Security (Administrator-only) · Report
+
+### Data Management: Backups
+
+The **Data Management** tab (under Security) lets an Administrator create, recover, and delete backups of the system. Each backup is a full copy of the database and the uploaded files.
+
+#### How to Create a Backup
+
+1. Click **Backup Now**.
+2. Confirm the prompt — the new backup appears in the list with its name and size.
+
+#### Storage Warning
+
+Because every backup is a full copy, backups use up server storage over time. Once **20 or more backups** are stored, clicking **Backup Now** shows a **Storage Warning** instead of the usual prompt. It tells you how many backups are stored and their approximate total size.
+
+- Click **Cancel**, then **Delete** any backups you no longer need to free up space; or
+- Click **Backup Anyway** to create the new backup regardless.
+
+The warning is only a reminder — the system never blocks a backup, so you can always back up right before a risky change.
 
 ---
 

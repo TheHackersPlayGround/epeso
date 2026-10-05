@@ -11,6 +11,7 @@ import { useCDSP } from '../../contexts/CDSPContext'
 import type { CdspActivity } from '../../contexts/CDSPContext'
 import * as cdspService from '../../services/cdspService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ export default function CDSPMaintenanceForm() {
   const titleRef = useRef<HTMLInputElement>(null)
   const dateWrapRef = useRef<HTMLDivElement>(null)
   const facilitatorRef = useRef<HTMLInputElement>(null)
+  const participantsRef = useRef<HTMLInputElement>(null)
   const counselorRef = useRef<HTMLInputElement>(null)
 
   // Load participants when viewing
@@ -258,6 +260,9 @@ export default function CDSPMaintenanceForm() {
     if (!formData.date) {
       errors.push({ field: 'date', message: 'Activity date is required.', focus: () => dateWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
     }
+    if (!/^\d+$/.test(formData.participants.trim()) || Number(formData.participants) < 1) {
+      errors.push({ field: 'participants', message: 'Number of Participants must be a whole number of at least 1.', focus: () => participantsRef.current?.focus() })
+    }
     if (facilitator && !NAME_REGEX.test(facilitator)) {
       errors.push({ field: 'facilitator', message: 'Facilitator name must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
     }
@@ -275,7 +280,7 @@ export default function CDSPMaintenanceForm() {
       facilitator:     formData.facilitator || '',
       counselor:       formData.counselor || '',
       sessionDuration: formData.sessionDuration || '',
-      participants:    formData.participants ? parseInt(formData.participants) : null,
+      participants:    parseInt(formData.participants),
       status:          formData.status,
     }
 
@@ -497,10 +502,12 @@ export default function CDSPMaintenanceForm() {
                   {fieldMessage('facilitator') && <p className="text-red-500 text-xs mt-1">{fieldMessage('facilitator')}</p>}
                 </div>
                 <div>
-                  <label className={labelCls}>Number of Participants</label>
-                  <input type="number" min="0" value={formData.participants} readOnly={isView}
-                    onChange={e => setFormData(p => ({ ...p, participants: e.target.value }))}
-                    className={inputCls} placeholder="0" />
+                  <label className={labelCls}>Number of Participants <span className="text-red-500">*</span></label>
+                  <input ref={participantsRef} type="number" min="1" value={formData.participants} readOnly={isView}
+                    onKeyDown={blockNonWholeNumberKeys}
+                    onChange={e => { setFormData(p => ({ ...p, participants: keepWholeNumber(e.target.value) })); clearFieldError('participants') }}
+                    className={`${inputCls} ${errCls('participants')}`} placeholder="Enter number" />
+                  {fieldMessage('participants') && <p className="text-red-500 text-xs mt-1">{fieldMessage('participants')}</p>}
                 </div>
               </div>
 

@@ -4,6 +4,7 @@ import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export default function TUPADForm({
 
   const titleRef = useRef<HTMLInputElement>(null)
   const facilitatorRef = useRef<HTMLInputElement>(null)
+  const participantsRef = useRef<HTMLInputElement>(null)
 
   function field<K extends keyof TUPADFormData>(key: K, value: TUPADFormData[K]) {
     onChange({ ...formData, [key]: value })
@@ -92,6 +94,9 @@ export default function TUPADForm({
     }
     if (!formData.date) {
       errors.push({ field: 'date', message: 'Date is required.', focus: () => document.getElementById('tupad-date')?.focus() })
+    }
+    if (!/^\d+$/.test(formData.participants.trim()) || Number(formData.participants) < 1) {
+      errors.push({ field: 'participants', message: 'Number of Participants must be a whole number of at least 1.', focus: () => participantsRef.current?.focus() })
     }
     if (facilitator && !NAME_REGEX.test(facilitator)) {
       errors.push({ field: 'facilitator', message: 'Person In Charge / Facilitator must contain letters only (no numbers or symbols).', focus: () => facilitatorRef.current?.focus() })
@@ -203,17 +208,20 @@ export default function TUPADForm({
             {fieldMessage('facilitator') && <p className="text-red-500 text-xs mt-1">{fieldMessage('facilitator')}</p>}
           </div>
           <div>
-            <label htmlFor="tupad-participants" className={labelCls}>Number of Participants / Beneficiaries</label>
+            <label htmlFor="tupad-participants" className={labelCls}>Number of Participants / Beneficiaries <span className="text-red-500">*</span></label>
             <input
               id="tupad-participants"
+              ref={participantsRef}
               type="number"
-              min="0"
+              min="1"
               value={formData.participants}
               readOnly={isView}
-              onChange={e => field('participants', e.target.value)}
-              className={inputCls}
+              onKeyDown={blockNonWholeNumberKeys}
+              onChange={e => { field('participants', keepWholeNumber(e.target.value)); clearFieldError('participants') }}
+              className={`${inputCls} ${errCls('participants')}`}
               placeholder="Enter number"
             />
+            {fieldMessage('participants') && <p className="text-red-500 text-xs mt-1">{fieldMessage('participants')}</p>}
           </div>
         </div>
 

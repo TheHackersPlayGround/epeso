@@ -3,6 +3,7 @@ import { Upload, X, FileText, Image as ImageIcon, Eye, Loader2 } from 'lucide-re
 import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
+import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,14 +179,15 @@ export default function CLPEPForm({
           </div>
 
           <div>
-            <label htmlFor="clpep-targetBeneficiaries" className={labelCls}>Target Beneficiaries</label>
+            <label htmlFor="clpep-targetBeneficiaries" className={labelCls}>Target Beneficiaries <span className="text-red-500">*</span></label>
             <input
               id="clpep-targetBeneficiaries"
               type="number"
-              min="0"
+              min="1"
               value={formData.targetBeneficiaries}
               readOnly={isView}
-              onChange={e => field('targetBeneficiaries', e.target.value)}
+              onKeyDown={blockNonWholeNumberKeys}
+              onChange={e => field('targetBeneficiaries', keepWholeNumber(e.target.value))}
               className={inputCls}
               placeholder="Enter target number"
             />

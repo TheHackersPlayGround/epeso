@@ -199,16 +199,21 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       return
     }
     let uploaded = 0
-    let failed = 0
+    // One line per failed file, e.g. "• report.pdf — already exists in this folder"
+    const failures: string[] = []
     for (const f of fileList) {
       try {
         const dataUrl = await readAsDataUrl(f)
         await documentsService.uploadDocument({ folderId: selectedFolder, fileName: f.name, dataUrl })
         uploaded++
-      } catch {
-        failed++
+      } catch (err) {
+        let reason = err instanceof Error ? err.message : 'Upload failed.'
+        // The server's duplicate message repeats the filename, so shorten it.
+        if (reason.includes('already exists')) reason = 'already exists in this folder'
+        failures.push(`• ${f.name} — ${reason}`)
       }
     }
+    const failed = failures.length
     await refreshDocuments()
 
     const folderNote = skippedFolders > 0
@@ -218,7 +223,13 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     if (failed === 0) {
       setSuccessModal({ open: true, message: (uploaded === 1 ? 'File uploaded successfully!' : `${uploaded} files uploaded successfully!`) + folderNote })
     } else {
-      setErrorModal({ open: true, message: `${uploaded} file(s) uploaded, ${failed} failed to upload.${folderNote}` })
+      const summary = uploaded === 0
+        ? (failed === 1 ? "This file couldn't be uploaded:" : "These files couldn't be uploaded:")
+        : `${uploaded} uploaded. ${failed} couldn't be uploaded:`
+      setErrorModal({
+        open: true,
+        message: `${summary}${folderNote}\n\n${failures.join('\n')}`,
+      })
     }
   }
 

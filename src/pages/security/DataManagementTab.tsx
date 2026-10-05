@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Database, Download, Trash2, RotateCcw, AlertTriangle, Loader2, UploadCloud } from 'lucide-react'
+import { Database, Download, Trash2, RotateCcw, AlertTriangle, Loader2, UploadCloud, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as backupService from '../../services/backupService'
 import type { BackupFile } from '../../services/backupService'
 import ConfirmModal from '../shared/ConfirmModal'
@@ -136,14 +136,41 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
   )
 }
 
+// Soft limit: past this many stored backups, "Backup Now" still works but asks
+// the admin to confirm first, since every backup is a full database + uploads
+// copy and they add up on the server's disk. Deliberately not a hard cap -- a
+// backup must never be refused right before a risky change.
+const BACKUP_WARNING_THRESHOLD = 20
+
+const BACKUPS_PER_PAGE = 5
+
+// The API returns sizes pre-formatted ("81.23 MB"); this sums them back into
+// one readable total for the warning message.
+function sumBackupSizes(backups: BackupFile[]): string {
+  const units: Record<string, number> = { bytes: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3 }
+  const total = backups.reduce((sum, b) => {
+    const [num, unit] = b.size.split(' ')
+    return sum + (parseFloat(num) || 0) * (units[unit?.toLowerCase()] ?? 0)
+  }, 0)
+  if (total >= units.gb) return `${(total / units.gb).toFixed(2)} GB`
+  return `${(total / units.mb).toFixed(0)} MB`
+}
+
 export default function DataManagementTab() {
   const [backups, setBackups] = useState<BackupFile[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(backups.length / BACKUPS_PER_PAGE))
+  // Clamped on read so deleting the last row of the final page lands on the
+  // previous page instead of an empty one.
+  const currentPage = Math.min(page, totalPages)
+  const pagedBackups = backups.slice((currentPage - 1) * BACKUPS_PER_PAGE, currentPage * BACKUPS_PER_PAGE)
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean; type: 'confirm' | 'success' | 'error'
-    title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
+    title: string; message: string; confirmText?: string; cancelText?: string
+    confirmVariant?: 'danger' | 'brand'; onConfirm: () => void
   }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; name: string | null }>({ open: false, name: null })
@@ -169,16 +196,21 @@ export default function DataManagementTab() {
   useEffect(() => { refreshBackups() }, [refreshBackups])
 
   const handleBackupDatabase = () => {
+    const overLimit = backups.length >= BACKUP_WARNING_THRESHOLD
     setConfirmModal({
-      isOpen: true, type: 'confirm', title: 'Backup Database',
-      message: 'This will create a secure backup of the entire system database. Do you want to proceed?',
-      confirmText: 'Yes, Backup Now', cancelText: 'Cancel',
+      isOpen: true, type: 'confirm', title: overLimit ? 'Storage Warning' : 'Backup Database',
+      message: overLimit
+        ? `You already have ${backups.length} backups stored (about ${sumBackupSizes(backups)}). Each new backup uses additional server storage.\n\nConsider downloading backups you need. Once saved, you can safely delete them from the system to free up space.\n\nCreate another backup anyway?`
+        : 'This will create a secure backup of the entire system database. Do you want to proceed?',
+      confirmText: overLimit ? 'Backup Anyway' : 'Yes, Backup Now', cancelText: 'Cancel',
+      confirmVariant: overLimit ? 'danger' : 'brand',
       onConfirm: async () => {
         closeModal()
         setCreating(true)
         try {
           const res = await backupService.createBackup()
           await refreshBackups()
+          setPage(1)
           setConfirmModal({
             isOpen: true, type: 'success', title: 'Backup Successful',
             message: `Database backup created successfully!\n\nBackup file: ${res.data.name} (${res.data.size})`,
@@ -215,8 +247,8 @@ export default function DataManagementTab() {
     if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file) return
     const ext = file.name.toLowerCase().split('.').pop()
-    if (ext !== 'sql' && ext !== 'zip') {
-      showError('Only .sql or .zip backup files are accepted.')
+    if (ext !== 'zip') {
+      showError('Only .zip backup files are accepted.')
       return
     }
     setRestoreTarget({ kind: 'upload', file })
@@ -271,7 +303,7 @@ export default function DataManagementTab() {
                   <h4 className="text-gray-800 mb-1">Restore from File</h4>
                   <p className="text-gray-600 text-sm">If a backup was deleted here but you still have a copy saved elsewhere</p>
                 </div>
-                <input ref={fileInputRef} type="file" accept=".sql,.zip" className="hidden"
+                <input ref={fileInputRef} type="file" accept=".zip" className="hidden"
                   onChange={e => handleFilePicked(e.target.files?.[0])} />
                 <button onClick={() => fileInputRef.current?.click()}
                   className="flex-shrink-0 px-5 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium shadow-sm hover:shadow-md whitespace-nowrap">
@@ -292,8 +324,9 @@ export default function DataManagementTab() {
           ) : backups.length === 0 ? (
             <p className="text-gray-400 text-sm py-6 text-center">No backups yet — click "Backup Now" to create one.</p>
           ) : (
+            <>
             <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
-              {backups.map(b => (
+              {pagedBackups.map(b => (
                 <div key={b.name} className="flex items-center justify-between px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{b.name}</p>
@@ -316,6 +349,18 @@ export default function DataManagementTab() {
                 </div>
               ))}
             </div>
+            {backups.length > BACKUPS_PER_PAGE && (
+              <div className="flex items-center justify-end gap-1 mt-3">
+                <button onClick={() => setPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft size={16} /></button>
+                <span className="text-sm text-gray-700 px-2">
+                  {(currentPage - 1) * BACKUPS_PER_PAGE + 1}–{Math.min(currentPage * BACKUPS_PER_PAGE, backups.length)} of {backups.length}
+                </span>
+                <button onClick={() => setPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight size={16} /></button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
@@ -323,6 +368,7 @@ export default function DataManagementTab() {
       <ConfirmModal
         isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title}
         message={confirmModal.message} confirmText={confirmModal.confirmText} cancelText={confirmModal.cancelText}
+        confirmVariant={confirmModal.confirmVariant}
         onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
       <ConfirmModal

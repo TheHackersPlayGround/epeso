@@ -73,8 +73,11 @@ export async function listDeleted(): Promise<RecycleBinRecord[]> {
 }
 
 // POST {module}/restoreRecord  { recordType, id }
-export async function restoreRecord(recordType: RecycleRecordType, id: number): Promise<void> {
-  await axiosClient.post(endpointsFor(recordType).restoreRecord, { recordType, id })
+// Returns the new name if the backend had to rename the record on restore
+// (Documents only: its name was reused while it sat in the bin), else null.
+export async function restoreRecord(recordType: RecycleRecordType, id: number): Promise<string | null> {
+  const res = await axiosClient.post(endpointsFor(recordType).restoreRecord, { recordType, id })
+  return res.data?.data?.renamedTo ?? null
 }
 
 // POST {module}/purgeRecord  { recordType, id, force? }  — permanent delete.

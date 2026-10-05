@@ -189,12 +189,18 @@ type UpdateProfileStatusModalProps = {
 function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileStatusModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<SkillsTrainingProfile['status']>(profile.status)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
+  // A refused change (e.g. "currently in an ongoing training") is shown inside
+  // the dialog, under the dropdown, and the dialog stays open so the user can retry.
   async function handleSave() {
     setSaving(true)
+    setError('')
     try {
       await onSave(profile.id, selectedStatus)
       onClose()
+    } catch (e: unknown) {
+      setError(errMsg(e, 'Failed to update status.'))
     } finally {
       setSaving(false)
     }
@@ -226,7 +232,7 @@ function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileSta
             <select
               id="skills-profile-status"
               value={selectedStatus}
-              onChange={e => setSelectedStatus(e.target.value as SkillsTrainingProfile['status'])}
+              onChange={e => { setSelectedStatus(e.target.value as SkillsTrainingProfile['status']); setError('') }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900"
             >
               {STATUS_OPTIONS.map(s => (
@@ -234,6 +240,8 @@ function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileSta
               ))}
             </select>
           </div>
+
+          {error && <p className="text-red-500 text-sm m-0">{error}</p>}
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
@@ -502,34 +510,31 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const handleUpdateProfileStatus = async (id: number, newStatus: SkillsTrainingProfile['status']) => {
     const p = profiles.find(x => x.id === id)
     if (!p) return
-    try {
-      await skillsTrainingService.updateProfile(id, {
-        firstName: p.firstName,
-        lastName: p.lastName,
-        middleName: p.middleName,
-        sex: p.sex,
-        birthdate: p.birthdate,
-        civilStatus: p.civilStatus,
-        streetPurok: p.streetPurok,
-        barangayId: p.barangayId,
-        contactNumber: p.contactNumber,
-        receivedBy: p.receivedBy,
-        dateApplicationReceived: p.dateApplicationReceived,
-        status: newStatus,
-        classification: p.classification,
-        classificationOther: p.classificationOther,
-        desiredQualification: p.desiredQualification,
-        qualificationOther: p.qualificationOther,
-        purposeOfTraining: p.purposeOfTraining,
-        purposeOther: p.purposeOther,
-        attachedDocuments: p.attachedDocuments,
-      })
-      await refreshProfiles()
-      setSuccessModal({ open: true, message: `Status updated to ${newStatus}.` })
-    } catch (e) {
-      setErrorModal({ open: true, message: errMsg(e, 'Failed to update status.') })
-      throw e // keep the Update Status modal open so the user can retry
-    }
+    // Errors are not caught here: UpdateProfileStatusModal catches them and shows
+    // the message inline, keeping the dialog open so the user can retry.
+    await skillsTrainingService.updateProfile(id, {
+      firstName: p.firstName,
+      lastName: p.lastName,
+      middleName: p.middleName,
+      sex: p.sex,
+      birthdate: p.birthdate,
+      civilStatus: p.civilStatus,
+      streetPurok: p.streetPurok,
+      barangayId: p.barangayId,
+      contactNumber: p.contactNumber,
+      receivedBy: p.receivedBy,
+      dateApplicationReceived: p.dateApplicationReceived,
+      status: newStatus,
+      classification: p.classification,
+      classificationOther: p.classificationOther,
+      desiredQualification: p.desiredQualification,
+      qualificationOther: p.qualificationOther,
+      purposeOfTraining: p.purposeOfTraining,
+      purposeOther: p.purposeOther,
+      attachedDocuments: p.attachedDocuments,
+    })
+    await refreshProfiles()
+    setSuccessModal({ open: true, message: `Status updated to ${newStatus}.` })
   }
 
   if (loading) {

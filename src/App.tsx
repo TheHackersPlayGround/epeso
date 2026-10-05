@@ -193,7 +193,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="flex-1 overflow-y-auto bg-gray-50 [scrollbar-gutter:stable]">
           <SecurityView onBack={() => setCurrentPage('dashboard')} />
         </div>
       </div>

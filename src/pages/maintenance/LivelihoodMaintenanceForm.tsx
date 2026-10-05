@@ -521,6 +521,7 @@ export default function LivelihoodMaintenanceForm() {
     if (!clpepFormData.interventionName.trim()) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter an Intervention Name.' }); return }
     if (!clpepFormData.interventionCategory) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please select an Intervention Category.' }); return }
     if (!clpepFormData.date) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter a Date.' }); return }
+    if (!/^\d+$/.test(clpepFormData.targetBeneficiaries.trim()) || Number(clpepFormData.targetBeneficiaries) < 1) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Target Beneficiaries must be a whole number of at least 1.' }); return }
     if (!clpepFormData.implementingOfficer.trim()) { setResultModal({ isOpen: true, type: 'error', title: 'Required', message: 'Please enter an Implementing Officer.' }); return }
 
     const realId = editingId !== null ? editingId - CLPEP_ID_OFFSET : null

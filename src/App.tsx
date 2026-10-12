@@ -12,7 +12,7 @@ import DocumentsView from './pages/documents/DocumentsView'
 import SkillsTrainingView from './pages/skills-training/SkillsTrainingView'
 import Maintenance from './pages/maintenance/Maintenance'
 import SecurityView from './pages/security/SecurityView'
-import { canView } from './utils/permissions'
+import { canView, diffPermissionLevels, type PermissionChange, type StoredUser } from './utils/permissions'
 import LivelihoodView from './pages/livelihood/LivelihoodView'
 import ReportView from './pages/report/ReportView'
 import AboutView from './pages/about/AboutView'
@@ -30,6 +30,7 @@ import { CLPEPProvider } from './contexts/CLPEPContext'
 import { EmploymentProvider } from './contexts/EmploymentContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import ConfirmModal from './pages/shared/ConfirmModal'
+import PermissionChangeModal from './pages/shared/PermissionChangeModal'
 import './styles/App.css'
 
 type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
@@ -258,6 +259,7 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [logoutConfirm, setLogoutConfirm] = useState(false)
+  const [permissionChanges, setPermissionChanges] = useState<PermissionChange[]>([])
 
   // Read the cached user and decide whether the security-questions setup is required.
   const refreshSetupGate = () => {
@@ -282,6 +284,50 @@ export default function App() {
       .finally(() => { if (active) setCheckingSession(false) })
     return () => { active = false }
   }, [])
+
+  // Permissions are otherwise only loaded once, at the effect above -- an
+  // admin changing someone's access mid-session would silently do nothing
+  // for that signed-in tab until they next logged out and back in. This
+  // periodically re-checks and, if anything actually changed, holds the new
+  // value back (the cached copy stays in effect) until the user acknowledges
+  // it in PermissionChangeModal, rather than their buttons shifting under
+  // them with no explanation mid-task.
+  useEffect(() => {
+    if (!isLoggedIn || needsSetup) return
+    let cancelled = false
+    const CHECK_INTERVAL_MS = 45_000
+
+    const checkForChanges = () => {
+      // Skip this tick if the modal from a previous tick is still waiting on
+      // the user -- avoids re-diffing against a cache that's deliberately
+      // stale right now, and re-queuing changes they haven't seen yet.
+      if (permissionChanges.length > 0) return
+      let before: StoredUser = {}
+      try { before = JSON.parse(localStorage.getItem('peso_current_user') || '{}') } catch { /* */ }
+      getMe()
+        .then(after => {
+          if (cancelled) return
+          const changes = diffPermissionLevels(before, after)
+          if (changes.length > 0) setPermissionChanges(changes)
+        })
+        .catch(() => { /* transient network hiccup -- try again next tick */ })
+    }
+
+    const id = window.setInterval(checkForChanges, CHECK_INTERVAL_MS)
+    return () => { cancelled = true; window.clearInterval(id) }
+  }, [isLoggedIn, needsSetup, permissionChanges])
+
+  // Applies the change the user just acknowledged and reloads -- simplest way
+  // to guarantee every already-mounted screen (not just the next click)
+  // reflects the new permissions, matching how a DB restore elsewhere in the
+  // app also reloads rather than trying to patch every component's state.
+  const acknowledgePermissionChange = () => {
+    getMe()
+      .then(user => {
+        try { localStorage.setItem('peso_current_user', JSON.stringify(user)) } catch { /* quota */ }
+      })
+      .finally(() => { window.location.reload() })
+  }
 
   const handleLogout = () => setLogoutConfirm(true)
 
@@ -342,6 +388,11 @@ export default function App() {
         title="Log out?" message="Are you sure you want to log out?"
         confirmText="Yes, log out" cancelText="Cancel"
         onConfirm={confirmLogout} onCancel={() => setLogoutConfirm(false)}
+      />
+      <PermissionChangeModal
+        isOpen={permissionChanges.length > 0}
+        changes={permissionChanges}
+        onAcknowledge={acknowledgePermissionChange}
       />
     </>
   )

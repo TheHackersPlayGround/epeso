@@ -26,6 +26,7 @@ import {
   EDUCATIONAL_ATTAINMENT_OPTIONS,
   SECTOR_OPTIONS,
 } from './SLPProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 const SEX_OPTIONS = ['Male', 'Female']
 const PARTICIPANT_TYPE_OPTIONS = ['4Ps', 'Non-4Ps']
@@ -451,7 +452,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     email: get(row, 'Email Address'),
     streetPurok: get(row, 'Street / Purok / Zone'),
     barangayId: address.barangayId,

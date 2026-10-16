@@ -1,4 +1,5 @@
 ﻿import { useState, useRef } from 'react';
+import { useFormDraft } from '../../../hooks/useFormDraft';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
@@ -8,6 +9,8 @@ import ConfirmModal from '../../shared/ConfirmModal';
 import { createDefaultApplicantFormData } from './applicantDefaults';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../../utils/attachments';
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
+import { todayIso } from '../../../utils/formatDate';
 
 interface ApplicantFormData {
   // Personal Information
@@ -228,6 +231,27 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     return merged;
   });
 
+  // Draft / unsaved-changes guard. Uploaded files, saved-document payloads and
+  // the ID photo are base64 blobs: they are tracked by id / size only for the
+  // dirty check and are never written into a draft.
+  const draft = useFormDraft<{ form: Record<string, unknown>; hasDisabilityStatus: 'Yes' | 'No'; uploaded: string[]; photoSize: number }>({
+    draftKey: 'employment-applicant',
+    mode: isEditMode ? 'edit' : 'add',
+    snapshot: {
+      form: { ...formData, savedDocuments: (formData.savedDocuments ?? []).map(d => d.id) },
+      hasDisabilityStatus,
+      uploaded: uploadedDocuments.map(d => d.id),
+      photoSize: profileImage.length,
+    },
+    onRestore: (d) => {
+      setFormData({ ...(d.form as unknown as ApplicantFormData), savedDocuments: [] });
+      setHasDisabilityStatus(d.hasDisabilityStatus);
+    },
+    forDraft: (d) => ({ ...d, form: { ...d.form, savedDocuments: [] }, uploaded: [], photoSize: 0 }),
+    draftNote: 'Uploaded documents and the ID photo are not kept in a draft.',
+    onClose,
+  });
+
   const sections = [
     { id: 'personalInfo' as Section, label: 'I. PERSONAL INFORMATION' },
     { id: 'jobPreference' as Section, label: 'II. JOB PREFERENCE' },
@@ -298,6 +322,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     }
     if (!formData.contactNumber.trim()) {
       errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: deferFocus(() => contactNumberRef.current?.focus()) });
+    } else if (!isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: deferFocus(() => contactNumberRef.current?.focus()) });
     }
     if (!formData.province.trim()) {
       errors.push({ field: 'province', message: 'Province is required.', focus: deferFocus(() => provinceWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
@@ -307,6 +333,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     }
     if (!formData.barangay.trim()) {
       errors.push({ field: 'barangay', message: 'Barangay is required.', focus: deferFocus(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) });
+    }
+    if ((formData.dateOfBirth ?? '') > todayIso()) {
+      errors.push({ field: 'dateOfBirth', message: 'Date of Birth cannot be in the future.', focus: () => {} })
     }
     return errors;
   }
@@ -322,7 +351,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     setShowConfirmation(false);
     try {
       // onSave persists to the backend; await so a failure doesn't show success.
-      await onSave({ ...formData, profileImage });
+      await draft.wrapSave(onSave)({ ...formData, profileImage });
       setResultModal({
         isOpen: true, type: 'success', title: 'Success!',
         message: isEditMode
@@ -581,7 +610,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth <span className="text-red-500">*</span></label>
                 <div ref={dateOfBirthWrapRef}>
-                  <DatePicker
+                  <DatePicker max={todayIso()}
                     className={inputClass('dateOfBirth')}
                     value={formData.dateOfBirth}
                     onChange={(value) => { setFormData({ ...formData, dateOfBirth: value }); clearFieldError('dateOfBirth'); }}
@@ -830,7 +859,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                     placeholder="Enter contact number"
                     type="text"
                     value={formData.contactNumber}
-                    onChange={(e) => { setFormData({ ...formData, contactNumber: e.target.value }); clearFieldError('contactNumber'); }}
+                    onChange={(e) => { setFormData({ ...formData, contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber'); }}
                     className={inputClass('contactNumber')}
                   />
                   <ErrorMsg k="contactNumber" />
@@ -2488,7 +2517,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 <h3 className="text-gray-800 m-0 text-base font-medium">{isEditMode ? 'Edit applicant' : 'Add new applicant'}</h3>
               </div>
               <button
-                onClick={onClose}
+                onClick={draft.requestClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X size={24} className="text-gray-600" />
@@ -2504,7 +2533,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
             <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={draft.requestClose}
                 className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Back to Applicants List
@@ -2540,6 +2569,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         isOpen={warningModal.isOpen} type="error" title={warningModal.title} message={warningModal.message}
         confirmText="OK" onConfirm={() => setWarningModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
       />
+      {draft.modals}
 
       {/* Document Preview Modal */}
       {previewDocument && (

@@ -8,13 +8,16 @@ interface DatePickerProps {
   readOnly?: boolean
   required?: boolean
   id?: string
+  /** Earliest / latest selectable date, yyyy-mm-dd. */
+  min?: string
+  max?: string
 }
 
 // Thin wrapper over the browser's native date input so every form gets the
 // standard browser calendar picker. The value contract is ISO yyyy-mm-dd, which
 // is what the native input emits and what the backend expects. A calendar icon
 // is overlaid (the default indicator is hidden) and opens the picker on click.
-export default function DatePicker({ value, onChange, className = '', readOnly, required, id }: DatePickerProps) {
+export default function DatePicker({ value, onChange, className = '', readOnly, required, id, min, max }: DatePickerProps) {
   const ref = useRef<HTMLInputElement>(null)
 
   const openPicker = () => {
@@ -35,6 +38,8 @@ export default function DatePicker({ value, onChange, className = '', readOnly, 
         readOnly={readOnly}
         disabled={readOnly}
         required={required}
+        min={min}
+        max={max}
         className={`${className} pr-9 [&::-webkit-calendar-picker-indicator]:hidden`}
       />
       <button

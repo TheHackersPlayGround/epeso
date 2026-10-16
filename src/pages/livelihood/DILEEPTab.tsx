@@ -17,15 +17,21 @@ import DILPProfileForm, { EMPTY_DILP_RECORD } from './DILPProfileForm'
 import TUPADProfileForm, { EMPTY_TUPAD_RECORD } from './TUPADProfileForm'
 import { downloadImportTemplate as downloadDilpTemplate, importDilpApplicants, type ImportResult as DilpImportResult } from './dilpImport'
 import { downloadImportTemplate as downloadTupadTemplate, importTupadApplicants, type ImportResult as TupadImportResult } from './tupadImport'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import WithdrawDialog from '../../components/WithdrawDialog'
+import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
+import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 type DILEEPProgram = 'DILEEP (DILP)' | 'DILEEP (TUPAD)'
 type DILEEPApplicant = DILPApplicant | TUPADApplicant
 type DILEEPProject = DILPProject | TUPADProject
-type DILEEPStatus = 'Active' | 'Inactive' | 'Completed'
+type DILEEPStatus = 'Active' | 'Inactive' | 'Completed' | 'Withdrawn'
 
 const PROGRAM_STATUS_OPTIONS: DILEEPStatus[] = ['Active', 'Inactive', 'Completed']
+// Withdrawn (left an Ongoing project early) exists for TUPAD only.
+const TUPAD_STATUS_OPTIONS: DILEEPStatus[] = [...PROGRAM_STATUS_OPTIONS, 'Withdrawn']
 
 const SEX_OPTIONS = ['Male', 'Female']
 
@@ -35,6 +41,7 @@ const STATUS_COLORS: Record<DILEEPStatus, string> = {
   Active:    'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
   Inactive:  'bg-gray-200 text-gray-400',
+  Withdrawn: 'bg-orange-100 text-orange-700',
 }
 
 function errMsg(e: unknown, fallback: string) {
@@ -250,7 +257,8 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
 
   const serviceLabel = program === 'DILEEP (DILP)' ? 'DILP' : 'DILEEP (TUPAD)'
 
-  const currentProject = beneficiary.assignedProjectId
+  const exited = !!(beneficiary as TUPADApplicant).exitedAt
+  const currentProject = beneficiary.assignedProjectId && !exited
     ? projects.find(p => p.id === beneficiary.assignedProjectId) ?? null
     : null
 
@@ -470,129 +478,81 @@ type ViewAssignedProjectModalProps = {
   program: DILEEPProgram
   projects: DILEEPProject[]
   onChangeAssignment: () => void
+  onWithdraw?: () => void
   onClose: () => void
 }
 
-function ViewAssignedProjectModal({ beneficiary: b, program, projects, onChangeAssignment, onClose }: ViewAssignedProjectModalProps) {
+function ViewAssignedProjectModal({ beneficiary: b, program, projects, onChangeAssignment, onWithdraw, onClose }: ViewAssignedProjectModalProps) {
   const assignedProject = b.assignedProjectId ? projects.find(p => p.id === b.assignedProjectId) ?? null : null
   // Matches the backend's unassign guard (dilp.php/tupad.php): once the
   // project moves past Planned, changing/unassigning would erase the only
-  // record this assignment ever happened — so only Planned can be changed.
+  // record this assignment ever happened -- so only Planned can be changed.
   const canChange = assignedProject?.status === 'Planned'
+  const money = (v?: string | null) => (v ? `\u20B1${Number(v).toLocaleString()}` : undefined)
 
-  function Row({ label, value }: { label: string; value?: string | null }) {
-    return (
-      <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
-        <span className="text-xs text-gray-500 font-medium w-36 flex-shrink-0">{label}</span>
-        <span className="text-xs text-gray-900 font-semibold text-right">{value || '—'}</span>
-      </div>
-    )
+  const actions: AssignedItemAction[] = []
+  if (onWithdraw && b.status === 'Active' && assignedProject?.status === 'Ongoing') {
+    actions.push({
+      label: 'Mark as withdrawn', variant: 'warning', disabled: !canManage('livelihood'),
+      onClick: () => { onWithdraw(); onClose() },
+    })
   }
-
-  const header = (
-    <div className="bg-brand-blue px-5 pt-5 pb-4 flex items-start justify-between">
-      <div>
-        <h2 className="text-base font-bold text-white">Assigned Project</h2>
-        <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(b)}</p>
-      </div>
-      <button type="button" onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white transition-colors mt-0.5">
-        <X size={18} />
-      </button>
-    </div>
-  )
-
-  const footer = (
-    <div className="px-5 pb-5 pt-2 flex gap-2">
-      <button
-        type="button"
-        onClick={onChangeAssignment}
-        disabled={!canChange || !canManage('livelihood')}
-        className={`flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors${(!canChange || !canManage('livelihood')) ? ' opacity-50 cursor-not-allowed' : ''}`}
-      >
-        Change Assignment
-      </button>
-      <button type="button" onClick={onClose} className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-semibold hover:bg-brand-blue-dark transition-colors">
-        Close
-      </button>
-    </div>
-  )
-
-  function statusBadgeClass(status?: string) {
-    if (status === 'Ongoing') return 'text-green-600 border border-green-500 bg-white'
-    if (status === 'Planned') return 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-    if (status === 'Completed') return 'bg-blue-100 text-blue-600 border border-blue-200'
-    return 'bg-gray-100 text-gray-600'
+  if (canChange && canManage('livelihood')) {
+    actions.push({ label: 'Change Assignment', variant: 'primary', onClick: onChangeAssignment })
   }
 
   if (program === 'DILEEP (TUPAD)') {
     const p = assignedProject as TUPADProject | null
+    const exitedAt = (b as TUPADApplicant).exitedAt
+    const exitReason = (b as TUPADApplicant).exitReason
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-          {header}
-          <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <p className="font-bold text-gray-900 text-base">{p?.title || b.assignedProjectName}</p>
-                <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">DILEEP (TUPAD)</span>
-              </div>
-              {p?.status && (
-                <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(p.status)}`}>
-                  {p.status}
-                </span>
-              )}
-            </div>
-            <Row label="Description" value={p?.description} />
-            <Row label="Date" value={p?.date} />
-            <Row label="Location" value={p?.location} />
-            <Row label="Facilitator" value={p?.facilitator} />
-            <Row label="Participants" value={p ? (p.participants ? `${p.assignedCount}/${p.participants}` : String(p.assignedCount)) : undefined} />
-            <Row label="Assistance Amount" value={p?.assistanceAmount ? `₱${Number(p.assistanceAmount).toLocaleString()}` : undefined} />
-            <Row label="Date Released" value={p?.dateReleased} />
-          </div>
-          {footer}
-        </div>
-      </div>
+      <AssignedItemModal
+        title="Assigned Project"
+        personName={formatDisplayName(b)}
+        itemName={p?.title || b.assignedProjectName}
+        status={p?.status}
+        description={p?.description}
+        notFound={!p}
+        rows={[
+          { label: 'Date', value: p?.date },
+          { label: 'Location', value: p?.location },
+          { label: 'Facilitator', value: p?.facilitator },
+          { label: 'Participants', value: p ? (p.participants ? `${p.assignedCount}/${p.participants}` : String(p.assignedCount)) : undefined },
+          { label: 'Assistance Amount', value: money(p?.assistanceAmount) },
+          { label: 'Date Released', value: p?.dateReleased },
+        ]}
+        banner={exitedAt ? <WithdrawalBanner exitedAt={exitedAt} reason={exitReason} /> : undefined}
+        footnote={exitedAt ? <WithdrawalFootnote what="project" /> : undefined}
+        actions={actions}
+        onClose={onClose}
+      />
     )
   }
 
-  // DILP layout
   const p = assignedProject as DILPProject | null
-  const assistanceDisplay = p?.assistanceAmount ? `₱${Number(p.assistanceAmount).toLocaleString()}` : '—'
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-        {header}
-        <div className="px-5 py-4 max-h-[65vh] overflow-y-auto">
-          {/* Project title + status + ID */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <p className="font-bold text-gray-900 text-base">{p?.projectName ?? b.assignedProjectName}</p>
-              {p?.projectIdNumber && (
-                <p className="text-xs text-gray-400 mt-0.5">{p.projectIdNumber}</p>
-              )}
-            </div>
-            {p?.status && (
-              <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(p.status)}`}>
-                {p.status}
-              </span>
-            )}
-          </div>
-          <Row label="Project Type" value={p?.typeOfProject} />
-          <Row label="Program Component" value={p?.programComponent} />
-          <Row label="Way of Implementation" value={p?.wayOfImplementation} />
-          <Row label="Region" value={b.region} />
-          <Row label="Province" value={b.province} />
-          <Row label="City / Municipality" value={b.cityMunicipality} />
-          <Row label="Barangay" value={b.barangay} />
-          <Row label="Street / Purok" value={b.streetPurok} />
-          <Row label="Assistance Amount" value={assistanceDisplay} />
-          <Row label="Date Released" value={p?.dateReleased} />
-        </div>
-        {footer}
-      </div>
-    </div>
+    <AssignedItemModal
+      title="Assigned Project"
+      personName={formatDisplayName(b)}
+      itemName={p?.projectName ?? b.assignedProjectName}
+      subtitle={p?.projectIdNumber}
+      status={p?.status}
+      notFound={!p}
+      rows={[
+        { label: 'Project Type', value: p?.typeOfProject },
+        { label: 'Program Component', value: p?.programComponent },
+        { label: 'Way of Implementation', value: p?.wayOfImplementation },
+        { label: 'Region', value: b.region },
+        { label: 'Province', value: b.province },
+        { label: 'City / Municipality', value: b.cityMunicipality },
+        { label: 'Barangay', value: b.barangay },
+        { label: 'Street / Purok', value: b.streetPurok },
+        { label: 'Assistance Amount', value: money(p?.assistanceAmount) },
+        { label: 'Date Released', value: p?.dateReleased },
+      ]}
+      actions={actions}
+      onClose={onClose}
+    />
   )
 }
 
@@ -612,6 +572,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const projects: DILEEPProject[] = isDILP ? dilp.projects : tupad.projects
   const refreshProfiles = isDILP ? dilp.refreshProfiles : tupad.refreshProfiles
   const refreshProjects = isDILP ? dilp.refreshProjects : tupad.refreshProjects
+  useRefreshOnReturn(isDILP ? dilp.refreshIfStale : tupad.refreshIfStale)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -649,6 +610,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [viewingAssignmentHistoryFor, setViewingAssignmentHistoryFor] = useState<TUPADApplicant | null>(null)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
+  // Mark as withdrawn (TUPAD only): someone leaving a project that has already started.
+  const [withdrawTarget, setWithdrawTarget] = useState<TUPADApplicant | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   useEffect(() => {
     onWizardChange(isAddOpen || !!editingBeneficiary || !!viewingBeneficiary)
@@ -657,7 +621,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const programLabel = isDILP ? 'DILP' : 'TUPAD'
 
   const availableFilters: FilterOption[] = [
-    { id: 'status',      label: 'Status',       options: PROGRAM_STATUS_OPTIONS },
+    { id: 'status',      label: 'Status',       options: isDILP ? PROGRAM_STATUS_OPTIONS : TUPAD_STATUS_OPTIONS },
     { id: 'sex',         label: 'Sex',           options: SEX_OPTIONS },
     { id: 'civilStatus', label: 'Civil Status',  options: CIVIL_STATUS_OPTIONS },
   ]
@@ -766,6 +730,23 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
+    }
+  }
+
+  async function handleWithdraw(reason: string, exitDate: string) {
+    if (!withdrawTarget || isWithdrawing) return
+    const name = formatDisplayName(withdrawTarget)
+    setIsWithdrawing(true)
+    try {
+      await tupadService.withdrawFromProject(withdrawTarget.id, reason, exitDate)
+      await refreshProfiles()
+      await refreshProjects()
+      setWithdrawTarget(null)
+      setResultModal({ isOpen: true, type: 'success', title: 'Withdrawn', message: `${name} has been marked as withdrawn.` })
+    } catch (e: unknown) {
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as withdrawn.') })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -1117,7 +1098,10 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                     {b.assignedProjectName ? (
                       <div>
                         <p className="text-gray-800 font-medium whitespace-nowrap">{b.assignedProjectName}</p>
-                        {b.assignedProjectStatus && (
+                        {/* Withdrawn (TUPAD): the project's own status would read as the person's, so show when they left instead. */}
+                        {(b as TUPADApplicant).exitedAt ? (
+                          <span className="inline-block mt-1.5 text-xs text-orange-600">Left on {fmtDate((b as TUPADApplicant).exitedAt as string)}</span>
+                        ) : b.assignedProjectStatus && (
                           <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${projectStatusClass(b.assignedProjectStatus)}`}>
                             {b.assignedProjectStatus}
                           </span>
@@ -1192,7 +1176,11 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
         // even after it's Completed (mirrors GIP's hasAssignment gate). TUPAD
         // supports a running history, so it keeps offering "Assign Project"
         // once the current one is Completed.
-        const showViewAssigned = !!menuBeneficiary.assignedProjectName && (isDILP || !isCompleted)
+        // A TUPAD beneficiary who withdrew has no live assignment any more, so (like
+        // Completed) the menu goes back to offering "Assign Project".
+        const isWithdrawn = !!(menuBeneficiary as TUPADApplicant).exitedAt
+        const showViewAssigned = !!menuBeneficiary.assignedProjectName && (isDILP || (!isCompleted && !isWithdrawn))
+        const canWithdraw = !isDILP && menuBeneficiary.status === 'Active' && menuBeneficiary.assignedProjectStatus === 'Ongoing'
         return (
           <>
             <div className="fixed inset-0 z-[200]" onClick={closeMenu} />
@@ -1207,6 +1195,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                 ? <button onClick={() => { setViewingAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
                 : <button onClick={() => { setAssigningBeneficiary(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
               }
+              {canWithdraw && (
+                <button onClick={() => { setWithdrawTarget(menuBeneficiary as TUPADApplicant); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Mark as withdrawn</button>
+              )}
               {!isDILP && (
                 <button onClick={() => { setViewingAssignmentHistoryFor(menuBeneficiary as TUPADApplicant); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50">View Assignment History</button>
               )}
@@ -1229,6 +1220,18 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
         />
       )}
 
+      {withdrawTarget && (
+        <WithdrawDialog
+          personName={formatDisplayName(withdrawTarget)}
+          assignmentName={withdrawTarget.assignedProjectName || 'this project'}
+          kind="project"
+          minDate={withdrawTarget.assignmentHistory[0]?.assignedDate}
+          isSaving={isWithdrawing}
+          onConfirm={handleWithdraw}
+          onClose={() => setWithdrawTarget(null)}
+        />
+      )}
+
       {viewingAssignedProject && (
         <ViewAssignedProjectModal
           beneficiary={viewingAssignedProject}
@@ -1239,6 +1242,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
             setViewingAssignedProject(null)
             setAssigningBeneficiary(b)
           }}
+          onWithdraw={!isDILP ? () => setWithdrawTarget(viewingAssignedProject as TUPADApplicant) : undefined}
           onClose={() => setViewingAssignedProject(null)}
         />
       )}
@@ -1249,6 +1253,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
         const statusCls = (s?: string) =>
           s === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
           s === 'Ongoing'   ? 'bg-green-100 text-green-700 border border-green-200' :
+          s === 'Withdrawn' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
           'bg-amber-100 text-amber-700 border border-amber-200'
         const history = b.assignmentHistory ?? []
         return (
@@ -1274,7 +1279,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                   <div className="space-y-3">
                     {history.map((entry, i) => {
                       const isCurrent = b.assignedProjectId === entry.projectId
-                      const entryStatus = isCurrent ? b.assignedProjectStatus : (entry.completedDate ? 'Completed' : undefined)
+                      // Left the project early: that, not the project's own status, is what happened to this person.
+                      const entryStatus = entry.exitedAt ? 'Withdrawn' : isCurrent ? b.assignedProjectStatus : (entry.completedDate ? 'Completed' : undefined)
                       return (
                         <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
                           <div className="min-w-0 flex-1">
@@ -1282,6 +1288,12 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                             <p className="text-xs text-gray-400 mt-1">Date Assigned: {fmtDate(entry.assignedDate)}</p>
                             {entry.completedDate && (
                               <p className="text-xs text-blue-500 mt-0.5">Date Completed: {fmtDate(entry.completedDate)}</p>
+                            )}
+                            {entry.exitedAt && (
+                              <>
+                                <p className="text-xs text-orange-600 mt-0.5">Date Left: {fmtDate(entry.exitedAt)}</p>
+                                {entry.exitReason && <p className="text-xs text-orange-600 mt-0.5">Reason: {entry.exitReason}</p>}
+                              </>
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">

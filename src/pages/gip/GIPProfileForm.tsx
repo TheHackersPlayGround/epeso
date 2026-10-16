@@ -6,7 +6,10 @@ import { searchProvinces, searchCities, searchBarangaysByCity } from '../../serv
 import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -72,7 +75,7 @@ export function StatusBadge({ status }: { status: GIPApplicant['status'] }) {
     Ongoing:   'bg-green-100 text-green-700',
     Inactive:  'bg-gray-100 text-gray-500',
     Completed: 'bg-blue-100 text-blue-700',
-    Cancelled: 'bg-red-100 text-red-600',
+    Withdrawn: 'bg-orange-100 text-orange-700',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -290,10 +293,15 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
   const [formData, setFormData] = useState(initial)
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'gip-applicant', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
   const [previewDoc, setPreviewDoc] = useState<GIPSavedDocument | null>(null)
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
   const set = (patch: Partial<Omit<GIPApplicant, 'id'>>) => setFormData(p => ({ ...p, ...patch }))
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -414,9 +422,17 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
       }
     }
 
+    if (formData.contactNumber.trim() && !isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => contactNumberRef.current?.focus() })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
-    onSave(formData)
+    draft.wrapSave(onSave)(formData)
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
@@ -455,7 +471,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — GIP'}
           </p>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8">
@@ -490,12 +506,12 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div ref={birthdateWrapRef}>
               <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
-              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              <DatePicker max={todayIso()} className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
               {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={e => set({ age: parseInt(e.target.value) || 0 })} placeholder="Enter age" />
+              <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -509,7 +525,8 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={e => set({ contactNumber: e.target.value })} placeholder="Enter contact number" />
+              <input ref={contactNumberRef} inputMode="tel" className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} placeholder="Enter contact number" />
+              {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
             </div>
             <div>
               <label className={lbl}>Email <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -655,7 +672,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
-              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
+              <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>
@@ -677,7 +694,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
-            <button onClick={onClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
+            <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
@@ -686,6 +703,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {draft.modals}
     </div>
   )
 }

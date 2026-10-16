@@ -23,6 +23,7 @@ import {
   EDUCATION_OPTIONS,
   educationFieldFlags,
 } from './GIPProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 const SEX_OPTIONS = ['Male', 'Female']
 
@@ -382,7 +383,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     email: get(row, 'Email'),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,

@@ -18,6 +18,7 @@ import {
 } from "../../../services/locationService";
 import { importEmployersBulk } from "../../../services/employerService";
 import type { Employer } from "../../../contexts/EmploymentContext";
+import { isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
 
 // ─── Shared result type ───────────────────────────────────────────────────────
 
@@ -356,6 +357,9 @@ export async function importEmployers(
       !barangayName      && "Barangay",
     ].filter(Boolean) as string[];
     if (missing.length) errors.push(`Missing required fields: ${missing.join(", ")}.`);
+    if (contactNumber && !isValidContactNumber(contactNumber)) {
+      errors.push(CONTACT_NUMBER_MESSAGE);
+    }
 
     // Resolve address IDs (only attempted when all three names are present).
     let provinceId: number | null = null;

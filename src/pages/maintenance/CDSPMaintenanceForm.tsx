@@ -12,6 +12,9 @@ import type { CdspActivity } from '../../contexts/CDSPContext'
 import * as cdspService from '../../services/cdspService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
+import { useFormDraft } from '../../hooks/useFormDraft'
+import { requestLeave } from '../../hooks/leaveGuard'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -99,7 +102,8 @@ const blankForm = {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CDSPMaintenanceForm() {
-  const { activities: cdspActivities, services: apiServices, refreshActivities, refreshProfiles } = useCDSP()
+  const { activities: cdspActivities, services: apiServices, refreshActivities, refreshProfiles, refreshIfStale } = useCDSP()
+  useRefreshOnReturn(refreshIfStale)
   const services = apiServices.length > 0 ? apiServices.map(s => s.name) : DEFAULT_SERVICES
 
   // Navigation
@@ -227,6 +231,19 @@ export default function CDSPMaintenanceForm() {
     setFilterStatus('All')
     setSearchQuery('')
   }
+
+  // Draft / unsaved-changes guard. This page swaps several actions in one
+  // component, so the guard is only active on the add / edit form and starts
+  // fresh whenever the action (or the activity being edited) changes.
+  const draft = useFormDraft({
+    draftKey: 'maintenance-cdsp-activity',
+    mode: action === 'add_activity' ? 'add' : 'edit',
+    enabled: action === 'add_activity' || action === 'edit_activity',
+    resetKey: `${action}:${editingId ?? ''}`,
+    snapshot: { formData, selectedService },
+    onRestore: (d) => { setFormData(d.formData); setSelectedService(d.selectedService) },
+    onClose: () => (action === 'add_activity' ? goHome() : goToList()),
+  })
 
   const fillFormFromActivity = (a: CdspActivity) => {
     setSelectedService(a.service)
@@ -380,7 +397,7 @@ export default function CDSPMaintenanceForm() {
           {cards.map(card => (
             <button
               key={card.key}
-              onClick={() => setAction(card.key)}
+              onClick={() => requestLeave(() => { resetForm(); setAction(card.key) })}
               disabled={card.editorOnly && !canManage('cdsp-maintenance')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key
@@ -415,7 +432,7 @@ export default function CDSPMaintenanceForm() {
         <div className="bg-brand-blue px-6 py-4">
           <div className="flex items-center gap-3">
             {(mode === 'edit' || mode === 'view') && (
-              <button onClick={goToList} className="p-1 text-white/80 hover:text-white transition-colors">
+              <button onClick={draft.requestClose} className="p-1 text-white/80 hover:text-white transition-colors">
                 <ArrowLeft size={20} />
               </button>
             )}
@@ -554,14 +571,14 @@ export default function CDSPMaintenanceForm() {
               <div className="flex justify-end gap-3 border-t pt-4 mt-2">
                 <button
                   type="button"
-                  onClick={mode === 'add' ? goHome : goToList}
+                  onClick={draft.requestClose}
                   className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
                 >
                   {mode === 'add' ? 'Cancel' : 'Back to Activities'}
                 </button>
                 {!isView && (
                   <button
-                    onClick={handleSave}
+                    onClick={() => { draft.markSubmitted(); handleSave() }}
                     disabled={!canManage('cdsp-maintenance') || isSaving}
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
                   >
@@ -1023,6 +1040,7 @@ export default function CDSPMaintenanceForm() {
         )
       })()}
     </div>
+    {draft.modals}
     <ConfirmModal
       isOpen={deleteConfirm !== null} type="confirm"
       title="Delete Activity?" message={deleteConfirm ? `Are you sure you want to delete "${deleteConfirm.title}"? This will move the activity to the recycle bin.` : ''}

@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
+import { requestLeave } from '../../hooks/leaveGuard'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
   PlusCircle, FolderOpen, MoreHorizontal,
@@ -22,6 +23,7 @@ import SLPForm from './SLPForm'
 import type { SLPFormData } from './SLPForm'
 import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // Each program's real id is offset so the four id sequences (DILP/TUPAD/
 // SLP/CLPEP each start back at 1 in their own table) never collide once
@@ -193,6 +195,7 @@ export default function LivelihoodMaintenanceForm() {
   const tupad = useTUPAD()
   const slp = useSLP()
   const clpep = useCLPEP()
+  useRefreshOnReturn(() => { void dilp.refreshIfStale(); void tupad.refreshIfStale(); void slp.refreshIfStale(); void clpep.refreshIfStale() })
 
   // Navigation
   const [action, setAction] = useState<Action>('')
@@ -691,7 +694,7 @@ export default function LivelihoodMaintenanceForm() {
           {cards.map(card => (
             <button
               key={card.key}
-              onClick={() => setAction(card.key)}
+              onClick={() => requestLeave(() => { resetForm(); setAction(card.key) })}
               disabled={card.label.startsWith('Add') && !canManage('livelihood-maintenance')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key
@@ -727,7 +730,7 @@ export default function LivelihoodMaintenanceForm() {
         <div className="bg-brand-blue px-6 py-4">
           <div className="flex items-center gap-3">
             {(mode === 'edit' || mode === 'view') && (
-              <button onClick={goToList} className="p-1 text-white/80 hover:text-white transition-colors">
+              <button onClick={() => requestLeave(goToList)} className="p-1 text-white/80 hover:text-white transition-colors">
                 <ArrowLeft size={20} />
               </button>
             )}

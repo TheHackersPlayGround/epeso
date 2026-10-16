@@ -8,8 +8,10 @@ import * as clpepService from '../../services/clpepService'
 import { useCLPEP } from '../../contexts/CLPEPContext'
 import type { CLPEPApplicant, CLPEPIntervention } from '../../contexts/CLPEPContext'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
-import CLPEPProfileForm, { EMPTY_CLPEP_RECORD } from './CLPEPProfileForm'
+import CLPEPProfileForm, { EMPTY_CLPEP_RECORD, CHILD_LABOR_STATUS_OPTIONS, SCHOOL_STATUS_OPTIONS } from './CLPEPProfileForm'
 import { downloadImportTemplate, importClpepApplicants, type ImportResult } from './clpepImport'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -591,100 +593,45 @@ function ViewAssignedInterventionModal({ beneficiary, interventions, onChangeAss
   const intervention = interventions.find(i => i.id === beneficiary.assignedInterventionId) ?? null
   const canChange = intervention?.status === 'Planned'
 
-  function Row({ label, value }: { label: string; value?: string | number | null }) {
-    return (
-      <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
-        <span className="text-xs text-gray-500 font-medium w-36 flex-shrink-0">{label}</span>
-        <span className="text-xs text-gray-900 font-semibold text-right">{value != null && value !== '' ? String(value) : '—'}</span>
-      </div>
-    )
+  const actions: AssignedItemAction[] = []
+  if (canChange && canManage('livelihood')) {
+    actions.push({ label: 'Change Assignment', variant: 'primary', onClick: () => { onChangeAssignment(beneficiary); onClose() } })
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-
-        {/* Header */}
-        <div className="bg-brand-blue px-6 pt-5 pb-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-white">Assigned Intervention</h2>
-              <p className="text-blue-200 text-sm mt-0.5">{formatDisplayName(beneficiary)}</p>
-            </div>
-            <button type="button" onClick={onClose} aria-label="Close modal" className="text-white/70 hover:text-white transition-colors mt-0.5">
-              <X size={20} />
-            </button>
+  const extra = beneficiary.assignmentHistory.length > 1 ? (
+    <div className="mt-4 pt-4 border-t border-gray-100">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
+      <div className="space-y-2">
+        {beneficiary.assignmentHistory.map((h, i) => (
+          <div key={`${h.interventionId}-${i}`} className="flex items-center justify-between text-xs">
+            <span className="text-gray-700">{h.interventionName}</span>
+            <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
           </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-5 max-h-[65vh] overflow-y-auto">
-          {intervention ? (
-            <>
-              {/* Title + type + status */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="font-bold text-gray-900 text-base">{intervention.interventionName}</p>
-                  <span className="inline-block mt-0.5 text-xs font-semibold text-gray-500">
-                    {intervention.interventionCategory === 'Other' ? (intervention.interventionCategoryOther || 'Other') : intervention.interventionCategory}
-                  </span>
-                </div>
-                <span className={`flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${INTERVENTION_STATUS_COLORS[intervention.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {intervention.status}
-                </span>
-              </div>
-
-              <Row label="Description" value={intervention.description} />
-              <Row label="Target Beneficiaries" value={intervention.targetBeneficiaries} />
-              <Row label="Date" value={intervention.date} />
-              <Row label="Implementing Officer" value={intervention.implementingOfficer} />
-              <Row
-                label="Partner Agency"
-                value={intervention.partnerAgency === 'Other' ? (intervention.partnerAgencyOther || 'Other') : intervention.partnerAgency}
-              />
-              <Row label="Location" value={intervention.location} />
-            </>
-          ) : (
-            <p className="text-xs text-gray-400 italic text-center py-8">No intervention details available</p>
-          )}
-
-          {beneficiary.assignmentHistory.length > 1 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
-              <div className="space-y-2">
-                {beneficiary.assignmentHistory.map((h, i) => (
-                  <div key={`${h.interventionId}-${i}`} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-700">{h.interventionName}</span>
-                    <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 pb-6 pt-2 flex gap-2">
-          {canChange && (
-            <button
-              type="button"
-              onClick={() => { onChangeAssignment(beneficiary); onClose() }}
-              disabled={!canManage('livelihood')}
-              className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Change Assignment
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-semibold hover:bg-brand-blue-dark transition-colors"
-          >
-            Close
-          </button>
-        </div>
+        ))}
       </div>
     </div>
+  ) : undefined
+
+  return (
+    <AssignedItemModal
+      title="Assigned Intervention"
+      personName={formatDisplayName(beneficiary)}
+      itemName={intervention?.interventionName ?? beneficiary.assignedInterventionName}
+      subtitle={intervention ? (intervention.interventionCategory === 'Other' ? (intervention.interventionCategoryOther || 'Other') : intervention.interventionCategory) : undefined}
+      status={intervention?.status}
+      description={intervention?.description}
+      notFound={!intervention}
+      rows={[
+        { label: 'Target Beneficiaries', value: intervention?.targetBeneficiaries },
+        { label: 'Date', value: intervention?.date },
+        { label: 'Implementing Officer', value: intervention?.implementingOfficer },
+        { label: 'Partner Agency', value: intervention ? (intervention.partnerAgency === 'Other' ? (intervention.partnerAgencyOther || 'Other') : intervention.partnerAgency) : undefined },
+        { label: 'Location', value: intervention?.location },
+      ]}
+      extra={extra}
+      actions={actions}
+      onClose={onClose}
+    />
   )
 }
 
@@ -752,6 +699,8 @@ function BeneficiaryTable({ beneficiaries, isFiltered, activeFilters, onView, on
           <tr className="bg-brand-blue">
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Name</th>
             {activeFilters.includes('sex') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sex</th>}
+            {activeFilters.includes('childLaborStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Child Labor Status</th>}
+            {activeFilters.includes('schoolStatus') && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">School Status</th>}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Barangay</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Assigned Intervention</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Applied</th>
@@ -762,7 +711,7 @@ function BeneficiaryTable({ beneficiaries, isFiltered, activeFilters, onView, on
         <tbody>
           {beneficiaries.length === 0 ? (
             <tr>
-              <td colSpan={6 + ['sex'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
+              <td colSpan={6 + ['sex', 'childLaborStatus', 'schoolStatus'].filter(f => activeFilters.includes(f)).length} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -786,6 +735,8 @@ function BeneficiaryTable({ beneficiaries, isFiltered, activeFilters, onView, on
               <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{formatTableName(b)}</td>
                 {activeFilters.includes('sex') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.sex || '—'}</td>}
+                {activeFilters.includes('childLaborStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.childLaborStatus || '—'}</td>}
+                {activeFilters.includes('schoolStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.schoolStatus || '—'}</td>}
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.barangay || '-'}</td>
                 <td className="px-4 py-3">
                   {b.assignedInterventionName ? (
@@ -871,7 +822,8 @@ function BeneficiaryTable({ beneficiaries, isFiltered, activeFilters, onView, on
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function CLPEPTab() {
-  const { applicants, interventions, loading, refreshProfiles, refreshInterventions } = useCLPEP()
+  const { applicants, interventions, loading, refreshProfiles, refreshInterventions, refreshIfStale } = useCLPEP()
+  useRefreshOnReturn(refreshIfStale)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -888,7 +840,12 @@ export default function CLPEPTab() {
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
 
+  // Option lists come from the same constants the profile form uses, so a
+  // filter value can never drift from what is actually stored.
   const availableFilters: FilterOption[] = useMemo(() => [
+    { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed'] },
+    { id: 'childLaborStatus', label: 'Child Labor Status', options: [...CHILD_LABOR_STATUS_OPTIONS] },
+    { id: 'schoolStatus', label: 'School Status', options: [...SCHOOL_STATUS_OPTIONS] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
   ], [])
 
@@ -985,6 +942,9 @@ export default function CLPEPTab() {
     for (const filterId of activeFilters) {
       const value = filterValues[filterId]
       if (!value) continue
+      if (filterId === 'status') result = result.filter(b => b.status === value)
+      if (filterId === 'childLaborStatus') result = result.filter(b => b.childLaborStatus === value)
+      if (filterId === 'schoolStatus') result = result.filter(b => b.schoolStatus === value)
       if (filterId === 'sex') result = result.filter(b => b.sex === value)
     }
     return result

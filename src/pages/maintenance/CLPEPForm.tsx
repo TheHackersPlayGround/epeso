@@ -4,6 +4,7 @@ import { canManage } from '../../utils/permissions'
 import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
+import { useFormDraft } from '../../hooks/useFormDraft'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,18 @@ export default function CLPEPForm({
 }: CLPEPFormProps) {
   const isView = mode === 'view'
   const isAdd = mode === 'add'
+
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  // Attached files are tracked by id only and are never kept in a draft.
+  const draft = useFormDraft<{ form: Record<string, unknown>; attachments: string[] }>({
+    draftKey: 'maintenance-clpep-project',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: { form: { ...formData }, attachments: attachments.map(a => a.id ?? a.name) },
+    onRestore: (d) => onChange(d.form as unknown as CLPEPFormData),
+    forDraft: (d) => ({ ...d, attachments: [] }),
+    draftNote: 'Attached documents are not kept in a draft.',
+    onClose: () => onCancel?.(),
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
 
@@ -370,7 +383,7 @@ export default function CLPEPForm({
         {onCancel && (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={draft.requestClose}
             className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
             {mode === 'add' ? 'Cancel' : 'Back to Projects'}
@@ -379,7 +392,7 @@ export default function CLPEPForm({
         {mode !== 'view' && (
           <button
             type="button"
-            onClick={onSave}
+            onClick={draft.wrapSave(onSave)}
             disabled={!canManage('livelihood-maintenance') || isSaving}
             className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2"
           >
@@ -429,6 +442,7 @@ export default function CLPEPForm({
           </div>
         </div>
       )}
+      {draft.modals}
     </>
   )
 }

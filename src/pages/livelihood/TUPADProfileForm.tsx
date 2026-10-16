@@ -7,7 +7,10 @@ import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -191,9 +194,14 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'tupad-beneficiary', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
   const [previewDoc, setPreviewDoc] = useState<TUPADSavedDocument | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -261,9 +269,17 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       errors.push({ field: 'barangay', message: 'Barangay is required.', focus: focusStep2(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) })
     }
 
+    if ((formData.contactNumber ?? '').trim() && !isValidContactNumber((formData.contactNumber ?? ''))) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: focusStep1(() => contactNumberRef.current?.focus()) })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
-    onSave(formData)
+    draft.wrapSave(onSave)(formData)
   }
 
   function SectionHeader({ title }: { title: string }) {
@@ -316,13 +332,13 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           <div ref={birthdateWrapRef}>
             <label className={labelClass}>Birthdate <span className="text-red-500">*</span></label>
             <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
-              <DatePicker className={inputClass} value={formData.birthdate ?? ''} onChange={value => { handleBirthdateChange(value); clearFieldError('birthdate') }} />
+              <DatePicker max={todayIso()} className={inputClass} value={formData.birthdate ?? ''} onChange={value => { handleBirthdateChange(value); clearFieldError('birthdate') }} />
             </div>
             {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
           </div>
           <div>
             <label className={labelClass}>Age</label>
-            <input type="number" className={inputClass + ' bg-gray-50'} value={formData.age ?? ''} readOnly />
+            <input type="number" className={inputClass + ' bg-gray-50'} placeholder="From birthdate" value={formData.birthdate && (formData.age ?? 0) >= 0 ? (formData.age ?? 0) : ''} readOnly />
           </div>
           <div>
             <label className={labelClass}>Civil Status <span className="text-red-500">*</span></label>
@@ -334,7 +350,8 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           </div>
           <div>
             <label className={labelClass}>Contact Number</label>
-            <input className={inputClass} placeholder="09XXXXXXXXX" value={formData.contactNumber ?? ''} onChange={e => updateField({ contactNumber: e.target.value })} />
+            <input ref={contactNumberRef} inputMode="tel" className={`${inputClass} ${errCls('contactNumber')}`} placeholder="09XXXXXXXXX" value={formData.contactNumber ?? ''} onChange={e => { updateField({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} />
+            {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
           </div>
         </div>
       </div>
@@ -415,7 +432,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
 
         <div>
           <label className={labelClass}>Date Applied</label>
-          <DatePicker className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
+          <DatePicker max={todayIso()} className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
         </div>
 
         <div>
@@ -490,7 +507,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
                 Edit
               </button>
             )}
-            <button type="button" onClick={onClose} aria-label="Close form" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button type="button" onClick={draft.requestClose} aria-label="Close form" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={24} className="text-gray-600" />
             </button>
           </div>
@@ -520,7 +537,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           <div className="flex items-center gap-3">
             {isViewMode ? (
               <>
-                <button type="button" onClick={onClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <button type="button" onClick={draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                   Close
                 </button>
                 {!isLastStep && (
@@ -531,7 +548,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
               </>
             ) : (
               <>
-                <button type="button" onClick={onClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <button type="button" onClick={draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                   Cancel
                 </button>
                 {isLastStep ? (
@@ -552,6 +569,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    {draft.modals}
     </>
   )
 }

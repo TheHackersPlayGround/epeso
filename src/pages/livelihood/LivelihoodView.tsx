@@ -1,3 +1,4 @@
+import { requestLeave } from '../../hooks/leaveGuard'
 import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import DILEEPTab from './DILEEPTab'
@@ -53,7 +54,7 @@ export default function LivelihoodView({ onBack }: LivelihoodViewProps) {
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => requestLeave(() => setActiveTab(tab.id))}
                 className={`px-6 py-4 text-base font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? 'border-brand-blue text-brand-blue'

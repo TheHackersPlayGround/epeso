@@ -7,7 +7,10 @@ import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // Display-only comma formatting for the Total Household Monthly Income input
 // -- the underlying value stays a plain numeric string (no commas), matching
@@ -261,10 +264,15 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'slp-beneficiary', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
   const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
   const isViewMode = mode === 'view'
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -359,11 +367,19 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
       })
     }
 
+    if ((formData.contactNumber ?? '').trim() && !isValidContactNumber((formData.contactNumber ?? ''))) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => focusOnStep(2, () => contactNumberRef.current?.focus()) })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
-    onSave({ ...formData, name: fullName })
+    draft.wrapSave(onSave)({ ...formData, name: fullName })
   }
 
   // ── Section header ─────────────────────────────────────────────────
@@ -506,7 +522,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             <label htmlFor="slp-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
-            <DatePicker
+            <DatePicker max={todayIso()}
               id="slp-birthdate"
               className={`${inputClass} ${errCls('birthdate')}`}
               value={formData.birthdate ?? ''}
@@ -521,7 +537,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               type="number"
               className={inputClass + ' bg-gray-50'}
               placeholder="From birthdate"
-              value={formData.age || ''}
+              value={formData.birthdate && (formData.age ?? 0) >= 0 ? (formData.age ?? 0) : ''}
               readOnly
             />
           </div>
@@ -561,12 +577,15 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           <div>
             <label htmlFor="slp-contactNumber" className={labelClass}>Contact Number</label>
             <input
+              ref={contactNumberRef}
               id="slp-contactNumber"
-              className={inputClass}
+              inputMode="tel"
+              className={`${inputClass} ${errCls('contactNumber')}`}
               placeholder="09XXXXXXXXX"
               value={formData.contactNumber ?? ''}
-              onChange={e => updateField({ contactNumber: e.target.value })}
+              onChange={e => { updateField({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }}
             />
+            {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
           </div>
         </div>
 
@@ -848,7 +867,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="slp-dateApplied" className={labelClass}>Date Applied</label>
-            <DatePicker
+            <DatePicker max={todayIso()}
               id="slp-dateApplied"
               className={inputClass}
               value={formData.dateApplied ?? ''}
@@ -928,7 +947,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={draft.requestClose}
             aria-label="Close form"
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -966,7 +985,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -995,7 +1014,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -1026,6 +1045,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    {draft.modals}
     </>
   )
 }

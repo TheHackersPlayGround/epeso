@@ -55,6 +55,7 @@ export type LivelihoodStatus =
   | 'Accepted'
   | 'Waitlisted'
   | 'Rejected'
+  | 'Withdrawn'
 
 export type LivelihoodBeneficiary = {
   id: number

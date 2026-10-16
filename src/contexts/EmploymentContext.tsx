@@ -115,9 +115,11 @@ export type Placement = {
 
 type ListKey = 'applicants' | 'vacancies' | 'employers' | 'referrals' | 'placements'
 
-// How old the provider's copy can be before entering the module triggers a
-// silent full revalidation (so another staff member's changes still show up).
-const STALE_AFTER_MS = 30_000
+// Entering the module (or returning to the window) always re-syncs silently so
+// other staff members' changes show up. A call within this window of the
+// previous full refresh is the same user action firing several triggers, so
+// it is skipped instead of hitting the server again.
+const REFRESH_GUARD_MS = 2_500
 
 interface EmploymentContextValue {
   applicants: Applicant[]
@@ -141,7 +143,7 @@ interface EmploymentContextValue {
   refreshReferrals: () => Promise<void>
   refreshPlacements: () => Promise<void>
   refreshAll: () => Promise<void>
-  // Runs refreshAll only if the last full refresh is older than STALE_AFTER_MS.
+  // Runs refreshAll only if the last full refresh is older than REFRESH_GUARD_MS.
   refreshIfStale: () => Promise<void>
 }
 
@@ -226,10 +228,10 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
 
   // A list whose last load FAILED is always retried on entry, however recent
   // the last full refresh was -- otherwise a hiccup at login would leave it
-  // empty for the next 30 s (the old per-tab fetch always retried on entry).
+  // empty (the old per-tab fetch always retried on entry).
   const refreshIfStale = useCallback(async () => {
     const anyFailed = Object.values(failed.current).some(Boolean)
-    if (!anyFailed && Date.now() - lastFullRefresh.current < STALE_AFTER_MS) return
+    if (!anyFailed && Date.now() - lastFullRefresh.current < REFRESH_GUARD_MS) return
     await refreshAll()
   }, [refreshAll])
 

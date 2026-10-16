@@ -156,7 +156,9 @@ function sumBackupSizes(backups: BackupFile[]): string {
   return `${(total / units.mb).toFixed(0)} MB`
 }
 
-export default function DataManagementTab() {
+// isActive: SecurityView keeps this tab mounted (hidden) after its first visit,
+// so the backup list is re-fetched each time the tab is shown again.
+export default function DataManagementTab({ isActive = true }: { isActive?: boolean }) {
   const [backups, setBackups] = useState<BackupFile[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -181,19 +183,26 @@ export default function DataManagementTab() {
   const showError = (message: string) =>
     setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message, onConfirm: closeModal })
 
-  const refreshBackups = useCallback(async () => {
-    setLoading(true)
+  const refreshBackups = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await backupService.listBackups()
       setBackups(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { refreshBackups() }, [refreshBackups])
+  // First visit loads with the spinner; every later time the tab is shown it
+  // re-syncs quietly so another admin's backup appears without a reload.
+  const hasLoadedBackups = useRef(false)
+  useEffect(() => {
+    if (!isActive) return
+    void refreshBackups(hasLoadedBackups.current)
+    hasLoadedBackups.current = true
+  }, [isActive, refreshBackups])
 
   const handleBackupDatabase = () => {
     const overLimit = backups.length >= BACKUP_WARNING_THRESHOLD

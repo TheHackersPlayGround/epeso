@@ -12,8 +12,10 @@ import {
   type PromotionInput,
 } from '../../services/placementService'
 import ConfirmModal from '../shared/ConfirmModal'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
+import { todayIso } from '../../utils/formatDate'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -472,6 +474,14 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
   const [showFieldErrors, setShowFieldErrors] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Edit-only: warn before discarding changes (no drafts for edits).
+  const draft = useFormDraft({
+    draftKey: 'employment-placement-edit', mode: 'edit',
+    snapshot: { dateHired, status },
+    onRestore: () => {},
+    onClose,
+  })
+
   async function handleSave() {
     if (!dateHired) {
       setShowFieldErrors(true)
@@ -498,7 +508,7 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800">Edit Placement</h3>
           <button
-            onClick={onClose}
+            onClick={draft.requestClose}
             aria-label="Close edit placement modal"
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -534,7 +544,7 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
             <label htmlFor="placement-date-hired" className="block text-sm font-medium text-gray-600 mb-1">
               Date Hired <span className="text-red-500">*</span>
             </label>
-            <DatePicker
+            <DatePicker max={todayIso()}
               id="placement-date-hired"
               className={dateFieldCls}
               value={dateHired}
@@ -564,7 +574,7 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
           <button
-            onClick={onClose}
+            onClick={draft.requestClose}
             className="px-6 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors font-medium"
           >
             Cancel
@@ -578,6 +588,7 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
           </button>
         </div>
       </div>
+      {draft.modals}
     </div>
   )
 }
@@ -683,6 +694,15 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
   const [showFieldErrors, setShowFieldErrors] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Promotions belong to one specific placement, so no drafts — just warn
+  // before throwing away what was typed.
+  const draft = useFormDraft({
+    draftKey: 'employment-placement-promotion', mode: 'edit',
+    snapshot: { promotionDate, newJobTitle, newSalaryMin, newSalaryMax, remarks },
+    onRestore: () => {},
+    onClose,
+  })
+
   const fieldCls =
     'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900'
 
@@ -713,7 +733,7 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800">Record Promotion</h3>
           <button
-            onClick={onClose}
+            onClick={draft.requestClose}
             aria-label="Close record promotion modal"
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -809,7 +829,7 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
           <button
-            onClick={onClose}
+            onClick={draft.requestClose}
             className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
           >
             Cancel
@@ -823,6 +843,7 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
           </button>
         </div>
       </div>
+      {draft.modals}
     </div>
   )
 }

@@ -22,6 +22,7 @@ import {
   SCHOOL_STATUS_OPTIONS,
   RELATIONSHIP_OPTIONS,
 } from './CLPEPProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 const SEX_OPTIONS = ['Male', 'Female']
 const YES_NO_OPTIONS = ['Yes', 'No']
@@ -398,7 +399,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     gradeYearLevel: get(row, 'Grade / Year Level'),
     guardianName: get(row, 'Parent / Guardian Name'),
     guardianRelationship,
-    guardianContactNumber: get(row, 'Guardian Contact Number'),
+    guardianContactNumber: contactNumberOrThrow(get(row, 'Guardian Contact Number')),
     dateApplied: toIsoDate(get(row, 'Date Applied (MM/DD/YYYY)')),
     remarks: get(row, 'Remarks'),
     receivedBy: get(row, 'Received By'),

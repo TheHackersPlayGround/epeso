@@ -5,6 +5,7 @@ import type { AttachmentItem } from './DILPForm'
 import DatePicker from '../../components/DatePicker'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
+import { useFormDraft } from '../../hooks/useFormDraft'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,18 @@ export default function TUPADForm({
 }: TUPADFormProps) {
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
+
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  // Attached files are tracked by id only and are never kept in a draft.
+  const draft = useFormDraft<{ form: Record<string, unknown>; attachments: string[] }>({
+    draftKey: 'maintenance-tupad-project',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: { form: { ...formData }, attachments: attachments.map(a => a.id ?? a.name) },
+    onRestore: (d) => onChange(d.form as unknown as TUPADFormData),
+    forDraft: (d) => ({ ...d, attachments: [] }),
+    draftNote: 'Attached documents are not kept in a draft.',
+    onClose: () => onCancel?.(),
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
@@ -103,7 +116,7 @@ export default function TUPADForm({
     }
 
     if (runValidation(errors)) return
-    onSave()
+    draft.wrapSave(onSave)()
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -361,7 +374,7 @@ export default function TUPADForm({
         {onCancel && (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={draft.requestClose}
             className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
             {mode === 'add' ? 'Cancel' : 'Back to Projects'}
@@ -420,6 +433,7 @@ export default function TUPADForm({
           </div>
         </div>
       )}
+      {draft.modals}
     </>
   )
 }

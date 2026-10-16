@@ -18,6 +18,7 @@ import CDSPProfileForm, {
   getEffectiveStatus, StatusBadge, CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS,
 } from './CDSPProfileForm'
 import { downloadImportTemplate, importCdspApplicants, type ImportResult } from './cdspImport'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -172,7 +173,8 @@ function activityStatusBadge(status: string) {
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
 export default function CDSPView({ onBack }: CDSPViewProps) {
-  const { applicants, activities: cdspActivities, services: svcList, loading, refreshProfiles, refreshActivities } = useCDSP()
+  const { applicants, activities: cdspActivities, services: svcList, loading, refreshProfiles, refreshActivities, refreshIfStale } = useCDSP()
+  useRefreshOnReturn(refreshIfStale)
   const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -271,7 +273,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       const val = filterValues[filterId]
       if (!val) return true
       if (filterId === 'service') return a.serviceAvailed === val
-      if (filterId === 'status') return getEffectiveStatus(a, cdspActivities) === val
+      if (filterId === 'status') return getEffectiveStatus(a) === val
       if (filterId === 'classification') return a.classification.includes(val) || (val === 'Others' && a.classificationOther !== '')
       if (filterId === 'sex') return a.sex === val
       if (filterId === 'civilStatus') return a.civilStatus === val
@@ -1003,7 +1005,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                           })()}
                         </td>
                       )}
-                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={getEffectiveStatus(applicant, cdspActivities)} /></td>
+                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={getEffectiveStatus(applicant)} /></td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button

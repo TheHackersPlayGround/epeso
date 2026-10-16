@@ -1,5 +1,6 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import WithdrawDialog from '../../components/WithdrawDialog'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
@@ -16,12 +17,14 @@ import SPESProfileForm, {
   StatusBadge, BatchStatusBadge, deriveStatus,
 } from './SPESProfileForm'
 import { downloadImportTemplate, importSpesApplicants, type ImportResult } from './spesImport'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 
 interface SPESViewProps {
   onBack: () => void
 }
 
-const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Inactive', 'Completed']
+const STATUS_OPTIONS: SPESApplicant['status'][] = ['Active', 'Inactive', 'Completed', 'Withdrawn']
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -168,7 +171,8 @@ function errMsg(e: unknown, fallback: string) {
 // ─── Main SPESView ────────────────────────────────────────────────────────────
 
 export default function SPESView({ onBack }: SPESViewProps) {
-  const { applicants, spesBatches, loading, refreshProfiles, refreshBatches } = useSPES()
+  const { applicants, spesBatches, loading, refreshProfiles, refreshBatches, refreshIfStale } = useSPES()
+  useRefreshOnReturn(refreshIfStale)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -239,6 +243,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
     setMenuPos(prev => (prev && prev.top === top && prev.right === menuAnchor.right) ? prev : { top, right: menuAnchor.right })
   }, [openActionMenuId, menuAnchor])
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
+  // Mark as withdrawn: someone leaving a batch that has already started.
+  const [withdrawTarget, setWithdrawTarget] = useState<SPESApplicant | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<SPESApplicant | null>(null)
 
   const batchNameFor = (applicant: SPESApplicant) =>
@@ -366,6 +373,24 @@ export default function SPESView({ onBack }: SPESViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
+    }
+  }
+
+  const handleWithdraw = async (reason: string, exitDate: string) => {
+    if (!withdrawTarget || isWithdrawing) return
+    const name = `${withdrawTarget.lastName}, ${withdrawTarget.firstName}`
+    setIsWithdrawing(true)
+    try {
+      await spesApiService.withdrawFromBatch(withdrawTarget.id, reason, exitDate)
+      await refreshProfiles()
+      await refreshBatches()
+      setWithdrawTarget(null)
+      setViewingAssignedBatchFor(null)
+      setResultModal({ isOpen: true, type: 'success', title: 'Withdrawn', message: `${name} has been marked as withdrawn.` })
+    } catch (e: unknown) {
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as withdrawn.') })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -511,6 +536,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
         // progress has happened, so unassigning or changing batch would
         // silently erase that record.
         const canChange = batch ? batch.status === 'Planned' : true
+        // Withdrawn: left an Ongoing batch early. The assignment is a permanent record.
+        const isWithdrawn = viewingAssignedBatchFor.status === 'Withdrawn'
         const statusColor = (s: string) =>
           s === 'Ongoing'   ? 'bg-green-100 text-green-700' :
           s === 'Completed' ? 'bg-blue-100 text-blue-700'  :
@@ -534,6 +561,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <button onClick={close} className="p-1 text-white/80 hover:text-white transition-colors"><X size={20} /></button>
               </div>
               <div className="overflow-y-auto flex-1 p-6">
+                {isWithdrawn && <WithdrawalBanner exitedAt={viewingAssignedBatchFor.exitedAt} reason={viewingAssignedBatchFor.exitReason} />}
                 {batch ? (
                   <>
                     <div className="flex items-start justify-between gap-3 mb-4">
@@ -564,28 +592,52 @@ export default function SPESView({ onBack }: SPESViewProps) {
                   </div>
                 )}
               </div>
-              {!canChange && (
+              {isWithdrawn ? (
+                <WithdrawalFootnote what="batch" />
+              ) : !canChange && (
                 <p className="px-6 py-3 text-xs text-gray-500 bg-gray-50 border-t border-gray-100 flex-shrink-0">
                   This batch is already {batch?.status}, so the assignment can no longer be changed or removed. Unassign and Change Batch are only available while the batch is Planned.
                 </p>
               )}
               <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                <button
+                {isWithdrawn && (
+                  <button onClick={close} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium">Close</button>
+                )}
+                {!isWithdrawn && <button
                   onClick={() => setConfirmUnassignId(viewingAssignedBatchFor.id)}
                   disabled={!canChange || !canManage('spes')}
                   title={!canChange ? 'This batch is no longer Planned — unassigning would erase the only record of this assignment.' : undefined}
                   className="px-4 py-2.5 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                >Unassign</button>
-                <button
+                >Unassign</button>}
+                {!isWithdrawn && <button
                   onClick={() => { close(); setAssignTarget(viewingAssignedBatchFor) }}
                   disabled={!canChange || !canManage('spes')}
                   className={`px-4 py-2.5 border border-brand-blue text-brand-blue rounded-xl hover:bg-blue-50 transition-colors text-sm font-medium${(!canChange || !canManage('spes')) ? ' opacity-50 cursor-not-allowed' : ''}`}
-                >Change Batch</button>
+                >Change Batch</button>}
+                {viewingAssignedBatchFor.status === 'Active' && batch?.status === 'Ongoing' && (
+                  <button
+                    onClick={() => { close(); setWithdrawTarget(viewingAssignedBatchFor) }}
+                    disabled={!canManage('spes')}
+                    className="px-4 py-2.5 border border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >Mark as withdrawn</button>
+                )}
               </div>
             </div>
           </div>
         )
       })()}
+
+      {withdrawTarget && (
+        <WithdrawDialog
+          personName={`${withdrawTarget.lastName}, ${withdrawTarget.firstName}`}
+          assignmentName={spesBatches.find(b => b.id === withdrawTarget.assignedBatchId)?.batchName ?? 'this batch'}
+          kind="batch"
+          minDate={withdrawTarget.assignmentHistory[0]?.assignedDate}
+          isSaving={isWithdrawing}
+          onConfirm={handleWithdraw}
+          onClose={() => setWithdrawTarget(null)}
+        />
+      )}
 
       {/* Assign Batch — selection modal (step 1) */}
       {assignTarget && !selectedBatch && (() => {
@@ -875,7 +927,10 @@ export default function SPESView({ onBack }: SPESViewProps) {
                           {batch ? (
                             <div>
                               <p className="line-clamp-2 leading-snug mb-1">{batch.batchName}</p>
-                              <BatchStatusBadge status={batch.status} />
+                              {/* Withdrawn: the batch's own status (e.g. Ongoing) would read as the person's, so show when they left instead. */}
+                              {applicant.status === 'Withdrawn' && applicant.exitedAt
+                                ? <span className="inline-block text-xs text-orange-600">Left on {fmtDate(applicant.exitedAt)}</span>
+                                : <BatchStatusBadge status={batch.status} />}
                             </div>
                           ) : <span>—</span>}
                         </td>
@@ -952,6 +1007,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
                 <button onClick={() => { setViewingAssignedBatchFor(applicant); setOpenActionMenuId(null) }} className="w-full px-3 py-2 text-left text-xs text-brand-blue font-medium hover:bg-blue-50">View Assigned Batch</button>
               ) : (
                 <button onClick={() => { setAssignTarget(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Batch</button>
+              )}
+              {applicant.status === 'Active' && spesBatches.find(b => b.id === applicant.assignedBatchId)?.status === 'Ongoing' && (
+                <button onClick={() => { setWithdrawTarget(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Mark as withdrawn</button>
               )}
               <div className="my-1 border-t border-gray-100" />
               <button onClick={() => { handleDelete(applicant); setOpenActionMenuId(null) }} disabled={!canManage('spes')} className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>

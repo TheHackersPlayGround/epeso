@@ -29,6 +29,7 @@ import {
   SEX_OPTIONS,
   STATUS_OPTIONS,
 } from './SkillsTrainingProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 // ─── Template definition (grouped by form section) ───────────────────────────
 
@@ -413,7 +414,7 @@ async function rowToPayload(row: Row, qualifications: string[], purposes: string
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,
     classification,

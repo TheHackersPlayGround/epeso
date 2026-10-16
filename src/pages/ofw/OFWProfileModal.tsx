@@ -8,6 +8,8 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
 import { REQUEST_TYPES, ELPOR_FORMS, EMPLOYMENT_STATUS_OPTIONS, CIVIL_STATUS_OPTIONS, ClearButton } from './AddOFWRequestForm'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 interface OFWProfileModalProps {
   profile: OFWProfile
@@ -181,6 +183,8 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
     if (!form.contactNumber.trim()) {
       errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: () => contactNumberRef.current?.focus() })
+    } else if (!isValidContactNumber(form.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => contactNumberRef.current?.focus() })
     }
 
     if (!form.sex) {
@@ -205,6 +209,10 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
     if (!form.dateFiled) {
       errors.push({ field: 'dateFiled', message: 'Date Filed is required.', focus: () => dateFiledWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+
+    if ((form.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
     if (runValidation(errors)) return
@@ -413,7 +421,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <div ref={dateFiledWrapRef}>
                   <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
                   <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
-                    <DatePicker className={inp} value={form.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
+                    <DatePicker max={todayIso()} className={inp} value={form.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
                   </div>
                   {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
                 </div>
@@ -476,7 +484,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <div ref={birthdateWrapRef}>
                   <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
                   <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
-                    <DatePicker className={inp} value={form.birthdate} onChange={value => { set({ birthdate: value }); clearFieldError('birthdate') }} />
+                    <DatePicker max={todayIso()} className={inp} value={form.birthdate} onChange={value => { set({ birthdate: value }); clearFieldError('birthdate') }} />
                   </div>
                   {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
                 </div>
@@ -493,7 +501,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Contact Number <span className="text-red-500">*</span></label>
-                  <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} placeholder="09XXXXXXXXX" value={form.contactNumber} onChange={e => { set({ contactNumber: e.target.value }); clearFieldError('contactNumber') }} />
+                  <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} placeholder="09XXXXXXXXX" value={form.contactNumber} inputMode="tel" onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} />
                   {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
                 </div>
                 <div>

@@ -23,6 +23,7 @@ import { useTUPAD } from '../../contexts/TUPADContext'
 import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
 import { useEmployment } from '../../contexts/EmploymentContext'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 interface ReportViewProps {
   onBack: () => void
@@ -69,7 +70,16 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   // Employment Facilitation's referrals/placements come from the same
   // app-level provider every category above uses.
-  const { referrals: efReferrals, placements: efPlacements } = useEmployment()
+  const { referrals: efReferrals, placements: efPlacements, refreshIfStale: refreshEmploymentIfStale } = useEmployment()
+  // Reports are built from the shared lists, so re-sync them all (silently)
+  // when the Reports page is opened.
+  const refreshers = [
+    useCDSP().refreshIfStale, useGIP().refreshIfStale, useSPES().refreshIfStale,
+    useSkillsTraining().refreshIfStale, useOFW().refreshIfStale, useDILP().refreshIfStale,
+    useTUPAD().refreshIfStale, useSLP().refreshIfStale, useCLPEP().refreshIfStale,
+    refreshEmploymentIfStale,
+  ]
+  useRefreshOnReturn(() => { refreshers.forEach(r => { void r() }) })
 
   const [infoModal, setInfoModal] = useState<{ isOpen: boolean; title: string; message: string }>({ isOpen: false, title: '', message: '' })
   const [reportCategory, setReportCategory] = useState<ReportCategory | ''>('')
@@ -623,11 +633,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Workplace/Office Address': w.deploymentLocation || '-',
               'Supervisor': w.supervisor || '-',
               'Allowance': formatCurrency(w.allowance),
-              // All interns ever assigned here (Ongoing + Completed), not just
+              // All interns assigned here (Ongoing + Completed), not just
               // currently-active ones -- w.assignedCount is Ongoing-only and
               // used elsewhere (Assign modal) for capacity, which isn't the
-              // question this report answers.
-              'Interns': gipApplicants.filter(a => a.assignedWorkplaceId === w.id).length,
+              // question this report answers. Withdrawn interns are excluded
+              // so this matches the "Export Interns" roster.
+              'Interns': gipApplicants.filter(a => a.assignedWorkplaceId === w.id && a.status !== 'Withdrawn').length,
               _batchId: w.id, // not rendered as a column — used to export this workplace's interns
             }))
         }
@@ -2639,7 +2650,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const workplace = gipWorkplaces.find(w => w.id === workplaceId)
     if (!workplace) return
     const interns = gipApplicants
-      .filter(a => a.assignedWorkplaceId === workplaceId)
+      // Withdrawn interns keep their workplace link for history but are no
+      // longer interning there, so they're left off the roster.
+      .filter(a => a.assignedWorkplaceId === workplaceId && a.status !== 'Withdrawn')
       .map((a, i) => [
         i + 1,
         `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
@@ -2744,7 +2757,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const batch = spesBatches.find(b => b.id === batchId)
     if (!batch) return
     const students = spesApplicants
-      .filter(a => a.assignedBatchId === batchId)
+      // Withdrawn students keep their batch link for history but are no longer
+      // part of the batch, so they're left off the roster (matches the
+      // Participants column and slot count).
+      .filter(a => a.assignedBatchId === batchId && a.status !== 'Withdrawn')
       .map((a, i) => [
         i + 1,
         `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
@@ -2939,7 +2955,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const project = tupadProjects.find(p => p.id === projectId)
       if (!project) return
       projectTitle = project.title || 'Project'
-      beneficiaries = tupadApplicants.filter(a => a.assignedProjectId === projectId)
+      beneficiaries = tupadApplicants.filter(a => a.assignedProjectId === projectId && a.status !== 'Withdrawn')
       infoLines = [
         [{ label: 'Project: ', value: project.title || '-' }],
         [{ label: 'Date: ', value: project.date || '-' }, { label: '     Location: ', value: project.location || '-' }],
@@ -2950,7 +2966,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const project = slpProjects.find(p => p.id === projectId)
       if (!project) return
       projectTitle = project.projectName || 'Project'
-      beneficiaries = slpApplicants.filter(a => a.assignedSlpProjectId === projectId)
+      beneficiaries = slpApplicants.filter(a => a.assignedSlpProjectId === projectId && a.status !== 'Withdrawn')
       infoLines = [
         [{ label: 'Project: ', value: project.projectName || '-' }],
         [{ label: 'SLP Track: ', value: project.slpTrack || '-' }, { label: '     Date Started: ', value: project.dateStarted || '-' }],

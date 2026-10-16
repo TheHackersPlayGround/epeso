@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as cdspService from '../services/cdspService'
 
@@ -101,6 +102,7 @@ interface CDSPContextValue {
   refreshProfiles: () => Promise<void>
   refreshActivities: () => Promise<void>
   refreshServices: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const CDSPContext = createContext<CDSPContextValue | null>(null)
@@ -113,27 +115,27 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await cdspService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshActivities = useCallback(async () => {
-    setLoadingActivities(true)
+  const refreshActivities = useCallback(async (silent = false) => {
+    if (!silent) setLoadingActivities(true)
     try {
       const res = await cdspService.listActivities()
       setActivities(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingActivities(false)
+      if (!silent) setLoadingActivities(false)
     }
   }, [])
 
@@ -147,14 +149,26 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshActivities(true), refreshServices()])
+  }, [refreshProfiles, refreshActivities, refreshServices])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshActivities()
     refreshServices()
   }, [refreshProfiles, refreshActivities, refreshServices])
 
   return (
-    <CDSPContext.Provider value={{ applicants, activities, services, programInfo, loading, loadingActivities, refreshProfiles, refreshActivities, refreshServices }}>
+    <CDSPContext.Provider value={{ applicants, activities, services, programInfo, loading, loadingActivities, refreshProfiles, refreshActivities, refreshServices, refreshIfStale }}>
       {children}
     </CDSPContext.Provider>
   )

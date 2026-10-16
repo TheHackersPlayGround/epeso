@@ -10,11 +10,15 @@ interface ConfirmModalProps {
   // aren't destructive (logout, restore, moving forward a status), so the
   // button color actually signals risk instead of always reading as delete.
   confirmVariant?: 'danger' | 'brand'
+  // Optional third action, rendered to the right of the confirm button
+  // (used by the "Leave this form?" modal: Keep editing / Discard / Save as draft).
+  thirdText?: string
+  onThird?: () => void
   onConfirm: () => void
   onCancel: () => void
 }
 
-export default function ConfirmModal({ isOpen, type, title, message, confirmText = 'OK', cancelText, confirmVariant = 'danger', onConfirm, onCancel }: ConfirmModalProps) {
+export default function ConfirmModal({ isOpen, type, title, message, confirmText = 'OK', cancelText, confirmVariant = 'danger', thirdText, onThird, onConfirm, onCancel }: ConfirmModalProps) {
   if (!isOpen) return null
   return (
     <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center p-4">
@@ -68,6 +72,14 @@ export default function ConfirmModal({ isOpen, type, title, message, confirmText
           >
             {confirmText}
           </button>
+          {type === 'confirm' && thirdText && onThird && (
+            <button
+              onClick={onThird}
+              className="flex-1 py-2.5 rounded-lg text-base text-white font-medium bg-[#0077BE] hover:bg-[#006699] transition-colors"
+            >
+              {thirdText}
+            </button>
+          )}
         </div>
       </div>
     </div>

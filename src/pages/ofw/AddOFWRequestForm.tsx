@@ -6,7 +6,10 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 interface AddOFWRequestFormProps {
   onClose: () => void
@@ -111,6 +114,10 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
   const set = (updates: Partial<Omit<OFWProfile, 'id'>>) => setFormData(prev => ({ ...prev, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'ofw-request', mode: 'add', formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose, keep: ['referenceNumber'],
+  })
   const [previewDoc, setPreviewDoc] = useState<OFWSavedAttachment | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
@@ -172,6 +179,8 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
 
     if (!formData.contactNumber.trim()) {
       errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: () => contactNumberRef.current?.focus() })
+    } else if (!isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => contactNumberRef.current?.focus() })
     }
 
     if (!formData.sex) {
@@ -202,11 +211,15 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
       errors.push({ field: 'dateFiled', message: 'Date Filed is required.', focus: () => dateFiledWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
     }
 
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = formData.suffix ? ' ' + formData.suffix : ''
-    onSave({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
+    draft.wrapSave(onSave)({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
   }
 
   const lbl = sublbl
@@ -222,7 +235,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
           </div>
           <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>Add New Request — OFW</p>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -244,7 +257,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
               <div ref={dateFiledWrapRef}>
                 <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
                 <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
-                  <DatePicker className={inp} value={formData.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
+                  <DatePicker max={todayIso()} className={inp} value={formData.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
                 </div>
                 {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
               </div>
@@ -295,7 +308,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
               <div ref={birthdateWrapRef}>
                 <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
                 <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
-                  <DatePicker className={inp} value={formData.birthdate} onChange={value => { set({ birthdate: value }); clearFieldError('birthdate') }} />
+                  <DatePicker max={todayIso()} className={inp} value={formData.birthdate} onChange={value => { set({ birthdate: value }); clearFieldError('birthdate') }} />
                 </div>
                 {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
               </div>
@@ -313,7 +326,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={lbl}>Contact Number <span className="text-red-500">*</span></label>
-                <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} onChange={e => { set({ contactNumber: e.target.value }); clearFieldError('contactNumber') }} />
+                <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} inputMode="tel" onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} />
                 {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
               </div>
               <div>
@@ -608,7 +621,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
             <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={draft.requestClose}
                 className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -628,6 +641,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {draft.modals}
     </div>
   )
 }

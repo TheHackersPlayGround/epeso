@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as skillsTrainingService from '../services/skillsTrainingService'
 
@@ -92,6 +93,7 @@ interface SkillsTrainingContextValue {
   refreshBatches: () => Promise<void>
   refreshActivities: () => Promise<void>
   refreshLookups: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const SkillsTrainingContext = createContext<SkillsTrainingContextValue | null>(null)
@@ -106,39 +108,39 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const [loadingBatches, setLoadingBatches] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await skillsTrainingService.listProfiles()
       setProfiles(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshBatches = useCallback(async () => {
-    setLoadingBatches(true)
+  const refreshBatches = useCallback(async (silent = false) => {
+    if (!silent) setLoadingBatches(true)
     try {
       const res = await skillsTrainingService.listBatches()
       setBatches(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingBatches(false)
+      if (!silent) setLoadingBatches(false)
     }
   }, [])
 
-  const refreshActivities = useCallback(async () => {
-    setLoadingActivities(true)
+  const refreshActivities = useCallback(async (silent = false) => {
+    if (!silent) setLoadingActivities(true)
     try {
       const res = await skillsTrainingService.listActivities()
       setActivities(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingActivities(false)
+      if (!silent) setLoadingActivities(false)
     }
   }, [])
 
@@ -155,7 +157,19 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshBatches(true), refreshActivities(true), refreshLookups()])
+  }, [refreshProfiles, refreshBatches, refreshActivities, refreshLookups])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshBatches()
     refreshActivities()
@@ -167,6 +181,7 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
       profiles, batches, activities, qualifications, purposes,
       loading, loadingBatches, loadingActivities,
       refreshProfiles, refreshBatches, refreshActivities, refreshLookups,
+      refreshIfStale,
     }}>
       {children}
     </SkillsTrainingContext.Provider>

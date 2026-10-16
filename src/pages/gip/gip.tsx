@@ -1,5 +1,6 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import WithdrawDialog from '../../components/WithdrawDialog'
 import ConfirmModal from '../shared/ConfirmModal'
 import JobPlacementModal from '../shared/JobPlacementModal'
 import {
@@ -18,6 +19,8 @@ import GIPProfileForm, {
 } from './GIPProfileForm'
 import { downloadImportTemplate, importGipApplicants, type ImportResult } from './gipImport'
 import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS, type AgingBucket } from '../../utils/aging'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 
 interface GIPViewProps {
   onBack: () => void
@@ -168,7 +171,8 @@ function errMsg(e: unknown, fallback: string) {
 // ─── Main GIPView ──────────────────────────────────────────────────────────────
 
 export default function GIPView({ onBack }: GIPViewProps) {
-  const { applicants, gipWorkplaces, loading, refreshProfiles, refreshWorkplaces } = useGIP()
+  const { applicants, gipWorkplaces, loading, refreshProfiles, refreshWorkplaces, refreshIfStale } = useGIP()
+  useRefreshOnReturn(refreshIfStale)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -179,7 +183,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
   const availableFilters = [
-    { id: 'status',         label: 'Status',         options: ['Ongoing', 'Inactive', 'Completed', 'Cancelled'] as string[] },
+    { id: 'status',         label: 'Status',         options: ['Ongoing', 'Inactive', 'Completed', 'Withdrawn'] as string[] },
     { id: 'classification', label: 'Classification',  options: [...CLASSIFICATION_OPTIONS, 'Others'] },
     { id: 'sex',            label: 'Sex',             options: ['Male', 'Female'] },
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
@@ -231,6 +235,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [confirmingWorkplace, setConfirmingWorkplace] = useState<GIPWorkplace | null>(null)
   const [viewWorkplaceTarget, setViewWorkplaceTarget] = useState<GIPApplicant | null>(null)
   const [completeConfirm, setCompleteConfirm] = useState<GIPApplicant | null>(null)
+  // Mark as withdrawn: an intern leaving their workplace/office before it finished.
+  const [withdrawTarget, setWithdrawTarget] = useState<GIPApplicant | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -392,6 +399,24 @@ export default function GIPView({ onBack }: GIPViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as completed.') })
     } finally {
       setIsAssigning(false)
+    }
+  }
+
+  const handleWithdraw = async (reason: string, exitDate: string) => {
+    if (!withdrawTarget || isWithdrawing) return
+    const name = `${withdrawTarget.lastName}, ${withdrawTarget.firstName}`
+    setIsWithdrawing(true)
+    try {
+      await gipApiService.withdrawFromWorkplace(withdrawTarget.id, reason, exitDate)
+      await refreshProfiles()
+      await refreshWorkplaces()
+      setWithdrawTarget(null)
+      setViewWorkplaceTarget(null)
+      setResultModal({ isOpen: true, type: 'success', title: 'Withdrawn', message: `${name} has been marked as withdrawn.` })
+    } catch (e: unknown) {
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as withdrawn.') })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -609,6 +634,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
         // the workplace is a reusable directory entry with no period of its
         // own; each person carries their own assigned/completed dates.
         const isCompleted = viewWorkplaceTarget.status === 'Completed'
+        const isWithdrawn = viewWorkplaceTarget.status === 'Withdrawn'
+        const isOngoing = viewWorkplaceTarget.status === 'Ongoing'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
@@ -620,13 +647,14 @@ export default function GIPView({ onBack }: GIPViewProps) {
                 <button onClick={() => setViewWorkplaceTarget(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
               </div>
               <div className="p-6 space-y-3">
+                {isWithdrawn && <WithdrawalBanner exitedAt={viewWorkplaceTarget.exitedAt} reason={viewWorkplaceTarget.exitReason} />}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-semibold text-gray-800">{currentWorkplace.workplaceName}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isCompleted ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
-                      {isCompleted ? 'Completed' : 'Ongoing'}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isWithdrawn ? 'bg-orange-100 text-orange-700' : isCompleted ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
+                      {isWithdrawn ? 'Withdrawn' : isCompleted ? 'Completed' : 'Ongoing'}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
@@ -643,12 +671,22 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assignment Period</p>
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                     <div><span className="text-gray-400">Start Date:</span> {viewWorkplaceTarget.assignmentHistory[0]?.assignedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].assignedDate) : '—'}</div>
-                    <div><span className="text-gray-400">End Date:</span> {isCompleted && viewWorkplaceTarget.assignmentHistory[0]?.completedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].completedDate) : '—'}</div>
+                    <div><span className="text-gray-400">End Date:</span> {isWithdrawn && viewWorkplaceTarget.exitedAt ? fmtDate(viewWorkplaceTarget.exitedAt) : isCompleted && viewWorkplaceTarget.assignmentHistory[0]?.completedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].completedDate) : '—'}</div>
                   </div>
                 </div>
               </div>
+              {isWithdrawn && <WithdrawalFootnote what="workplace/office" />}
               <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
-                {!isCompleted && (
+                {isOngoing && (
+                  <button
+                    onClick={() => { setWithdrawTarget(viewWorkplaceTarget); setViewWorkplaceTarget(null) }}
+                    disabled={!canManage('gip') || isAssigning}
+                    className="flex-1 py-2 border border-orange-300 text-orange-600 rounded-lg text-sm hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Mark as withdrawn
+                  </button>
+                )}
+                {isOngoing && (
                   <button
                     onClick={() => handleUnassignWorkplace()}
                     disabled={!canManage('gip') || isAssigning}
@@ -663,6 +701,18 @@ export default function GIPView({ onBack }: GIPViewProps) {
           </div>
         )
       })()}
+
+      {withdrawTarget && (
+        <WithdrawDialog
+          personName={`${withdrawTarget.lastName}, ${withdrawTarget.firstName}`}
+          assignmentName={gipWorkplaces.find(w => w.id === withdrawTarget.assignedWorkplaceId)?.workplaceName ?? 'this workplace/office'}
+          kind="workplace"
+          minDate={withdrawTarget.assignmentHistory[0]?.assignedDate}
+          isSaving={isWithdrawing}
+          onConfirm={handleWithdraw}
+          onClose={() => setWithdrawTarget(null)}
+        />
+      )}
 
       {/* Import Modal */}
       {isImportModalOpen && (
@@ -952,12 +1002,20 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   className="w-full px-3 py-2 text-left text-xs text-blue-600 hover:bg-blue-50"
                 >View Assigned Workplace/Office</button>
               )}
+              {isActive && <div className="my-1 border-t border-gray-100" />}
               {isActive && (
                 <button
                   onClick={() => { setCompleteConfirm(applicant); setOpenActionMenuId(null) }}
                   disabled={!canManage('gip')}
                   className="w-full px-3 py-2 text-left text-xs text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >Mark as Completed</button>
+              )}
+              {isActive && (
+                <button
+                  onClick={() => { setWithdrawTarget(applicant); setOpenActionMenuId(null) }}
+                  disabled={!canManage('gip')}
+                  className="w-full px-3 py-2 text-left text-xs text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                >Mark as withdrawn</button>
               )}
               {applicant.status === 'Inactive' && (
                 <button

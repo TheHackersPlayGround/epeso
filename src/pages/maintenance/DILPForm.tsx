@@ -5,6 +5,7 @@ import { searchProvinces, searchCities, searchBarangaysByCity } from '../../serv
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
 import { useFieldValidation, type ValidationError } from '../../hooks/useFieldValidation'
+import { useFormDraft } from '../../hooks/useFormDraft'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,18 @@ export default function DILPForm({
 }: DILPFormProps) {
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
+
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  // Attached files are tracked by id only and are never kept in a draft.
+  const draft = useFormDraft<{ form: Record<string, unknown>; attachments: string[] }>({
+    draftKey: 'maintenance-dilp-project',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: { form: { ...formData }, attachments: attachments.map(a => a.id ?? a.name) },
+    onRestore: (d) => onChange(d.form as unknown as DILPFormData),
+    forDraft: (d) => ({ ...d, attachments: [] }),
+    draftNote: 'Attached documents are not kept in a draft.',
+    onClose: () => onCancel?.(),
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewItem, setPreviewItem] = useState<AttachmentItem | null>(null)
   const [provinceId, setProvinceId] = useState<number | null>(null)
@@ -120,7 +133,7 @@ export default function DILPForm({
     }
 
     if (runValidation(errors)) return
-    onSave()
+    draft.wrapSave(onSave)()
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -357,7 +370,7 @@ export default function DILPForm({
       {/* ─── Buttons ──────────────────────────────────────────────────────────── */}
       <div className="flex justify-end gap-3 border-t pt-4">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+          <button type="button" onClick={draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm">
             {mode === 'add' ? 'Cancel' : 'Back to Projects List'}
           </button>
         )}
@@ -409,6 +422,7 @@ export default function DILPForm({
           </div>
         </div>
       )}
+      {draft.modals}
     </>
   )
 }

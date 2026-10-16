@@ -10,6 +10,7 @@ import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
 import { useDocuments, IMAGE_TYPES } from '../../contexts/DocumentsContext'
 import * as documentsService from '../../services/documentsService'
 import ConfirmModal from '../shared/ConfirmModal'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 const BRAND = '#0077BE'
 const BRAND_DARK = '#0065A5'
@@ -53,7 +54,8 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 export default function DocumentsView({ onBack }: DocumentsViewProps) {
-  const { folders, files, refreshFolders, refreshDocuments } = useDocuments()
+  const { folders, files, refreshFolders, refreshDocuments, refreshIfStale } = useDocuments()
+  useRefreshOnReturn(refreshIfStale)
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedFolder, setSelectedFolder] = useState('root')
@@ -294,6 +296,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       }
       setSuccessModal({ open: true, message: 'Folder created successfully!' })
     } catch (err) {
+      if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to create the folder.' })
     }
   }
@@ -309,8 +312,26 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       await refreshFolders()
       setSuccessModal({ open: true, message: 'Folder renamed successfully!' })
     } catch (err) {
+      if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to rename the folder.' })
     }
+  }
+
+  // Another user may have deleted (or moved) the item since this list was
+  // loaded. The backend answers 404 "Document not found." / "Folder not found."
+  // / "Parent folder not found."; say so plainly instead of a bare "not found",
+  // and refresh both lists so the stale entry disappears at once.
+  const reportMissing = async (err: unknown): Promise<boolean> => {
+    const e = err as { status?: number; message?: string }
+    if (e?.status !== 404) return false
+    const msg = e.message ?? ''
+    let text = 'This item no longer exists. It may have already been deleted by another user.'
+    if (msg === 'Document not found.') text = 'This file no longer exists. It may have already been deleted by another user.'
+    else if (msg === 'Folder not found.') text = 'This folder no longer exists. It may have already been deleted by another user.'
+    else if (msg === 'Parent folder not found.') text = 'The destination folder no longer exists. It may have already been deleted by another user.'
+    await Promise.all([refreshFolders(), refreshDocuments()])
+    setErrorModal({ open: true, message: text })
+    return true
   }
 
   const handleDeleteFolder = async (folderId: string) => {
@@ -321,6 +342,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       if (selectedFolder === folderId) setSelectedFolder('root')
       setSuccessModal({ open: true, message: 'Folder moved to recycle bin.' })
     } catch (err) {
+      if (await reportMissing(err)) { if (selectedFolder === folderId) setSelectedFolder('root'); return }
       setFolderInUseModal({
         open: true, folderId,
         message: err instanceof Error ? err.message : 'Failed to delete the folder.',
@@ -336,6 +358,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       await refreshDocuments()
       setSuccessModal({ open: true, message: 'File moved to recycle bin.' })
     } catch (err) {
+      if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to delete the file.' })
     }
   }
@@ -371,6 +394,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       await refreshDocuments()
       setSuccessModal({ open: true, message: 'File moved successfully!' })
     } catch (err) {
+      if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to move the file.' })
     }
   }
@@ -385,6 +409,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
       await refreshDocuments()
       setSuccessModal({ open: true, message: 'File renamed successfully!' })
     } catch (err) {
+      if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to rename the file.' })
     }
   }
@@ -483,10 +508,13 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   }
 
   // ── File action menu shared ───────────────────────────────────────────────────
-  const FileMenu = ({ file }: { file: FileItem }) => (
+  // align: which edge of the ⋮ button the menu hangs from. In the grid the button
+  // sits at the card's left, so the menu opens to the right (staying inside the
+  // card); in the list it sits at the row's right end, so it opens to the left.
+  const FileMenu = ({ file, align = 'right' }: { file: FileItem; align?: 'left' | 'right' }) => (
     <>
       <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20">
+      <div className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20`}>
         <button onClick={() => { handleViewFile(file); setActiveMenuId(null) }}
           className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
           <Eye size={16} /> View
@@ -773,8 +801,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
                   style={{ position: 'fixed', top: folderMenuPos.top, right: folderMenuPos.right }}
                   className="w-40 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50"
                 >
-                  <button onClick={() => { setFolderToEdit(menuFolder); setEditFolderName(menuFolder.name); setIsEditFolderModalOpen(true); setActiveFolderMenuId(null) }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                  <button onClick={() => { setFolderToEdit(menuFolder); setEditFolderName(menuFolder.name); setIsEditFolderModalOpen(true); setActiveFolderMenuId(null) }} disabled={!canManage('documents')}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <Edit2 size={14} /> Rename
                   </button>
                   <div className="border-t border-gray-200 my-1" />
@@ -869,7 +897,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
                           className="p-1.5 bg-white rounded-lg shadow-md hover:bg-gray-50">
                           <MoreVertical size={16} className="text-gray-700" />
                         </button>
-                        {activeMenuId === file.id && <FileMenu file={file} />}
+                        {activeMenuId === file.id && <FileMenu file={file} align="left" />}
                       </div>
                       <div className="flex flex-col items-center text-center">
                         <div className="mb-3">{getFileIcon(file.type)}</div>

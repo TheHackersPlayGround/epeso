@@ -6,8 +6,11 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { canManage } from '../../utils/permissions'
 import { useFieldValidation, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -204,10 +207,15 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'clpep-beneficiary', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
 
   const isViewMode = mode === 'view'
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const sexRef = useRef<HTMLSelectElement>(null)
@@ -271,13 +279,21 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       })
     }
 
+    if ((formData.guardianContactNumber ?? '').trim() && !isValidContactNumber((formData.guardianContactNumber ?? ''))) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => focusOnStep(4, () => contactNumberRef.current?.focus()) })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
       .filter(Boolean)
       .join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
-    onSave({ ...formData, name: fullName })
+    draft.wrapSave(onSave)({ ...formData, name: fullName })
   }
 
   function handleDocumentUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -378,7 +394,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             <label htmlFor="clpep-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
             </label>
-            <DatePicker
+            <DatePicker max={todayIso()}
               id="clpep-birthdate"
               className={`${inputClass} ${errCls('birthdate')}`}
               value={formData.birthdate ?? ''}
@@ -393,7 +409,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               type="number"
               className={inputClass + ' bg-gray-50'}
               placeholder="From birthdate"
-              value={formData.age || ''}
+              value={formData.birthdate && (formData.age ?? 0) >= 0 ? (formData.age ?? 0) : ''}
               readOnly
             />
           </div>
@@ -618,12 +634,15 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           <div>
             <label htmlFor="clpep-guardianContactNumber" className={labelClass}>Contact Number</label>
             <input
+              ref={contactNumberRef}
               id="clpep-guardianContactNumber"
-              className={inputClass}
+              inputMode="tel"
+              className={`${inputClass} ${errCls('contactNumber')}`}
               placeholder="09XXXXXXXXX"
               value={formData.guardianContactNumber ?? ''}
-              onChange={e => updateField({ guardianContactNumber: e.target.value })}
+              onChange={e => { updateField({ guardianContactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }}
             />
+            {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
           </div>
         </div>
       </div>
@@ -707,7 +726,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
 
         <div>
           <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
-          <DatePicker
+          <DatePicker max={todayIso()}
             id="clpep-dateApplied"
             className={inputClass}
             value={formData.dateApplied ?? ''}
@@ -797,7 +816,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={draft.requestClose}
             aria-label="Close form"
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -835,7 +854,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -864,7 +883,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -895,6 +914,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    {draft.modals}
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Login from './pages/auth/login'
 import SecuritySetup from './pages/auth/SecuritySetup'
 import Dashboard from './pages/dashboard/dashboard'
@@ -30,6 +30,9 @@ import { CLPEPProvider } from './contexts/CLPEPContext'
 import { EmploymentProvider } from './contexts/EmploymentContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import ConfirmModal from './pages/shared/ConfirmModal'
+import { clearAllDrafts, clearDraftsForModules } from './hooks/useFormDraft'
+import { requestLeave, hasDirtyForm } from './hooks/leaveGuard'
+import NavLeaveGuard from './components/NavLeaveGuard'
 import PermissionChangeModal from './pages/shared/PermissionChangeModal'
 import './styles/App.css'
 
@@ -60,18 +63,23 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
 
   const [navUsername, setNavUsername] = useState(getCurrentUsername)
 
+  // Every page renders {navbar}, so the unsaved-form confirmation is mounted
+  // here once. Navigating away asks first if an open form has changes.
   const navbar = (
-    <Navbar
-      activeTab={activeTab}
-      onTabChange={(tab) => {
-        setActiveTab(tab)
-        if (tab === 'About PESO') setCurrentPage('about')
-        if (tab === 'Dashboard') setCurrentPage('dashboard')
-      }}
-      onLogout={onLogout}
-      onProfileClick={() => setCurrentPage('profile')}
-      username={navUsername}
-    />
+    <>
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={(tab) => requestLeave(() => {
+          setActiveTab(tab)
+          if (tab === 'About PESO') setCurrentPage('about')
+          if (tab === 'Dashboard') setCurrentPage('dashboard')
+        })}
+        onLogout={onLogout}
+        onProfileClick={() => requestLeave(() => setCurrentPage('profile'))}
+        username={navUsername}
+      />
+      <NavLeaveGuard />
+    </>
   )
 
   if (currentPage === 'cdsp') {
@@ -79,7 +87,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <CDSPView onBack={() => setCurrentPage('dashboard')} />
+          <CDSPView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -90,7 +98,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <GIPView onBack={() => setCurrentPage('dashboard')} />
+          <GIPView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -101,7 +109,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <SPESView onBack={() => setCurrentPage('dashboard')} />
+          <SPESView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -112,7 +120,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <OFWView onBack={() => setCurrentPage('dashboard')} />
+          <OFWView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -123,7 +131,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto">
-          <EmploymentFacilitation onBack={() => setCurrentPage('dashboard')} />
+          <EmploymentFacilitation onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -134,7 +142,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <DocumentsView onBack={() => setCurrentPage('dashboard')} />
+          <DocumentsView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -145,7 +153,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-hidden">
-          <SkillsTrainingView onBack={() => setCurrentPage('dashboard')} />
+          <SkillsTrainingView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -156,7 +164,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto">
-          <Maintenance onBack={() => setCurrentPage('dashboard')} />
+          <Maintenance onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -167,7 +175,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto">
-          <LivelihoodView onBack={() => setCurrentPage('dashboard')} />
+          <LivelihoodView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -195,7 +203,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto bg-gray-50 [scrollbar-gutter:stable]">
-          <SecurityView onBack={() => setCurrentPage('dashboard')} />
+          <SecurityView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -206,7 +214,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          <ReportView onBack={() => setCurrentPage('dashboard')} />
+          <ReportView onBack={() => requestLeave(() => setCurrentPage('dashboard'))} />
         </div>
       </div>
     )
@@ -217,7 +225,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
       <div className="h-screen flex flex-col overflow-hidden">
         {navbar}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          <AboutView onBack={() => { setCurrentPage('dashboard'); setActiveTab('Dashboard') }} />
+          <AboutView onBack={() => requestLeave(() => { setCurrentPage('dashboard'); setActiveTab('Dashboard') })} />
         </div>
       </div>
     )
@@ -229,7 +237,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
         {navbar}
         <div className="flex-1 overflow-y-auto bg-gray-50">
           <ProfileView
-            onBack={() => setCurrentPage('dashboard')}
+            onBack={() => requestLeave(() => setCurrentPage('dashboard'))}
             onLogout={onLogout}
             onNameChange={(firstName) => setNavUsername(firstName)}
           />
@@ -254,12 +262,30 @@ function needsSecuritySetup(user: { role?: string; securityQuestionsSet?: boolea
   return user?.role === 'Administrator' && user?.securityQuestionsSet === false
 }
 
+// How often a signed-in tab re-checks its own permissions (an administrator may
+// have changed them). Also checked when the window regains focus, the browser
+// comes back online, or an action is refused (403).
+const PERMISSION_CHECK_MS = 10_000
+const PERMISSION_CHECK_TIMEOUT_MS = 8_000
+const PERMISSION_RETRY_MS = 3_000
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [logoutConfirm, setLogoutConfirm] = useState(false)
   const [permissionChanges, setPermissionChanges] = useState<PermissionChange[]>([])
+  // The permission check could not reach the server several times in a row, so
+  // the on-screen access may be out of date (shown as a small banner).
+  const [accessCheckFailing, setAccessCheckFailing] = useState(false)
+  // The server says the session is gone (signed out elsewhere / expired).
+  const [sessionEnded, setSessionEnded] = useState(false)
+  // An administrator deactivated this account while it was in use.
+  const [accountDeactivated, setAccountDeactivated] = useState(false)
+  // This tab's own last-known permissions. Compared against instead of the
+  // shared localStorage copy, which another tab may already have refreshed,
+  // so every open tab gets its own notice.
+  const knownUserRef = useRef<StoredUser | null>(null)
 
   // Read the cached user and decide whether the security-questions setup is required.
   const refreshSetupGate = () => {
@@ -292,36 +318,95 @@ export default function App() {
   // value back (the cached copy stays in effect) until the user acknowledges
   // it in PermissionChangeModal, rather than their buttons shifting under
   // them with no explanation mid-task.
+  // Any request that discovers the account was deactivated raises this event
+  // (see services/axiosClient.ts) -- covers both the background check and a
+  // click on something that was then refused.
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const onDeactivated = () => setAccountDeactivated(true)
+    window.addEventListener('peso:deactivated', onDeactivated)
+    return () => window.removeEventListener('peso:deactivated', onDeactivated)
+  }, [isLoggedIn])
+
+  // A new login (or logging out) starts from a fresh baseline. Declared BEFORE
+  // the polling effect so that on login it runs first and the poller then reads
+  // a clean baseline.
+  useEffect(() => { knownUserRef.current = null }, [isLoggedIn])
+
   useEffect(() => {
     if (!isLoggedIn || needsSetup) return
     let cancelled = false
-    const CHECK_INTERVAL_MS = 45_000
+    let inFlight = false
+    let failures = 0
+    let retryTimer: number | undefined
 
-    const checkForChanges = () => {
-      // Skip this tick if the modal from a previous tick is still waiting on
-      // the user -- avoids re-diffing against a cache that's deliberately
-      // stale right now, and re-queuing changes they haven't seen yet.
-      if (permissionChanges.length > 0) return
-      let before: StoredUser = {}
-      try { before = JSON.parse(localStorage.getItem('peso_current_user') || '{}') } catch { /* */ }
-      getMe()
-        .then(after => {
-          if (cancelled) return
-          const changes = diffPermissionLevels(before, after)
-          if (changes.length > 0) setPermissionChanges(changes)
-        })
-        .catch(() => { /* transient network hiccup -- try again next tick */ })
+    // This tab's baseline: what it last knew, falling back to the cached copy.
+    if (!knownUserRef.current) {
+      try { knownUserRef.current = JSON.parse(localStorage.getItem('peso_current_user') || '{}') } catch { knownUserRef.current = {} }
     }
 
-    const id = window.setInterval(checkForChanges, CHECK_INTERVAL_MS)
-    return () => { cancelled = true; window.clearInterval(id) }
+    const checkForChanges = () => {
+      // Skip while the notice from a previous check is still waiting on the
+      // user, and never overlap two checks (a slow server would pile them up).
+      if (permissionChanges.length > 0 || inFlight) return
+      inFlight = true
+      getMe(PERMISSION_CHECK_TIMEOUT_MS)
+        .then(after => {
+          if (cancelled) return
+          failures = 0
+          setAccessCheckFailing(false)
+          const changes = diffPermissionLevels(knownUserRef.current ?? {}, after)
+          if (changes.length > 0) setPermissionChanges(changes)
+        })
+        .catch((err: Error & { status?: number }) => {
+          if (cancelled) return
+          const code = (err as Error & { detail?: { code?: string } }).detail?.code
+          if (err.status === 401 && code === 'ACCOUNT_DEACTIVATED') return // handled by the peso:deactivated event
+          if (err.status === 401) {
+            // Signed out elsewhere or the session expired -- say so instead of
+            // leaving the user working on a session that no longer exists.
+            setSessionEnded(true)
+            return
+          }
+          // Network blip / slow or failing server: retry shortly rather than
+          // waiting for the next regular tick, and tell the user if it persists.
+          failures += 1
+          if (failures >= 3) setAccessCheckFailing(true)
+          window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(checkForChanges, PERMISSION_RETRY_MS)
+        })
+        .finally(() => { inFlight = false })
+    }
+
+    const onVisible = () => { if (document.visibilityState === 'visible') checkForChanges() }
+
+    const id = window.setInterval(checkForChanges, PERMISSION_CHECK_MS)
+    window.addEventListener('focus', checkForChanges)
+    window.addEventListener('online', checkForChanges)
+    window.addEventListener('peso:forbidden', checkForChanges)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+      window.clearTimeout(retryTimer)
+      window.removeEventListener('focus', checkForChanges)
+      window.removeEventListener('online', checkForChanges)
+      window.removeEventListener('peso:forbidden', checkForChanges)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [isLoggedIn, needsSetup, permissionChanges])
+
 
   // Applies the change the user just acknowledged and reloads -- simplest way
   // to guarantee every already-mounted screen (not just the next click)
   // reflects the new permissions, matching how a DB restore elsewhere in the
   // app also reloads rather than trying to patch every component's state.
   const acknowledgePermissionChange = () => {
+    // Drafts of a module they can no longer edit could never be opened again,
+    // but would keep personal data in this browser -- remove them.
+    clearDraftsForModules(
+      permissionChanges.filter(c => c.to === 'Viewer' || c.to === 'No Access').map(c => c.module),
+    )
     getMe()
       .then(user => {
         try { localStorage.setItem('peso_current_user', JSON.stringify(user)) } catch { /* quota */ }
@@ -336,6 +421,7 @@ export default function App() {
     // End the backend session; ignore network errors so the UI still logs out.
     apiLogout().catch(() => { /* already effectively logged out */ })
     try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+    clearAllDrafts()
     setNeedsSetup(false)
     setIsLoggedIn(false)
   }
@@ -392,8 +478,41 @@ export default function App() {
       <PermissionChangeModal
         isOpen={permissionChanges.length > 0}
         changes={permissionChanges}
+        hasUnsavedForm={permissionChanges.length > 0 && hasDirtyForm()}
         onAcknowledge={acknowledgePermissionChange}
       />
+      <ConfirmModal
+        isOpen={sessionEnded} type="error"
+        title="Session ended" message={'Your session has ended. Please sign in again.'}
+        confirmText="Sign in"
+        onConfirm={() => {
+          setSessionEnded(false)
+          try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+          clearAllDrafts()
+          setNeedsSetup(false)
+          setIsLoggedIn(false)
+        }}
+        onCancel={() => { /* must sign in again */ }}
+      />
+      <ConfirmModal
+        isOpen={accountDeactivated} type="error"
+        title="Account Deactivated"
+        message={'Your account has been deactivated by an administrator. You have been signed out. Please contact an administrator if you think this is a mistake.'}
+        confirmText="OK"
+        onConfirm={() => {
+          setAccountDeactivated(false)
+          try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+          clearAllDrafts()
+          setNeedsSetup(false)
+          setIsLoggedIn(false)
+        }}
+        onCancel={() => { /* must sign in again */ }}
+      />
+      {accessCheckFailing && isLoggedIn && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg shadow px-4 py-2">
+          Can't confirm your access right now. Please check your connection.
+        </div>
+      )}
     </>
   )
 }

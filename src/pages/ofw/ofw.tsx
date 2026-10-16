@@ -10,6 +10,7 @@ import { useOFW } from '../../contexts/OFWContext'
 import * as ofwService from '../../services/ofwService'
 import AddOFWRequestForm, { EMPLOYMENT_STATUS_OPTIONS, REQUEST_TYPES } from './AddOFWRequestForm'
 import OFWProfileModal from './OFWProfileModal'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 interface OFWViewProps {
   onBack: () => void
@@ -147,7 +148,8 @@ function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onD
 }
 
 export default function OFWView({ onBack }: OFWViewProps) {
-  const { profiles, loading, refreshProfiles } = useOFW()
+  const { profiles, loading, refreshProfiles, refreshIfStale } = useOFW()
+  useRefreshOnReturn(refreshIfStale)
 
   // View / edit / delete modals
   const [showAddForm, setShowAddForm] = useState(false)

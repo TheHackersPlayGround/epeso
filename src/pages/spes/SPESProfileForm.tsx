@@ -6,7 +6,10 @@ import { searchProvinces, searchCities, searchBarangaysByCity } from '../../serv
 import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -45,7 +48,9 @@ export const emptyForm: Omit<SPESApplicant, 'id'> = {
 // ─── Exported helpers ──────────────────────────────────────────────────────────
 
 export function deriveStatus(applicant: Omit<SPESApplicant, 'id'>, batches: SPESBatch[]): SPESApplicant['status'] {
-  if (applicant.status === 'Completed' || applicant.status === 'Cancelled') return applicant.status
+  // Withdrawn is a recorded outcome (left an Ongoing batch early), not something to
+  // re-derive from the batch -- the batch itself may still be Ongoing.
+  if (applicant.status === 'Completed' || applicant.status === 'Cancelled' || applicant.status === 'Withdrawn') return applicant.status
   if (!applicant.assignedBatchId) return 'Inactive'
   const batch = batches.find(b => b.id === applicant.assignedBatchId)
   if (!batch || batch.status === 'Completed') return 'Inactive'
@@ -60,6 +65,7 @@ export function StatusBadge({ status }: { status: SPESApplicant['status'] }) {
     Inactive:  'bg-gray-100 text-gray-500',
     Completed: 'bg-emerald-100 text-emerald-700',
     Cancelled: 'bg-red-100 text-red-600',
+    Withdrawn: 'bg-orange-100 text-orange-700',
   }
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -224,6 +230,12 @@ export function ViewApplicantPanel({ applicant, onClose }: {
       </div>
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
+          {applicant.status === 'Withdrawn' && (
+            <div className="mb-6 p-4 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-800">
+              <p className="font-semibold">Withdrawn{applicant.exitedAt ? ` on ${applicant.exitedAt.slice(0, 10)}` : ''}</p>
+              {applicant.exitReason && <p className="mt-1">{applicant.exitReason}</p>}
+            </div>
+          )}
           <Sec num="I" title="Personal Information" />
           <div className="grid grid-cols-3 gap-5">
             <Field label="Last Name" value={applicant.lastName} />
@@ -319,9 +331,14 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
     })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'spes-applicant', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
   const [previewDoc, setPreviewDoc] = useState<SPESSavedDocument | null>(null)
 
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -345,7 +362,10 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
     clearFieldError('birthdate')
   }
 
-  const derivedStatus: SPESApplicant['status'] = formData.assignedBatchId !== null ? 'Active' : 'Inactive'
+  // A withdrawn applicant keeps that status (it is set by Mark as withdrawn, not derived here).
+  const derivedStatus: SPESApplicant['status'] = formData.status === 'Withdrawn'
+    ? 'Withdrawn'
+    : formData.assignedBatchId !== null ? 'Active' : 'Inactive'
 
   // Sex, birthdate, civil status, and barangay are required by the underlying
   // beneficiaries table (NOT NULL columns); name fields additionally reject
@@ -396,8 +416,16 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
       })
     }
 
+    if (formData.contactNumber.trim() && !isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => contactNumberRef.current?.focus() })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
-    onSave({ ...formData, status: derivedStatus })
+    draft.wrapSave(onSave)({ ...formData, status: derivedStatus })
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
@@ -436,7 +464,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={derivedStatus} />
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+          <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
       </div>
 
@@ -472,12 +500,12 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div ref={birthdateWrapRef}>
               <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
-              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              <DatePicker max={todayIso()} className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
               {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={e => set({ age: parseInt(e.target.value) || 0 })} placeholder="Enter age" />
+              <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -491,7 +519,8 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={e => set({ contactNumber: e.target.value })} placeholder="Enter contact number" />
+              <input ref={contactNumberRef} inputMode="tel" className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} placeholder="Enter contact number" />
+              {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
             </div>
             <div>
               <label className={lbl}>Email (optional)</label>
@@ -606,7 +635,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
-              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
+              <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>
@@ -628,7 +657,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
-            <button onClick={onClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
+            <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
@@ -637,6 +666,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {draft.modals}
     </div>
   )
 }

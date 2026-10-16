@@ -9,6 +9,7 @@ import ConfirmModal from './ConfirmModal'
 import DatePicker from '../../components/DatePicker'
 import * as jobPlacementService from '../../services/jobPlacementService'
 import type { JobPlacement } from '../../services/jobPlacementService'
+import { todayIso } from '../../utils/formatDate'
 
 interface JobPlacementModalProps {
   beneficiaryServiceId: number
@@ -138,7 +139,7 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
                 </div>
                 <div>
                   <label className={labelCls}>Date Hired<span className="text-red-500 ml-0.5">*</span></label>
-                  <DatePicker className={`${inputCls} ${errors.dateHired ? 'border-red-400' : ''}`} value={form.dateHired} onChange={v => set('dateHired', v)} />
+                  <DatePicker max={todayIso()} className={`${inputCls} ${errors.dateHired ? 'border-red-400' : ''}`} value={form.dateHired} onChange={v => set('dateHired', v)} />
                   {errors.dateHired && <p className="text-red-500 text-xs mt-1">{errors.dateHired}</p>}
                 </div>
                 <div>

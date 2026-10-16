@@ -5,6 +5,9 @@ import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../services/locationService';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
+import { useFormDraft } from '../../../hooks/useFormDraft';
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
+import { todayIso } from '../../../utils/formatDate';
 
 interface EmployerFormData {
   companyName: string;
@@ -48,6 +51,10 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
     barangayId: initialData.barangayId ?? null,
     cityId: initialData.cityId ?? null,
     provinceId: initialData.provinceId ?? null,
+  });
+
+  const draft = useFormDraft<EmployerFormData>({
+    draftKey: 'employment-employer', mode: 'edit', snapshot: formData, onRestore: setFormData, onClose,
   });
 
   const sections = [
@@ -109,6 +116,8 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
     }
     if (!formData.contactNumber.trim()) {
       errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: deferFocus(() => contactNumberRef.current?.focus()) });
+    } else if (!isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: deferFocus(() => contactNumberRef.current?.focus()) });
     }
     if (!formData.street.trim()) {
       errors.push({ field: 'street', message: 'Street is required.', focus: deferFocus(() => streetRef.current?.focus()) });
@@ -239,7 +248,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <input ref={contactNumberRef} type="tel" value={formData.contactNumber}
-                  onChange={e => handleChange('contactNumber', e.target.value)}
+                  onChange={e => handleChange('contactNumber', sanitizeContactNumber(e.target.value))}
                   className={inputCls('w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500 border-gray-300 focus:ring-brand-blue', 'contactNumber')} />
                 <ErrMsg k="contactNumber" />
               </div>
@@ -334,7 +343,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date Registered</label>
-                <DatePicker value={formData.dateRegistered}
+                <DatePicker max={todayIso()} value={formData.dateRegistered}
                   onChange={value => handleChange('dateRegistered', value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
@@ -378,7 +387,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                 <p className="text-gray-500 text-xs mt-0.5">{initialData.companyName}</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={draft.requestClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={24} className="text-gray-600" />
             </button>
           </div>
@@ -388,7 +397,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
           </div>
 
           <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={draft.requestClose}
               className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
               Cancel
             </button>
@@ -405,6 +414,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         confirmText="Yes, Save" cancelText="Cancel"
         onConfirm={confirmSave} onCancel={() => setSaveConfirm(false)}
       />
+      {draft.modals}
     </>
   );
 }

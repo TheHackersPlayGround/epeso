@@ -14,11 +14,13 @@ import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
 import PlacementsTab from "./PlacementsTab";
 import EmployersTab from "./employers/EmployersTab";
+import { requestLeave } from "../../hooks/leaveGuard";
 import AddApplicantSidebar from "./applicants/AddApplicantSidebar";
 import type { ApplicantFormData } from "./applicants/AddApplicantSidebar";
 import ResumeMaker, { type ApplicantData } from "./applicants/ResumeMaker";
 import ViewApplicantSidebar from "./applicants/ViewApplicantSidebar";
 import EmploymentHistoryPanel from "./applicants/EmploymentHistoryPanel";
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -526,18 +528,22 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
 
   // The lists are held by EmploymentProvider, so entering this module shows
   // them immediately. Both refreshes below are silent (no spinner):
-  //  - on entering the module, revalidate everything if the provider's copy is
-  //    older than 30 s (catches other staff members' changes);
+  //  - on entering the module / returning to the window, revalidate everything
+  //    (catches other staff members' changes; duplicate triggers within a
+  //    couple of seconds are collapsed by the provider);
   //  - on RETURNING to the Applicants tab, re-fetch applicants so the computed
   //    referralState (Refer/Referred/Hired) reflects status changes made in the
   //    Referrals/Placements tabs. (Those tabs also refresh it themselves after
   //    every change; this is the safety net.)
-  useEffect(() => { void refreshIfStale(); }, [refreshIfStale]);
+  useRefreshOnReturn(refreshIfStale);
   const isFirstTabRun = useRef(true);
   useEffect(() => {
     if (isFirstTabRun.current) { isFirstTabRun.current = false; return; }
+    // Applicants always re-fetch (referral state may have changed elsewhere);
+    // switching to any other tab re-syncs all the Employment lists.
     if (activeTab === "applicants") void refreshApplicants();
-  }, [activeTab, refreshApplicants]);
+    else void refreshIfStale();
+  }, [activeTab, refreshApplicants, refreshIfStale]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingApplicant, setEditingApplicant] = useState<Applicant | null>(null);
   const [viewingApplicant, setViewingApplicant] = useState<Applicant | null>(null);
@@ -777,7 +783,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => requestLeave(() => { handleCloseSidebar(); setActiveTab(tab.id); })}
                 className={`px-6 py-4 text-base font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-brand-blue text-brand-blue"

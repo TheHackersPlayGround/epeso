@@ -20,6 +20,7 @@ import SkillsTrainingProfileForm, {
   ViewProfilePanel,
   CLASSIFICATION_OPTIONS, CIVIL_STATUS_OPTIONS, STATUS_OPTIONS, StatusBadge,
 } from './SkillsTrainingProfileForm'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 interface SkillsTrainingViewProps {
   onBack: () => void
@@ -265,7 +266,8 @@ function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileSta
 }
 
 export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
-  const { profiles, activities, batches, qualifications, purposes, loading, refreshProfiles, refreshActivities } = useSkillsTraining()
+  const { profiles, activities, batches, qualifications, purposes, loading, refreshProfiles, refreshActivities, refreshIfStale } = useSkillsTraining()
+  useRefreshOnReturn(refreshIfStale)
   const plannedTrainings = activities.filter(t => t.status === 'Planned')
 
   const [isFormOpen, setIsFormOpen] = useState(false)

@@ -7,7 +7,10 @@ import { searchProvinces, searchCities, searchBarangaysByCity } from '../../serv
 import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,10 +53,11 @@ const emptyForm: Omit<CDSPApplicant, 'id'> = {
 
 // ─── Shared helpers (also used by main view) ──────────────────────────────────
 
-export function getEffectiveStatus(applicant: CDSPApplicant, activities: { title: string; status: string }[]): 'Active' | 'Inactive' {
-  if (!applicant.assignedActivity) return 'Inactive'
-  const act = activities.find(a => a.title === applicant.assignedActivity)
-  return (act && act.status !== 'Completed') ? 'Active' : 'Inactive'
+// The status is worked out on the server (Active while the current activity is
+// Planned/Ongoing, otherwise Inactive) so the page, reports and exports agree;
+// this just narrows the type.
+export function getEffectiveStatus(applicant: Pick<CDSPApplicant, 'status'>): 'Active' | 'Inactive' {
+  return applicant.status === 'Active' ? 'Active' : 'Inactive'
 }
 
 export function StatusBadge({ status }: { status: 'Active' | 'Inactive' }) {
@@ -187,7 +191,7 @@ function DocAttachSection({
 // ─── View Applicant Panel ─────────────────────────────────────────────────────
 
 export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPApplicant; onClose: () => void }) {
-  const { activities: cdspActivities, services: svcList } = useCDSP()
+  const { services: svcList } = useCDSP()
   const cdspServices = svcList.length > 0 ? svcList.map(s => s.name) : CDSP_SEED_SERVICES
   const [previewDoc, setPreviewDoc] = useState<CDSPSavedDocument | null>(null)
 
@@ -213,7 +217,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge status={getEffectiveStatus(applicant, cdspActivities)} />
+          <StatusBadge status={getEffectiveStatus(applicant)} />
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
       </div>
@@ -293,7 +297,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           <div className="grid grid-cols-2 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
-            <Field label="Status" value={getEffectiveStatus(applicant, cdspActivities)} />
+            <Field label="Status" value={getEffectiveStatus(applicant)} />
             <Field label="Remarks" value={applicant.remarks} />
           </div>
 
@@ -351,6 +355,11 @@ export default function CDSPProfileForm({
   const [previewDoc, setPreviewDoc] = useState<CDSPSavedDocument | null>(null)
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
+  const draft = useProfileDraft({
+    draftKey: 'cdsp-applicant', mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
+
   const toggleClassification = (value: string) =>
     set({
       classification: formData.classification.includes(value)
@@ -373,6 +382,7 @@ export default function CDSPProfileForm({
     clearFieldError('birthdate')
   }
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -457,9 +467,17 @@ export default function CDSPProfileForm({
       })
     }
 
+    if (formData.contactNumber.trim() && !isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: () => contactNumberRef.current?.focus() })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
-    onSave(formData)
+    draft.wrapSave(onSave)(formData)
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
@@ -489,7 +507,7 @@ export default function CDSPProfileForm({
             {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — CDSP'}
           </p>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8">
@@ -525,12 +543,12 @@ export default function CDSPProfileForm({
             </div>
             <div ref={birthdateWrapRef}>
               <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
-              <DatePicker className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
+              <DatePicker max={todayIso()} className={`${inp} ${errCls('birthdate')}`} value={formData.birthdate} onChange={handleBirthdate} />
               {fieldMessage('birthdate') && <p className="text-red-500 text-xs mt-1">{fieldMessage('birthdate')}</p>}
             </div>
             <div>
               <label className={lbl}>Age</label>
-              <input type="number" className={inp} value={formData.age || ''} onChange={(e) => set({ age: parseInt(e.target.value) || 0 })} placeholder="Enter age" min={0} />
+              <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -544,7 +562,8 @@ export default function CDSPProfileForm({
             </div>
             <div>
               <label className={lbl}>Contact Number</label>
-              <input className={inp} value={formData.contactNumber} onChange={(e) => set({ contactNumber: e.target.value })} placeholder="Enter contact number" />
+              <input ref={contactNumberRef} inputMode="tel" className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} onChange={(e) => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} placeholder="Enter contact number" />
+              {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
             </div>
             <div>
               <label className={lbl}>Email <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -708,7 +727,7 @@ export default function CDSPProfileForm({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
-              <DatePicker className={inp} value={formData.dateApplicationReceived} onChange={(value) => set({ dateApplicationReceived: value })} />
+              <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={(value) => set({ dateApplicationReceived: value })} />
             </div>
             <div>
               <label className={lbl}>Received By</label>
@@ -726,7 +745,7 @@ export default function CDSPProfileForm({
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <button onClick={onClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
+            <button onClick={draft.requestClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
@@ -735,6 +754,7 @@ export default function CDSPProfileForm({
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {draft.modals}
     </div>
   )
 }

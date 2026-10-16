@@ -56,3 +56,8 @@ export function unassignWorkplace(applicantId: number) {
 export function completeAssignment(applicantId: number) {
   return axiosClient.post(ENDPOINTS.gip.completeAssignment, { applicantId }).then(r => r.data)
 }
+
+// Records that an applicant left their workplace/office internship early.
+export function withdrawFromWorkplace(applicantId: number, reason: string, exitDate: string) {
+  return axiosClient.post(ENDPOINTS.gip.withdrawFromWorkplace, { applicantId, reason, exitDate }).then(r => r.data)
+}

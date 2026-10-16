@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as tupadService from '../services/tupadService'
 
@@ -17,6 +18,8 @@ export interface TUPADAssignmentHistory {
   projectName: string
   assignedDate: string
   completedDate?: string | null
+  exitedAt?: string | null
+  exitReason?: string
 }
 
 export interface TUPADApplicant {
@@ -45,7 +48,10 @@ export interface TUPADApplicant {
   dateApplied: string
   remarks: string
   receivedBy: string
-  status: 'Active' | 'Inactive' | 'Completed'
+  status: 'Active' | 'Inactive' | 'Completed' | 'Withdrawn'
+  // Set only when status is 'Withdrawn' (left an Ongoing project early).
+  exitedAt?: string | null
+  exitReason?: string
 }
 
 export interface TUPADProject {
@@ -70,6 +76,7 @@ interface TUPADContextValue {
   loadingProjects: boolean
   refreshProfiles: () => Promise<void>
   refreshProjects: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const TUPADContext = createContext<TUPADContextValue | null>(null)
@@ -80,37 +87,49 @@ export function TUPADProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await tupadService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshProjects = useCallback(async () => {
-    setLoadingProjects(true)
+  const refreshProjects = useCallback(async (silent = false) => {
+    if (!silent) setLoadingProjects(true)
     try {
       const res = await tupadService.listProjects()
       setProjects(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingProjects(false)
+      if (!silent) setLoadingProjects(false)
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshProjects(true)])
+  }, [refreshProfiles, refreshProjects])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshProjects()
   }, [refreshProfiles, refreshProjects])
 
   return (
-    <TUPADContext.Provider value={{ applicants, projects, loading, loadingProjects, refreshProfiles, refreshProjects }}>
+    <TUPADContext.Provider value={{ applicants, projects, loading, loadingProjects, refreshProfiles, refreshProjects, refreshIfStale }}>
       {children}
     </TUPADContext.Provider>
   )

@@ -26,6 +26,7 @@ import {
 import { importApplicantsBulk } from "../../../services/applicantService";
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 import { createDefaultApplicantFormData } from "./applicantDefaults";
+import { isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
 
 // ─── Enum option lists (must match the Add Applicant form / backend enums) ────
 
@@ -577,6 +578,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
 
   const contactNumber = get(row, "Contact Number");
   if (!contactNumber) errors.push("Contact Number is required.");
+  else if (!isValidContactNumber(contactNumber)) errors.push(CONTACT_NUMBER_MESSAGE);
 
   const addrResolution = await resolveAddress(
     get(row, "Province"),

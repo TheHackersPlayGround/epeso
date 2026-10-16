@@ -7,7 +7,10 @@ import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
+import { todayIso } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -203,9 +206,14 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const draft = useProfileDraft({
+    draftKey: 'dilp-beneficiary', mode: mode, formData, setFormData,
+    provinceId, setProvinceId, cityId, setCityId, onClose,
+  })
   const [previewDoc, setPreviewDoc] = useState<DILPSavedDocument | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
 
+  const contactNumberRef = useRef<HTMLInputElement>(null)
   const lastNameRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
@@ -281,9 +289,17 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       errors.push({ field: 'barangay', message: 'Barangay is required.', focus: focusStep2(() => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) })
     }
 
+    if ((formData.contactNumber ?? '').trim() && !isValidContactNumber((formData.contactNumber ?? ''))) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: focusStep1(() => contactNumberRef.current?.focus()) })
+    }
+
+    if ((formData.birthdate ?? '') > todayIso()) {
+      errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
+    }
+
     if (runValidation(errors)) return
 
-    onSave(formData)
+    draft.wrapSave(onSave)(formData)
   }
 
   // ── Section header — inset block matching AddApplicantSidebar style ──
@@ -379,7 +395,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               Birthdate <span className="text-red-500">*</span>
             </label>
             <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
-              <DatePicker
+              <DatePicker max={todayIso()}
                 id="dilp-birthdate"
                 className={inputClass}
                 value={formData.birthdate ?? ''}
@@ -394,7 +410,8 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               id="dilp-age"
               type="number"
               className={inputClass + ' bg-gray-50'}
-              value={formData.age || ''}
+              placeholder="From birthdate"
+              value={formData.birthdate && (formData.age ?? 0) >= 0 ? (formData.age ?? 0) : ''}
               readOnly
             />
           </div>
@@ -417,12 +434,15 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
           <div>
             <label htmlFor="dilp-contactNumber" className={labelClass}>Contact Number</label>
             <input
+              ref={contactNumberRef}
               id="dilp-contactNumber"
-              className={inputClass}
-              value={formData.contactNumber ?? ''}
-              onChange={e => updateField({ contactNumber: e.target.value })}
+              inputMode="tel"
+              className={`${inputClass} ${errCls('contactNumber')}`}
               placeholder="09XXXXXXXXX"
+              value={formData.contactNumber ?? ''}
+              onChange={e => { updateField({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }}
             />
+            {fieldMessage('contactNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('contactNumber')}</p>}
           </div>
         </div>
 
@@ -590,7 +610,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
 
         <div>
           <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
-          <DatePicker
+          <DatePicker max={todayIso()}
             id="dilp-dateApplied"
             className={inputClass}
             value={formData.dateApplied ?? ''}
@@ -688,7 +708,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             )}
             <button
               type="button"
-              onClick={onClose}
+              onClick={draft.requestClose}
               aria-label="Close form"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -727,7 +747,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -746,7 +766,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               <>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -777,6 +797,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    {draft.modals}
     </>
   )
 }

@@ -54,3 +54,8 @@ export function assignBatch(applicantId: number, batchId: number) {
 export function unassignBatch(applicantId: number) {
   return axiosClient.post(ENDPOINTS.spes.unassignBatch, { applicantId }).then(r => r.data)
 }
+
+// Records that an applicant left an already-started (Ongoing) batch early.
+export function withdrawFromBatch(applicantId: number, reason: string, exitDate: string) {
+  return axiosClient.post(ENDPOINTS.spes.withdrawFromBatch, { applicantId, reason, exitDate }).then(r => r.data)
+}

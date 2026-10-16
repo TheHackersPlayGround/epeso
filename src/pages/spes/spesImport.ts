@@ -18,6 +18,7 @@ import {
 } from '../../services/locationService'
 import { importProfilesBulk } from '../../services/spesService'
 import { CIVIL_STATUS_OPTIONS, SCHOOL_TYPE_OPTIONS, gradeYearLevelOptionsFor, CLASSIFICATION_OPTIONS } from './SPESProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 const SEX_OPTIONS = ['Male', 'Female']
 
@@ -383,7 +384,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     email: get(row, 'Email'),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,

@@ -5,6 +5,7 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { canManage } from '../../utils/permissions'
 import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -262,6 +263,17 @@ export default function SPESMaintenanceForm({
 
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
   const [previewDoc, setPreviewDoc] = useState<SPESSavedDocument | null>(null)
+
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  const draft = useFormDraft<Record<string, unknown>>({
+    draftKey: 'maintenance-spes-batch',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: { ...form, documents: form.documents.map(d => d.id) },
+    onRestore: (d) => setForm({ ...(d as unknown as Omit<SPESBatch, 'id'>), documents: [] }),
+    forDraft: (d) => ({ ...d, documents: [] }),
+    draftNote: 'Attached documents are not kept in a draft.',
+    onClose: onCancel,
+  })
   const batchNameRef = useRef<HTMLDivElement>(null)
   const programStartDateRef = useRef<HTMLDivElement>(null)
   const programEndDateRef = useRef<HTMLDivElement>(null)
@@ -315,7 +327,7 @@ export default function SPESMaintenanceForm({
     if (isEdit && onUpdateBatch && initialBatch) {
       onUpdateBatch({ ...initialBatch, ...form })
     } else {
-      onSaveBatch(form)
+      draft.wrapSave(onSaveBatch)(form)
     }
   }
 
@@ -326,7 +338,7 @@ export default function SPESMaintenanceForm({
       <div className="bg-brand-blue px-6 py-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={onCancel}
+            onClick={draft.requestClose}
             className="p-1 text-white/80 hover:text-white transition-colors"
           >
             <ArrowLeft size={20} />
@@ -552,7 +564,7 @@ export default function SPESMaintenanceForm({
           <div className="border-t border-gray-200 pt-5 flex justify-end gap-3">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={draft.requestClose}
               className="px-5 py-2.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               {isView ? 'Close' : 'Cancel'}
@@ -575,6 +587,7 @@ export default function SPESMaintenanceForm({
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {draft.modals}
     </div>
   )
 }

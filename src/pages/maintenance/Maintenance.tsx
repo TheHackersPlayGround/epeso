@@ -1,3 +1,4 @@
+import { requestLeave } from '../../hooks/leaveGuard'
 import { useState } from 'react'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
@@ -18,6 +19,7 @@ import SkillsTrainingMaintenanceForm from './SkillsTrainingMaintenanceForm'
 import CDSPMaintenanceForm from './CDSPMaintenanceForm'
 import GIPMaintenanceForm from './GIPMaintenanceForm'
 import LivelihoodMaintenanceForm from './LivelihoodMaintenanceForm'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,9 @@ const TABS: { key: MaintenanceTab; label: string }[] = [
 function MaintenanceInner({ onBack }: MaintenanceProps) {
   const { spesBatches, applicants: spesApplicants, refreshProfiles: refreshSpesProfiles, refreshBatches: refreshSpesBatches } = useSPES()
   const { gipWorkplaces, applicants: gipApplicants, refreshProfiles: refreshGipProfiles, refreshWorkplaces: refreshGipWorkplaces } = useGIP()
+  const { refreshIfStale: refreshSpesIfStale } = useSPES()
+  const { refreshIfStale: refreshGipIfStale } = useGIP()
+  useRefreshOnReturn(() => { void refreshSpesIfStale(); void refreshGipIfStale() })
   const [activeTab, setActiveTab] = useState<MaintenanceTab>('CDSP')
 
   // ── SPES state ─────────────────────────────────────────────────────────────
@@ -114,6 +119,10 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   }
 
   const handleTabChange = (tab: MaintenanceTab) => {
+    // SPES and GIP render inside this component (they don't mount/unmount per
+    // tab like the others), so re-sync them whenever a tab is opened.
+    void refreshSpesIfStale()
+    void refreshGipIfStale()
     setActiveTab(tab)
     resetSpesState()
     resetGipState()
@@ -269,7 +278,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       <div className="w-full px-6 py-8">
         <div className="mb-4">
           <button
-            onClick={() => { setSpesBatchAction(''); setSelectedBatch(null) }}
+            onClick={() => requestLeave(() => { setSpesBatchAction(''); setSelectedBatch(null) })}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
           >
             <ArrowLeft size={16} /> Back to Batches
@@ -301,7 +310,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-4">
           <button
-            onClick={() => { setSpesBatchAction(''); setSelectedBatch(null) }}
+            onClick={() => requestLeave(() => { setSpesBatchAction(''); setSelectedBatch(null) })}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
           >
             <ArrowLeft size={16} /> Back to Batches
@@ -383,7 +392,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       <div className="w-full px-6 py-8">
         <div className="mb-4">
           <button
-            onClick={() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) }}
+            onClick={() => requestLeave(() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) })}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
           >
             <ArrowLeft size={16} /> Back to Workplaces/Offices
@@ -414,7 +423,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-4">
           <button
-            onClick={() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) }}
+            onClick={() => requestLeave(() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) })}
             className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
           >
             <ArrowLeft size={16} /> Back to Workplaces/Offices
@@ -510,7 +519,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
+            onClick={() => requestLeave(() => handleTabChange(tab.key))}
             className={`px-5 py-2 rounded-lg transition-all text-sm whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.key
                 ? 'bg-brand-blue text-white'
@@ -546,7 +555,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               ].map(action => (
                 <button
                   key={action.key}
-                  onClick={() => setGipAction(action.key)}
+                  onClick={() => requestLeave(() => setGipAction(action.key))}
                   disabled={action.label.startsWith('Add') && !canManage('gip-maintenance')}
                   className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     gipAction === action.key
@@ -652,7 +661,9 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       </thead>
                       <tbody>
                         {paginatedGipWorkplaces.map(w => {
-                          const participantCount = gipApplicants.filter(a => a.assignedWorkplaceId === w.id).length
+                          const atWorkplace = gipApplicants.filter(a => a.assignedWorkplaceId === w.id)
+                          const participantCount = atWorkplace.length
+                          const withdrawnCount = atWorkplace.filter(a => a.status === 'Withdrawn').length
                           return (
                             <tr key={w.id} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="px-6 py-4 text-sm">
@@ -663,6 +674,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                 {participantCount > 0 && (
                                   <span className="inline-flex items-center gap-1 text-xs mt-1" style={{ color: GIP_CONFIRM_COLOR }}>
                                     <Users size={11} /> {participantCount} participant{participantCount !== 1 ? 's' : ''}
+                                    {withdrawnCount > 0 && <span className="text-orange-600"> · {withdrawnCount} withdrawn</span>}
                                   </span>
                                 )}
                               </td>
@@ -797,7 +809,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               ].map(action => (
                 <button
                   key={action.key}
-                  onClick={() => setSpesAction(action.key)}
+                  onClick={() => requestLeave(() => setSpesAction(action.key))}
                   disabled={action.label.startsWith('Add') && !canManage('spes-maintenance')}
                   className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                     spesAction === action.key
@@ -918,10 +930,15 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                 <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{b.description}</p>
                               )}
                               {(() => {
-                                const count = spesApplicants.filter(a => a.assignedBatchId === b.id).length
-                                return count > 0 ? (
+                                // Same rule as the Slots column: a withdrawn applicant no longer
+                                // holds a slot, so count them separately instead of as "assigned".
+                                const inBatch = spesApplicants.filter(a => a.assignedBatchId === b.id)
+                                const withdrawn = inBatch.filter(a => a.status === 'Withdrawn').length
+                                const count = inBatch.length - withdrawn
+                                return inBatch.length > 0 ? (
                                   <span className="inline-flex items-center gap-1 text-xs text-brand-blue mt-1">
                                     <Users size={11} /> {count} applicant{count !== 1 ? 's' : ''} assigned
+                                    {withdrawn > 0 && <span className="text-orange-600"> · {withdrawn} withdrawn</span>}
                                   </span>
                                 ) : null
                               })()}

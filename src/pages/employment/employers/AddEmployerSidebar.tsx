@@ -6,6 +6,9 @@ import { searchProvinces, searchCities, searchBarangaysByCity } from '../../../s
 import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 import ConfirmModal from '../../shared/ConfirmModal';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
+import { useFormDraft } from '../../../hooks/useFormDraft';
+import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
+import { todayIso } from '../../../utils/formatDate';
 
 interface EmployerFormData {
   companyName: string;
@@ -70,6 +73,10 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     remarks: '',
   });
 
+  const draft = useFormDraft<EmployerFormData>({
+    draftKey: 'employment-employer', mode: 'add', snapshot: formData, onRestore: setFormData, onClose,
+  });
+
   const sections = [
     { id: 'companyInfo' as Section, label: 'Company information' },
     { id: 'contactPerson' as Section, label: 'Contact person' },
@@ -86,7 +93,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     setShowConfirmation(false);
     try {
       // onSave persists to the backend; await so success only shows on success.
-      await onSave(formData);
+      await draft.wrapSave(onSave)(formData);
       setResultModal({ isOpen: true, type: 'success', message: 'Employer has been successfully added to the system.' });
     } catch {
       setResultModal({ isOpen: true, type: 'error', message: 'Could not save the employer. Please try again.' });
@@ -149,6 +156,8 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     }
     if (inScope('contactNumber') && !formData.contactNumber.trim()) {
       errors.push({ field: 'contactNumber', message: 'Contact Number is required.', focus: deferFocus(() => contactNumberRef.current?.focus()) });
+    } else if (inScope('contactNumber') && !isValidContactNumber(formData.contactNumber)) {
+      errors.push({ field: 'contactNumber', message: CONTACT_NUMBER_MESSAGE, focus: deferFocus(() => contactNumberRef.current?.focus()) });
     }
     if (inScope('street') && !formData.street.trim()) {
       errors.push({ field: 'street', message: 'Street is required.', focus: deferFocus(() => streetRef.current?.focus()) });
@@ -330,7 +339,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Contact Number <span className="text-red-500">*</span></label>
                 <input ref={contactNumberRef} type="tel" value={formData.contactNumber}
-                  onChange={e => handleChange('contactNumber', e.target.value)}
+                  onChange={e => handleChange('contactNumber', sanitizeContactNumber(e.target.value))}
                   placeholder="e.g., 09123456789"
                   className={inputCls('contactNumber')} />
                 <ErrMsg k="contactNumber" />
@@ -428,7 +437,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date Registered</label>
-                <DatePicker value={formData.dateRegistered}
+                <DatePicker max={todayIso()} value={formData.dateRegistered}
                   onChange={value => handleChange('dateRegistered', value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
               </div>
@@ -470,7 +479,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
               <Briefcase size={20} className="text-brand-blue" />
               <h3 className="text-gray-800 m-0 text-base font-medium">Add new employer</h3>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={draft.requestClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={24} className="text-gray-600" />
             </button>
           </div>
@@ -480,7 +489,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
           </div>
 
           <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={draft.requestClose}
               className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
               Back to Employers List
             </button>
@@ -507,6 +516,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
         onConfirm={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
         onCancel={() => { setResultModal(prev => ({ ...prev, isOpen: false })); if (resultModal.type === 'success') onClose(); }}
       />
+      {draft.modals}
 
     </>
   );

@@ -54,3 +54,8 @@ export function assignProject(applicantId: number, projectId: number) {
 export function unassignProject(applicantId: number) {
   return axiosClient.post(ENDPOINTS.tupad.unassignProject, { applicantId }).then(r => r.data)
 }
+
+// Records that a beneficiary left an already-started (Ongoing) project early.
+export function withdrawFromProject(applicantId: number, reason: string, exitDate: string) {
+  return axiosClient.post(ENDPOINTS.tupad.withdrawFromProject, { applicantId, reason, exitDate }).then(r => r.data)
+}

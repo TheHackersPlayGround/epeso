@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as slpService from '../services/slpService'
 
@@ -15,6 +16,8 @@ export interface SLPAssignmentHistory {
   projectName: string
   assignedDate: string
   completedDate?: string | null
+  exitedAt?: string | null
+  exitReason?: string
 }
 
 export interface SLPApplicant {
@@ -59,7 +62,10 @@ export interface SLPApplicant {
   attachedDocuments: SLPSavedDocument[]
   dateApplied: string
   receivedBy: string
-  status: 'Active' | 'Inactive' | 'Completed'
+  status: 'Active' | 'Inactive' | 'Completed' | 'Withdrawn'
+  // Set only when status is 'Withdrawn' (left an Ongoing project early).
+  exitedAt?: string | null
+  exitReason?: string
 }
 
 export interface SLPProject {
@@ -84,6 +90,7 @@ interface SLPContextValue {
   loadingProjects: boolean
   refreshProfiles: () => Promise<void>
   refreshProjects: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const SLPContext = createContext<SLPContextValue | null>(null)
@@ -94,37 +101,49 @@ export function SLPProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await slpService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshProjects = useCallback(async () => {
-    setLoadingProjects(true)
+  const refreshProjects = useCallback(async (silent = false) => {
+    if (!silent) setLoadingProjects(true)
     try {
       const res = await slpService.listProjects()
       setProjects(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingProjects(false)
+      if (!silent) setLoadingProjects(false)
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshProjects(true)])
+  }, [refreshProfiles, refreshProjects])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshProjects()
   }, [refreshProfiles, refreshProjects])
 
   return (
-    <SLPContext.Provider value={{ applicants, projects, loading, loadingProjects, refreshProfiles, refreshProjects }}>
+    <SLPContext.Provider value={{ applicants, projects, loading, loadingProjects, refreshProfiles, refreshProjects, refreshIfStale }}>
       {children}
     </SLPContext.Provider>
   )

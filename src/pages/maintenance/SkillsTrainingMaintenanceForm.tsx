@@ -11,6 +11,9 @@ import { useSkillsTraining } from '../../contexts/SkillsTrainingContext'
 import type { SkillsTrainingBatch, SkillsTrainingActivity } from '../../contexts/SkillsTrainingContext'
 import * as skillsTrainingService from '../../services/skillsTrainingService'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
+import { useFormDraft } from '../../hooks/useFormDraft'
+import { requestLeave } from '../../hooks/leaveGuard'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,6 +96,15 @@ function TrainingForm({
   const isView = mode === 'view'
   const isAdd  = mode === 'add'
   const selectedBatchName = batches.find(b => String(b.id) === form.selectedBatch)?.batchName ?? ''
+
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  const draft = useFormDraft<typeof blank>({
+    draftKey: 'maintenance-skills-training',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: form,
+    onRestore: (d) => (Object.keys(d) as (keyof typeof blank)[]).forEach(k => onChange(k, String(d[k]))),
+    onClose: onCancel,
+  })
 
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -226,12 +238,12 @@ function TrainingForm({
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={onCancel}
+              <button onClick={draft.requestClose}
                 className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm">
                 {isView ? 'Close' : 'Cancel'}
               </button>
               {!isView && onSave && (
-                <button onClick={onSave} disabled={!canManage('skills-maintenance') || isSaving}
+                <button onClick={draft.wrapSave(onSave)} disabled={!canManage('skills-maintenance') || isSaving}
                   className="px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue flex items-center gap-2">
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   {isSaving ? 'Saving…' : (mode === 'add' ? 'Save Activity' : 'Save Changes')}
@@ -241,6 +253,7 @@ function TrainingForm({
           </>
         )}
       </div>
+      {draft.modals}
     </div>
   )
 }
@@ -248,7 +261,8 @@ function TrainingForm({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SkillsTrainingMaintenanceForm() {
-  const { batches, activities, refreshBatches, refreshActivities, refreshProfiles } = useSkillsTraining()
+  const { batches, activities, refreshBatches, refreshActivities, refreshProfiles, refreshIfStale } = useSkillsTraining()
+  useRefreshOnReturn(refreshIfStale)
 
   const [action, setAction] = useState<STAction>('')
 
@@ -599,7 +613,7 @@ export default function SkillsTrainingMaintenanceForm() {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
-              <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
+              <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); setTrainingSubView('') })}
                 disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
                 className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
@@ -611,7 +625,7 @@ export default function SkillsTrainingMaintenanceForm() {
           </div>
         </div>
 
-        <button onClick={() => setTrainingSubView('')}
+        <button onClick={() => requestLeave(() => setTrainingSubView(''))}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 text-sm font-medium">
           <ArrowLeft size={16} /> Back to Trainings
         </button>
@@ -726,7 +740,7 @@ export default function SkillsTrainingMaintenanceForm() {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {ACTION_CARDS.map(card => (
-              <button key={card.key} onClick={() => { setAction(card.key); setTrainingSubView('') }}
+              <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); setTrainingSubView('') })}
                 disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
                 className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'
@@ -738,7 +752,7 @@ export default function SkillsTrainingMaintenanceForm() {
           </div>
         </div>
 
-        <button onClick={() => setTrainingSubView('')}
+        <button onClick={() => requestLeave(() => setTrainingSubView(''))}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 text-sm font-medium">
           <ArrowLeft size={16} /> Back to Trainings
         </button>
@@ -768,7 +782,7 @@ export default function SkillsTrainingMaintenanceForm() {
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
           {ACTION_CARDS.map(card => (
-            <button key={card.key} onClick={() => { setAction(card.key); resetAdd(); setTrainingSubView('') }}
+            <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); resetAdd(); setTrainingSubView('') })}
               disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
               className={`flex flex-col items-center gap-4 py-8 px-4 rounded-2xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 action === card.key ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 hover:border-brand-blue hover:bg-blue-50 text-gray-600 hover:text-brand-blue'

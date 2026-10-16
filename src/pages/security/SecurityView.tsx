@@ -72,8 +72,8 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
 
       {/* Tab content */}
       <div>
-        {visited.has('users') && <div className={activeTab === 'users' ? '' : 'hidden'}><SystemUsersTab /></div>}
-        {visited.has('data')  && <div className={activeTab === 'data'  ? '' : 'hidden'}><DataManagementTab /></div>}
+        {visited.has('users') && <div className={activeTab === 'users' ? '' : 'hidden'}><SystemUsersTab isActive={activeTab === 'users'} /></div>}
+        {visited.has('data')  && <div className={activeTab === 'data'  ? '' : 'hidden'}><DataManagementTab isActive={activeTab === 'data'} /></div>}
         {visited.has('bin')   && <div className={activeTab === 'bin'   ? '' : 'hidden'}><RecycleBinTab isActive={activeTab === 'bin'} onCountChange={setBinCount} /></div>}
         {visited.has('logs')  && <div className={activeTab === 'logs'  ? '' : 'hidden'}><ActivityLogsTab isActive={activeTab === 'logs'} /></div>}
       </div>

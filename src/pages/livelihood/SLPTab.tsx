@@ -10,6 +10,10 @@ import type { SLPApplicant, SLPProject } from '../../contexts/SLPContext'
 import type { LivelihoodBeneficiary } from '../../contexts/LivelihoodContext'
 import SLPProfileForm, { EMPTY_SLP_RECORD, ASSESSMENT_RESULT_OPTIONS } from './SLPProfileForm'
 import { downloadImportTemplate, importSlpApplicants, type ImportResult } from './slpImport'
+import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import WithdrawDialog from '../../components/WithdrawDialog'
+import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
+import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -154,6 +158,7 @@ const STATUS_COLORS: Record<string, string> = {
   Active:    'bg-green-100 text-green-700',
   Completed: 'bg-blue-100 text-blue-700',
   Inactive:  'bg-gray-200 text-gray-400',
+  Withdrawn: 'bg-orange-100 text-orange-700',
 }
 
 const PROJECT_STATUS_COLORS: Record<string, string> = {
@@ -695,112 +700,67 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
 // ─── View Assigned Project Modal ──────────────────────────────────────────────
 
 type ViewAssignedProjectModalProps = {
+  onWithdraw: (b: SLPApplicant) => void
   beneficiary: SLPApplicant
   projects: SLPProject[]
   onChangeAssignment: (b: SLPApplicant) => void
   onClose: () => void
 }
 
-function ViewAssignedProjectModalRow({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
-      <span className="text-xs text-gray-500 font-medium w-32 flex-shrink-0">{label}</span>
-      <span className="text-xs text-gray-900 font-semibold text-right">{value || '-'}</span>
-    </div>
-  )
-}
-
-function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, onClose }: ViewAssignedProjectModalProps) {
+function ViewAssignedProjectModal({ beneficiary, projects, onChangeAssignment, onWithdraw, onClose }: ViewAssignedProjectModalProps) {
   const project = projects.find(p => p.id === beneficiary.assignedSlpProjectId) ?? null
   const canChange = project?.status === 'Planned'
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+  const actions: AssignedItemAction[] = []
+  if (beneficiary.status === 'Active' && project?.status === 'Ongoing') {
+    actions.push({
+      label: 'Mark as withdrawn', variant: 'warning', disabled: !canManage('livelihood'),
+      onClick: () => { onWithdraw(beneficiary); onClose() },
+    })
+  }
+  if (canChange && canManage('livelihood')) {
+    actions.push({ label: 'Change Assignment', variant: 'primary', onClick: () => { onChangeAssignment(beneficiary); onClose() } })
+  }
 
-        {/* Header */}
-        <div className="bg-brand-blue px-5 pt-5 pb-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-bold text-white">Assigned Project</h2>
-              <p className="text-blue-200 text-sm mt-1">{formatDisplayName(beneficiary)}</p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close modal"
-              className="text-white/70 hover:text-white transition-colors mt-0.5"
-            >
-              <X size={20} />
-            </button>
+  const extra = (
+    <>
+      {beneficiary.assignmentHistory.length > 1 && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
+          <div className="space-y-2">
+            {beneficiary.assignmentHistory.map((h, i) => (
+              <div key={`${h.projectId}-${i}`} className="flex items-center justify-between text-xs">
+                <span className="text-gray-700">{h.projectName}</span>
+                <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
+              </div>
+            ))}
           </div>
         </div>
+      )}
+    </>
+  )
 
-        {/* Body */}
-        <div className="px-5 py-4">
-          {project ? (
-            <>
-              {/* Project title + status badge */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="font-bold text-gray-900 text-base">{project.projectName}</p>
-                  <span className="inline-block mt-1 text-xs font-semibold text-gray-500">SLP</span>
-                </div>
-                <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[project.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {project.status}
-                </span>
-              </div>
-
-              <div>
-                <ViewAssignedProjectModalRow label="Description" value={project.description} />
-                <ViewAssignedProjectModalRow label="Date Started" value={project.dateStarted} />
-                <ViewAssignedProjectModalRow label="Location" value={project.location} />
-                {project.facilitator && <ViewAssignedProjectModalRow label="Facilitator" value={project.facilitator} />}
-                {project.assistanceAmount && <ViewAssignedProjectModalRow label="Assistance Amount" value={`₱${Number(project.assistanceAmount).toLocaleString()}`} />}
-                {project.dateReleased && <ViewAssignedProjectModalRow label="Date Released" value={project.dateReleased} />}
-              </div>
-
-              {beneficiary.assignmentHistory.length > 1 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Assignment History</p>
-                  <div className="space-y-2">
-                    {beneficiary.assignmentHistory.map((h, i) => (
-                      <div key={`${h.projectId}-${i}`} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700">{h.projectName}</span>
-                        <span className="text-gray-400">{fmtDate(h.assignedDate)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 italic text-center py-8">No project details available</p>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 pb-5 pt-2 flex gap-2">
-          {canChange && (
-            <button
-              type="button"
-              onClick={() => { onChangeAssignment(beneficiary); onClose() }}
-              disabled={!canManage('livelihood')}
-              className="flex-1 py-2.5 border border-brand-blue text-brand-blue rounded-xl text-xs font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Change Assignment
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-semibold hover:bg-brand-blue-dark transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+  return (
+    <AssignedItemModal
+      title="Assigned Project"
+      personName={formatDisplayName(beneficiary)}
+      itemName={project?.projectName ?? beneficiary.projectName}
+      status={project?.status}
+      description={project?.description}
+      notFound={!project}
+      rows={[
+        { label: 'Date Started', value: project?.dateStarted },
+        { label: 'Location', value: project?.location },
+        { label: 'Facilitator', value: project?.facilitator },
+        { label: 'Assistance Amount', value: project?.assistanceAmount ? `\u20B1${Number(project.assistanceAmount).toLocaleString()}` : undefined },
+        { label: 'Date Released', value: project?.dateReleased },
+      ]}
+      banner={beneficiary.status === 'Withdrawn' ? <WithdrawalBanner exitedAt={beneficiary.exitedAt} reason={beneficiary.exitReason} /> : undefined}
+      footnote={beneficiary.status === 'Withdrawn' ? <WithdrawalFootnote what="project" /> : undefined}
+      extra={extra}
+      actions={actions}
+      onClose={onClose}
+    />
   )
 }
 
@@ -818,9 +778,10 @@ type BeneficiaryTableProps = {
   onUpdateAssessment: (b: SLPApplicant) => void
   onAssignProject: (b: SLPApplicant) => void
   onViewAssignedProject: (b: SLPApplicant) => void
+  onWithdraw: (b: SLPApplicant) => void
 }
 
-function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onUpdateAssessment, onAssignProject, onViewAssignedProject }: BeneficiaryTableProps) {
+function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onUpdateAssessment, onAssignProject, onViewAssignedProject, onWithdraw }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is set immediately on click (button's own position); pos is the
   // menu's actual final placement, corrected by measuring the menu's real
@@ -917,7 +878,10 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
                     return (
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm text-gray-800 line-clamp-1">{b.projectName}</span>
-                        {proj && (
+                        {/* Withdrawn: the project's own status (e.g. Ongoing) would read as the person's, so show when they left instead. */}
+                        {b.status === 'Withdrawn' && b.exitedAt ? (
+                          <span className="self-start text-xs text-orange-600">Left on {fmtDate(b.exitedAt)}</span>
+                        ) : proj && (
                           <span className={`self-start px-1.5 py-0.5 rounded-full text-xs font-medium ${PROJECT_STATUS_COLORS[proj.status] ?? 'bg-gray-100 text-gray-500'}`}>
                             {proj.status}
                           </span>
@@ -993,6 +957,9 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
               ? <button onClick={() => { onViewAssignedProject(menuBeneficiary); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View Assigned Project</button>
               : <button onClick={() => { onAssignProject(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Assign Project</button>
             }
+            {menuBeneficiary.status === 'Active' && menuBeneficiary.assignedProjectStatus === 'Ongoing' && (
+              <button onClick={() => { onWithdraw(menuBeneficiary); closeMenu() }} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Mark as withdrawn</button>
+            )}
             <button onClick={() => onRemove(menuBeneficiary.id, formatDisplayName(menuBeneficiary))} disabled={!canManage('livelihood')} className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Remove</button>
           </div>
         </>
@@ -1004,7 +971,8 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SLPTab() {
-  const { applicants, projects, loading, refreshProfiles, refreshProjects } = useSLP()
+  const { applicants, projects, loading, refreshProfiles, refreshProjects, refreshIfStale } = useSLP()
+  useRefreshOnReturn(refreshIfStale)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -1021,9 +989,12 @@ export default function SLPTab() {
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [removeConfirm, setRemoveConfirm] = useState<{ id: number; name: string } | null>(null)
+  // Mark as withdrawn: someone leaving a project that has already started.
+  const [withdrawTarget, setWithdrawTarget] = useState<SLPApplicant | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   const availableFilters: FilterOption[] = useMemo(() => [
-    { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed'] },
+    { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed', 'Withdrawn'] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
     { id: 'civilStatus', label: 'Civil Status', options: ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'] },
   ], [])
@@ -1106,6 +1077,23 @@ export default function SLPTab() {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove assignment.') })
     } finally {
       setIsAssigning(false)
+    }
+  }
+
+  async function handleWithdraw(reason: string, exitDate: string) {
+    if (!withdrawTarget || isWithdrawing) return
+    const name = formatDisplayName(withdrawTarget)
+    setIsWithdrawing(true)
+    try {
+      await slpService.withdrawFromProject(withdrawTarget.id, reason, exitDate)
+      await refreshProfiles()
+      await refreshProjects()
+      setWithdrawTarget(null)
+      setResultModal({ isOpen: true, type: 'success', title: 'Withdrawn', message: `${name} has been marked as withdrawn.` })
+    } catch (e: unknown) {
+      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to mark as withdrawn.') })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -1276,7 +1264,20 @@ export default function SLPTab() {
           beneficiary={viewingAssignedProject}
           projects={projects}
           onChangeAssignment={b => { setViewingAssignedProject(null); setAssigningBeneficiary(b) }}
+          onWithdraw={setWithdrawTarget}
           onClose={() => setViewingAssignedProject(null)}
+        />
+      )}
+
+      {withdrawTarget && (
+        <WithdrawDialog
+          personName={formatDisplayName(withdrawTarget)}
+          assignmentName={withdrawTarget.projectName || 'this project'}
+          kind="project"
+          minDate={withdrawTarget.assignmentHistory[0]?.assignedDate}
+          isSaving={isWithdrawing}
+          onConfirm={handleWithdraw}
+          onClose={() => setWithdrawTarget(null)}
         />
       )}
 
@@ -1359,6 +1360,7 @@ export default function SLPTab() {
           onUpdateAssessment={setUpdatingAssessment}
           onAssignProject={setAssigningBeneficiary}
           onViewAssignedProject={setViewingAssignedProject}
+          onWithdraw={setWithdrawTarget}
         />
       </div>
 

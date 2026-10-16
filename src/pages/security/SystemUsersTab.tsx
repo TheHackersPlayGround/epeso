@@ -194,21 +194,21 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
             <h4 className="text-base font-semibold text-gray-700 mb-4">Basic Information</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.firstName} onChange={e => onFormChange('firstName', e.target.value)} className={inp} placeholder="Enter first name" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.lastName} onChange={e => onFormChange('lastName', e.target.value)} className={inp} placeholder="Enter last name" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.username} onChange={e => onFormChange('username', e.target.value)} className={inp} placeholder="Enter username" />
               </div>
 
               {!isEdit ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={e => onFormChange('password', e.target.value)} className={`${inp} pr-10`} placeholder="Enter password" />
                     <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700" onClick={() => setShowPassword(!showPassword)}>
@@ -252,14 +252,14 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role {!isEdit && '*'}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role {!isEdit && <span className="text-red-500">*</span>}</label>
                 <select value={formData.role} onChange={e => onRoleChange(e.target.value)} className={inp}>
                   <option value="Staff">Staff</option>
                   <option value="Administrator">Administrator</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status {!isEdit && '*'}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status {!isEdit && <span className="text-red-500">*</span>}</label>
                 {/* New users always start Active; the status can be changed later via Edit. */}
                 <select value={formData.status} onChange={e => onFormChange('status', e.target.value)} disabled={!isEdit}
                   className={`${inp} ${!isEdit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}>
@@ -319,7 +319,9 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
   )
 }
 
-export default function SystemUsersTab() {
+// isActive: SecurityView keeps this tab mounted (hidden) after its first visit,
+// so the list is re-fetched each time the tab is shown again.
+export default function SystemUsersTab({ isActive = true }: { isActive?: boolean }) {
   const [users,          setUsers]          = useState<User[]>([])
   const [loading,        setLoading]        = useState(true)
   const [showAddModal,   setShowAddModal]   = useState(false)
@@ -332,11 +334,12 @@ export default function SystemUsersTab() {
   }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
 
   // Load real users from the backend on mount.
-  const loadUsers = async () => {
+  const loadUsers = async (silent = false) => {
     try {
       const data = await getUsers()
       setUsers(data.map(u => ({ ...u, lastLogin: fmtLastLogin(u.lastLogin) })))
     } catch (err) {
+      if (silent) return // background re-sync: keep the list we have, no popup
       setConfirmModal({
         isOpen: true, type: 'error', title: 'Failed to load users',
         message: err instanceof Error ? err.message : 'Could not load users from the server.',
@@ -347,7 +350,13 @@ export default function SystemUsersTab() {
     }
   }
 
-  useEffect(() => { loadUsers() }, [])
+  const hasLoadedUsers = useRef(false)
+  useEffect(() => {
+    if (!isActive) return
+    void loadUsers(hasLoadedUsers.current)
+    hasLoadedUsers.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive])
 
   const [formData, setFormData] = useState({ firstName: '', lastName: '', username: '', email: '', password: '', role: 'Staff', status: 'Active' })
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
@@ -438,7 +447,7 @@ export default function SystemUsersTab() {
     }
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Confirm Delete',
-      message: `Are you sure you want to delete user "${userToDelete?.username}"?\n\nThis action cannot be undone.`,
+      message: `Delete user "${userToDelete?.username}"?\n\nThey will be signed out immediately and will no longer be able to log in. This cannot be undone. If they might return, set them to Inactive instead.`,
       confirmText: 'Yes, Delete', cancelText: 'Cancel',
       onConfirm: async () => {
         try {

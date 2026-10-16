@@ -55,6 +55,11 @@ export function unassignProject(applicantId: number) {
   return axiosClient.post(ENDPOINTS.slp.unassignProject, { applicantId }).then(r => r.data)
 }
 
+// Records that a beneficiary left an already-started (Ongoing) project early.
+export function withdrawFromProject(applicantId: number, reason: string, exitDate: string) {
+  return axiosClient.post(ENDPOINTS.slp.withdrawFromProject, { applicantId, reason, exitDate }).then(r => r.data)
+}
+
 export function updateAssessmentResult(applicantId: number, assessmentResult: string) {
   return axiosClient.post(ENDPOINTS.slp.updateAssessmentResult, { applicantId, assessmentResult }).then(r => r.data)
 }

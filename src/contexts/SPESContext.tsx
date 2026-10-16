@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as spesService from '../services/spesService'
 
@@ -60,7 +61,10 @@ export interface SPESApplicant {
   // IX. PESO Office
   dateApplicationReceived: string
   receivedBy: string
-  status: 'Active' | 'Inactive' | 'Completed' | 'Cancelled'
+  status: 'Active' | 'Inactive' | 'Completed' | 'Cancelled' | 'Withdrawn'
+  // Set only when status is 'Withdrawn' (left an Ongoing batch early).
+  exitedAt?: string | null
+  exitReason?: string
   remarks: string
 }
 
@@ -88,6 +92,7 @@ interface SPESContextValue {
   loadingBatches: boolean
   refreshProfiles: () => Promise<void>
   refreshBatches: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const SPESContext = createContext<SPESContextValue | null>(null)
@@ -98,37 +103,49 @@ export function SPESProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingBatches, setLoadingBatches] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await spesService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshBatches = useCallback(async () => {
-    setLoadingBatches(true)
+  const refreshBatches = useCallback(async (silent = false) => {
+    if (!silent) setLoadingBatches(true)
     try {
       const res = await spesService.listBatches()
       setSpesBatches(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingBatches(false)
+      if (!silent) setLoadingBatches(false)
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshBatches(true)])
+  }, [refreshProfiles, refreshBatches])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshBatches()
   }, [refreshProfiles, refreshBatches])
 
   return (
-    <SPESContext.Provider value={{ applicants, spesBatches, loading, loadingBatches, refreshProfiles, refreshBatches }}>
+    <SPESContext.Provider value={{ applicants, spesBatches, loading, loadingBatches, refreshProfiles, refreshBatches, refreshIfStale }}>
       {children}
     </SPESContext.Provider>
   )

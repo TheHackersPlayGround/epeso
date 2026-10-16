@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as clpepService from '../services/clpepService'
 
@@ -78,6 +79,7 @@ interface CLPEPContextValue {
   loadingInterventions: boolean
   refreshProfiles: () => Promise<void>
   refreshInterventions: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const CLPEPContext = createContext<CLPEPContextValue | null>(null)
@@ -88,37 +90,49 @@ export function CLPEPProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingInterventions, setLoadingInterventions] = useState(true)
 
-  const refreshProfiles = useCallback(async () => {
-    setLoading(true)
+  const refreshProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await clpepService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
       // silent — show empty list rather than crashing
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  const refreshInterventions = useCallback(async () => {
-    setLoadingInterventions(true)
+  const refreshInterventions = useCallback(async (silent = false) => {
+    if (!silent) setLoadingInterventions(true)
     try {
       const res = await clpepService.listInterventions()
       setInterventions(res.data ?? [])
     } catch {
       // silent
     } finally {
-      setLoadingInterventions(false)
+      if (!silent) setLoadingInterventions(false)
     }
   }, [])
 
+  // Re-fetch (silently: no spinner, so an open form is never replaced) every
+  // time the module is opened or the window regains focus, so other staff
+  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
+  // one is skipped: it is the same user action firing several triggers.
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshProfiles(true), refreshInterventions(true)])
+  }, [refreshProfiles, refreshInterventions])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     refreshProfiles()
     refreshInterventions()
   }, [refreshProfiles, refreshInterventions])
 
   return (
-    <CLPEPContext.Provider value={{ applicants, interventions, loading, loadingInterventions, refreshProfiles, refreshInterventions }}>
+    <CLPEPContext.Provider value={{ applicants, interventions, loading, loadingInterventions, refreshProfiles, refreshInterventions, refreshIfStale }}>
       {children}
     </CLPEPContext.Provider>
   )

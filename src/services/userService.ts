@@ -48,8 +48,8 @@ export async function logout(): Promise<void> {
   await axiosClient.post('/auth/logout')
 }
 
-export async function getMe(): Promise<ApiUser> {
-  const { data } = await axiosClient.get('/auth/me')
+export async function getMe(timeoutMs?: number): Promise<ApiUser> {
+  const { data } = await axiosClient.get('/auth/me', timeoutMs ? { timeout: timeoutMs } : undefined)
   return data.user
 }
 

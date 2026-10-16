@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { REFRESH_GUARD_MS } from '../hooks/useRefreshOnReturn'
 import type { ReactNode } from 'react'
 import * as documentsService from '../services/documentsService'
 
@@ -30,6 +31,7 @@ interface DocumentsContextValue {
   loading: boolean
   refreshFolders: () => Promise<void>
   refreshDocuments: () => Promise<void>
+  refreshIfStale: () => Promise<void>
 }
 
 const DocumentsContext = createContext<DocumentsContextValue | null>(null)
@@ -69,13 +71,24 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Silent re-sync (these two never touch `loading`) every time the Documents
+  // tab is opened or the window regains focus. A call within REFRESH_GUARD_MS
+  // of the previous one is skipped (same user action, several triggers).
+  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const refreshIfStale = useCallback(async () => {
+    if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
+    lastLoad.current = Date.now()
+    await Promise.all([refreshFolders(), refreshDocuments()])
+  }, [refreshFolders, refreshDocuments])
+
   useEffect(() => {
+    lastLoad.current = Date.now()
     setLoading(true)
     Promise.all([refreshFolders(), refreshDocuments()]).finally(() => setLoading(false))
   }, [refreshFolders, refreshDocuments])
 
   return (
-    <DocumentsContext.Provider value={{ folders, files, loading, refreshFolders, refreshDocuments }}>
+    <DocumentsContext.Provider value={{ folders, files, loading, refreshFolders, refreshDocuments, refreshIfStale }}>
       {children}
     </DocumentsContext.Provider>
   )

@@ -29,6 +29,7 @@ import {
   EMPLOYMENT_STATUS_OPTIONS,
   SEX_OPTIONS,
 } from './CDSPProfileForm'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 // ─── Template definition (grouped by form section) ───────────────────────────
 
@@ -468,7 +469,7 @@ async function rowToPayload(row: Row, services: string[], caches: ResolveCaches)
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     email: get(row, 'Email'),
     streetPurok: get(row, 'Street / Purok #'),
     barangayId: address.barangayId,

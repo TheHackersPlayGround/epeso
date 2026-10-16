@@ -23,6 +23,7 @@ import {
   type LocationOption,
 } from '../../services/locationService'
 import { importProfilesBulk } from '../../services/tupadService'
+import { contactNumberOrThrow } from '../../utils/contactNumber'
 
 const SEX_OPTIONS = ['Male', 'Female']
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Annulled']
@@ -324,7 +325,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
     sex,
     birthdate,
     civilStatus,
-    contactNumber: get(row, 'Contact Number'),
+    contactNumber: contactNumberOrThrow(get(row, 'Contact Number')),
     streetPurok: get(row, 'Street / Purok'),
     barangayId: address.barangayId,
     dateApplied: toIsoDate(get(row, 'Date Applied (MM/DD/YYYY)')),

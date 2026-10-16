@@ -5,6 +5,7 @@ import { useEmployment, type Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
 import { createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
 import ConfirmModal from '../shared/ConfirmModal'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
@@ -462,6 +463,18 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
   const [description, setDescription] = useState(vacancy.description)
   const [requirements, setRequirements] = useState(vacancy.requirements)
 
+  const draft = useFormDraft({
+    draftKey: 'employment-vacancy', mode: 'edit',
+    snapshot: { jobTitle, employer, employerId, vacanciesCount, jobType, salaryMin, salaryMax, description, requirements },
+    onRestore: (d) => {
+      setJobTitle(d.jobTitle); setEmployer(d.employer); setEmployerId(d.employerId)
+      setVacanciesCount(d.vacanciesCount); setJobType(d.jobType)
+      setSalaryMin(d.salaryMin); setSalaryMax(d.salaryMax)
+      setDescription(d.description); setRequirements(d.requirements)
+    },
+    onClose,
+  })
+
   const filteredEmployers = employers.filter(e =>
     e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
@@ -492,7 +505,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800">Edit Vacancy</h3>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button onClick={draft.requestClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -625,7 +638,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button onClick={onClose}
+          <button onClick={draft.requestClose}
             className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
             Cancel
           </button>
@@ -635,6 +648,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
           </button>
         </div>
       </div>
+      {draft.modals}
     </div>
   )
 }
@@ -661,6 +675,18 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
   const [requirements, setRequirements] = useState('')
   const [showFieldErrors, setShowFieldErrors] = useState(false)
 
+  const draft = useFormDraft({
+    draftKey: 'employment-vacancy', mode: 'add',
+    snapshot: { jobTitle, employer, employerId, vacanciesCount, jobType, salaryMin, salaryMax, description, requirements },
+    onRestore: (d) => {
+      setJobTitle(d.jobTitle); setEmployer(d.employer); setEmployerId(d.employerId)
+      setVacanciesCount(d.vacanciesCount); setJobType(d.jobType)
+      setSalaryMin(d.salaryMin); setSalaryMax(d.salaryMax)
+      setDescription(d.description); setRequirements(d.requirements)
+    },
+    onClose,
+  })
+
   const filteredEmployers = employers.filter(e =>
     e.companyName.toLowerCase().includes(employerSearch.toLowerCase())
   )
@@ -682,7 +708,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
     }
     const min = parseSalaryInput(salaryMin)
     const max = parseSalaryInput(salaryMax)
-    onSave({
+    draft.wrapSave(onSave)({
       jobTitle: jobTitle.trim(),
       employer,
       employerId,
@@ -703,7 +729,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800">Add Vacancy</h3>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button onClick={draft.requestClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -845,7 +871,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button onClick={onClose}
+          <button onClick={draft.requestClose}
             className="px-6 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium">
             Cancel
           </button>
@@ -855,6 +881,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
           </button>
         </div>
       </div>
+      {draft.modals}
     </div>
   )
 }

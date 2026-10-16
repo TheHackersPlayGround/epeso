@@ -6,6 +6,7 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { canManage } from '../../utils/permissions'
 import type { GIPWorkplace, GIPSavedDocument } from '../../contexts/GIPContext'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
+import { useFormDraft } from '../../hooks/useFormDraft'
 
 // ─── Re-export for consumers ──────────────────────────────────────────────────
 export type { GIPWorkplace }
@@ -151,6 +152,17 @@ export default function GIPMaintenanceForm({
   const [previewDoc, setPreviewDoc] = useState<GIPSavedDocument | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Draft / unsaved-changes guard (view mode never changes, so never prompts).
+  const draft = useFormDraft<Record<string, unknown>>({
+    draftKey: 'maintenance-gip-workplace',
+    mode: isAdd ? 'add' : 'edit',
+    snapshot: { ...form, documents: form.documents.map(d => d.id) },
+    onRestore: (d) => setForm({ ...(d as unknown as Omit<GIPWorkplace, 'id'>), documents: [] }),
+    forDraft: (d) => ({ ...d, documents: [] }),
+    draftNote: 'Attached documents are not kept in a draft.',
+    onClose: onCancel,
+  })
+
   const workplaceNameRef = useRef<HTMLDivElement>(null)
   const deploymentLocationRef = useRef<HTMLDivElement>(null)
   const supervisorRef = useRef<HTMLDivElement>(null)
@@ -223,7 +235,7 @@ export default function GIPMaintenanceForm({
     if (isEdit && initialWorkplace && onUpdateWorkplace) {
       onUpdateWorkplace({ ...form, id: initialWorkplace.id } as GIPWorkplace)
     } else {
-      onSaveWorkplace(form)
+      draft.wrapSave(onSaveWorkplace)(form)
     }
   }
 
@@ -374,7 +386,7 @@ export default function GIPMaintenanceForm({
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
         {isView ? (
           <button
-            onClick={onCancel}
+            onClick={draft.requestClose}
             className="px-6 py-2.5 text-gray-600 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors font-medium text-sm"
           >
             Close
@@ -382,7 +394,7 @@ export default function GIPMaintenanceForm({
         ) : (
           <>
             <button
-              onClick={onCancel}
+              onClick={draft.requestClose}
               className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium text-sm"
             >
               Cancel
@@ -400,6 +412,7 @@ export default function GIPMaintenanceForm({
       </div>
     </div>
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+    {draft.modals}
     </>
   )
 }

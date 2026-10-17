@@ -24,6 +24,7 @@ import type { SLPFormData } from './SLPForm'
 import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { formatProjectName } from '../../utils/projectName'
 
 // Each program's real id is offset so the four id sequences (DILP/TUPAD/
 // SLP/CLPEP each start back at 1 in their own table) never collide once
@@ -307,8 +308,10 @@ export default function LivelihoodMaintenanceForm() {
     program: 'Livelihood',
     service: 'DILEEP (DILP)',
     title: p.projectName,
-    date: p.dateReleased,
-    location: [p.cityMunicipality, p.province].filter(Boolean).join(', '),
+    barangay: p.barangay,
+    date: p.createdDate, // the day the project was entered -- same date the reports use for DILP
+    // Full address, most specific first: street/purok, barangay, city, province
+    location: [p.streetPurok, p.barangay, p.cityMunicipality, p.province].filter(Boolean).join(', '),
     status: p.status as ProjectStatus,
     assistanceAmount: p.assistanceAmount,
     dateReleased: p.dateReleased,
@@ -342,6 +345,7 @@ export default function LivelihoodMaintenanceForm() {
     const matchesStatus  = filterStatus  === 'All' || a.status  === filterStatus
     const matchesSearch  = !searchQuery  ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.barangay ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesService && matchesStatus && matchesSearch
   }).sort((a, b) => statusRank(a.status) - statusRank(b.status))
@@ -1035,7 +1039,7 @@ export default function LivelihoodMaintenanceForm() {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Project Title</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Service</th>
-                  <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Date</th>
+                  <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold" title="DILP: the day the project was created. Other programs: the project's own date.">Date</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Location</th>
                   <th className="px-6 py-4 text-center text-sm text-gray-700 font-semibold">Beneficiaries</th>
                   <th className="px-6 py-4 text-left text-sm text-gray-700 font-semibold">Status</th>
@@ -1047,9 +1051,8 @@ export default function LivelihoodMaintenanceForm() {
                   <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-6 py-4 max-w-[240px]">
                       <p className="font-medium text-gray-800 text-sm line-clamp-1">{a.title}</p>
-                      {a.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
-                      )}
+                      {/* Barangay goes on its own line so a long project name does not cut it off */}
+                      {a.barangay && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.barangay}</p>}
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-blue-50 text-brand-blue rounded-md text-xs font-medium">{a.service}</span>
@@ -1170,7 +1173,7 @@ export default function LivelihoodMaintenanceForm() {
         {/* Header */}
         <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-white text-base font-semibold m-0">{selectedProject.title}</h3>
+            <h3 className="text-white text-base font-semibold m-0">{formatProjectName(selectedProject.title, selectedProject.barangay)}</h3>
             <p className="text-white/80 text-sm mt-0.5">
               {participants.length} participant{participants.length !== 1 ? 's' : ''} found
             </p>
@@ -1302,7 +1305,7 @@ export default function LivelihoodMaintenanceForm() {
               </div>
 
               <p className="text-gray-600 text-sm mb-6">
-                Change <span className="font-medium text-gray-800">{project.title}</span> from{' '}
+                Change <span className="font-medium text-gray-800">{formatProjectName(project.title, project.barangay)}</span> from{' '}
                 <span className="font-medium text-blue-500">{project.status}</span> to{' '}
                 <span className={`font-medium ${nextStatus === 'Completed' ? 'text-green-600' : 'text-brand-blue'}`}>{nextStatus}</span>?
               </p>
@@ -1343,7 +1346,7 @@ export default function LivelihoodMaintenanceForm() {
         isOpen={deleteConfirm !== null}
         type="confirm"
         title="Delete Project?"
-        message={deleteConfirm ? `Are you sure you want to delete "${deleteConfirm.title}"? This will move the project to the recycle bin.` : ''}
+        message={deleteConfirm ? `Are you sure you want to delete "${formatProjectName(deleteConfirm.title, deleteConfirm.barangay)}"? This will move the project to the recycle bin.` : ''}
         confirmText="Yes, Delete"
         cancelText="Cancel"
         onConfirm={proceedDelete}

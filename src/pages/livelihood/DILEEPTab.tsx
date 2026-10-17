@@ -1,5 +1,9 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import SearchableSelect from '../../components/SearchableSelect'
+import ProjectNameLabel from '../../components/ProjectNameLabel'
+import { formatProjectName } from '../../utils/projectName'
+import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import {
   Search, Plus, ChevronDown, ChevronRight, ChevronLeft, X, Download, Upload,
   MoreHorizontal, Users, Info, Loader2,
@@ -52,9 +56,26 @@ function projectTitle(program: DILEEPProgram, project: DILEEPProject): string {
   return program === 'DILEEP (DILP)' ? (project as DILPProject).projectName : (project as TUPADProject).title
 }
 
+// Only DILP projects run per barangay (e.g. "Cassava Production" in many barangays), so only
+// they get a barangay shown beside the name. TUPAD projects return '' and show the plain title.
+function projectBarangay(program: DILEEPProgram, project: DILEEPProject): string {
+  return program === 'DILEEP (DILP)' ? (project as DILPProject).barangay : ''
+}
+
+// Barangay of the project a beneficiary is assigned to (DILP only), looked up from the loaded projects.
+function assignedBarangay(dilpProjects: DILPProject[], isDILP: boolean, b: DILEEPApplicant): string {
+  if (!isDILP || !b.assignedProjectId) return ''
+  return dilpProjects.find(p => p.id === b.assignedProjectId)?.barangay ?? ''
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterOption = { id: string; label: string; options: string[] }
+
+// One step of the Address filter (Province / City / Barangay): the picked place's ID and name.
+type AddressPick = { id: number; name: string } | null
+type AddressFilter = { province: AddressPick; city: AddressPick; barangay: AddressPick }
+const EMPTY_ADDRESS_FILTER: AddressFilter = { province: null, city: null, barangay: null }
 
 // ─── Name helpers ─────────────────────────────────────────────────────────────
 
@@ -265,7 +286,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
   const programProjects = projects.filter(p => p.status === 'Planned')
 
   const filteredProjects = projectSearch.trim()
-    ? programProjects.filter(p => projectTitle(program, p).toLowerCase().includes(projectSearch.toLowerCase()))
+    ? programProjects.filter(p => formatProjectName(projectTitle(program, p), projectBarangay(program, p)).toLowerCase().includes(projectSearch.toLowerCase()))
     : programProjects
 
   return (
@@ -302,7 +323,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                       ['Description', (selectedProject as TUPADProject).description],
                     ]
                   : [
-                      ['Project ID Number', (selectedProject as DILPProject).projectIdNumber],
+                      ['Project ID Number', (selectedProject as DILPProject).projectIdNumber || '—'],
                       ['Project Name', (selectedProject as DILPProject).projectName],
                       ['Project Type', (selectedProject as DILPProject).typeOfProject],
                       ['Program Component', (selectedProject as DILPProject).programComponent],
@@ -368,7 +389,9 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                 <p className="text-xs font-bold text-brand-blue uppercase tracking-widest mb-1.5">Currently Assigned</p>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-xs font-bold text-brand-blue">{projectTitle(program, currentProject)}</p>
+                    <p className="text-xs font-bold text-brand-blue">
+                      <ProjectNameLabel name={projectTitle(program, currentProject)} barangay={projectBarangay(program, currentProject)} />
+                    </p>
                     <div className="flex items-center gap-1.5 mt-1">
                       {program === 'DILEEP (DILP)' && (currentProject as DILPProject).typeOfProject && (
                         <span className="text-xs border border-brand-blue text-brand-blue rounded-full px-2 py-0.5">
@@ -415,7 +438,9 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-xs font-semibold text-gray-800">{projectTitle(program, project)}</p>
+                          <p className="text-xs font-semibold text-gray-800">
+                            <ProjectNameLabel name={projectTitle(program, project)} barangay={projectBarangay(program, project)} />
+                          </p>
                           {isCurrent && (
                             <span className="text-xs bg-orange-100 text-orange-600 rounded-full px-2 py-0.5 font-medium">Current</span>
                           )}
@@ -461,10 +486,10 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
         isOpen={confirmingAssign}
         type="confirm"
         title="Confirm Assignment"
-        message={selectedProject ? `Assign "${projectTitle(program, selectedProject)}" to ${formatDisplayName(beneficiary)}?` : ''}
+        message={selectedProject ? `Assign "${formatProjectName(projectTitle(program, selectedProject), projectBarangay(program, selectedProject))}" to ${formatDisplayName(beneficiary)}?` : ''}
         confirmText="Yes, Assign"
         cancelText="Cancel"
-        onConfirm={() => { setConfirmingAssign(false); if (selectedProject) onAssign(selectedProject.id, projectTitle(program, selectedProject)) }}
+        onConfirm={() => { setConfirmingAssign(false); if (selectedProject) onAssign(selectedProject.id, formatProjectName(projectTitle(program, selectedProject), projectBarangay(program, selectedProject))) }}
         onCancel={() => setConfirmingAssign(false)}
       />
     </div>
@@ -534,7 +559,7 @@ function ViewAssignedProjectModal({ beneficiary: b, program, projects, onChangeA
     <AssignedItemModal
       title="Assigned Project"
       personName={formatDisplayName(b)}
-      itemName={p?.projectName ?? b.assignedProjectName}
+      itemName={p ? <ProjectNameLabel name={p.projectName} barangay={p.barangay} /> : b.assignedProjectName}
       subtitle={p?.projectIdNumber}
       status={p?.status}
       notFound={!p}
@@ -580,6 +605,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [addressFilter, setAddressFilter] = useState<AddressFilter>(EMPTY_ADDRESS_FILTER)
   const [perPage, setPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
@@ -624,6 +650,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     { id: 'status',      label: 'Status',       options: isDILP ? PROGRAM_STATUS_OPTIONS : TUPAD_STATUS_OPTIONS },
     { id: 'sex',         label: 'Sex',           options: SEX_OPTIONS },
     { id: 'civilStatus', label: 'Civil Status',  options: CIVIL_STATUS_OPTIONS },
+    // Address has three pickers instead of one dropdown, so it is drawn separately
+    { id: 'address',     label: 'Address',       options: [] },
   ]
 
   async function handleAddBeneficiary(data: Record<string, unknown>) {
@@ -659,6 +687,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   function handleRemoveFilter(id: string) {
     setActiveFilters(prev => prev.filter(f => f !== id))
     setFilterValues(prev => { const n = { ...prev }; delete n[id]; return n })
+    if (id === 'address') setAddressFilter(EMPTY_ADDRESS_FILTER)
     setCurrentPage(1)
   }
 
@@ -757,8 +786,17 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       result = result.filter(b =>
         formatDisplayName(b).toLowerCase().includes(q) ||
         (b.barangay ?? '').toLowerCase().includes(q) ||
-        (b.assignedProjectName ?? '').toLowerCase().includes(q)
+        (b.assignedProjectName ?? '').toLowerCase().includes(q) ||
+        assignedBarangay(dilp.projects, isDILP, b).toLowerCase().includes(q)
       )
+    }
+    // Address: IDs, not names -- barangay and city names repeat across places.
+    // Each picked level narrows further; unpicked levels match everyone.
+    if (activeFilters.includes('address')) {
+      const { province, city, barangay } = addressFilter
+      if (province) result = result.filter(b => b.provinceId === province.id)
+      if (city)     result = result.filter(b => b.cityId === city.id)
+      if (barangay) result = result.filter(b => b.barangayId === barangay.id)
     }
     for (const filterId of activeFilters) {
       const value = filterValues[filterId]
@@ -768,7 +806,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       if (filterId === 'civilStatus') result = result.filter(b => b.civilStatus === value)
     }
     return result
-  }, [applicants, searchQuery, activeFilters, filterValues])
+  }, [applicants, searchQuery, activeFilters, filterValues, addressFilter, dilp.projects, isDILP])
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOrder === 'dateApplied_newest') return (b.dateApplied || '').localeCompare(a.dateApplied || '')
@@ -779,7 +817,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
   })
 
-  const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
+  const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f]) ||
+    (activeFilters.includes('address') && !!addressFilter.province)
   const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
   const safePage = Math.min(currentPage, totalPages)
   const paginated = sorted.slice((safePage - 1) * perPage, safePage * perPage)
@@ -1028,6 +1067,54 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
               {activeFilters.map(filterId => {
                 const filter = availableFilters.find(f => f.id === filterId)
                 if (!filter) return null
+                if (filterId === 'address') {
+                  return (
+                    <div key={filterId} className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                      <span className="text-sm text-blue-700 font-medium whitespace-nowrap">Address:</span>
+                      <div className="w-44">
+                        <SearchableSelect
+                          value={addressFilter.province?.name ?? ''}
+                          placeholder="All provinces"
+                          fetchOptions={s => searchProvinces(s)}
+                          onSelect={opt => { setAddressFilter({ province: opt, city: null, barangay: null }); setCurrentPage(1) }}
+                        />
+                      </div>
+                      <div className="w-44">
+                        <SearchableSelect
+                          value={addressFilter.city?.name ?? ''}
+                          placeholder={addressFilter.province ? 'All cities' : 'Pick province first'}
+                          disabled={!addressFilter.province}
+                          refetchKey={addressFilter.province?.id ?? ''}
+                          fetchOptions={s => searchCities(addressFilter.province?.id ?? 0, s)}
+                          onSelect={opt => { setAddressFilter(prev => ({ ...prev, city: opt, barangay: null })); setCurrentPage(1) }}
+                        />
+                      </div>
+                      <div className="w-44">
+                        <SearchableSelect
+                          value={addressFilter.barangay?.name ?? ''}
+                          placeholder={addressFilter.city ? 'All barangays' : 'Pick city first'}
+                          disabled={!addressFilter.city}
+                          refetchKey={addressFilter.city?.id ?? ''}
+                          fetchOptions={s => searchBarangaysByCity(addressFilter.city?.id ?? 0, s)}
+                          onSelect={opt => { setAddressFilter(prev => ({ ...prev, barangay: opt })); setCurrentPage(1) }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => setAddressFilter(EMPTY_ADDRESS_FILTER)}
+                        className="text-xs text-blue-700 hover:text-blue-900 underline whitespace-nowrap"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        onClick={() => handleRemoveFilter(filterId)}
+                        aria-label="Remove Address filter"
+                        className="text-blue-700 hover:text-blue-900 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )
+                }
                 return (
                   <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                     <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
@@ -1097,7 +1184,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                   <td className="px-4 py-3">
                     {b.assignedProjectName ? (
                       <div>
-                        <p className="text-gray-800 font-medium whitespace-nowrap">{b.assignedProjectName}</p>
+                        <p className="text-gray-800 font-medium whitespace-nowrap">
+                          <ProjectNameLabel name={b.assignedProjectName} barangay={assignedBarangay(dilp.projects, isDILP, b)} />
+                        </p>
                         {/* Withdrawn (TUPAD): the project's own status would read as the person's, so show when they left instead. */}
                         {(b as TUPADApplicant).exitedAt ? (
                           <span className="inline-block mt-1.5 text-xs text-orange-600">Left on {fmtDate((b as TUPADApplicant).exitedAt as string)}</span>

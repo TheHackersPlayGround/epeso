@@ -112,13 +112,13 @@ export default function DILPForm({
   const typeOfProjectRef = useRef<HTMLSelectElement>(null)
   const programComponentRef = useRef<HTMLSelectElement>(null)
   const wayOfImplementationRef = useRef<HTMLSelectElement>(null)
+  const provinceWrapRef = useRef<HTMLDivElement>(null)
+  const cityWrapRef = useRef<HTMLDivElement>(null)
+  const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   function handleSaveClick() {
     const errors: ValidationError[] = []
 
-    if (!formData.projectIdNumber.trim()) {
-      errors.push({ field: 'projectIdNumber', message: 'Project ID Number is required.', focus: () => projectIdRef.current?.focus() })
-    }
     if (!formData.projectName.trim()) {
       errors.push({ field: 'projectName', message: 'Project Name is required.', focus: () => projectNameRef.current?.focus() })
     }
@@ -130,6 +130,16 @@ export default function DILPForm({
     }
     if (!formData.wayOfImplementation) {
       errors.push({ field: 'wayOfImplementation', message: 'Implementation Type is required.', focus: () => wayOfImplementationRef.current?.focus() })
+    }
+    // Project location: the Barangay is what tells same-named projects apart, so all three are required.
+    if (!formData.province) {
+      errors.push({ field: 'province', message: 'Province is required.', focus: () => provinceWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+    if (!formData.cityMunicipality) {
+      errors.push({ field: 'cityMunicipality', message: 'City / Municipality is required.', focus: () => cityWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
+    }
+    if (!formData.barangayId) {
+      errors.push({ field: 'barangay', message: 'Barangay is required.', focus: () => barangayWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
     }
 
     if (runValidation(errors)) return
@@ -160,7 +170,7 @@ export default function DILPForm({
         <p className={sectionHeadingCls}>Project Information</p>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className={labelCls}>Project ID Number <span className="text-red-500">*</span></label>
+            <label className={labelCls}>Project ID Number</label>
             <input ref={projectIdRef} type="text" value={formData.projectIdNumber} readOnly={isView}
               onChange={e => { onChange({ ...formData, projectIdNumber: e.target.value }); clearFieldError('projectIdNumber') }}
               className={`${inputCls} ${errCls('projectIdNumber')}`} placeholder="Enter project ID number" />
@@ -230,43 +240,54 @@ export default function DILPForm({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Province</label>
-              <SearchableSelect
-                value={formData.province}
-                placeholder="Search province..."
-                fetchOptions={s => searchProvinces(s)}
-                onSelect={opt => {
-                  setProvinceId(opt.id)
-                  setCityId(null)
-                  onChange({ ...formData, province: opt.name, cityMunicipality: '', barangay: '', barangayId: null, region: '' })
-                }}
-              />
+            <div ref={provinceWrapRef}>
+              <label className={labelCls}>Province <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldMessage('province') ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.province}
+                  placeholder="Search province..."
+                  fetchOptions={s => searchProvinces(s)}
+                  onSelect={opt => {
+                    setProvinceId(opt.id)
+                    setCityId(null)
+                    onChange({ ...formData, province: opt.name, cityMunicipality: '', barangay: '', barangayId: null, region: '' })
+                    clearFieldError('province')
+                  }}
+                />
+              </div>
+              {fieldMessage('province') && <p className="text-red-500 text-xs mt-1">{fieldMessage('province')}</p>}
             </div>
-            <div>
-              <label className={labelCls}>City / Municipality</label>
-              <SearchableSelect
-                value={formData.cityMunicipality}
-                placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
-                disabled={!provinceId}
-                refetchKey={provinceId ?? ''}
-                fetchOptions={s => searchCities(provinceId ?? 0, s)}
-                onSelect={opt => {
-                  setCityId(opt.id)
-                  onChange({ ...formData, cityMunicipality: opt.name, barangay: '', barangayId: null })
-                }}
-              />
+            <div ref={cityWrapRef}>
+              <label className={labelCls}>City / Municipality <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldMessage('cityMunicipality') ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.cityMunicipality}
+                  placeholder={provinceId ? 'Search city/municipality...' : 'Select province first'}
+                  disabled={!provinceId}
+                  refetchKey={provinceId ?? ''}
+                  fetchOptions={s => searchCities(provinceId ?? 0, s)}
+                  onSelect={opt => {
+                    setCityId(opt.id)
+                    onChange({ ...formData, cityMunicipality: opt.name, barangay: '', barangayId: null })
+                    clearFieldError('cityMunicipality')
+                  }}
+                />
+              </div>
+              {fieldMessage('cityMunicipality') && <p className="text-red-500 text-xs mt-1">{fieldMessage('cityMunicipality')}</p>}
             </div>
-            <div>
-              <label className={labelCls}>Barangay</label>
-              <SearchableSelect
-                value={formData.barangay}
-                placeholder={cityId ? 'Search barangay...' : 'Select city first'}
-                disabled={!cityId}
-                refetchKey={cityId ?? ''}
-                fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
-                onSelect={opt => onChange({ ...formData, barangay: opt.name, barangayId: opt.id })}
-              />
+            <div ref={barangayWrapRef}>
+              <label className={labelCls}>Barangay <span className="text-red-500">*</span></label>
+              <div className={`rounded-lg ${fieldMessage('barangay') ? 'ring-2 ring-red-200' : ''}`}>
+                <SearchableSelect
+                  value={formData.barangay}
+                  placeholder={cityId ? 'Search barangay...' : 'Select city first'}
+                  disabled={!cityId}
+                  refetchKey={cityId ?? ''}
+                  fetchOptions={s => searchBarangaysByCity(cityId ?? 0, s)}
+                  onSelect={opt => { onChange({ ...formData, barangay: opt.name, barangayId: opt.id }); clearFieldError('barangay') }}
+                />
+              </div>
+              {fieldMessage('barangay') && <p className="text-red-500 text-xs mt-1">{fieldMessage('barangay')}</p>}
             </div>
             <div>
               <label className={labelCls}>Street / Purok #</label>

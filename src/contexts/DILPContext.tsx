@@ -31,6 +31,8 @@ export interface DILPApplicant {
   streetPurok: string
   barangay: string
   barangayId: number
+  cityId?: number // set by the server on loaded rows (used by the Address filter)
+  provinceId?: number
   cityMunicipality: string
   province: string
   region: string
@@ -61,6 +63,7 @@ export interface DILPProject {
   streetPurok: string
   assistanceAmount: string
   dateReleased: string
+  createdDate: string // YYYY-MM-DD the project was entered; the reports place DILP projects by this date
   status: 'Planned' | 'Ongoing' | 'Completed' | 'Cancelled'
   assignedCount: number
   documents: DILPSavedDocument[]

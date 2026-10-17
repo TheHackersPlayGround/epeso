@@ -647,7 +647,10 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <p className="text-[10px] font-bold text-brand-blue uppercase tracking-widest mb-1">Currently Assigned</p>
                     <p className="text-sm font-semibold text-gray-800 truncate">{currentActivity.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {currentActivity.service && <span className="text-xs text-gray-500">{currentActivity.service}</span>}
+                      {/* Date and location tell apart activities that share a title */}
+                      <span className="text-xs text-gray-500">
+                        {[currentActivity.service, currentActivity.date, currentActivity.location].filter(Boolean).join(' · ')}
+                      </span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-100 text-yellow-700">{currentActivity.status}</span>
                     </div>
                   </div>

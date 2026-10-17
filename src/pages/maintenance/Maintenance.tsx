@@ -1,4 +1,5 @@
 import { requestLeave } from '../../hooks/leaveGuard'
+import { fmtDate } from '../../utils/formatDate'
 import { useState } from 'react'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
@@ -451,6 +452,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                   <th className="px-4 py-3 text-left text-white font-semibold">Contact Number</th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Email</th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Barangay</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Date Assigned</th>
+                  <th className="px-4 py-3 text-left text-white font-semibold">Date Completed</th>
                   <th className="px-4 py-3 text-left text-white font-semibold">Status</th>
                 </tr>
               </thead>
@@ -462,6 +465,8 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                     <td className="px-4 py-3 text-gray-600">{a.contactNumber || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{a.email || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{a.barangay || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(a.assignmentHistory[0]?.assignedDate)}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(a.assignmentHistory[0]?.completedDate)}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${APPLICANT_STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-500'}`}>
                         {a.status}
@@ -662,24 +667,26 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                       <tbody>
                         {paginatedGipWorkplaces.map(w => {
                           const atWorkplace = gipApplicants.filter(a => a.assignedWorkplaceId === w.id)
-                          const participantCount = atWorkplace.length
+                          // Withdrawn interns are shown separately, not counted as participants
                           const withdrawnCount = atWorkplace.filter(a => a.status === 'Withdrawn').length
+                          const participantCount = atWorkplace.length - withdrawnCount
                           return (
                             <tr key={w.id} className="border-b border-gray-100 hover:bg-gray-50">
-                              <td className="px-6 py-4 text-sm">
+                              {/* max-w keeps a long description from stretching this column and squeezing Address */}
+                              <td className="px-6 py-4 text-sm max-w-md">
                                 <span className="text-gray-800 font-medium">{w.workplaceName}</span>
                                 {w.description && (
                                   <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{w.description}</p>
                                 )}
-                                {participantCount > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-xs mt-1" style={{ color: GIP_CONFIRM_COLOR }}>
+                                {atWorkplace.length > 0 && (
+                                  <span className="flex items-center gap-1 text-xs mt-1" style={{ color: GIP_CONFIRM_COLOR }}>
                                     <Users size={11} /> {participantCount} participant{participantCount !== 1 ? 's' : ''}
                                     {withdrawnCount > 0 && <span className="text-orange-600"> · {withdrawnCount} withdrawn</span>}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-600 max-w-[180px]">
-                                <p className="line-clamp-1">{w.deploymentLocation || '—'}</p>
+                              <td className="px-6 py-4 text-sm text-gray-600 min-w-[220px]">
+                                <p className="line-clamp-2">{w.deploymentLocation || '—'}</p>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <button

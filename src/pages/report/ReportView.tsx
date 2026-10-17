@@ -90,6 +90,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [gipReportType, setGipReportType] = useState<'participants' | 'batches' | 'aging'>('participants')
   const [spesReportType, setSpesReportType] = useState<'participants' | 'batches'>('participants')
   const [livelihoodReportType, setLivelihoodReportType] = useState<'beneficiaries' | 'projects'>('beneficiaries')
+  // Status filter for the project/session/batch/training lists (Livelihood projects, CDSP sessions,
+  // SPES batches, Skills Training trainings): 'All' or one exact status.
+  const [listStatusFilter, setListStatusFilter] = useState('All')
   const [skillsReportType, setSkillsReportType] = useState<'participants' | 'activities' | 'aging'>('participants')
   const [skillsAgingLoading, setSkillsAgingLoading] = useState(false)
   // General PESO Report: which programs to roll up — defaults to all of them
@@ -131,7 +134,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // reflecting the new selection.
   useEffect(() => {
     setGeneratedReport(null)
-  }, [reportCategory, programType, cdspReportType, gipReportType, spesReportType, livelihoodReportType, skillsReportType, selectedGeneralPrograms, reportPeriod, month, year, fromDate, toDate])
+  }, [reportCategory, programType, cdspReportType, gipReportType, spesReportType, livelihoodReportType, listStatusFilter, skillsReportType, selectedGeneralPrograms, reportPeriod, month, year, fromDate, toDate])
 
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
@@ -438,22 +441,34 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // way the Participant List's own "by Program Type" breakdown pre-seeds
   // every program via generateProgramAnalytics's allGroups. Deliberately not
   // one shared list across every category -- each record type's own status
-  // enum differs (CDSP/SPES/TUPAD/CLPEP never have "Cancelled"; DILP/SLP/
-  // Skills Training do), so each list only names statuses that record type
-  // can genuinely have.
+  // enum differs, so each list only names statuses that record type can
+  // genuinely have. "Cancelled" exists in the database for DILP/SLP/CDSP/Skills
+  // Training but no Maintenance screen can set it, so it is not seeded as an empty
+  // row; a record that somehow has it is still counted (the breakdown adds
+  // unseeded statuses as it goes).
   const CDSP_SESSION_STATUSES = ['Planned', 'Ongoing', 'Completed']
   const SPES_BATCH_STATUSES = ['Planned', 'Ongoing', 'Completed']
-  const SKILLS_ACTIVITY_STATUSES = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+  const SKILLS_ACTIVITY_STATUSES = ['Planned', 'Ongoing', 'Completed']
   // Livelihood's specific-program views use that program's own status set;
   // the combined "All Programs" view mixes all four record types together,
   // so it needs the union of every one of them instead.
   const LIVELIHOOD_PROJECT_STATUSES: Record<string, string[]> = {
-    'DILEEP (DILP)': ['Planned', 'Ongoing', 'Completed', 'Cancelled'],
+    'DILEEP (DILP)': ['Planned', 'Ongoing', 'Completed'],
     'DILEEP (TUPAD)': ['Planned', 'Ongoing', 'Completed'],
-    'SLP': ['Planned', 'Ongoing', 'Completed', 'Cancelled'],
+    'SLP': ['Planned', 'Ongoing', 'Completed'],
     'CLPEP': ['Planned', 'Ongoing', 'Completed'],
   }
-  const LIVELIHOOD_ALL_PROJECT_STATUSES = ['Planned', 'Ongoing', 'Completed', 'Cancelled']
+  const LIVELIHOOD_ALL_PROJECT_STATUSES = ['Planned', 'Ongoing', 'Completed']
+  // Statuses offered by the report's Status filter, or null when the chosen report has no status filter.
+  const getStatusFilterOptions = (): string[] | null => {
+    let statuses: string[] | null = null
+    if (reportCategory === 'livelihood' && livelihoodReportType === 'projects') statuses = getLivelihoodProjectStatuses(programType)
+    else if (reportCategory === 'cdsp' && cdspReportType === 'sessions') statuses = CDSP_SESSION_STATUSES
+    else if (reportCategory === 'spes' && spesReportType === 'batches') statuses = SPES_BATCH_STATUSES
+    else if (reportCategory === 'skills-training' && skillsReportType === 'activities') statuses = SKILLS_ACTIVITY_STATUSES
+    return statuses
+  }
+
   const getLivelihoodProjectStatuses = (programType: string): string[] =>
     LIVELIHOOD_PROJECT_STATUSES[programType] ?? LIVELIHOOD_ALL_PROJECT_STATUSES
 
@@ -476,7 +491,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                      'Date Applied', 'Contact Number', 'Barangay', 'Address', 'Assigned Project/Intervention',
                      'Assistance Amount', 'Release Date', 'Status', 'Remarks'],
       'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
-              'Start Date', 'End Date', 'Status', 'School Name', 'Course', 'Strand', 'Civil Status',
+              'Date Assigned', 'Date Completed', 'Status', 'School Name', 'Course', 'Strand', 'Civil Status',
               'Contact Number', 'Barangay', 'Address', 'Supervisor', 'Allowance', 'Remarks'],
       'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location',
                'Start Date', 'End Date', 'Status', 'Batch', 'Course', 'School Type', 'Civil Status', 'Contact Number',
@@ -503,7 +518,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Highest Education', 'Employment Status', 'Contact Number', 'Address']
     // GIP: interns deployed to government offices — identity, education, deployment office and period.
     // (Status is optional, matching CDSP.)
-    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Start Date', 'End Date', 'Contact Number', 'Address']
+    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Date Assigned', 'Date Completed', 'Contact Number', 'Address']
     // SPES Batch List: few columns, all useful — show all by default.
     if (category === 'spes' && spesReportType === 'batches') return withoutStatus(SPES_BATCH_COLUMNS)
     // SPES: working students — identity, school/year level, employer and period.
@@ -533,6 +548,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // midnight but reads the year/month back in the viewer's local timezone, which
   // can misclassify Jan 1 / Dec 31 records into the wrong month or year on a
   // negative-UTC-offset machine (same pitfall formatLongDate below avoids).
+  // True when the report covers every status. Only then is a "by Status" breakdown worth
+  // showing -- with one status picked it would be that status plus rows of zeros.
+  const coversAllStatuses = (filter?: string): boolean => !filter || filter === 'All'
+
+  // Does a list row's status pass the chosen Status filter?
+  const matchesListStatus = (status: string): boolean => {
+    return listStatusFilter === 'All' || status === listStatusFilter
+  }
+
   const inSelectedPeriod = (dateStr: string): boolean => {
     if (!dateStr) return false
     const [yStr, mStr, dStr] = dateStr.split('-')
@@ -541,6 +565,27 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (reportPeriod === 'annual') return recYear === Number(year)
     if (reportPeriod === 'custom') return dateStr >= fromDate && dateStr <= toDate
     return recYear === Number(year) && recMonth === Number(month)
+  }
+
+  // First and last day (YYYY-MM-DD) of the chosen report period.
+  const getPeriodRange = (): { start: string; end: string } => {
+    if (reportPeriod === 'annual') return { start: `${year}-01-01`, end: `${year}-12-31` }
+    if (reportPeriod === 'custom') return { start: fromDate, end: toDate }
+    const mm = String(Number(month)).padStart(2, '0')
+    const lastDay = String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, '0')
+    return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${lastDay}` }
+  }
+
+  // Was this GIP intern at their workplace at any point in the report period? They count from the
+  // day they were assigned until the day they completed (or still, if they have not completed).
+  // An intern with no assignment date cannot be placed in time, so is not counted.
+  const internAtWorkplaceInPeriod = (a: { assignmentHistory: { assignedDate: string; completedDate?: string | null }[] }): boolean => {
+    const history = a.assignmentHistory[0]
+    const assigned = (history?.assignedDate ?? '').slice(0, 10)
+    if (!assigned) return false
+    const completed = (history?.completedDate ?? '').slice(0, 10)
+    const { start, end } = getPeriodRange()
+    return assigned <= end && (!completed || completed >= start)
   }
 
   const generateData = (category: ReportCategory): any[] => {
@@ -580,7 +625,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             // Service Type filter (from the "Program Type" dropdown; '' = All Programs)
             .filter(act => !programType || act.service === programType)
             // Period filter on the date the activity was conducted
-            .filter(act => inSelectedPeriod(act.date))
+            .filter(act => inSelectedPeriod(act.date) && matchesListStatus(act.status))
             .map(act => ({
               'Activity Title': act.title || '-',
               'Service Type': act.service || '-',
@@ -633,12 +678,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Workplace/Office Address': w.deploymentLocation || '-',
               'Supervisor': w.supervisor || '-',
               'Allowance': formatCurrency(w.allowance),
-              // All interns assigned here (Ongoing + Completed), not just
-              // currently-active ones -- w.assignedCount is Ongoing-only and
-              // used elsewhere (Assign modal) for capacity, which isn't the
-              // question this report answers. Withdrawn interns are excluded
-              // so this matches the "Export Interns" roster.
-              'Interns': gipApplicants.filter(a => a.assignedWorkplaceId === w.id && a.status !== 'Withdrawn').length,
+              // Interns who were at this workplace during the report period (Ongoing or
+              // Completed -- w.assignedCount is Ongoing-only and used elsewhere for capacity,
+              // which isn't the question this report answers). A workplace with none shows 0.
+              // Withdrawn interns are excluded so this matches the "Export Interns" roster.
+              'Interns': gipApplicants.filter(a => a.assignedWorkplaceId === w.id && a.status !== 'Withdrawn' && internAtWorkplaceInPeriod(a)).length,
               _batchId: w.id, // not rendered as a column — used to export this workplace's interns
             }))
         }
@@ -662,8 +706,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
               // every other date column here which is a plain date -- keep only
               // the date part so this column matches the rest instead of showing
               // "2026-08-09 22:25:55.419333".
-              'Start Date': dateOnly(history?.assignedDate),
-              'End Date': dateOnly(history?.completedDate),
+              'Date Assigned': dateOnly(history?.assignedDate),
+              'Date Completed': dateOnly(history?.completedDate),
               'Status': a.status,
               'School Name': a.schoolName || '-',
               'Course': a.course || '-',
@@ -682,7 +726,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         if (spesReportType === 'batches') {
           return spesBatches
             // Period filter on the batch's program start date
-            .filter(b => inSelectedPeriod(b.programStartDate))
+            .filter(b => inSelectedPeriod(b.programStartDate) && matchesListStatus(b.status))
             .map(b => ({
               'Batch Name': b.batchName || '-',
               'Employer': b.employer || '-',
@@ -732,7 +776,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         if (skillsReportType === 'activities') {
           return skillsActivities
             // Period filter on the date the training was conducted
-            .filter(act => inSelectedPeriod(act.date))
+            .filter(act => inSelectedPeriod(act.date) && matchesListStatus(act.status))
             .map(act => ({
               'Training Title': act.title || '-',
               'Training Batch': act.service || '-',
@@ -782,7 +826,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
           // record types is an explicit, opt-in comparison view.
           if (programType === 'DILEEP (DILP)') {
             return dilpProjects
-              .filter(p => inSelectedPeriod(p.dateReleased))
+              // Date Released is optional, so DILP projects are placed by the day they were entered
+              .filter(p => inSelectedPeriod(p.createdDate) && matchesListStatus(p.status))
               .map((p, i) => ({
                 'No.': i + 1,
                 'Project ID': p.projectIdNumber || '-',
@@ -800,7 +845,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           }
           if (programType === 'DILEEP (TUPAD)') {
             return tupadProjects
-              .filter(p => inSelectedPeriod(p.date))
+              .filter(p => inSelectedPeriod(p.date) && matchesListStatus(p.status))
               .map((p, i) => ({
                 'No.': i + 1,
                 'Project Title': p.title || '-',
@@ -817,7 +862,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           }
           if (programType === 'SLP') {
             return slpProjects
-              .filter(p => inSelectedPeriod(p.dateStarted))
+              .filter(p => inSelectedPeriod(p.dateStarted) && matchesListStatus(p.status))
               .map((p, i) => ({
                 'No.': i + 1,
                 'Project Name': p.projectName || '-',
@@ -835,7 +880,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
           }
           if (programType === 'CLPEP') {
             return clpepInterventions
-              .filter(p => inSelectedPeriod(p.date))
+              .filter(p => inSelectedPeriod(p.date) && matchesListStatus(p.status))
               .map((p, i) => ({
                 'No.': i + 1,
                 'Intervention Name': p.interventionName || '-',
@@ -861,7 +906,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             ...dilpProjects.map(p => ({
               ...p, _program: 'DILEEP (DILP)', _name: p.projectName,
               _category: [p.typeOfProject, p.programComponent].filter(Boolean).join(' - '),
-              _desc: '-', _date: p.dateReleased,
+              _desc: '-', _date: p.createdDate,
               _location: formatAddress({ streetPurok: p.streetPurok, barangay: p.barangay, cityMunicipality: p.cityMunicipality, province: p.province }),
               _facilitator: '-',
             })),
@@ -884,8 +929,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
             // branches above already handle every non-empty value, so reaching
             // this point means programType is '' (All Programs).
             // Period filter on the project/intervention's own date field -- DILP
-            // has no start date (only a release date), so it filters on that instead.
-            .filter(p => inSelectedPeriod(p._date))
+            // has no start date (its release date is optional), so it filters on the day
+            // the project was entered instead.
+            .filter(p => inSelectedPeriod(p._date) && matchesListStatus(p.status))
             .map((p, i) => ({
               'No.': i + 1,
               'Project/Intervention Name': p._name || '-',
@@ -1403,6 +1449,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       gipReportType,
       spesReportType,
       livelihoodReportType,
+      listStatusFilter,
       skillsReportType,
       period: reportPeriod,
       periodDetails: getPeriodDetails(),
@@ -1772,11 +1819,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
           [`${String(generatedReport.categoryName).toUpperCase()} ACTIVITY LIST SUMMARY`], [],
           ...(cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
           ['Report Period', generatedReport.periodDetails],
-          ['Program Type', generatedReport.programType || cdspPrograms.join(', ')], [],
+          ['Program Type', generatedReport.programType || cdspPrograms.join(', ')],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Activities', totalActivities],
           ['Total Participants', totalParticipants], [],
-          ['ACTIVITIES BY STATUS'], ['Status', 'Activities'],
-          ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['ACTIVITIES BY STATUS'], ['Status', 'Activities'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['ACTIVITIES BY SERVICE TYPE'], ['Service Type', 'Activities'],
           ...Object.entries(serviceCounts).map(([k, v]) => [k, v]),
         ]
@@ -1840,11 +1887,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
         const aoa: any[][] = [
           [`${String(generatedReport.categoryName).toUpperCase()} BATCH LIST SUMMARY`], [],
-          ['Report Period', generatedReport.periodDetails], [],
+          ['Report Period', generatedReport.periodDetails],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Batches', totalBatches],
           ['Total Participants', totalParticipants], [],
-          ['BATCHES BY STATUS'], ['Status', 'Batches'],
-          ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['BATCHES BY STATUS'], ['Status', 'Batches'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['BATCHES BY EMPLOYER'], ['Employer', 'Batches'],
           ...Object.entries(employerCounts).map(([k, v]) => [k, v]),
         ]
@@ -1888,12 +1935,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const aoa: any[][] = [
           [`${String(generatedReport.categoryName).toUpperCase()} ${unit.singular.toUpperCase()} LIST SUMMARY`], [],
           ['Report Period', generatedReport.periodDetails],
-          ['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')], [],
+          ['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')],
+          ['Status', generatedReport.listStatusFilter], [],
           [`Total ${unit.plural}`, totalProjects],
           ['Total Beneficiaries Assigned', totalBeneficiaries], [],
-          [byStatusLabel], ['Status', 'Count'],
-          ...Object.entries(statusCounts).map(([k, v]) => [k, v]),
-          ...(showProgramBreakdown ? [[], [byProgramLabel], ['Program Type', 'Count'], ...Object.entries(programCounts).map(([k, v]) => [k, v])] : []),
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [[byStatusLabel], ['Status', 'Count'], ...Object.entries(statusCounts).map(([k, v]) => [k, v])] : []),
+          ...(showProgramBreakdown ? [...(coversAllStatuses(generatedReport.listStatusFilter) ? [[]] : []), [byProgramLabel], ['Program Type', 'Count'], ...Object.entries(programCounts).map(([k, v]) => [k, v])] : []),
         ]
         const ws = wb.addWorksheet('Summary')
         aoa.forEach(r => ws.addRow(r))
@@ -1924,11 +1971,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
         const aoa: any[][] = [
           [`${String(generatedReport.categoryName).toUpperCase()} TRAINING LIST SUMMARY`], [],
-          ['Report Period', generatedReport.periodDetails], [],
+          ['Report Period', generatedReport.periodDetails],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Trainings', totalTrainings],
           ['Total Participants', totalParticipants], [],
-          ['TRAININGS BY STATUS'], ['Status', 'Trainings'],
-          ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['TRAININGS BY STATUS'], ['Status', 'Trainings'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['TRAININGS BY TRAINING BATCH'], ['Training Batch', 'Trainings'],
           ...Object.entries(batchCounts).map(([k, v]) => [k, v]),
         ]
@@ -2076,10 +2123,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
           [`${String(generatedReport.categoryName).toUpperCase()} ACTIVITY LIST SUMMARY`], [],
           ...(cdspProgramInfo ? [['Program', reportDisplayTitle('cdsp')]] : []),
           // Word's masthead already shows "Report Period: X" above this Summary.
-          ['Program Type', generatedReport.programType || cdspPrograms.join(', ')], [],
+          ['Program Type', generatedReport.programType || cdspPrograms.join(', ')],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Activities', rows.length],
           ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
-          ['ACTIVITIES BY STATUS'], ['Status', 'Activities'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['ACTIVITIES BY STATUS'], ['Status', 'Activities'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['ACTIVITIES BY SERVICE TYPE'], ['Service Type', 'Activities'], ...Object.entries(serviceCounts).map(([k, v]) => [k, v]),
         ]
       } else if (isGipBatches) {
@@ -2103,9 +2151,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
         summaryAoa = [
           [`${String(generatedReport.categoryName).toUpperCase()} BATCH LIST SUMMARY`], [],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Batches', rows.length],
           ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
-          ['BATCHES BY STATUS'], ['Status', 'Batches'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['BATCHES BY STATUS'], ['Status', 'Batches'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['BATCHES BY EMPLOYER'], ['Employer', 'Batches'], ...Object.entries(employerCounts).map(([k, v]) => [k, v]),
         ]
       } else if (isLivelihoodProjects) {
@@ -2119,11 +2168,12 @@ export default function ReportView({ onBack }: ReportViewProps) {
         if (showProgramBreakdown) rows.forEach(r => { programCounts[r['Program Type'] || 'Unspecified'] = (programCounts[r['Program Type'] || 'Unspecified'] || 0) + 1 })
         summaryAoa = [
           [`${String(generatedReport.categoryName).toUpperCase()} ${unit.singular.toUpperCase()} LIST SUMMARY`], [],
-          ['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')], [],
+          ['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')],
+          ['Status', generatedReport.listStatusFilter], [],
           [`Total ${unit.plural}`, rows.length],
           ['Total Beneficiaries Assigned', rows.reduce((s, r) => s + (Number(r['Beneficiaries Assigned']) || 0), 0)], [],
-          [`${unit.plural.toUpperCase()} BY STATUS`], ['Status', 'Count'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]),
-          ...(showProgramBreakdown ? [[], [`${unit.plural.toUpperCase()} BY PROGRAM TYPE`], ['Program Type', 'Count'], ...Object.entries(programCounts).map(([k, v]) => [k, v])] : []),
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [[`${unit.plural.toUpperCase()} BY STATUS`], ['Status', 'Count'], ...Object.entries(statusCounts).map(([k, v]) => [k, v])] : []),
+          ...(showProgramBreakdown ? [...(coversAllStatuses(generatedReport.listStatusFilter) ? [[]] : []), [`${unit.plural.toUpperCase()} BY PROGRAM TYPE`], ['Program Type', 'Count'], ...Object.entries(programCounts).map(([k, v]) => [k, v])] : []),
         ]
       } else if (isSkillsActivities) {
         const rows = generatedReport.data as any[]
@@ -2136,9 +2186,10 @@ export default function ReportView({ onBack }: ReportViewProps) {
         })
         summaryAoa = [
           [`${String(generatedReport.categoryName).toUpperCase()} TRAINING LIST SUMMARY`], [],
+          ['Status', generatedReport.listStatusFilter], [],
           ['Total Trainings', rows.length],
           ['Total Participants', rows.reduce((s, r) => s + (Number(r['Participants']) || 0), 0)], [],
-          ['TRAININGS BY STATUS'], ['Status', 'Trainings'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), [],
+          ...(coversAllStatuses(generatedReport.listStatusFilter) ? [['TRAININGS BY STATUS'], ['Status', 'Trainings'], ...Object.entries(statusCounts).map(([k, v]) => [k, v]), []] : []),
           ['TRAININGS BY TRAINING BATCH'], ['Training Batch', 'Trainings'], ...Object.entries(batchCounts).map(([k, v]) => [k, v]),
         ]
       }
@@ -2455,6 +2506,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         if (isCdsp && cdspProgramInfo) infoRows.push(['Program', reportDisplayTitle('cdsp')])
         if (isCdsp) infoRows.push(['Program Type', generatedReport.programType || cdspPrograms.join(', ')])
         else if (isLivelihoodProjects) infoRows.push(['Program Type', generatedReport.programType || livelihoodPrograms.join(', ')])
+        if (!isGip) infoRows.push(['Status', generatedReport.listStatusFilter])
         if (infoRows.length > 0) y = drawSummaryTable(infoRows, y)
 
         const totalsLabel = isLivelihoodProjects ? 'Beneficiaries' : isGip ? 'Interns' : 'Participants'
@@ -2462,7 +2514,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
         // Workplaces have no status of their own (see the Excel/Word summary
         // above) -- skip this breakdown for GIP.
-        if (!isGip) {
+        // (and with a single Status picked it would only be zeros plus that one status).
+        if (!isGip && coversAllStatuses(generatedReport.listStatusFilter)) {
           y += 4
           doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
           doc.text(`${unitPlural.toUpperCase()} BY STATUS`, 14, y); y += 3
@@ -2652,7 +2705,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const interns = gipApplicants
       // Withdrawn interns keep their workplace link for history but are no
       // longer interning there, so they're left off the roster.
-      .filter(a => a.assignedWorkplaceId === workplaceId && a.status !== 'Withdrawn')
+      // Same rule as the Interns count in the Workplace/Office List: only those at this workplace during the report period.
+      .filter(a => a.assignedWorkplaceId === workplaceId && a.status !== 'Withdrawn' && internAtWorkplaceInPeriod(a))
       .map((a, i) => [
         i + 1,
         `${a.lastName}, ${a.firstName}${a.middleName ? ' ' + a.middleName : ''}`.trim(),
@@ -2662,12 +2716,14 @@ export default function ReportView({ onBack }: ReportViewProps) {
         a.schoolName || '-',
         a.course || '-',
         a.highestEducation || '-',
+        dateOnly(a.assignmentHistory[0]?.assignedDate),
+        dateOnly(a.assignmentHistory[0]?.completedDate),
       ])
     if (interns.length === 0) {
-      setInfoModal({ isOpen: true, title: 'No Interns', message: 'This workplace/office has no interns assigned yet.' })
+      setInfoModal({ isOpen: true, title: 'No Interns', message: 'This workplace/office has no interns in this report period.' })
       return
     }
-    const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'School Name', 'Course', 'Highest Education']
+    const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'School Name', 'Course', 'Highest Education', 'Date Assigned', 'Date Completed']
     const infoLines: { label: string; value: string | number }[][] = [
       [{ label: 'Assigned Office: ', value: workplace.workplaceName || '-' }, { label: '     Workplace/Office Address: ', value: workplace.deploymentLocation || '-' }],
       [{ label: 'Supervisor: ', value: workplace.supervisor || '-' }],
@@ -2697,7 +2753,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const ws = wb.addWorksheet('Interns')
     const THIN = { style: 'thin' as const, color: { argb: 'FFD9D9D9' } }
     const BORDERS = { top: THIN, left: THIN, bottom: THIN, right: THIN }
-    const lastCol = String.fromCharCode(64 + headerLabels.length) // 8 cols -> 'H'
+    const lastCol = String.fromCharCode(64 + headerLabels.length) // 10 cols -> 'J'
 
     const titleRow = ws.addRow(['GIP INTERN LIST'])
     titleRow.font = { bold: true, size: 14 }
@@ -2947,6 +3003,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       beneficiaries = dilpApplicants.filter(a => a.assignedProjectId === projectId)
       infoLines = [
         [{ label: 'Project: ', value: project.projectName || '-' }],
+        [{ label: 'Barangay: ', value: project.barangay || '-' }],
         [{ label: 'Type of Project: ', value: project.typeOfProject || '-' }, { label: '     Program Component: ', value: project.programComponent || '-' }],
         [{ label: 'Assistance Amount: ', value: formatCurrency(project.assistanceAmount) }, { label: '     Release Date: ', value: project.dateReleased || '-' }],
         [{ label: 'Total Beneficiaries: ', value: beneficiaries.length }],
@@ -3285,6 +3342,20 @@ export default function ReportView({ onBack }: ReportViewProps) {
                   className="appearance-none w-full pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
                   <option value="">All Programs</option>
                   {cdspPrograms.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              </div>
+            </div>
+          )}
+
+          {getStatusFilterOptions() && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <div className="relative">
+                <select value={listStatusFilter} onChange={e => setListStatusFilter(e.target.value)}
+                  className="appearance-none w-full pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
+                  <option value="All">All</option>
+                  {getStatusFilterOptions()?.map(st => <option key={st} value={st}>{st}</option>)}
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
               </div>

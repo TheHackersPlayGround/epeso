@@ -24,7 +24,7 @@ interface AssignedItemModalProps {
   title: string
   personName: string
   /** Bold title of the project / activity / intervention. */
-  itemName: string
+  itemName: ReactNode
   /** Small gray line under the title (e.g. a project ID or category). */
   subtitle?: string
   status?: string

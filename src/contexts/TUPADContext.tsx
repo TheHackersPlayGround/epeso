@@ -37,6 +37,8 @@ export interface TUPADApplicant {
   streetPurok: string
   barangay: string
   barangayId: number
+  cityId?: number // set by the server on loaded rows (used by the Address filter)
+  provinceId?: number
   cityMunicipality: string
   province: string
   region: string

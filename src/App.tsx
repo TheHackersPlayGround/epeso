@@ -282,6 +282,8 @@ export default function App() {
   const [sessionEnded, setSessionEnded] = useState(false)
   // An administrator deactivated this account while it was in use.
   const [accountDeactivated, setAccountDeactivated] = useState(false)
+  // An administrator deleted this account while it was in use.
+  const [accountDeleted, setAccountDeleted] = useState(false)
   // This tab's own last-known permissions. Compared against instead of the
   // shared localStorage copy, which another tab may already have refreshed,
   // so every open tab gets its own notice.
@@ -318,14 +320,19 @@ export default function App() {
   // value back (the cached copy stays in effect) until the user acknowledges
   // it in PermissionChangeModal, rather than their buttons shifting under
   // them with no explanation mid-task.
-  // Any request that discovers the account was deactivated raises this event
-  // (see services/axiosClient.ts) -- covers both the background check and a
-  // click on something that was then refused.
+  // Any request that discovers the account was deactivated or deleted raises
+  // one of these events (see services/axiosClient.ts) -- covers both the
+  // background check and a click on something that was then refused.
   useEffect(() => {
     if (!isLoggedIn) return
     const onDeactivated = () => setAccountDeactivated(true)
+    const onDeleted = () => setAccountDeleted(true)
     window.addEventListener('peso:deactivated', onDeactivated)
-    return () => window.removeEventListener('peso:deactivated', onDeactivated)
+    window.addEventListener('peso:deleted', onDeleted)
+    return () => {
+      window.removeEventListener('peso:deactivated', onDeactivated)
+      window.removeEventListener('peso:deleted', onDeleted)
+    }
   }, [isLoggedIn])
 
   // A new login (or logging out) starts from a fresh baseline. Declared BEFORE
@@ -361,7 +368,7 @@ export default function App() {
         .catch((err: Error & { status?: number }) => {
           if (cancelled) return
           const code = (err as Error & { detail?: { code?: string } }).detail?.code
-          if (err.status === 401 && code === 'ACCOUNT_DEACTIVATED') return // handled by the peso:deactivated event
+          if (err.status === 401 && (code === 'ACCOUNT_DEACTIVATED' || code === 'ACCOUNT_DELETED')) return // handled by the peso:deactivated/peso:deleted event
           if (err.status === 401) {
             // Signed out elsewhere or the session expired -- say so instead of
             // leaving the user working on a session that no longer exists.
@@ -501,6 +508,20 @@ export default function App() {
         confirmText="OK"
         onConfirm={() => {
           setAccountDeactivated(false)
+          try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
+          clearAllDrafts()
+          setNeedsSetup(false)
+          setIsLoggedIn(false)
+        }}
+        onCancel={() => { /* must sign in again */ }}
+      />
+      <ConfirmModal
+        isOpen={accountDeleted} type="error"
+        title="Account Deleted"
+        message={'Your account has been deleted by an administrator. You have been signed out. Please contact an administrator if you think this is a mistake.'}
+        confirmText="OK"
+        onConfirm={() => {
+          setAccountDeleted(false)
           try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
           clearAllDrafts()
           setNeedsSetup(false)

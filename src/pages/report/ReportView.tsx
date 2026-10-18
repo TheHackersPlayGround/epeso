@@ -385,10 +385,9 @@ export default function ReportView({ onBack }: ReportViewProps) {
     'Description', 'Date / Start Date', 'Location', 'Facilitator / Officer', 'Assistance Amount', 'Release Date',
     'Beneficiaries Assigned', 'Status']
   // Skills Training Activity List columns — one row per training session, not
-  // per participant. "Training Batch" is the batch the training belongs to
-  // (SkillsTrainingActivity.service, shown as the training's subtitle/category
-  // everywhere else in the app) — there's no separate Counselor/Duration field
-  // the way CDSP's sessions have.
+  // per participant. "Training Batch" is the batch name typed directly on the
+  // training (SkillsTrainingActivity.batchName) — there's no separate
+  // Counselor/Duration field the way CDSP's sessions have.
   // Present/Absent only populate once a training is Completed -- attended is
   // still mostly unset for a Planned/Ongoing training (see generateData below).
   const SKILLS_TRAINING_ACTIVITY_COLUMNS = ['Training Title', 'Training Batch', 'Date', 'Venue', 'Facilitator', 'Participants', 'Present', 'Absent', 'Status']
@@ -779,7 +778,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             .filter(act => inSelectedPeriod(act.date) && matchesListStatus(act.status))
             .map(act => ({
               'Training Title': act.title || '-',
-              'Training Batch': act.service || '-',
+              'Training Batch': act.batchName || '-',
               'Date': act.date || '-',
               'Venue': act.location || '-',
               'Facilitator': act.facilitator || '-',
@@ -3120,7 +3119,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const headerLabels = ['No.', 'Participant Name', 'Sex', 'Age', 'Contact Number', 'Civil Status', 'Attendance']
     const infoLines: { label: string; value: string | number }[][] = [
       [{ label: 'Training: ', value: activity.title || '-' }],
-      [{ label: 'Training Batch: ', value: activity.service || '-' }],
+      [{ label: 'Training Batch: ', value: activity.batchName || '-' }],
       [{ label: 'Date: ', value: activity.date || '-' }, { label: '     Venue: ', value: activity.location || '-' }],
       [{ label: 'Facilitator: ', value: activity.facilitator || '-' }],
       [{ label: 'Total Participants: ', value: participants.length }],

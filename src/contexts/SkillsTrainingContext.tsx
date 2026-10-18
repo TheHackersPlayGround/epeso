@@ -48,18 +48,9 @@ export interface SkillsTrainingProfile {
   attachedDocuments: SkillsTrainingSavedDocument[]
 }
 
-export interface SkillsTrainingBatch {
-  id: number
-  batchName: string
-  description: string
-  isActive: boolean
-  trainingCount: number
-}
-
 export interface SkillsTrainingActivity {
   id: number
-  batchId: number
-  service: string
+  batchName: string
   program: string
   title: string
   description: string
@@ -82,15 +73,12 @@ export interface SkillsTrainingLookup {
 
 interface SkillsTrainingContextValue {
   profiles: SkillsTrainingProfile[]
-  batches: SkillsTrainingBatch[]
   activities: SkillsTrainingActivity[]
   qualifications: SkillsTrainingLookup[]
   purposes: SkillsTrainingLookup[]
   loading: boolean
-  loadingBatches: boolean
   loadingActivities: boolean
   refreshProfiles: () => Promise<void>
-  refreshBatches: () => Promise<void>
   refreshActivities: () => Promise<void>
   refreshLookups: () => Promise<void>
   refreshIfStale: () => Promise<void>
@@ -100,12 +88,10 @@ const SkillsTrainingContext = createContext<SkillsTrainingContextValue | null>(n
 
 export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<SkillsTrainingProfile[]>([])
-  const [batches, setBatches] = useState<SkillsTrainingBatch[]>([])
   const [activities, setActivities] = useState<SkillsTrainingActivity[]>([])
   const [qualifications, setQualifications] = useState<SkillsTrainingLookup[]>([])
   const [purposes, setPurposes] = useState<SkillsTrainingLookup[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingBatches, setLoadingBatches] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
   const refreshProfiles = useCallback(async (silent = false) => {
@@ -117,18 +103,6 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
       // silent — show empty list rather than crashing
     } finally {
       if (!silent) setLoading(false)
-    }
-  }, [])
-
-  const refreshBatches = useCallback(async (silent = false) => {
-    if (!silent) setLoadingBatches(true)
-    try {
-      const res = await skillsTrainingService.listBatches()
-      setBatches(res.data ?? [])
-    } catch {
-      // silent
-    } finally {
-      if (!silent) setLoadingBatches(false)
     }
   }, [])
 
@@ -165,22 +139,21 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
-    await Promise.all([refreshProfiles(true), refreshBatches(true), refreshActivities(true), refreshLookups()])
-  }, [refreshProfiles, refreshBatches, refreshActivities, refreshLookups])
+    await Promise.all([refreshProfiles(true), refreshActivities(true), refreshLookups()])
+  }, [refreshProfiles, refreshActivities, refreshLookups])
 
   useEffect(() => {
     lastLoad.current = Date.now()
     refreshProfiles()
-    refreshBatches()
     refreshActivities()
     refreshLookups()
-  }, [refreshProfiles, refreshBatches, refreshActivities, refreshLookups])
+  }, [refreshProfiles, refreshActivities, refreshLookups])
 
   return (
     <SkillsTrainingContext.Provider value={{
-      profiles, batches, activities, qualifications, purposes,
-      loading, loadingBatches, loadingActivities,
-      refreshProfiles, refreshBatches, refreshActivities, refreshLookups,
+      profiles, activities, qualifications, purposes,
+      loading, loadingActivities,
+      refreshProfiles, refreshActivities, refreshLookups,
       refreshIfStale,
     }}>
       {children}

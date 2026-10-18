@@ -48,10 +48,15 @@ axiosClient.interceptors.response.use(
     // A refused action may mean the user's access just changed: let the app
     // re-check their permissions straight away (see App.tsx).
     if (error.response?.status === 403) window.dispatchEvent(new Event('peso:forbidden'))
-    // The account was deactivated (or removed) while signed in -- whichever request
-    // hit it first, tell the app so it can explain and sign the user out.
-    if (error.response?.status === 401 && error.response?.data?.detail?.code === 'ACCOUNT_DEACTIVATED') {
+    // The account was deactivated or deleted while signed in -- whichever request
+    // hit it first, tell the app so it can explain (with the right wording for
+    // which one happened) and sign the user out.
+    const authCode = error.response?.data?.detail?.code
+    if (error.response?.status === 401 && authCode === 'ACCOUNT_DEACTIVATED') {
       window.dispatchEvent(new Event('peso:deactivated'))
+    }
+    if (error.response?.status === 401 && authCode === 'ACCOUNT_DELETED') {
+      window.dispatchEvent(new Event('peso:deleted'))
     }
     return Promise.reject(wrapped)
   },

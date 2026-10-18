@@ -18,7 +18,7 @@ export type RecycleRecordType =
   | 'tupadApplicant' | 'tupadProject'
   | 'slpApplicant' | 'slpProject'
   | 'clpepApplicant' | 'clpepIntervention'
-  | 'skillsTrainingApplicant' | 'skillsTrainingBatch' | 'skillsTrainingActivity'
+  | 'skillsTrainingApplicant' | 'skillsTrainingActivity'
   | 'ofwProfile'
   | 'documentsFolder' | 'documentsDocument'
 
@@ -41,7 +41,7 @@ function endpointsFor(recordType: RecycleRecordType) {
   if (recordType === 'tupadApplicant' || recordType === 'tupadProject') return ENDPOINTS.tupad
   if (recordType === 'slpApplicant' || recordType === 'slpProject') return ENDPOINTS.slp
   if (recordType === 'clpepApplicant' || recordType === 'clpepIntervention') return ENDPOINTS.clpep
-  if (recordType === 'skillsTrainingApplicant' || recordType === 'skillsTrainingBatch' || recordType === 'skillsTrainingActivity') return ENDPOINTS.skillsTraining
+  if (recordType === 'skillsTrainingApplicant' || recordType === 'skillsTrainingActivity') return ENDPOINTS.skillsTraining
   if (recordType === 'ofwProfile') return ENDPOINTS.ofw
   if (recordType === 'documentsFolder' || recordType === 'documentsDocument') return ENDPOINTS.documents
   return ENDPOINTS.employment

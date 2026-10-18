@@ -266,7 +266,7 @@ function UpdateProfileStatusModal({ profile, onClose, onSave }: UpdateProfileSta
 }
 
 export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) {
-  const { profiles, activities, batches, qualifications, purposes, loading, refreshProfiles, refreshActivities, refreshIfStale } = useSkillsTraining()
+  const { profiles, activities, qualifications, purposes, loading, refreshProfiles, refreshActivities, refreshIfStale } = useSkillsTraining()
   useRefreshOnReturn(refreshIfStale)
   const plannedTrainings = activities.filter(t => t.status === 'Planned')
 
@@ -326,7 +326,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     { id: 'desiredQualification', label: 'Desired Qualification', options: [...qualificationOptions, 'Others'] },
     { id: 'purposeOfTraining',   label: 'Purpose of Training',  options: [...purposeOptions, 'Others'] },
     { id: 'status',              label: 'Status',               options: ['Accepted', 'Waitlisted'] },
-    { id: 'batch',               label: 'Training Batch',       options: batches.map(b => b.batchName) },
+    { id: 'batch',               label: 'Training Batch',       options: Array.from(new Set(activities.map(a => a.batchName).filter(Boolean))) },
     { id: 'sex',                 label: 'Sex',                  options: ['Male', 'Female'] },
     { id: 'age',                 label: 'Age',                  options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',         label: 'Civil Status',         options: CIVIL_STATUS_OPTIONS },
@@ -353,7 +353,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const batchNameForProfile = (p: SkillsTrainingProfile): string => {
     if (!p.assignedTrainingId) return ''
     const activity = activities.find(a => a.id === p.assignedTrainingId)
-    return activity?.service ?? ''
+    return activity?.batchName ?? ''
   }
 
   // null for anyone already Placed, or who has never genuinely completed a
@@ -714,7 +714,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                               <p className="text-sm font-medium text-gray-800">{training.title}</p>
                               {isAssigned && <span className="text-xs px-2 py-0.5 bg-blue-100 text-brand-blue rounded-full">Currently assigned</span>}
                             </div>
-                            <p className="text-xs text-gray-400 mt-0.5">{training.service}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{training.batchName}</p>
                             <p className="text-xs text-gray-500 mt-1">{training.location}{training.date ? ` · ${training.date}` : ''}</p>
                             {noSlots && <p className="text-xs text-red-500 mt-1">No participant slots set for this training yet — set a slot count in Maintenance first.</p>}
                           </div>
@@ -747,7 +747,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-gray-800">{selectedTraining.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{selectedTraining.service}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{selectedTraining.batchName}</p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${trainingStatusBadge(selectedTraining.status)}`}>
                         {selectedTraining.status}

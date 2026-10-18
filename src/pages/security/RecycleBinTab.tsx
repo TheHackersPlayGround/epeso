@@ -51,7 +51,7 @@ const binModules  = [
   'TUPAD Beneficiaries', 'TUPAD Projects',
   'SLP Beneficiaries', 'SLP Projects',
   'CLPEP Beneficiaries', 'CLPEP Interventions',
-  'Skills Training Applicants', 'Skills Training Batches', 'Skills Training Activities',
+  'Skills Training Applicants', 'Skills Training Activities',
   'OFW Profiles',
   'Document Folders', 'Document Files',
 ]
@@ -78,7 +78,6 @@ const BIN_MODULE_BADGE: Record<string, string> = {
   'CLPEP Beneficiaries': 'bg-rose-50 text-rose-700',
   'CLPEP Interventions': 'bg-rose-50 text-rose-700',
   'Skills Training Applicants': 'bg-lime-50 text-lime-700',
-  'Skills Training Batches': 'bg-lime-50 text-lime-700',
   'Skills Training Activities': 'bg-lime-50 text-lime-700',
   'OFW Profiles': 'bg-fuchsia-50 text-fuchsia-700',
   'Document Folders': 'bg-yellow-50 text-yellow-700',
@@ -102,7 +101,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
   const { refreshProfiles: refreshTupadProfiles, refreshProjects: refreshTupadProjects } = useTUPAD()
   const { refreshProfiles: refreshSlpProfiles, refreshProjects: refreshSlpProjects } = useSLP()
   const { refreshProfiles: refreshClpepProfiles, refreshInterventions: refreshClpepInterventions } = useCLPEP()
-  const { refreshProfiles: refreshSkillsTrainingProfiles, refreshBatches: refreshSkillsTrainingBatches, refreshActivities: refreshSkillsTrainingActivities } = useSkillsTraining()
+  const { refreshProfiles: refreshSkillsTrainingProfiles, refreshActivities: refreshSkillsTrainingActivities } = useSkillsTraining()
   const { refreshProfiles: refreshOfwProfiles } = useOFW()
   const { refreshFolders: refreshDocumentsFolders, refreshDocuments: refreshDocumentsDocuments } = useDocuments()
   const { refreshAll: refreshEmploymentAll } = useEmployment()
@@ -183,7 +182,6 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     if (recordType === 'clpepApplicant') await refreshClpepProfiles()
     if (recordType === 'clpepIntervention') await refreshClpepInterventions()
     if (recordType === 'skillsTrainingApplicant') await refreshSkillsTrainingProfiles()
-    if (recordType === 'skillsTrainingBatch') await refreshSkillsTrainingBatches()
     if (recordType === 'skillsTrainingActivity') await refreshSkillsTrainingActivities()
     if (recordType === 'ofwProfile') await refreshOfwProfiles()
     if (recordType === 'documentsFolder') await refreshDocumentsFolders()

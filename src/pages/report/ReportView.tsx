@@ -482,7 +482,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       'employment-facilitation': ['Applicant Name', 'Employer', 'Job Title', 'Referral Status', 'Placement Status', 'Employment Type', 'Date Referred', 'Date Hired'],
       'ofw-services': ['No.', 'OFW Name', 'Sex', 'Civil Status', 'Contact Number', 'Email', 'Address', 'Barangay',
                         'Type of Request', 'Employment Status', 'Desired Position', 'Type of Skill', 'Agencies',
-                        'Date Filed', 'Status', 'Remarks'],
+                        'Date Filed', 'Status'],
       'cdsp': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Highest Education',
                'Employment Status', 'School', 'Course / Program', 'Strand', 'Current Occupation', 'Civil Status',
                'Date Applied', 'Contact Number', 'Barangay', 'Address', 'Status', 'Remarks'],
@@ -1004,7 +1004,6 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Agencies': p.agencies?.length ? p.agencies.join(', ') : '-',
             'Date Filed': p.dateFiled,
             'Status': p.status,
-            'Remarks': p.remarks || '-',
           }))
 
       // 'general-peso' is handled entirely by handleGenerateGeneralPesoReport()

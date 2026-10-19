@@ -360,7 +360,6 @@ export default function OFWView({ onBack }: OFWViewProps) {
         'Employment Status': p.employmentStatus,
         'Type of Request': p.typeOfRequest.join(', '),
         'Status': p.status,
-        'Remarks': p.remarks,
       }))
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()

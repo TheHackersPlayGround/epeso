@@ -381,13 +381,6 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 </div>
               </div>
 
-              {profile.remarks && (
-                <>
-                  <hr className="border-gray-100" />
-                  <Field label="Remarks" value={profile.remarks} />
-                </>
-              )}
-
               {/* PESO Office Only */}
               <hr className="border-gray-100" />
               <div>
@@ -681,12 +674,6 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Remarks */}
-              <div>
-                <label className={lbl}>Remarks</label>
-                <textarea className={inp + ' resize-none'} rows={3} placeholder="Additional notes or remarks..." value={form.remarks} onChange={e => set({ remarks: e.target.value })} />
               </div>
 
               {/* PESO Office Only */}

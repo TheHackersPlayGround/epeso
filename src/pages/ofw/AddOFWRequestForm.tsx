@@ -53,7 +53,6 @@ const emptyOFWForm: Omit<OFWProfile, 'id'> = {
   employmentStatus: '',
   typeOfRequest: [],
   status: 'Pending',
-  remarks: '',
   desiredPosition: '', typeOfSkill: '', agencies: [],
   inquirySpecify: '', otherProgramSpecify: '',
   owwaWelfareFile: null,

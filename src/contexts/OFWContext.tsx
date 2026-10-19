@@ -36,7 +36,6 @@ export interface OFWProfile {
   employmentStatus: string
   typeOfRequest: string[]
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected'
-  remarks: string
   // Employment referral sub-panel
   desiredPosition?: string
   typeOfSkill?: string

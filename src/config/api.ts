@@ -33,6 +33,7 @@ export const ENDPOINTS = {
     updateApplicant: '/employment/updateApplicant',
     deleteApplicant: '/employment/deleteApplicant',
     listEmployers: '/employment/listEmployers',
+    listIndustries: '/employment/listIndustries',
     createEmployer: '/employment/createEmployer',
     importEmployersBulk: '/employment/importEmployersBulk',
     updateEmployer: '/employment/updateEmployer',

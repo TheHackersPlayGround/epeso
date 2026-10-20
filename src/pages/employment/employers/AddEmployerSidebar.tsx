@@ -7,6 +7,7 @@ import ApplicantReviewModal from '../shared/ApplicantReviewModal';
 import ConfirmModal from '../../shared/ConfirmModal';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 import { useFormDraft } from '../../../hooks/useFormDraft';
+import { useEmployment } from '../../../contexts/EmploymentContext';
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
 import { todayIso } from '../../../utils/formatDate';
 
@@ -14,9 +15,7 @@ interface EmployerFormData {
   companyName: string;
   industry: string;
   industryOther: string;
-  companySize: string;
   businessType: string;
-  yearsInOperation: string;
   tinNumber: string;
   contactPersonName: string;
   position: string;
@@ -51,9 +50,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     companyName: '',
     industry: '',
     industryOther: '',
-    companySize: '',
     businessType: '',
-    yearsInOperation: '',
     tinNumber: '',
     contactPersonName: '',
     position: '',
@@ -72,6 +69,8 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
     dateRegistered: new Date().toISOString().split('T')[0],
     remarks: '',
   });
+
+  const { industryOptions } = useEmployment();
 
   const draft = useFormDraft<EmployerFormData>({
     draftKey: 'employment-employer', mode: 'add', snapshot: formData, onRestore: setFormData, onClose,
@@ -110,12 +109,14 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
   const provinceWrapRef = useRef<HTMLDivElement>(null);
   const cityWrapRef = useRef<HTMLDivElement>(null);
   const barangayWrapRef = useRef<HTMLDivElement>(null);
+  const industryOtherRef = useRef<HTMLInputElement>(null);
 
   const SECTION_OF: Partial<Record<keyof EmployerFormData, Section>> = {
     companyName: 'companyInfo',
     tinNumber: 'companyInfo',
     contactPersonName: 'contactPerson',
     contactNumber: 'contactPerson',
+    industryOther: 'companyInfo',
     street: 'companyAddress',
     province: 'companyAddress',
     city: 'companyAddress',
@@ -143,6 +144,9 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
 
     if (inScope('companyName') && !formData.companyName.trim()) {
       errors.push({ field: 'companyName', message: 'Company Name is required.', focus: deferFocus(() => companyNameRef.current?.focus()) });
+    }
+    if (inScope('industryOther') && formData.industry === 'Other' && !formData.industryOther.trim()) {
+      errors.push({ field: 'industryOther', message: 'Please specify the industry.', focus: deferFocus(() => industryOtherRef.current?.focus()) });
     }
     if (inScope('tinNumber') && !formData.tinNumber.trim()) {
       errors.push({ field: 'tinNumber', message: 'TIN Number is required.', focus: deferFocus(() => tinNumberRef.current?.focus()) });
@@ -208,9 +212,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div><span className="font-semibold">Company Name:</span> {formData.companyName}</div>
           <div><span className="font-semibold">Industry:</span> {formData.industry === 'Other' ? `Other - ${formData.industryOther}` : formData.industry}</div>
-          <div><span className="font-semibold">Company Size:</span> {formData.companySize}</div>
           <div><span className="font-semibold">Business Type:</span> {formData.businessType}</div>
-          <div><span className="font-semibold">Years in Operation:</span> {formData.yearsInOperation}</div>
           <div><span className="font-semibold">TIN Number:</span> {formData.tinNumber}</div>
         </div>
       </div>
@@ -249,7 +251,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY INFORMATION</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+              <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Name <span className="text-red-500">*</span></label>
                 <input ref={companyNameRef} type="text" value={formData.companyName}
                   onChange={e => handleChange('companyName', e.target.value)}
@@ -262,30 +264,19 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                 <select value={formData.industry} onChange={e => handleChange('industry', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500">
                   <option value="">Select Industry</option>
-                  {['Manufacturing','Information Technology','Agriculture','Retail','Healthcare','Education','Construction','Hospitality','Transportation','Financial Services','Other'].map(o => <option key={o}>{o}</option>)}
+                  {[...industryOptions.standard, 'Other'].map(o => <option key={o}>{o}</option>)}
                 </select>
               </div>
-              <div>
-                {formData.industry === 'Other' && (
-                  <>
-                    <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Please specify industry</label>
-                    <input type="text" value={formData.industryOther}
-                      onChange={e => handleChange('industryOther', e.target.value)}
-                      placeholder="e.g., Mining, Logistics..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
-                  </>
-                )}
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Size</label>
-                <select value={formData.companySize} onChange={e => handleChange('companySize', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500">
-                  <option value="">Select Size</option>
-                  <option value="Small (1-50 employees)">Small (1-50 employees)</option>
-                  <option value="Medium (51-200 employees)">Medium (51-200 employees)</option>
-                  <option value="Large (201+ employees)">Large (201+ employees)</option>
-                </select>
-              </div>
+              {formData.industry === 'Other' && (
+                <div className="col-span-2">
+                  <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Please specify industry</label>
+                  <input ref={industryOtherRef} type="text" value={formData.industryOther}
+                    onChange={e => handleChange('industryOther', e.target.value)}
+                    placeholder="e.g., Mining, Logistics..."
+                    className={inputCls('industryOther')} />
+                  <ErrMsg k="industryOther" />
+                </div>
+              )}
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Business Type</label>
                 <select value={formData.businessType} onChange={e => handleChange('businessType', e.target.value)}
@@ -298,13 +289,6 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
                 </select>
               </div>
               <div>
-                <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Years in Operation</label>
-                <input type="text" value={formData.yearsInOperation}
-                  onChange={e => handleChange('yearsInOperation', e.target.value)}
-                  placeholder="e.g., 5"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-gray-900 placeholder:text-gray-500" />
-              </div>
-              <div className="col-span-2">
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">TIN Number <span className="text-red-500">*</span></label>
                 <input ref={tinNumberRef} type="text" value={formData.tinNumber}
                   onChange={e => handleChange('tinNumber', e.target.value)}

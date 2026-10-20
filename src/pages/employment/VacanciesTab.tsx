@@ -10,11 +10,21 @@ import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 
 type FilterOption = { id: string; label: string; options: string[] }
 
-const AVAILABLE_FILTERS: FilterOption[] = [
-  { id: 'industry', label: 'Industry', options: ['Manufacturing', 'Information Technology', 'Agriculture', 'Retail', 'Healthcare', 'Education', 'Construction', 'Hospitality', 'Transportation', 'Financial Services', 'Government', 'Other'] },
+const BASE_FILTERS: FilterOption[] = [
+  { id: 'industry', label: 'Industry', options: [] }, // options come from the shared industry choices
   { id: 'jobType', label: 'Job Type', options: ['Full-time', 'Part-time', 'Contract'] },
   { id: 'status', label: 'Status', options: ['Open', 'Closed'] },
 ]
+
+// The filter list, with the Industry choices filled in from the shared list (standard industries
+// plus any custom ones employers use).
+function useAvailableFilters(): FilterOption[] {
+  const { industryOptions } = useEmployment()
+  return useMemo(
+    () => BASE_FILTERS.map((f) => (f.id === 'industry' ? { ...f, options: [...industryOptions.standard, ...industryOptions.custom] } : f)),
+    [industryOptions],
+  )
+}
 
 type EmployerOption = { id: number; companyName: string }
 
@@ -47,7 +57,8 @@ function VacanciesSearchBar({
   onExportExcel,
   isExporting,
 }: VacanciesSearchBarProps) {
-  const unselected = AVAILABLE_FILTERS.filter((f) => !activeFilters.includes(f.id))
+  const availableFilters = useAvailableFilters()
+  const unselected = availableFilters.filter((f) => !activeFilters.includes(f.id))
 
   return (
     <div className="flex flex-wrap gap-3">
@@ -130,12 +141,13 @@ function VacanciesFilterBadges({
   onFilterValueChange,
   onRemoveFilter,
 }: VacanciesFilterBadgesProps) {
+  const availableFilters = useAvailableFilters()
   if (activeFilters.length === 0) return null
 
   return (
     <div className="flex flex-wrap gap-2">
       {activeFilters.map((filterId) => {
-        const filter = AVAILABLE_FILTERS.find((f) => f.id === filterId)
+        const filter = availableFilters.find((f) => f.id === filterId)
         if (!filter) return null
         return (
           <div

@@ -9,6 +9,17 @@ export async function listEmployers(): Promise<Employer[]> {
   return res.data.data ?? []
 }
 
+// The industry choices for every dropdown and filter: the standard names (one list, kept on the
+// backend) plus any custom industries employers currently use.
+export type IndustryOptions = { standard: string[]; custom: string[] }
+
+export async function listIndustries(): Promise<IndustryOptions> {
+  const res = await axiosClient.get<{ status: string; data: IndustryOptions }>(
+    ENDPOINTS.employment.listIndustries,
+  )
+  return res.data.data ?? { standard: [], custom: [] }
+}
+
 export async function createEmployer(data: Omit<Employer, 'id'>): Promise<number> {
   const res = await axiosClient.post<{ status: string; data: { id: number } }>(
     ENDPOINTS.employment.createEmployer,

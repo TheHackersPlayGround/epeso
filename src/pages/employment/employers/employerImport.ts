@@ -30,14 +30,6 @@ export type ImportResult = {
 
 // ─── Enum option lists (must match the Add Employer form / backend enums) ─────
 
-const INDUSTRY_OPTIONS = [
-  "Manufacturing", "Information Technology", "Agriculture", "Retail",
-  "Healthcare", "Education", "Construction", "Hospitality",
-  "Transportation", "Financial Services", "Other",
-];
-const COMPANY_SIZE_OPTIONS = [
-  "Small (1-50 employees)", "Medium (51-200 employees)", "Large (201+ employees)",
-];
 const BUSINESS_TYPE_OPTIONS = [
   "Corporation", "Partnership", "Sole Proprietorship", "Cooperative",
 ];
@@ -69,11 +61,9 @@ const SECTIONS: Section[] = [
     optionalArgb: "FF9DC3E6",
     columns: [
       { header: "Company Name",        width: 28, example: "ABC Corporation",   required: true },
-      { header: "Industry",            width: 22, example: "Manufacturing",     options: INDUSTRY_OPTIONS },
+      { header: "Industry",            width: 22, example: "Manufacturing" },  // dropdown options are filled in when the template is built
       { header: "Industry (if Other)", width: 20, example: "" },
-      { header: "Company Size",        width: 26, example: "Small (1-50 employees)", options: COMPANY_SIZE_OPTIONS },
       { header: "Business Type",       width: 22, example: "Corporation",       options: BUSINESS_TYPE_OPTIONS },
-      { header: "Years in Operation",  width: 18, example: "5" },
       { header: "TIN Number",          width: 18, example: "123-456-789-000",   required: true },
     ],
   },
@@ -122,7 +112,15 @@ const VALIDATION_ROWS = 200;
 
 // ─── Template generation ──────────────────────────────────────────────────────
 
-export async function downloadImportTemplate(): Promise<void> {
+// standardIndustries: the industry names from the backend's single list (the dropdown in the
+// template offers these plus "Other"). Custom industries are not listed -- an Excel dropdown
+// is limited to ~255 characters.
+export async function downloadImportTemplate(standardIndustries: string[]): Promise<void> {
+  const sections: Section[] = SECTIONS.map((section) => ({
+    ...section,
+    columns: section.columns.map((c) =>
+      c.header === "Industry" ? { ...c, options: [...standardIndustries, "Other"] } : c),
+  }));
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Employers");
 
@@ -137,7 +135,7 @@ export async function downloadImportTemplate(): Promise<void> {
 
   // Row 1 — section label band
   let startCol = 1;
-  for (const section of SECTIONS) {
+  for (const section of sections) {
     const endCol = startCol + section.columns.length - 1;
     for (let c = startCol; c <= endCol; c++) {
       const cell = ws.getCell(1, c);
@@ -154,7 +152,7 @@ export async function downloadImportTemplate(): Promise<void> {
 
   // Row 2 — field headers colored per section (blue shades / yellow shades), black text
   let colIdx2 = 0;
-  for (const section of SECTIONS) {
+  for (const section of sections) {
     for (const col of section.columns) {
       const cell = ws.getCell(2, colIdx2 + 1);
       cell.value = col.required ? `${col.header} *` : col.header;
@@ -403,9 +401,7 @@ export async function importEmployers(
       companyName,
       industry:         get(row, "Industry"),
       industryOther:    get(row, "Industry (if Other)"),
-      companySize:      get(row, "Company Size"),
       businessType:     get(row, "Business Type"),
-      yearsInOperation: get(row, "Years in Operation"),
       tinNumber,
       contactPersonName,
       position:         get(row, "Position"),

@@ -5,9 +5,7 @@ interface EmployerFormData {
   companyName: string;
   industry: string;
   industryOther: string;
-  companySize: string;
   businessType: string;
-  yearsInOperation: string;
   tinNumber: string;
   contactPersonName: string;
   position: string;
@@ -57,16 +55,10 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY INFORMATION</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <ReadOnlyField label="Company Name" value={data.companyName} />
-              </div>
+              <ReadOnlyField label="Company Name" value={data.companyName} />
               <ReadOnlyField label="Industry" value={data.industry === 'Other' ? `Other - ${data.industryOther}` : data.industry} />
-              <ReadOnlyField label="Company Size" value={data.companySize} />
               <ReadOnlyField label="Business Type" value={data.businessType} />
-              <ReadOnlyField label="Years in Operation" value={data.yearsInOperation} />
-              <div className="col-span-2">
-                <ReadOnlyField label="TIN Number" value={data.tinNumber} />
-              </div>
+              <ReadOnlyField label="TIN Number" value={data.tinNumber} />
             </div>
           </div>
         );

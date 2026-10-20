@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { listApplicants } from '../services/applicantService'
 import { listVacancies } from '../services/vacancyService'
-import { listEmployers } from '../services/employerService'
+import { listEmployers, listIndustries, type IndustryOptions } from '../services/employerService'
 import { listReferrals } from '../services/referralService'
 import { listPlacements } from '../services/placementService'
 
@@ -34,11 +34,10 @@ export type Applicant = {
 export type Employer = {
   id: number
   companyName: string
-  industry: string
-  industryOther: string
-  companySize: string
+  industry: string        // the form's dropdown value ("Other" for a custom industry)
+  industryOther: string   // the typed name when industry is "Other"
+  industryName?: string   // the real industry name, for lists, filters and exports (from the server)
   businessType: string
-  yearsInOperation: string
   tinNumber: string
   contactPersonName: string
   position: string
@@ -125,6 +124,8 @@ interface EmploymentContextValue {
   applicants: Applicant[]
   vacancies: Vacancy[]
   employers: Employer[]
+  // Choices for the industry dropdowns and filters (standard names + custom ones in use).
+  industryOptions: IndustryOptions
   referrals: Referral[]
   placements: Placement[]
   // Optimistic local edits (e.g. dropping a referral the moment it's removed)
@@ -156,6 +157,7 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<Applicant[]>([])
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [employers, setEmployers] = useState<Employer[]>([])
+  const [industryOptions, setIndustryOptions] = useState<IndustryOptions>({ standard: [], custom: [] })
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [placements, setPlacements] = useState<Placement[]>([])
   const [loading, setLoading] = useState<Record<ListKey, boolean>>(allTrue)
@@ -195,7 +197,13 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
 
   const refreshApplicants = useCallback(() => load('applicants', listApplicants, setApplicants), [load])
   const refreshVacancies = useCallback(() => load('vacancies', listVacancies, setVacancies), [load])
-  const refreshEmployers = useCallback(() => load('employers', listEmployers, setEmployers), [load])
+  // Industries are reloaded with the employers: saving an employer can add a new custom industry.
+  const refreshIndustries = useCallback(async () => {
+    try { setIndustryOptions(await listIndustries()) } catch { /* keep the previous choices */ }
+  }, [])
+  const refreshEmployers = useCallback(async () => {
+    await Promise.all([load('employers', listEmployers, setEmployers), refreshIndustries()])
+  }, [load, refreshIndustries])
   const refreshReferrals = useCallback(() => load('referrals', listReferrals, setReferrals), [load])
   const refreshPlacements = useCallback(() => load('placements', listPlacements, setPlacements), [load])
 
@@ -239,7 +247,7 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
 
   return (
     <EmploymentContext.Provider value={{
-      applicants, vacancies, employers, referrals, placements,
+      applicants, vacancies, employers, industryOptions, referrals, placements,
       setReferrals: setReferralsOptimistic, setPlacements: setPlacementsOptimistic, setEmployers: setEmployersOptimistic,
       loading, loadFailed,
       refreshApplicants, refreshVacancies, refreshEmployers, refreshReferrals, refreshPlacements,

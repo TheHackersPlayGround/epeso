@@ -16,8 +16,6 @@ import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
 type FilterOption = { id: string; label: string; options: string[] }
 
 const STATIC_FILTERS: FilterOption[] = [
-  { id: 'industry', label: 'Industry', options: ['Manufacturing', 'Information Technology', 'Agriculture', 'Retail', 'Healthcare', 'Education', 'Construction', 'Hospitality', 'Transportation', 'Financial Services', 'Other'] },
-  { id: 'companySize', label: 'Company Size', options: ['Small (1-50 employees)', 'Medium (51-200 employees)', 'Large (201+ employees)'] },
   { id: 'businessType', label: 'Business Type', options: ['Corporation', 'Partnership', 'Sole Proprietorship', 'Cooperative'] },
   { id: 'status', label: 'Status', options: ['Active', 'Inactive'] },
 ]
@@ -100,7 +98,6 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
 
   const menuEmployer = employers.find(e => e.id === openMenuId) ?? null
 
-  const showCompanySize = activeFilters.includes('companySize')
   const showIndustry = activeFilters.includes('industry')
   const showBusinessType = activeFilters.includes('businessType')
   const showStatus = activeFilters.includes('status')
@@ -115,7 +112,6 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
               {showIndustry && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Industry</th>}
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Contact Person</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Email</th>
-              {showCompanySize && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Company Size</th>}
               {showBusinessType && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Business Type</th>}
               {showStatus && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Status</th>}
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Actions</th>
@@ -128,10 +124,9 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
               employers.map(employer => (
                 <tr key={employer.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{employer.companyName}</td>
-                  {showIndustry && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.industry}</td>}
+                  {showIndustry && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.industryName ?? employer.industry}</td>}
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.contactPersonName}</td>
                   <td className="px-4 py-3 text-gray-600">{employer.email}</td>
-                  {showCompanySize && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.companySize}</td>}
                   {showBusinessType && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.businessType}</td>}
                   {showStatus && (
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -356,6 +351,7 @@ function ImportResultView({ result }: { result: ImportResult }) {
 }
 
 function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const { industryOptions } = useEmployment()
   const [file, setFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
@@ -410,7 +406,7 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
           ) : (
             <>
               <div>
-                <button type="button" onClick={() => { void downloadImportTemplate() }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
+                <button type="button" onClick={() => { void downloadImportTemplate(industryOptions.standard) }} className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Download Template</button>
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
@@ -465,7 +461,7 @@ export default function EmployersTab() {
   // The list lives in EmploymentProvider (shared with the other tabs and
   // kept across visits to this module) -- see the refresh calls below for
   // how a change here reaches the tabs it can affect.
-  const { employers, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
+  const { employers, industryOptions, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
   const loading = listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
@@ -481,7 +477,14 @@ export default function EmployersTab() {
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
 
-  const availableFilters = STATIC_FILTERS
+  // Industry filter: the standard industries plus any custom ones employers use (e.g. "Mining").
+  const availableFilters = useMemo<FilterOption[]>(
+    () => [
+      { id: 'industry', label: 'Industry', options: [...industryOptions.standard, ...industryOptions.custom] },
+      ...STATIC_FILTERS,
+    ],
+    [industryOptions],
+  )
 
   // Same error this tab always showed when its own initial fetch failed --
   // the fetch itself now happens in the provider, which just reports it.
@@ -497,8 +500,7 @@ export default function EmployersTab() {
         const val = filterValues[filterId]
         if (!val) continue
         if (filterId === 'status' && e.status !== val) return false
-        if (filterId === 'industry' && e.industry !== val) return false
-        if (filterId === 'companySize' && e.companySize !== val) return false
+        if (filterId === 'industry' && (e.industryName ?? e.industry) !== val) return false
         if (filterId === 'businessType' && e.businessType !== val) return false
       }
       return true
@@ -614,10 +616,8 @@ export default function EmployersTab() {
     try {
       const rows = filtered.map(e => ({
         'Company Name': e.companyName,
-        'Industry': e.industry === 'Other' ? `Other - ${e.industryOther}` : e.industry,
-        'Company Size': e.companySize,
+        'Industry': e.industryName ?? e.industry,
         'Business Type': e.businessType,
-        'Years in Operation': e.yearsInOperation,
         'TIN Number': e.tinNumber,
         'Contact Person': e.contactPersonName,
         'Position': e.position,

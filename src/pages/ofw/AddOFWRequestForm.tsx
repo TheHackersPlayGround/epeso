@@ -14,7 +14,6 @@ import { todayIso } from '../../utils/formatDate'
 interface AddOFWRequestFormProps {
   onClose: () => void
   onSave: (data: Omit<OFWProfile, 'id'>) => void
-  nextRefNumber: string
 }
 
 export const REQUEST_TYPES = [
@@ -108,8 +107,8 @@ export function ClearButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: AddOFWRequestFormProps) {
-  const [formData, setFormData] = useState<Omit<OFWProfile, 'id'>>({ ...emptyOFWForm, referenceNumber: nextRefNumber })
+export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestFormProps) {
+  const [formData, setFormData] = useState<Omit<OFWProfile, 'id'>>({ ...emptyOFWForm })
   const set = (updates: Partial<Omit<OFWProfile, 'id'>>) => setFormData(prev => ({ ...prev, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
@@ -271,17 +270,17 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className={lbl}>Surname <span className="text-red-500">*</span></label>
-                <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} />
+                <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
                 {fieldMessage('lastName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('lastName')}</p>}
               </div>
               <div>
                 <label className={lbl}>First Name <span className="text-red-500">*</span></label>
-                <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} />
+                <input ref={firstNameRef} className={`${inp} ${errCls('firstName')}`} value={formData.firstName} onChange={e => { set({ firstName: e.target.value }); clearFieldError('firstName') }} placeholder="Enter first name" />
                 {fieldMessage('firstName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('firstName')}</p>}
               </div>
               <div>
                 <label className={lbl}>Middle Name</label>
-                <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} />
+                <input ref={middleNameRef} className={`${inp} ${errCls('middleName')}`} value={formData.middleName} onChange={e => { set({ middleName: e.target.value }); clearFieldError('middleName') }} placeholder="Enter middle name" />
                 {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
               </div>
               <div>

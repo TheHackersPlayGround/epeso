@@ -107,6 +107,7 @@ interface CDSPContextValue {
 
 const CDSPContext = createContext<CDSPContextValue | null>(null)
 
+// Provides CDSP applicants, activities, and services to the app.
 export function CDSPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<CDSPApplicant[]>([])
   const [activities, setActivities] = useState<CdspActivity[]>([])
@@ -115,18 +116,20 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
+  // Reloads the list of CDSP applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await cdspService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // ignore, keep list empty
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of CDSP activities.
   const refreshActivities = useCallback(async (silent = false) => {
     if (!silent) setLoadingActivities(true)
     try {
@@ -139,6 +142,7 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Reloads the list of CDSP services and program info.
   const refreshServices = useCallback(async () => {
     try {
       const res = await cdspService.listCdspServices()
@@ -149,11 +153,8 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants, activities, and services, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -174,6 +175,7 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the CDSP context.
 export function useCDSP() {
   const ctx = useContext(CDSPContext)
   if (!ctx) throw new Error('useCDSP must be used inside CDSPProvider')

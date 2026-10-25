@@ -3,14 +3,6 @@ import { ChevronDown, Loader2 } from 'lucide-react'
 import type { LocationOption } from '../services/locationService'
 
 // Generic searchable dropdown backed by an async fetch.
-//
-// Type to filter; options load (debounced) from `fetchOptions`. Picking a result
-// calls `onSelect` with the full { id, name }. Used to build the cascading
-// Province -> City -> Barangay address pickers.
-//
-// `value` is the confirmed selection's display name held by the parent. When the
-// parent clears it (e.g. province changed), the field resets. `refetchKey` lets
-// the parent force the open list to reload for a new scope (e.g. a new province).
 
 interface SearchableSelectProps {
   value: string
@@ -43,19 +35,7 @@ export default function SearchableSelect({
   const GAP = 4
   const PREFERRED_HEIGHT = 240 // matches the old fixed max-h-60
 
-  // Positioned via `fixed` + measured coordinates instead of `absolute`, so the
-  // list floats above the page instead of being clipped -- this field is used
-  // inside forms whose step content scrolls in its own `overflow-y-auto` box
-  // (e.g. TUPADProfileForm), and an `absolute` dropdown is clipped at that
-  // container's edge rather than overlaying the rest of the form. Recomputed on
-  // every scroll (capture phase, so it also catches the ancestor scroll
-  // container's own scroll events, not just the window's) and resize so it
-  // stays glued to the input.
-  //
-  // Also flips to open upward when there isn't enough room below (e.g. a field
-  // near the bottom of the viewport, like Province just above a form's footer
-  // buttons) -- otherwise the list runs off the bottom of the screen with no
-  // way to reach the rest of it, since it's outside any scrollable ancestor.
+  // Computes the dropdown's fixed position, flipping upward if there's no room below.
   useLayoutEffect(() => {
     if (!open) return
     function updateRect() {
@@ -115,6 +95,7 @@ export default function SearchableSelect({
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [value])
 
+  // Confirms a selected option and closes the dropdown.
   function pick(opt: LocationOption) {
     skipNextSearch.current = true
     onSelect(opt)
@@ -123,6 +104,7 @@ export default function SearchableSelect({
     setResults([])
   }
 
+  // Handles arrow/enter/escape keys for navigating the results list.
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open) return
     if (e.key === 'ArrowDown') { e.preventDefault(); setHighlight(h => Math.min(h + 1, results.length - 1)) }
@@ -150,12 +132,9 @@ export default function SearchableSelect({
           onChange={(e) => { setText(e.target.value); setOpen(true) }}
           onFocus={() => !disabled && setOpen(true)}
           onKeyDown={onKeyDown}
-          // Chrome ignores autoComplete="off" on fields it pattern-matches as an
-          // address (province/city/etc.), still showing its own native autofill
-          // suggestions -- which render above the page entirely, on top of this
-          // dropdown, since they're not part of the DOM. "new-password" is the
-          // standard workaround: Chrome treats it as an explicit opt-out signal
-          // it actually honors, regardless of what the field semantically is.
+          // Chrome ignores autoComplete="off" on address-like fields and still
+          // shows native autofill suggestions over this dropdown.
+          // "new-password" is the standard workaround Chrome actually honors.
           autoComplete="new-password"
           name="search-no-autofill"
           className={`${baseInput} ${stateInput}`}

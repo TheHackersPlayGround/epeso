@@ -1,28 +1,20 @@
-// Builds the Reports module's Word (.docx) export -- the main report export
-// menu's third format alongside Excel/PDF. Purely mechanical (docx assembly):
-// ReportView.tsx does all the report-specific work of deciding what content
-// goes in, this file just knows how to lay out a title, a summary section
-// (built from the same plain array-of-rows shape the Excel Summary sheets
-// already use), optional chart images, and one or more data tables.
+// Builds the Reports module's Word (.docx) export. Purely mechanical docx
+// assembly: ReportView.tsx decides what content goes in, this file lays out
+// a title, a summary section, optional chart images, and data tables.
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, AlignmentType, BorderStyle, ImageRun, PageOrientation,
   VerticalAlign, convertMillimetersToTwip, TableBorders, ShadingType,
 } from 'docx'
 
-// Folio / Long bond (8.5 x 13") -- same paper size the Excel export sets via
-// ExcelJS's pageSetup.paperSize: 14 and the PDF export sets via jsPDF's
-// FOLIO_MM constant, so all three formats print on the same paper. Given as
-// portrait width/height -- docx swaps them itself for LANDSCAPE orientation.
+// Folio / Long bond (8.5 x 13"), same paper size as the Excel/PDF exports.
+// Given as portrait width/height; docx swaps them for landscape orientation.
 const FOLIO_WIDTH_TWIP = convertMillimetersToTwip(215.9)
 const FOLIO_HEIGHT_TWIP = convertMillimetersToTwip(330.2)
 
-// Times New Roman set explicitly everywhere below (rather than left unset,
-// which silently falls back to whatever the OOXML/Word default happens to
-// be) so the choice is deliberate and doesn't drift if that fallback ever
-// changes. It renders the peso sign (₱) correctly on its own, so no per-
-// character font override is needed here (unlike the PDF export, which
-// draws its own glyphs and needed a Unicode-safe font).
+// Times New Roman set explicitly everywhere below instead of left to the
+// Word default. Renders the peso sign correctly on its own, unlike the PDF
+// export which needed a Unicode-safe font.
 const BASE_FONT = 'Times New Roman'
 
 const BORDER_BLACK = '000000'
@@ -31,10 +23,8 @@ const THIN_BORDER = { style: BorderStyle.SINGLE, size: 2, color: BORDER_BLACK }
 const CELL_BORDERS = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER }
 const CELL_MARGINS = { top: 60, bottom: 60, left: 100, right: 100 }
 
-// A row like "CDSP SUMMARY" / "BENEFICIARIES BY STATUS" is always written in
-// ALL CAPS by the callers that build these aoa rows (see ReportView.tsx) --
-// used here to tell a section heading apart from an ordinary single-cell row
-// without needing a separate list of which rows are headings.
+// Section headings are always written in ALL CAPS by the callers that build
+// these aoa rows, so this is enough to tell a heading apart from a plain row.
 const isAllCapsHeading = (s: string): boolean => /[A-Z]/.test(s) && s === s.toUpperCase()
 
 // Every TextRun in this file goes through this instead of being constructed
@@ -42,10 +32,8 @@ const isAllCapsHeading = (s: string): boolean => /[A-Z]/.test(s) && s === s.toUp
 const runsForText = (text: string, opts: { bold?: boolean; color?: string; size?: number; font?: string } = {}): TextRun[] =>
   [new TextRun({ ...opts, text, font: opts.font ?? BASE_FONT })]
 
-// `fill` (a "#RRGGBB" or "RRGGBB" hex string) is set only for the Aging
-// Report's "Time Since Completion" cell, colored by its aging bucket -- same
-// highlight the Excel and PDF exports already use for that same column, in
-// white bold text so it stays readable against the colored background.
+// `fill` is set only for the Aging Report's "Time Since Completion" cell,
+// colored by its aging bucket, in white bold text for readability.
 const textCell = (value: string | number, widthPct: number, fill?: string): TableCell =>
   new TableCell({
     width: { size: widthPct, type: WidthType.PERCENTAGE },
@@ -56,13 +44,9 @@ const textCell = (value: string | number, widthPct: number, fill?: string): Tabl
     children: [new Paragraph({ children: runsForText(String(value), { size: 18, bold: !!fill, color: fill ? 'FFFFFF' : undefined }) })],
   })
 
-// Converts the same plain array-of-rows shape the Excel Summary sheets build
-// (see the "Participant-program summary sheet" etc. blocks in ReportView.tsx)
-// into Word content: a blank row becomes spacing, a single-cell ALL-CAPS row
-// becomes a bold section heading, and any run of same-width multi-cell rows
-// becomes one small table -- so a summary's key/value pairs and its little
-// breakdown tables all fall out of the same conversion without the caller
-// needing to say which rows are which.
+// Converts the same array-of-rows shape the Excel Summary sheets build into
+// Word content: a blank row becomes spacing, a single-cell ALL-CAPS row
+// becomes a heading, and a run of same-width rows becomes a small table.
 function aoaToElements(aoa: (string | number)[][]): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   let pendingRows: TableRow[] = []
@@ -96,13 +80,12 @@ function aoaToElements(aoa: (string | number)[][]): (Paragraph | Table)[] {
   return elements
 }
 
-// "No." is just a 1-3 digit row index -- giving it the same share as every
-// other column (e.g. "Participant Name") leaves it mostly empty while
-// squeezing the columns that actually need the room, forcing their text to
-// wrap. It gets a small fixed share instead; everything else splits the rest.
+// "No." is a 1-3 digit index; giving it a small fixed share instead of an
+// equal share leaves more room for columns that actually need it.
 const NARROW_COLUMN_PCT = 5
 const NARROW_COLUMNS = new Set(['No.'])
 
+// Computes each column's width as a percentage of the table.
 function computeColumnWidthPcts(columns: string[]): number[] {
   const narrowCount = columns.filter(c => NARROW_COLUMNS.has(c)).length
   const wideCount = columns.length - narrowCount
@@ -110,12 +93,9 @@ function computeColumnWidthPcts(columns: string[]): number[] {
   return columns.map(c => NARROW_COLUMNS.has(c) ? NARROW_COLUMN_PCT : widePct)
 }
 
-// The main Detailed Report / Placed / Not Yet Placed data tables -- a bold
-// plain-white header row with black text and black borders throughout.
-// cellFill is optional -- only the Aging Report uses it, to highlight the
-// "Time Since Completion" cell with its bucket color (matches the Excel and
-// PDF exports' own highlighting for that same column). Returns a hex color,
-// or undefined for no fill, same shape as the Excel export's own cellFill.
+// The main data tables: a bold plain-white header row, black text and
+// borders. cellFill is optional; only the Aging Report uses it, matching
+// the Excel/PDF highlight on "Time Since Completion".
 function buildDataTable(columns: string[], rows: Record<string, any>[], cellFill?: (col: string, row: any) => string | undefined): Table {
   const widths = computeColumnWidthPcts(columns)
   const header = new TableRow({
@@ -151,22 +131,15 @@ export interface WordReportInput {
   title: string
   periodDetails: string
   summaryAoa?: (string | number)[][]
-  // aspect = height/width, kept explicit rather than guessed since the bar
-  // chart canvas (800x400/800x350) and pie chart canvas (800x450) are drawn at
-  // different fixed proportions in ReportView.tsx. label is what each chart
-  // shows (e.g. "Beneficiaries by Status") -- drawn above its image the same
-  // way the PDF export captions its own charts, so the two aren't just
-  // pictures with no indication of what they represent.
+  // aspect = height/width, kept explicit since the bar/pie chart canvases use
+  // different fixed proportions. label is the caption drawn above the image.
   chartImages?: { dataUrl: string; aspect: number; label: string }[]
   detailed: WordDataTable
   extraTables?: WordDataTable[]
 }
 
-// One TableCell per chart: its label (bold, centered) above the image (also
-// centered). Built as a borderless layout table (see buildChartsRow) rather
-// than stacking each chart in its own full-width paragraph -- side by side,
-// both charts comfortably fit the same page instead of the second one
-// spilling onto a page of its own.
+// One TableCell per chart: label above image, both centered. Side by side
+// in a borderless layout table so both charts fit on one page.
 const CHART_WIDTH_PX = 480
 function buildChartCell(chart: { dataUrl: string; aspect: number; label: string }, widthPct: number): TableCell {
   const base64 = chart.dataUrl.split(',')[1]
@@ -183,23 +156,21 @@ function buildChartCell(chart: { dataUrl: string; aspect: number; label: string 
   })
 }
 
-// Lays out up to two charts side by side in one borderless row (a third or
-// later chart would start a new row) -- every category this module actually
-// produces charts for (General PESO Report, Aging Reports) only ever has one
-// or two, so a single row covers every real case.
+// Lays out up to two charts side by side per row; every category this module
+// handles only ever produces one or two charts.
 function buildChartsTable(charts: { dataUrl: string; aspect: number; label: string }[]): Table {
   const rows: TableRow[] = []
   for (let i = 0; i < charts.length; i += 2) {
     const pair = charts.slice(i, i + 2)
     rows.push(new TableRow({ children: pair.map(c => buildChartCell(c, 100 / pair.length)) }))
   }
-  // TableBorders.NONE at the table level, not just on each cell -- otherwise
-  // this layout table can still pick up Word's default "Table Grid" borders,
-  // which is what made it look like a continuation of the bordered summary
-  // table directly above it instead of a separate, borderless chart row.
+  // TableBorders.NONE at the table level, not just on each cell, otherwise
+  // Word's default grid borders make this look like a continuation of the
+  // summary table above.
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: TableBorders.NONE, rows })
 }
 
+// Builds the Word (.docx) export for a full report.
 export async function generateWordReport(input: WordReportInput): Promise<Blob> {
   const children: (Paragraph | Table)[] = []
 
@@ -216,22 +187,14 @@ export async function generateWordReport(input: WordReportInput): Promise<Blob> 
   if (input.summaryAoa) children.push(...aoaToElements(input.summaryAoa))
 
   if (input.chartImages && input.chartImages.length > 0) {
-    // A spacer paragraph before the charts table -- two tables placed back to
-    // back with nothing between them can otherwise read as one continuous
-    // table, especially once the borders above are visible and this one isn't.
-    // No forced page break here -- side by side and shrunk to CHART_WIDTH_PX,
-    // both charts are compact enough to flow naturally into whatever room is
-    // left after the summary tables above, rather than being shoved onto a
-    // fresh page even when the previous one still had plenty of space.
+    // Spacer so two tables back to back don't read as one continuous table.
+    // No forced page break; the charts are small enough to flow naturally.
     children.push(new Paragraph({ spacing: { before: 200, after: 200 }, text: '' }))
     children.push(buildChartsTable(input.chartImages))
   }
 
   children.push(new Paragraph({
-    // Keeps this heading on the same page as the table right after it --
-    // without this, Word can leave the heading orphaned at the bottom of one
-    // page (there was just enough room for the text) while the table itself
-    // starts alone on the next.
+    // Keeps this heading on the same page as the table right after it.
     keepNext: true,
     spacing: { before: 200, after: 100 },
     children: runsForText(input.detailed.title, { bold: true, color: '000000', size: 26 }),
@@ -250,8 +213,7 @@ export async function generateWordReport(input: WordReportInput): Promise<Blob> 
   return packDocument(children)
 }
 
-// Shared by generateWordReport and generateWordRoster below -- same Folio
-// landscape page every Word export in this module uses.
+// Shared by generateWordReport and generateWordRoster: same Folio landscape page.
 function packDocument(children: (Paragraph | Table)[]): Promise<Blob> {
   const doc = new Document({
     sections: [{
@@ -262,20 +224,14 @@ function packDocument(children: (Paragraph | Table)[]): Promise<Blob> {
   return Packer.toBlob(doc)
 }
 
-// Word counterpart to buildRosterPdf (the per-activity/batch/project roster
-// exports: Export Attendees/Interns/Students/Beneficiaries/Trainees) -- same
-// shape as that PDF: a centered bold title, centered "Label: value" info
-// lines, then a plain data table. infoLines/headerLabels/rows are the exact
-// same arrays ReportView.tsx already builds for the PDF/CSV versions of these
-// same rosters, just laid out as Word content instead of PDF drawing calls.
+// Word counterpart to buildRosterPdf: centered title, centered info lines,
+// then a plain data table, from the same arrays the PDF version uses.
 export async function generateWordRoster(
   title: string,
   infoLines: { label: string; value: string | number }[][],
   headerLabels: string[],
   rows: (string | number)[][],
-  // Only the Skills Training roster's Attendance column uses this (green/red
-  // by Present/Absent) -- same 0-based-index shape as buildRosterPdf's, since
-  // these rosters are plain arrays rather than objects keyed by column name.
+  // Only the Skills Training roster's Attendance column uses this.
   cellFill?: (colIndex: number, row: (string | number)[]) => string | undefined,
 ): Promise<Blob> {
   const children: (Paragraph | Table)[] = []

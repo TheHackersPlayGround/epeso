@@ -68,23 +68,26 @@ interface OFWContextValue {
 
 const OFWContext = createContext<OFWContextValue | null>(null)
 
+// Provides OFW profiles and request types to the app.
 export function OFWProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<OFWProfile[]>([])
   const [requestTypes, setRequestTypes] = useState<OFWRequestType[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Reloads the list of OFW profiles.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await ofwService.listProfiles()
       setProfiles(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // keep list empty on error
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of OFW request types.
   const refreshRequestTypes = useCallback(async () => {
     try {
       const res = await ofwService.listRequestTypes()
@@ -94,11 +97,8 @@ export function OFWProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes profiles and request types, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -118,6 +118,7 @@ export function OFWProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the OFW context.
 export function useOFW() {
   const ctx = useContext(OFWContext)
   if (!ctx) throw new Error('useOFW must be used inside OFWProvider')

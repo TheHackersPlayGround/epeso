@@ -18,24 +18,15 @@ import { useOFW } from '../../contexts/OFWContext'
 import { useDocuments } from '../../contexts/DocumentsContext'
 import { useEmployment } from '../../contexts/EmploymentContext'
 
+// Formats a deletion timestamp for display.
 function formatTimestamp(ts: string): string {
   const d = new Date(ts.replace(' ', 'T'))
   return isNaN(d.getTime()) ? ts : d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-// The recycle bin shows real soft-deleted records from every module that
-// supports soft delete: Employment Facilitation (applicants, employers,
-// referrals), GIP (applicants), CDSP (applicants), SPES (applicants), and
-// DILP/TUPAD (beneficiaries). Other modules don't have soft delete yet, so
-// they won't appear here until they do.
 type RecycleBinItem = RecycleBinRecord
 
-// Days left before the 30-day retention window elapses. This used to be
-// display-only -- now each module's backend actually enforces it too (see
-// {module}PurgeExpired(), called from {module}ListDeleted(): the next time
-// anyone loads this recycle bin, anything past 30 days for a given module
-// is hard-deleted before the remaining list is returned). Keep this number
-// in sync with RECYCLE_BIN_RETENTION_DAYS in core/helpers.php.
+// Returns the days left before a deleted record's 30-day retention window elapses.
 function getDaysRemaining(deletedAt: string): number {
   const deleted = new Date(deletedAt)
   const diff = Math.floor((Date.now() - deleted.getTime()) / (1000 * 60 * 60 * 24))
@@ -56,9 +47,7 @@ const binModules  = [
   'Document Folders', 'Document Files',
 ]
 
-// Colors the recycle bin's Module badge — records and their program's
-// Maintenance-level entities (batches/projects/activities/interventions)
-// share one color per program, so the family is recognizable at a glance.
+// Badge color per module, shared by a program's related entities.
 const BIN_MODULE_BADGE: Record<string, string> = {
   'Applicants': 'bg-blue-50 text-blue-700',
   'Employers': 'bg-purple-50 text-purple-700',
@@ -84,15 +73,12 @@ const BIN_MODULE_BADGE: Record<string, string> = {
   'Document Files': 'bg-yellow-50 text-yellow-700',
 }
 
-// isActive: SecurityView keeps this tab mounted after its first visit, so the
-// bin refreshes itself each time the tab is shown again.
-// onCountChange keeps the count badge on the "Recycle Bin" tab (in SecurityView)
-// in sync after a restore / delete / empty-bin changes how many items are in the bin.
 interface RecycleBinTabProps {
   isActive: boolean
   onCountChange: (count: number) => void
 }
 
+// Renders the Recycle Bin tab: lists, restores, and purges soft-deleted records.
 export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTabProps) {
   const { refreshProfiles: refreshGipProfiles, refreshWorkplaces: refreshGipWorkplaces } = useGIP()
   const { refreshProfiles: refreshCdspProfiles, refreshActivities: refreshCdspActivities } = useCDSP()
@@ -128,14 +114,11 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
   const paginatedBin  = filteredBin.slice((binPage - 1) * binPerPage, binPage * binPerPage)
   const expiringDaysLeft = recycleBin.map(i => getDaysRemaining(i.deletedAt)).filter(d => d <= 7)
   const expiringCount = expiringDaysLeft.length
-  // The banner's wording should reflect the most urgent item's real countdown,
-  // not the fixed 7-day threshold used to decide whether to show it at all.
   const soonestExpiry = expiringCount > 0 ? Math.min(...expiringDaysLeft) : 0
 
   useEffect(() => { setBinPage(1) }, [binModuleFilter, binSearch])
 
-  // "Loading…" only shows for the very first load (binLoading starts true).
-  // Later reloads update the list quietly, with no flash.
+  // Reloads the recycle bin list.
   const reloadBin = useCallback(async () => {
     try {
       setRecycleBin(await listDeleted())
@@ -146,26 +129,17 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     }
   }, [])
 
-  // Loads when the tab is first opened and again every time it is shown, so a
-  // deletion made elsewhere appears without a full page refresh.
   useEffect(() => { if (isActive) reloadBin() }, [isActive, reloadBin])
-  // Report the count only once the first load has finished, so the badge doesn't
-  // flash to 0 while the list is still empty.
   useEffect(() => { if (!binLoading) onCountChange(recycleBin.length) }, [binLoading, recycleBin.length, onCountChange])
 
+  // Closes the confirm/result modal.
   const closeModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+  // Shows an error message in the confirm modal.
   const showError = (message: string) =>
     setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message, onConfirm: closeModal })
 
-  // A restored applicant needs the module's own list refreshed too — GIP/CDSP
-  // applicant tables read from a shared context mounted at the app root
-  // (GIPProvider/CDSPProvider in App.tsx), so refreshing it here means the
-  // table is already up to date the moment the user navigates back to it,
-  // no manual page refresh needed.
+  // Refreshes the shared context list(s) affected by a restored record.
   const refreshModuleFor = async (recordType: RecycleBinItem['recordType']) => {
-    // EF's lists live in EmploymentProvider now too. A restored applicant,
-    // employer or referral can bring related rows back with it, so refresh all
-    // five lists rather than guessing which ones.
     if (recordType === 'applicant' || recordType === 'employer' || recordType === 'referral') await refreshEmploymentAll()
     if (recordType === 'gipApplicant') await refreshGipProfiles()
     if (recordType === 'gipWorkplace') await refreshGipWorkplaces()
@@ -188,6 +162,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     if (recordType === 'documentsDocument') await refreshDocumentsDocuments()
   }
 
+  // Confirms and restores one deleted record.
   const handleRestoreItem = (item: RecycleBinItem) => {
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Restore Record',
@@ -208,6 +183,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     })
   }
 
+  // Confirms permanently deleting one record.
   const handlePermanentDelete = (item: RecycleBinItem) => {
     setConfirmModal({
       isOpen: true, type: 'confirm', title: 'Permanently Delete',
@@ -217,10 +193,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     })
   }
 
-  // `force=false` first — an EF applicant with placement/referral history, or
-  // a Documents folder with leftover recycle-bin files, gets blocked by the
-  // backend (detail.code === 'has_history' / 'has_files') so we can show a
-  // second, more specific warning before retrying with force=true.
+  // Permanently deletes one record, prompting to force past any extra history/files.
   const proceedPurge = async (item: RecycleBinItem, force: boolean) => {
     try {
       await purgeRecord(item.recordType, item.id, force)
@@ -256,14 +229,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     }
   }
 
-  // Two-pass empty: try every item WITHOUT force first, exactly like a
-  // single-item Purge would. An EF applicant with placement/referral
-  // history, or a Documents folder with leftover recycle-bin files, gets
-  // blocked by the backend instead of silently force-deleted — those are
-  // left untouched and reported back in one aggregate follow-up warning
-  // (naming exactly what extra data would be lost), rather than either
-  // skipping the warning entirely (the old bug: "Empty Bin"'s generic
-  // message never mentioned this) or nagging once per blocked item.
+  // Purges every item in the bin, reporting any blocked items in one aggregate warning.
   const runEmptyBinPass = async (items: RecycleBinItem[], force: boolean) => {
     type PurgeDetail = { code?: string; placements?: number; referrals?: number; count?: number }
     const blocked: { item: RecycleBinItem; detail: PurgeDetail }[] = []
@@ -312,6 +278,7 @@ export default function RecycleBinTab({ isActive, onCountChange }: RecycleBinTab
     setConfirmModal({ isOpen: true, type: 'success', title: 'Bin Emptied', message: 'All items in the recycle bin have been permanently deleted.', onConfirm: closeModal })
   }
 
+  // Confirms and empties the entire recycle bin.
   const handleEmptyBin = () => {
     if (recycleBin.length === 0) return
     setConfirmModal({

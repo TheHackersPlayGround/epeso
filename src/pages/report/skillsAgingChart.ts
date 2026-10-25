@@ -1,26 +1,14 @@
 // Grafts an Aging Report's bar+pie charts into an already-built ExcelJS
-// workbook as REAL native Excel chart objects -- not the static picture
-// createHorizontalBarChartImage/createPieChartImage produce for the PDF
-// export and (previously) for this same Excel export. Despite the filename
-// (this started as Skills Training's own module), everything here is
-// generic -- fully parameterized via AgingChartOptions -- and is shared
-// as-is by the CDSP Aging Report too.
+// workbook as native Excel chart objects, not static pictures. Generic via
+// AgingChartOptions, shared by both Skills Training's and CDSP's Aging Reports.
 //
-// ExcelJS has no API for native chart objects at all (it can only embed
-// static images), so this works entirely below that layer: it takes the
-// .xlsx ExcelJS already produced, and the chart objects from
-// general_peso_template.xlsx (charts authored by hand in real Microsoft
-// Excel -- see that report's own file for why hand-authoring chart XML from
-// a library has already failed Excel's validator once), retargets those
-// charts' cell references at this workbook's own tables, and splices the
-// resulting parts into the ExcelJS zip. Two completely different code paths
-// (ExcelJS's object model vs. direct zip/XML editing) producing one combined
-// file -- there is no library that bridges the two, so this is done by hand
-// at the OOXML level.
+// ExcelJS can't create native charts, so this works below that layer: it
+// takes the chart objects from general_peso_template.xlsx, retargets their
+// cell references at this workbook's own tables, and splices the resulting
+// parts into the ExcelJS zip directly at the OOXML level.
 //
-// The bar chart is further converted from the template's single-series
-// layout into a stacked-by-sex bar (Male/Female per bucket) -- the pie stays
-// single-series, showing each bucket's share of everyone regardless of sex.
+// The bar chart is converted from the template's single series into a
+// stacked-by-sex bar (Male/Female per bucket); the pie stays single-series.
 import JSZip from 'jszip'
 import {
   retargetChartRef, setStrCache, setNumCache, setPieColors, setPieShowPercent, setChartTitle, makeStackedBySexBarChart, addLegend,
@@ -38,16 +26,12 @@ const TEMPLATE_PARTS = {
   drawingRels: 'xl/drawings/_rels/drawing1.xml.rels',
 } as const
 
-// The template's own <c:f> references -- what every retarget starts from.
+// The template's own cell references, what every retarget starts from.
 const TEMPLATE_SERIES_REF = 'ChartData!$B$1'
 const TEMPLATE_CAT_REF = 'ChartData!$A$2:$A$8'
 const TEMPLATE_VAL_REF = 'ChartData!$B$2:$B$8'
 
-// Replaces the Nth (0-indexed) <xdr:twoCellAnchor> block's <xdr:from>/<xdr:to>
-// with new cell-aligned coordinates (zero offsets -- the chart's edges snap
-// exactly to column/row boundaries rather than the template's original
-// fractional-column sizing, which was tuned for its own two-charts-side-by-side
-// layout and doesn't apply once the charts are stacked full-width instead).
+// Replaces the Nth anchor block's position with cell-aligned coordinates.
 function setAnchorPosition(drawingXml: string, anchorIndex: number, from: { col: number; row: number }, to: { col: number; row: number }): string {
   const marker = '<xdr:twoCellAnchor>'
   const parts = drawingXml.split(marker)
@@ -62,11 +46,7 @@ function setAnchorPosition(drawingXml: string, anchorIndex: number, from: { col:
   return parts.join(marker)
 }
 
-// Finds which xl/worksheets/sheetN.xml a given <sheet name="..."> in
-// workbook.xml actually resolves to -- ExcelJS numbers sheet files in
-// creation order, which happens to put "Summary" first today, but resolving
-// this properly (via workbook.xml -> r:id -> workbook.xml.rels) means it
-// keeps working even if that ever changes.
+// Resolves a sheet name to its worksheet file path.
 async function findSheetPath(mainZip: JSZip, sheetName: string): Promise<string> {
   const workbookXml = await mainZip.file('xl/workbook.xml')!.async('string')
   const sheetTag = (workbookXml.match(/<sheet\b[^>]*\/>/g) || []).find(t => t.includes(`name="${sheetName}"`))
@@ -78,26 +58,23 @@ async function findSheetPath(mainZip: JSZip, sheetName: string): Promise<string>
   const relTag = (relsXml.match(/<Relationship\b[^>]*\/>/g) || []).find(t => t.includes(`Id="${relId}"`))
   const target = relTag?.match(/Target="([^"]+)"/)?.[1]
   if (!target) throw new Error(`skillsAgingChart: relationship ${relId} not found for sheet "${sheetName}"`)
-  return `xl/${target}` // Target is relative to xl/, e.g. "worksheets/sheet1.xml"
+  return `xl/${target}` // Target is relative to xl/
 }
 
 export type AgingChartOptions = {
-  sheetName: string // the worksheet both source tables live on (e.g. 'Summary')
-  // 1-indexed row where ALL text content on the sheet ends -- i.e. aoa.length
-  // at the point every table (pie's, sex bar's, and anything appended after,
-  // like CDSP's sub-service breakdown) has actually been written. The charts
-  // are positioned below THIS, not just below the pie/sex tables' own ranges,
-  // so anything appended after those two doesn't end up hidden underneath them.
+  sheetName: string // the worksheet both source tables live on
+  // 1-indexed row where all text content on the sheet ends, so the charts
+  // are positioned below every appended table, not just the pie/sex tables.
   contentEndRow: number
-  categories: string[] // bucket labels in order, e.g. ['0-1 month', ..., 'Placed']
-  // The "BENEFICIARIES BY STATUS" table -- feeds the pie chart.
+  categories: string[] // bucket labels in order
+  // The "BENEFICIARIES BY STATUS" table, feeds the pie chart.
   pie: {
-    seriesNameRow: number // 1-indexed row holding the column-B header cell (e.g. "Participants")
+    seriesNameRow: number // 1-indexed row holding the column-B header cell
     categoryStartRow: number // 1-indexed row where the first bucket row begins
     values: number[] // total per bucket, matching `categories`
-    colorMap: Record<string, string> // bucket name -> hex color, for the pie's per-slice colors
+    colorMap: Record<string, string> // bucket name -> hex color
   }
-  // The "BENEFICIARIES BY STATUS AND SEX" table -- feeds the stacked bar chart.
+  // The "BENEFICIARIES BY STATUS AND SEX" table, feeds the stacked bar chart.
   sexBar: {
     categoryStartRow: number // 1-indexed row where the first bucket row begins (col A = bucket, B = male, C = female)
     maleValues: number[]
@@ -107,9 +84,8 @@ export type AgingChartOptions = {
   }
 }
 
-// Takes the buffer from wb.xlsx.writeBuffer() (built WITHOUT any
-// ws.addImage() picture-chart calls) and returns a new Blob with the same
-// content plus two real, editable native Excel charts spliced in.
+// Grafts two native Excel charts into an ExcelJS-built workbook buffer and
+// returns the resulting Blob.
 export async function graftAgingCharts(mainBuffer: ArrayBuffer, opts: AgingChartOptions): Promise<Blob> {
   const { sheetName, categories } = opts
   const lastCategoryRow = opts.pie.categoryStartRow + categories.length - 1
@@ -129,7 +105,7 @@ export async function graftAgingCharts(mainBuffer: ArrayBuffer, opts: AgingChart
   const templateZip = await JSZip.loadAsync(templateBuf)
 
   if (mainZip.file(TEMPLATE_PARTS.drawing)) {
-    throw new Error('skillsAgingChart: workbook already has a drawing at the expected path -- refusing to overwrite it')
+    throw new Error('skillsAgingChart: workbook already has a drawing at the expected path, refusing to overwrite it')
   }
 
   const readTemplatePart = (path: string) => templateZip.file(path)!.async('string')

@@ -112,9 +112,8 @@ const VALIDATION_ROWS = 200;
 
 // ─── Template generation ──────────────────────────────────────────────────────
 
-// standardIndustries: the industry names from the backend's single list (the dropdown in the
-// template offers these plus "Other"). Custom industries are not listed -- an Excel dropdown
-// is limited to ~255 characters.
+// standardIndustries: the backend's industry list, offered plus "Other".
+// Custom industries aren't listed since Excel's dropdown is capped at ~255 characters.
 export async function downloadImportTemplate(standardIndustries: string[]): Promise<void> {
   const sections: Section[] = SECTIONS.map((section) => ({
     ...section,
@@ -133,7 +132,7 @@ export async function downloadImportTemplate(standardIndustries: string[]): Prom
     right:  { style: "thin" as const, color: { argb: "FFCBD5E1" } },
   };
 
-  // Row 1 — section label band
+  // Row 1: section label band
   let startCol = 1;
   for (const section of sections) {
     const endCol = startCol + section.columns.length - 1;
@@ -150,7 +149,7 @@ export async function downloadImportTemplate(standardIndustries: string[]): Prom
   }
   ws.getRow(1).height = 26;
 
-  // Row 2 — field headers colored per section (blue shades / yellow shades), black text
+  // Row 2: field headers colored per section, black text
   let colIdx2 = 0;
   for (const section of sections) {
     for (const col of section.columns) {
@@ -165,7 +164,7 @@ export async function downloadImportTemplate(standardIndustries: string[]): Prom
   }
   ws.getRow(2).height = 32;
 
-  // Row 3 — example row (greyed italic)
+  // Row 3: example row, greyed italic
   const exampleRow = ws.addRow(ALL_COLUMNS.map((c) => c.example));
   exampleRow.eachCell((cell) => {
     cell.font = { italic: true, color: { argb: "FF94A3B8" } };
@@ -207,19 +206,19 @@ export async function downloadImportTemplate(standardIndustries: string[]): Prom
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
 
+// Normalizes a header or cell value for comparison.
 function norm(v: unknown): string {
   return String(v ?? "").replace(/\*/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 type Row = Record<string, string>;
 
+// Reads one column's value from a parsed row.
 function get(row: Row, header: string): string {
   return (row[norm(header)] ?? "").trim();
 }
 
-// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
-// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
-// rather than letting the Date constructor silently roll it over.
+// Parses a date string into ISO (YYYY-MM-DD) format.
 function toIsoDate(v: string): string | null {
   const s = v.trim();
   const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -248,15 +247,18 @@ type Caches = {
   barangay: Map<string, LocationOption | null>;
 };
 
+// Creates empty address-lookup caches.
 function makeCaches(): Caches {
   return { province: new Map(), city: new Map(), barangay: new Map() };
 }
 
+// Finds an option whose name matches exactly (case-insensitive).
 function exactMatch(opts: LocationOption[], name: string): LocationOption | null {
   const target = norm(name);
   return opts.find((o) => norm(o.name) === target) ?? null;
 }
 
+// Resolves a province name to its dataset record.
 async function resolveProvince(name: string, caches: Caches): Promise<LocationOption | null> {
   const key = norm(name);
   if (caches.province.has(key)) return caches.province.get(key)!;
@@ -265,6 +267,7 @@ async function resolveProvince(name: string, caches: Caches): Promise<LocationOp
   return match;
 }
 
+// Resolves a city/municipality name within a province to its dataset record.
 async function resolveCity(provinceId: number, name: string, caches: Caches): Promise<LocationOption | null> {
   const key = `${provinceId}::${norm(name)}`;
   if (caches.city.has(key)) return caches.city.get(key)!;
@@ -273,6 +276,7 @@ async function resolveCity(provinceId: number, name: string, caches: Caches): Pr
   return match;
 }
 
+// Resolves a barangay name within a city to its dataset record.
 async function resolveBarangay(cityId: number, name: string, caches: Caches): Promise<LocationOption | null> {
   const key = `${cityId}::${norm(name)}`;
   if (caches.barangay.has(key)) return caches.barangay.get(key)!;
@@ -283,6 +287,7 @@ async function resolveBarangay(cityId: number, name: string, caches: Caches): Pr
 
 // ─── Main import function ─────────────────────────────────────────────────────
 
+// Parses an uploaded workbook and imports its rows as employers.
 export async function importEmployers(
   file: File,
   onProgress?: (done: number, total: number) => void,
@@ -305,6 +310,7 @@ export async function importEmployers(
 
   const headerRow = (rawRows[headerRowIdx] as unknown[]).map((h) => norm(h as string));
 
+  // Converts one raw spreadsheet row into a header-keyed row.
   function parseRow(raw: unknown[]): Row {
     const out: Row = {};
     headerRow.forEach((h, i) => { out[h] = String(raw[i] ?? "").trim(); });
@@ -388,11 +394,11 @@ export async function importEmployers(
       continue;
     }
 
-    // Date registered — default to today if blank or invalid
+    // Date registered: default to today if blank or invalid
     const dateRaw = get(row, "Date Registered (MM/DD/YYYY)");
     const dateRegistered = (dateRaw && toIsoDate(dateRaw)) ?? new Date().toISOString().split("T")[0];
 
-    // Status — default Active if blank
+    // Status: default Active if blank
     const statusRaw = get(row, "Status");
     const status = (STATUS_OPTIONS.includes(statusRaw) ? statusRaw : "Active") as "Active" | "Inactive";
 
@@ -431,8 +437,7 @@ export async function importEmployers(
     return { total, succeeded: 0, failed: [] };
   }
 
-  // Every row resolved locally — hand the whole batch to the backend, which
-  // writes it inside a single DB transaction: all rows land, or none do.
+  // Hand the resolved batch to the backend in one DB transaction.
   try {
     await importEmployersBulk(payloads);
     return { total, succeeded: total, failed: [] };

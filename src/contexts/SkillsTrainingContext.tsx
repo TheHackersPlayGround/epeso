@@ -86,6 +86,7 @@ interface SkillsTrainingContextValue {
 
 const SkillsTrainingContext = createContext<SkillsTrainingContextValue | null>(null)
 
+// Provides Skills Training profiles, activities, and lookups to the app.
 export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<SkillsTrainingProfile[]>([])
   const [activities, setActivities] = useState<SkillsTrainingActivity[]>([])
@@ -94,18 +95,20 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingActivities, setLoadingActivities] = useState(true)
 
+  // Reloads the list of Skills Training profiles.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await skillsTrainingService.listProfiles()
       setProfiles(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // fail quietly
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of Skills Training activities.
   const refreshActivities = useCallback(async (silent = false) => {
     if (!silent) setLoadingActivities(true)
     try {
@@ -118,6 +121,7 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Reloads the qualification and purpose lookup lists.
   const refreshLookups = useCallback(async () => {
     try {
       const [qRes, pRes] = await Promise.all([
@@ -131,11 +135,8 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes profiles, activities, and lookups, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -161,6 +162,7 @@ export function SkillsTrainingProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the Skills Training context.
 export function useSkillsTraining() {
   const ctx = useContext(SkillsTrainingContext)
   if (!ctx) throw new Error('useSkillsTraining must be used inside SkillsTrainingProvider')

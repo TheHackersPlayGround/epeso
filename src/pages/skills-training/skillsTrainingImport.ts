@@ -49,10 +49,6 @@ type TemplateSection = {
   columns: TemplateColumn[]
 }
 
-// Address has no numeral of its own on-screen (SkillsTrainingProfileForm.tsx
-// renders it as a plain sub-heading inside Section I, not its own
-// SectionDivider) -- folded into Section I here too rather than inventing a
-// section the real form doesn't have.
 const SECTION_PERSONAL: TemplateSection = {
   label: 'I. PERSONAL INFORMATION',
   fillArgb: 'FF2980B9',
@@ -83,9 +79,7 @@ const SECTION_CLASSIFICATION: TemplateSection = {
   ],
 }
 
-// Section III — Desired Qualification. The option list is fetched live (new
-// qualifications can be added over time), so the dropdown options are
-// injected by the caller rather than hardcoded here.
+// Builds the "Desired Qualification" template section.
 function makeQualificationSection(qualifications: string[]): TemplateSection {
   return {
     label: 'III. DESIRED QUALIFICATION',
@@ -98,7 +92,7 @@ function makeQualificationSection(qualifications: string[]): TemplateSection {
   }
 }
 
-// Section IV — Purpose of Training. Same reasoning as Desired Qualification.
+// Builds the "Purpose of Training" template section.
 function makePurposeSection(purposes: string[]): TemplateSection {
   return {
     label: 'IV. PURPOSE OF TRAINING',
@@ -123,6 +117,7 @@ const SECTION_OFFICE: TemplateSection = {
   ],
 }
 
+// Builds the full list of template sections.
 function buildSections(qualifications: string[], purposes: string[]): TemplateSection[] {
   return [
     SECTION_PERSONAL,
@@ -138,17 +133,16 @@ function buildSections(qualifications: string[], purposes: string[]): TemplateSe
 const TEMPLATE_VALIDATION_ROWS = 200
 const FIRST_DATA_ROW = 3 // row 1 = section labels, row 2 = field headers.
 
-// Excel silently caps a data-validation error message at ~225 characters (and
-// truncating/exceeding it is exactly what triggers the "we found a problem
-// with some content" repair prompt on open). Long option lists blow past that
-// when fully enumerated, so fall back to a generic message rather than risk
-// corrupting the workbook.
+// Keep validation messages under Excel's ~225-char cap; use a generic
+// message when the option list is too long to enumerate.
 const MAX_VALIDATION_ERROR_LEN = 200
+// Builds the dropdown's validation error message.
 function validationErrorMessage(options: string[]): string {
   const enumerated = `Please choose one of: ${options.join(', ')}`
   return enumerated.length <= MAX_VALIDATION_ERROR_LEN ? enumerated : 'Please choose a value from the dropdown list.'
 }
 
+// Generates and downloads the Skills Training applicant import template.
 export async function downloadImportTemplate(qualifications: string[], purposes: string[]): Promise<void> {
   const sections = buildSections(qualifications, purposes)
   const columns = sections.flatMap((s) => s.columns)
@@ -207,11 +201,8 @@ export async function downloadImportTemplate(qualifications: string[], purposes:
   })
 
   // Freeze both header rows, then apply dropdown validation to the enum columns.
-  // Longer option lists can exceed Excel's ~255-character limit on an inline
-  // list formula ("a,b,c"), which corrupts the workbook (Excel prompts to
-  // "repair" it on open). To avoid that entirely, every dropdown's values are
-  // written to a hidden helper sheet and referenced by cell range instead of
-  // as a literal string.
+  // Dropdown values live on a hidden helper sheet (Excel's inline list formula
+  // tops out around 255 characters).
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   const lastRow = FIRST_DATA_ROW + TEMPLATE_VALIDATION_ROWS - 1
   const optionColumns = columns.filter((c) => c.options && c.options.length > 0)
@@ -255,21 +246,18 @@ export async function downloadImportTemplate(qualifications: string[], purposes:
 
 // ─── Parsing helpers ─────────────────────────────────────────────────────────
 
-// Normalize a header or cell value for comparison: trim, collapse whitespace,
-// strip the "*" required marker, lowercase.
+// Normalizes a header or cell value for comparison.
 function norm(v: unknown): string {
   return String(v ?? '').replace(/\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
-// Return the canonical option matching `value` (case-insensitively), or "".
+// Returns the canonical option matching `value`, or "".
 function pickEnum(value: string, options: string[]): string {
   const n = norm(value)
   return options.find((o) => norm(o) === n) ?? ''
 }
 
-// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
-// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
-// rather than letting the Date constructor silently roll it over.
+// Parses a date string into ISO (YYYY-MM-DD) format.
 function toIsoDate(v: string): string {
   const s = v.trim()
   if (!s) return ''
@@ -294,6 +282,7 @@ function toIsoDate(v: string): string {
 // A single parsed row, keyed by normalized header.
 type Row = Record<string, string>
 
+// Reads one column's value from a parsed row.
 function get(row: Row, header: string): string {
   return (row[norm(header)] ?? '').trim()
 }
@@ -306,15 +295,18 @@ type ResolveCaches = {
   barangay: Map<string, LocationOption | null>
 }
 
+// Creates empty address-lookup caches.
 function makeCaches(): ResolveCaches {
   return { province: new Map(), city: new Map(), barangay: new Map() }
 }
 
+// Finds an option whose name matches exactly (case-insensitive).
 function exactMatch(options: LocationOption[], name: string): LocationOption | null {
   const target = norm(name)
   return options.find((o) => norm(o.name) === target) ?? null
 }
 
+// Resolves a province name to its dataset record.
 async function resolveProvince(name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = norm(name)
   if (caches.province.has(key)) return caches.province.get(key)!
@@ -323,6 +315,7 @@ async function resolveProvince(name: string, caches: ResolveCaches): Promise<Loc
   return match
 }
 
+// Resolves a city/municipality name within a province to its dataset record.
 async function resolveCity(provinceId: number, name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = `${provinceId}::${norm(name)}`
   if (caches.city.has(key)) return caches.city.get(key)!
@@ -331,6 +324,7 @@ async function resolveCity(provinceId: number, name: string, caches: ResolveCach
   return match
 }
 
+// Resolves a barangay name within a city to its dataset record.
 async function resolveBarangay(cityId: number, name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = `${cityId}::${norm(name)}`
   if (caches.barangay.has(key)) return caches.barangay.get(key)!
@@ -339,6 +333,7 @@ async function resolveBarangay(cityId: number, name: string, caches: ResolveCach
   return match
 }
 
+// Resolves a province/city/barangay triple to a barangay id, or throws.
 async function resolveAddress(
   provinceName: string,
   cityName: string,
@@ -365,6 +360,7 @@ async function resolveAddress(
 
 // ─── Row -> create-profile payload ───────────────────────────────────────────
 
+// Validates one spreadsheet row and converts it into a create-profile payload.
 async function rowToPayload(row: Row, qualifications: string[], purposes: string[], caches: ResolveCaches): Promise<Record<string, unknown>> {
   const lastName = get(row, 'Last Name')
   const firstName = get(row, 'First Name')
@@ -438,14 +434,17 @@ export type ImportResult = { total: number; succeeded: number; failed: ImportRow
 const EXAMPLE_SURNAME = 'dela cruz'
 const EXAMPLE_FIRST = 'juan'
 
+// Checks whether a row has no values at all.
 function isEmptyRow(row: Row): boolean {
   return Object.values(row).every((v) => String(v ?? '').trim() === '')
 }
 
+// Checks whether a row is the template's example row.
 function isExampleRow(row: Row): boolean {
   return norm(get(row, 'Last Name')) === EXAMPLE_SURNAME && norm(get(row, 'First Name')) === EXAMPLE_FIRST
 }
 
+// Parses an uploaded workbook and imports its rows as Skills Training applicants.
 export async function importSkillsTrainingApplicants(
   file: File,
   qualifications: string[],

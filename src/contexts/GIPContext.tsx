@@ -87,24 +87,27 @@ interface GIPContextValue {
 
 const GIPContext = createContext<GIPContextValue | null>(null)
 
+// Provides GIP applicants and workplaces to the app.
 export function GIPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<GIPApplicant[]>([])
   const [gipWorkplaces, setGipWorkplaces] = useState<GIPWorkplace[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingWorkplaces, setLoadingWorkplaces] = useState(true)
 
+  // Reloads the list of GIP applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await gipService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // silent
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of GIP workplaces.
   const refreshWorkplaces = useCallback(async (silent = false) => {
     if (!silent) setLoadingWorkplaces(true)
     try {
@@ -117,11 +120,8 @@ export function GIPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants and workplaces, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -141,6 +141,7 @@ export function GIPProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the GIP context.
 export function useGIP() {
   const ctx = useContext(GIPContext)
   if (!ctx) throw new Error('useGIP must be used inside GIPProvider')

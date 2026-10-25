@@ -81,24 +81,27 @@ interface DILPContextValue {
 
 const DILPContext = createContext<DILPContextValue | null>(null)
 
+// Provides DILP applicants and projects to the app.
 export function DILPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<DILPApplicant[]>([])
   const [projects, setProjects] = useState<DILPProject[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(true)
 
+  // Reloads the list of DILP applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await dilpService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // fail quietly
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of DILP projects.
   const refreshProjects = useCallback(async (silent = false) => {
     if (!silent) setLoadingProjects(true)
     try {
@@ -111,11 +114,8 @@ export function DILPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants and projects, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -135,6 +135,7 @@ export function DILPProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the DILP context.
 export function useDILP() {
   const ctx = useContext(DILPContext)
   if (!ctx) throw new Error('useDILP must be used inside DILPProvider')

@@ -48,6 +48,7 @@ type ReferApplicantPanelProps = {
 
 type VacancyOption = { id: number; jobTitle: string; employer: string; vacanciesCount: number }
 
+// Renders the slide-over panel to refer an applicant to a job vacancy.
 function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   const { vacancies: allVacancies, refreshVacancies, refreshReferrals, refreshApplicants } = useEmployment()
   const vacancies = useMemo<VacancyOption[]>(() => allVacancies.filter(v => v.status === 'Open').map(v => ({
@@ -78,6 +79,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
     setIsOpen(false)
   }
 
+  // Creates the referral for the selected vacancy.
   async function handleConfirm() {
     if (!selected) return
     if (!(await confirmReferralOk(applicant.id, selected.id, applicant.name))) return
@@ -86,8 +88,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
     try {
       await createReferral(applicant.id, selected.id)
       setReferred(true)
-      // A new referral changes this applicant's Refer/Referred state and adds a
-      // row to the Referrals tab -- both live in the shared lists now.
+      // A new referral changes this applicant's Refer/Referred state and adds a row to the Referrals tab.
       void refreshApplicants()
       void refreshReferrals()
     } catch (err: unknown) {
@@ -199,6 +200,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
+// Renders the applicant bulk-import modal (template download, upload, result).
 function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -212,6 +214,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
     setError(null);
   }
 
+  // Imports the picked file and shows the result.
   async function handleImport() {
     if (!file || isImporting) return;
     setIsImporting(true);
@@ -293,6 +296,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
   );
 }
 
+// Renders the import result summary and failed-row list.
 function ImportResultView({ result }: { result: ImportResult }) {
   return (
     <div>
@@ -333,6 +337,7 @@ function ImportResultView({ result }: { result: ImportResult }) {
 
 // ─── Applicant data mapper ─────────────────────────────────────────────────────
 
+// Converts an Applicant record into ResumeMaker's expected data shape.
 function toApplicantData(a: Applicant): ApplicantData {
   const fd = (a.fullFormData ?? {}) as Record<string, unknown>;
   return {
@@ -395,6 +400,7 @@ function toApplicantData(a: Applicant): ApplicantData {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
+// Renders the Employment Facilitation module and its five tabs.
 export default function EmploymentFacilitation({ onBack }: EmploymentFacilitationProps) {
   // ── Applicant state (source of truth = the database, held by EmploymentProvider) ──
   const {
@@ -418,6 +424,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('');
 
   // ── Derived data ──────────────────────────────────────────────────
+  // Applies search, active filters, and sort order to the applicant list.
   const filteredApplicants = useMemo(() => {
     let result = applicants;
 
@@ -497,9 +504,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     } else if (sortOrder === 'dateApplied_oldest') {
       result = [...result].sort((a, b) => (a.dateApplicationReceived ?? '').localeCompare(b.dateApplicationReceived ?? ''));
     } else if (sortOrder) {
-      // name is "Lastname, Firstname M. Suffix" (see employment.php's $name
-      // build) — split on the comma rather than whitespace, since a surname
-      // can itself contain spaces (e.g. "Dela Cruz").
+      // name is "Lastname, Firstname M. Suffix"; split on the comma since a
+      // surname can contain spaces.
       const surnameOf = (n: string) => (n.split(',')[0] ?? n).trim().toLowerCase();
       const firstNameOf = (n: string) => (n.split(',')[1] ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
       result = [...result].sort((a, b) => {
@@ -522,8 +528,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // ── Modal states ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>("applicants");
 
-  // Cross-tab "jump to record" state for Placements' Linked Vacancy —
-  // set by PlacementsTab, consumed (and cleared) by VacanciesTab.
+  // Cross-tab "jump to record" state for Placements' Linked Vacancy, set by
+  // PlacementsTab, consumed by VacanciesTab.
   const [pendingVacancyId, setPendingVacancyId] = useState<number | null>(null);
 
   // The lists are held by EmploymentProvider, so entering this module shows
@@ -553,9 +559,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   const [isResumeMakerOpen, setIsResumeMakerOpen] = useState(false);
 
   // ── CRUD handlers ─────────────────────────────────────────────────
-  // Persists to the database via the API, then refreshes the list from the
-  // server (the authoritative source — resolved address, derived fields, etc.).
-  // The sidebar awaits this and shows its own success screen, then closes.
+  // Creates or updates an applicant, then refreshes the list.
   async function handleSaveApplicant(formData: ApplicantFormData) {
     if (editingApplicant) {
       await updateApplicant(editingApplicant.id, formData);
@@ -567,10 +571,12 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     if (editingApplicant) { void refreshReferrals(); void refreshPlacements(); }
   }
 
+  // Opens the delete confirmation for an applicant.
   function handleDeleteApplicant(applicant: Applicant) {
     setDeleteApplicantConfirm(applicant);
   }
 
+  // Deletes the applicant pending confirmation.
   async function confirmDeleteApplicant() {
     const applicant = deleteApplicantConfirm;
     if (!applicant) return;
@@ -621,18 +627,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   }
 
   // ── Export handlers ───────────────────────────────────────────────
-  // Column order/names here must match applicantImport.ts's expected headers
-  // exactly (Import looks columns up by name via get()/norm(), not
-  // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device).
-  //
-  // applicantImport.ts scans repeating sections (Job Preference, Language,
-  // Graduate Study, Training, Eligibility, Professional License, Work
-  // Experience) dynamically by column index -- "N" can be any number, not
-  // just the template's default 1-3 -- so instead of hardcoding those
-  // defaults, the column count for each section here is sized to whichever
-  // applicant in this export actually has the most entries, so nobody's
-  // 4th+ work experience/job preference/etc silently gets left out.
+  // Computes how many repeating-section rows (job preference, language, etc.)
+  // the export needs, sized to the applicant with the most entries.
   function buildImportCompatibleColumns() {
     const fds = filteredApplicants.map((a) => (a.fullFormData as ApplicantFormData | undefined));
     const maxOf = (get: (fd: ApplicantFormData) => number, min: number) =>
@@ -649,6 +645,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     };
   }
 
+  // Builds the export's column headers, matching applicantImport.ts's expected headers.
   function buildImportCompatibleHeaders(counts: ReturnType<typeof buildImportCompatibleColumns>) {
     const repeat = (n: number, make: (i: number) => string[]) =>
       Array.from({ length: n }, (_, i) => make(i + 1)).flat();
@@ -684,11 +681,12 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       'Other Skills (comma-separated)',
       // IX. Referred Program
       'Referred Program', 'Referred Program (Other)',
-      // Display-only from here -- Import ignores anything it doesn't recognize.
+      // Display-only from here; Import ignores anything it doesn't recognize.
       'Age', 'Skills Summary',
     ];
   }
 
+  // Builds the export's data rows from the filtered applicants.
   function buildImportCompatibleRows(counts: ReturnType<typeof buildImportCompatibleColumns>) {
     const pad = <T,>(arr: T[], n: number): (T | undefined)[] => Array.from({ length: n }, (_, i) => arr[i]);
 
@@ -731,18 +729,15 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     })
   }
 
+  // Exports the filtered applicants to an .xlsx file.
   async function handleExportExcel() {
     setIsExporting(true);
-    // Let the "Exporting..." state actually paint before the synchronous
-    // build/write below blocks the main thread -- without this yield, React
-    // never gets a chance to repaint between the two setIsExporting calls.
+    // Yield so the "Exporting..." state paints before the synchronous build/write blocks the main thread.
     await new Promise((resolve) => setTimeout(resolve, 0));
     try {
       const counts = buildImportCompatibleColumns();
-      // Row 1 just carries a plain label: Import always skips the physical
-      // first row (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2 -- this label is
-      // only so the row doesn't look like a formatting mistake when opened.
+      // Row 1 is a plain label; Import always skips the first row. Real
+      // headers go on row 2.
       const aoa = [["Applicants Export"], buildImportCompatibleHeaders(counts), ...buildImportCompatibleRows(counts)];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
@@ -850,11 +845,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
             />
           )
         )}
-        {/* Vacancies/Referrals/Placements/Employers stay mounted and are only
-            hidden via CSS -- conditionally rendering them (like Applicants'
-            content above) would unmount+remount on every tab switch, resetting
-            their local data and loading state and forcing a fresh fetch (and
-            a "Loading..." flash) every single time the user revisits a tab. */}
+        {/* These tabs stay mounted and are only hidden via CSS, so switching
+            tabs doesn't reset their state or force a refetch. */}
         <div className={activeTab === "vacancies" ? "" : "hidden"}>
           <VacanciesTab
             focusVacancyId={pendingVacancyId}

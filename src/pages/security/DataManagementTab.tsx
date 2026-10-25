@@ -4,17 +4,11 @@ import * as backupService from '../../services/backupService'
 import type { BackupFile } from '../../services/backupService'
 import ConfirmModal from '../shared/ConfirmModal'
 
-// Either an existing on-server backup (Recover in the history list) or a
-// file the admin just picked from their own machine (Restore from File,
-// for when the on-server copy was deleted and only an external copy
-// remains). Both end up hitting the same danger-confirmation UI below.
+// Either an on-server backup (Recover) or a file picked from disk
+// (Restore from File). Both share the same confirmation UI below.
 type RestoreTarget = { kind: 'existing'; name: string } | { kind: 'upload'; file: File }
 
-// Restoring overwrites the live database (and uploads/ if bundled) with one
-// backup's contents -- a misclick here is far more costly than a normal
-// delete confirm, so it requires typing the exact filename rather than a
-// single click, matching the "type to confirm" pattern used for other
-// irreversible actions (e.g. deleting a GitHub repo).
+// Confirms a database restore by typed filename, then runs it with progress.
 function RestoreConfirmModal({ target, onClose, onRestored }: {
   target: RestoreTarget
   onClose: () => void
@@ -28,16 +22,12 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
   const matches = typedName === displayName
   const aliveRef = useRef(true)
   useEffect(() => {
-    // Re-arm on every mount, not just once at construction -- React's Strict
-    // Mode deliberately mounts every component twice in development (mount,
-    // cleanup, mount again) to catch missing-cleanup bugs. Without resetting
-    // this to true here, that harmless double-mount would permanently flip
-    // it to false via the very first cleanup, silently discarding every
-    // future progress update for the rest of this component's real life.
+    // Reset on every mount so a dev-mode double-mount doesn't leave this stuck false.
     aliveRef.current = true
     return () => { aliveRef.current = false }
   }, [])
 
+  // Runs the restore and polls its progress until it finishes.
   const handleRestore = async () => {
     if (!matches || isRestoring) return
     setIsRestoring(true)
@@ -156,8 +146,7 @@ function sumBackupSizes(backups: BackupFile[]): string {
   return `${(total / units.mb).toFixed(0)} MB`
 }
 
-// isActive: SecurityView keeps this tab mounted (hidden) after its first visit,
-// so the backup list is re-fetched each time the tab is shown again.
+// Renders the Backup/Restore database management tab.
 export default function DataManagementTab({ isActive = true }: { isActive?: boolean }) {
   const [backups, setBackups] = useState<BackupFile[]>([])
   const [loading, setLoading] = useState(true)
@@ -179,17 +168,20 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
   const [restoreTarget, setRestoreTarget] = useState<RestoreTarget | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Closes the confirm/result modal.
   const closeModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+  // Shows an error message in the confirm modal.
   const showError = (message: string) =>
     setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message, onConfirm: closeModal })
 
+  // Reloads the list of backups.
   const refreshBackups = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await backupService.listBackups()
       setBackups(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // ignore, keep list empty
     } finally {
       if (!silent) setLoading(false)
     }
@@ -204,6 +196,7 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
     hasLoadedBackups.current = true
   }, [isActive, refreshBackups])
 
+  // Confirms and creates a new database backup.
   const handleBackupDatabase = () => {
     const overLimit = backups.length >= BACKUP_WARNING_THRESHOLD
     setConfirmModal({
@@ -234,6 +227,7 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
     })
   }
 
+  // Downloads a backup file.
   const handleDownload = async (name: string) => {
     try {
       await backupService.downloadBackup(name)
@@ -242,6 +236,7 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
     }
   }
 
+  // Deletes a backup file.
   const handleDeleteBackup = async (name: string) => {
     setDeleteConfirm({ open: false, name: null })
     try {
@@ -252,6 +247,7 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
     }
   }
 
+  // Validates a picked file and queues it for restore.
   const handleFilePicked = (file: File | undefined) => {
     if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file) return
@@ -263,14 +259,10 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
     setRestoreTarget({ kind: 'upload', file })
   }
 
+  // Shows the restore result and reloads the page once acknowledged.
   const handleRestored = async (result: { uploadsRestored: boolean; safetyBackup: string }) => {
     setRestoreTarget(null)
     await refreshBackups()
-    // A restore swaps out the entire database underneath the running app --
-    // every other tab/page already has old data sitting in memory that
-    // won't know to refetch on its own. Reloading the whole page once the
-    // admin acknowledges this dialog is simpler and more reliable than
-    // trying to invalidate every context/query in the app individually.
     setConfirmModal({
       isOpen: true, type: 'success', title: 'Restore Complete',
       message: `The system has been restored${result.uploadsRestored ? ' (database and uploaded files)' : ' (database only -- this backup had no bundled documents)'}.\n\nA safety backup of the previous state was created: ${result.safetyBackup}\n\nThe page will now reload to reflect the restored data.`,

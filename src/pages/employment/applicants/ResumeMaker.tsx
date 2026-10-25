@@ -172,6 +172,7 @@ interface FieldSelection {
   footer: boolean;
 }
 
+// Renders the resume builder: applicant search, field toggles, and A4 preview/export.
 export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -262,6 +263,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     setPages(prev => (JSON.stringify(prev) === JSON.stringify(result) ? prev : result));
   }, [selectedApplicant, selectedFields, resumePhoto]);
 
+  // Reads a picked photo file and sets it as the resume photo.
   function handleResumePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -280,19 +282,21 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
           `${a.firstName} ${a.surname}`.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-  // Builds the full display name shown in the search box after selecting an applicant
+  // Builds an applicant's full display name.
   function buildFullName(applicant: ApplicantData): string {
     const middle = applicant.middleName ? applicant.middleName + ' ' : '';
     const suffix = applicant.suffix ? ' ' + applicant.suffix : '';
     return `${applicant.firstName} ${middle}${applicant.surname}${suffix}`;
   }
 
+  // Selects an applicant and fills the search box with their name.
   function handleApplicantSelect(applicant: ApplicantData) {
     setSelectedApplicant(applicant);
     setSearchQuery(buildFullName(applicant));
     setShowDropdown(false);
   }
 
+  // Toggles whether a resume field is included.
   function toggleField(field: keyof FieldSelection) {
     // When re-enabling Profile Picture, restore the applicant's attached 2x2
     // photo (or null → default user icon when no 2x2 is attached).
@@ -302,6 +306,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     setSelectedFields((prev) => ({ ...prev, [field]: !prev[field] }));
   }
 
+  // Checks whether a field has data to show for the selected applicant.
   function isFieldAvailable(field: keyof FieldSelection): boolean {
     if (!selectedApplicant) return false;
     switch (field) {
@@ -333,6 +338,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     }
   }
 
+  // Calculates age in years from a birth date.
   function calculateAge(birthDate: string): number {
     if (!birthDate || birthDate === 'N/A') return 0;
     const today = new Date();
@@ -343,6 +349,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     return age;
   }
 
+  // Formats a date string for display.
   function formatDate(dateString: string): string {
     if (!dateString || dateString === 'N/A') return '';
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -352,6 +359,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     window.print();
   }
 
+  // Rasterizes each resume page and saves them as a PDF.
   async function handleDownloadPDF() {
     const els = pageRefs.current.filter((el): el is HTMLDivElement => !!el);
     if (!selectedApplicant || els.length === 0) return;
@@ -400,8 +408,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     setShowDropdown(true);
   }
 
-  // School name stored per education level on the applicant (educations.school_name).
-  // Keys: 'elementary' | 'secondary' | 'tertiary' | 'graduate-<idx>'.
+  // Returns the school name for an education-level key.
   const schoolNameFor = (key: string): string => {
     if (!selectedApplicant) return '';
     if (key === 'elementary') return selectedApplicant.elementary?.schoolName ?? '';
@@ -412,7 +419,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     return '';
   };
 
-  // Resume preview: show the applicant's stored school name as plain text.
+  // Renders the school name field for the resume preview.
   const schoolNameField = (key: string) => {
     const name = schoolNameFor(key);
     return name.trim()
@@ -920,9 +927,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
                           style={pageStyle}
                         >
                           {blockIdxs.map(i => {
-                            // `pages` can briefly reference a block index that no longer
-                            // exists (e.g. right after toggling a field off) until the
-                            // layout effect re-measures — skip those to avoid a crash.
+                            // Guard against a stale block index during re-measure.
                             const block = resumeBlocks[i];
                             if (!block) return null;
                             return (

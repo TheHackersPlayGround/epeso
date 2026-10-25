@@ -22,16 +22,13 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
+// Renders the CDSP applicant bulk-import modal.
 function CDSPImportModal({ services, onClose, onImported }: { services: string[]; onClose: () => void; onImported: () => void }) {
   const [file, setFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The applicant list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -40,6 +37,7 @@ function CDSPImportModal({ services, onClose, onImported }: { services: string[]
     setError(null)
   }
 
+  // Imports the picked file and shows the result.
   async function handleImport() {
     if (!file || isImporting) return
     setIsImporting(true)
@@ -58,6 +56,7 @@ function CDSPImportModal({ services, onClose, onImported }: { services: string[]
     }
   }
 
+  // Closes the modal, refreshing the applicant list if anything was imported.
   function handleClose() {
     if (needsRefresh) onImported()
     onClose()
@@ -119,6 +118,7 @@ function CDSPImportModal({ services, onClose, onImported }: { services: string[]
   )
 }
 
+// Renders the import result summary and failed-row list.
 function ImportResultView({ result }: { result: ImportResult }) {
   return (
     <div>
@@ -163,6 +163,7 @@ interface CDSPViewProps {
 
 // ─── Activity status badge ─────────────────────────────────────────────────────
 
+// Returns the badge color classes for an activity's status.
 function activityStatusBadge(status: string) {
   if (status === 'Ongoing')   return 'bg-green-100 text-green-700'
   if (status === 'Completed') return 'bg-blue-100 text-blue-700'
@@ -172,6 +173,7 @@ function activityStatusBadge(status: string) {
 
 // ─── Main CDSPView ─────────────────────────────────────────────────────────────
 
+// Renders the CDSP module: applicant list, activity list, and aging view.
 export default function CDSPView({ onBack }: CDSPViewProps) {
   const { applicants, activities: cdspActivities, services: svcList, loading, refreshProfiles, refreshActivities, refreshIfStale } = useCDSP()
   useRefreshOnReturn(refreshIfStale)
@@ -193,14 +195,11 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     { id: 'age',            label: 'Age',             options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
     { id: 'course',         label: 'Course / Program', type: 'text' as const },
-    // Time since their last genuinely completed activity (Completed + attended),
-    // for anyone not yet placed -- same buckets as the Aging Report, so this
-    // list and that report are always describing the same thing.
+    // Time since last completed activity, for anyone not yet placed, same buckets as the Aging Report.
     { id: 'aging',          label: 'Aging',           options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
 
-  // null for anyone already Placed, or who has never genuinely completed an
-  // activity -- neither belongs in any aging bucket (matches the Aging Report).
+  // null for anyone already Placed or who hasn't completed an activity.
   const agingBucketForApplicant = (a: CDSPApplicant): AgingBucket | null => {
     if (a.placed || !a.lastCompletedDate) return null
     return agingBucket(monthsSince(a.lastCompletedDate))
@@ -233,20 +232,15 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect near the menu's
-  // render block below) -- a hardcoded height guess drifts stale every time
-  // a menu item is added or removed, which is exactly what cut this menu off
-  // after "Record Job Placement" made it taller than the old guess assumed.
+  // anchor is the button's own position, set on click; pos is the menu's
+  // final placement, corrected by measuring its real rendered height once
+  // mounted, instead of a hardcoded guess that goes stale as items change.
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Runs synchronously right after the menu mounts/updates, before the
-  // browser paints -- flips it above the button instead of below when its
-  // real height wouldn't fit in the remaining space, using the menu's
-  // actual measured height rather than a guessed constant.
+  // Runs before paint; flips the menu above the button when its measured
+  // height wouldn't fit below.
   useLayoutEffect(() => {
     if (openActionMenuId === null || !menuAnchor || !menuRef.current) return
     const height = menuRef.current.getBoundingClientRect().height
@@ -307,6 +301,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const recordStart = sorted.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, sorted.length)
 
+  // Creates a new applicant profile.
   const handleAddSave = async (data: Omit<CDSPApplicant, 'id'>) => {
     try {
       await cdspApiService.createProfile(data as unknown as Record<string, unknown>)
@@ -318,6 +313,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
+  // Updates the applicant being edited.
   const handleEditSave = async (data: Omit<CDSPApplicant, 'id'>) => {
     if (!editingApplicant) return
     try {
@@ -330,6 +326,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
+  // Deletes an applicant profile.
   const handleDelete = async (id: number) => {
     try {
       await cdspApiService.deleteProfile(id)
@@ -341,6 +338,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
+  // Assigns the target applicant to an activity.
   const handleAssign = async (activity: CdspActivity) => {
     if (!assignTarget?.beneficiaryServiceId || isAssigning) return
     setIsAssigning(true)
@@ -357,6 +355,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       setIsAssigning(false)
     }
   }
+  // Removes an applicant's activity assignment.
   const handleUnassign = async (targetId?: number) => {
     if (isAssigning) return
     const applicant = targetId
@@ -379,10 +378,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     }
   }
 
-  // Column order/names here must match cdspImport.ts's expected headers
-  // exactly (Import looks columns up by name via get()/norm(), not
-  // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device).
+  // Column order/names must match cdspImport.ts's expected headers exactly,
+  // so an exported .xlsx is directly re-importable.
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email',
@@ -392,10 +389,11 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
     'Employment Status', 'Current Occupation',
     'Service Availed',
     'Date Applied (MM/DD/YYYY)', 'Received By', 'Remarks',
-    // Display-only from here -- Import ignores anything it doesn't recognize.
+    // Display-only from here; Import ignores anything it doesn't recognize.
     'Age', 'Assigned Activity', 'Status',
   ]
 
+  // Exports the filtered applicant list to an .xlsx file.
   const exportToExcel = async () => {
     setIsExporting(true)
     await new Promise(resolve => setTimeout(resolve, 0))
@@ -472,10 +470,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               <span className="text-sm text-gray-800 font-medium">{value}</span>
             </div>
           ) : null
-        // Once an activity is Completed, unassigning would hard-delete the
-        // cdsp_activity_participants row — the only place date_assigned/completed_at
-        // for that history entry live — so changing/unassigning is only offered
-        // beforehand (Planned/Ongoing), preserving the completion record.
+        // Once Completed, unassigning would hard-delete the history record,
+        // so changing/unassigning is only offered beforehand.
         const canChange = !activity || activity.status !== 'Completed'
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
@@ -579,8 +575,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                       const act = cdspActivities.find(x => x.id === entry.activityId)
                       const isCurrent = a.assignedActivityId === entry.activityId
                       const rawStatus = act?.status ?? 'Planned'
-                      // An activity marked Completed only counts as completed for this
-                      // person if they actually attended -- mirrors assignedActivityStatus.
+                      // Completed only counts if they actually attended.
                       const entryStatus = (rawStatus === 'Completed' && entry.attended === false) ? 'Absent' : rawStatus
                       return (
                         <div key={i} className={`rounded-xl border px-5 py-4 flex items-start justify-between gap-3 ${isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -609,7 +604,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         )
       })()}
 
-      {/* Assign Activity Modal — Step 1: Select */}
+      {/* Assign Activity Modal, Step 1: Select */}
       {assignTarget && !selectedActivity && (() => {
         const currentActivity = assignTarget.assignedActivityId
           ? cdspActivities.find(a => a.id === assignTarget.assignedActivityId) ?? null
@@ -719,7 +714,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         )
       })()}
 
-      {/* Assign Activity Modal — Step 2: Confirm */}
+      {/* Assign Activity Modal, Step 2: Confirm */}
       {assignTarget && selectedActivity && (() => {
         const isAssigned = assignTarget.assignedActivityId === selectedActivity.id
         const statusBadge = (s: string) =>
@@ -987,10 +982,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                       {activeFilters.includes('aging') && (
                         <td className="px-4 py-3 whitespace-nowrap">
                           {(() => {
-                            // A bare "—" would mean two very different things here --
-                            // "already placed" and "never completed anything" -- so
-                            // Placed gets its own labeled badge instead of collapsing
-                            // both into the same blank dash.
+                            // Placed gets its own badge instead of collapsing into the same blank dash.
                             if (applicant.placed) {
                               return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
                             }
@@ -1067,13 +1059,9 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find((a) => a.id === openActionMenuId)
         if (!applicant) return null
-        // Only Planned/Ongoing locks the row into "View Assigned Activity" --
-        // once it's Completed/Absent, "Assign Activity" reappears so the person
-        // can be enrolled into another one (PESO allows availing more than one
-        // CDSP activity), mirroring the same fix made for Skills Training.
-        // Uses assignedActivityStatus (attendance-aware, from cdspBuildProfile)
-        // rather than looking the activity up by id -- an activity marked
-        // Completed only counts as completed for someone who actually attended.
+        // Only Planned/Ongoing locks the row into "View Assigned Activity";
+        // once Completed/Absent, "Assign Activity" reappears. Uses
+        // assignedActivityStatus, which is attendance-aware.
         const hasActive = !!applicant.assignedActivityId
           && (applicant.assignedActivityStatus === 'Planned' || applicant.assignedActivityStatus === 'Ongoing')
         const isCompleted = applicant.assignedActivityStatus === 'Completed'

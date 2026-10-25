@@ -95,24 +95,27 @@ interface SLPContextValue {
 
 const SLPContext = createContext<SLPContextValue | null>(null)
 
+// Provides SLP applicants and projects to the app.
 export function SLPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<SLPApplicant[]>([])
   const [projects, setProjects] = useState<SLPProject[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(true)
 
+  // Reloads the list of SLP applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await slpService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // silent
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of SLP projects.
   const refreshProjects = useCallback(async (silent = false) => {
     if (!silent) setLoadingProjects(true)
     try {
@@ -125,11 +128,8 @@ export function SLPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants and projects, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -149,6 +149,7 @@ export function SLPProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the SLP context.
 export function useSLP() {
   const ctx = useContext(SLPContext)
   if (!ctx) throw new Error('useSLP must be used inside SLPProvider')

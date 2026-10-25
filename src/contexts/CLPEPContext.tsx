@@ -84,24 +84,27 @@ interface CLPEPContextValue {
 
 const CLPEPContext = createContext<CLPEPContextValue | null>(null)
 
+// Provides CLPEP applicants and interventions to the app.
 export function CLPEPProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<CLPEPApplicant[]>([])
   const [interventions, setInterventions] = useState<CLPEPIntervention[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingInterventions, setLoadingInterventions] = useState(true)
 
+  // Reloads the list of CLPEP applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await clpepService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // keep list empty on error
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of CLPEP interventions.
   const refreshInterventions = useCallback(async (silent = false) => {
     if (!silent) setLoadingInterventions(true)
     try {
@@ -114,11 +117,8 @@ export function CLPEPProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants and interventions, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -138,6 +138,7 @@ export function CLPEPProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the CLPEP context.
 export function useCLPEP() {
   const ctx = useContext(CLPEPContext)
   if (!ctx) throw new Error('useCLPEP must be used inside CLPEPProvider')

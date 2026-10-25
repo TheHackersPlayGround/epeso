@@ -38,10 +38,12 @@ import './styles/App.css'
 
 type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
 
+// Renders the current page and its navbar based on navigation state.
 function AppContent({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
 
+  // Switches the current page by module id.
   const nav = (id: string) => {
     if (id === 'cdsp') setCurrentPage('cdsp')
     if (id === 'gip') setCurrentPage('gip')
@@ -56,6 +58,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
     if (id === 'report')     setCurrentPage('report')
   }
 
+  // Reads the signed-in user's first name from local storage.
   const getCurrentUsername = () => {
     try { return (JSON.parse(localStorage.getItem('peso_current_user') || '{}') as { firstName?: string }).firstName || 'User' }
     catch { return 'User' }
@@ -257,7 +260,7 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
   )
 }
 
-// An admin who hasn't set up security questions must do so before continuing.
+// Checks whether an administrator still needs to set up security questions.
 function needsSecuritySetup(user: { role?: string; securityQuestionsSet?: boolean }): boolean {
   return user?.role === 'Administrator' && user?.securityQuestionsSet === false
 }
@@ -269,6 +272,7 @@ const PERMISSION_CHECK_MS = 10_000
 const PERMISSION_CHECK_TIMEOUT_MS = 8_000
 const PERMISSION_RETRY_MS = 3_000
 
+// Top-level app: handles login, session restore, and permission checks.
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
@@ -289,7 +293,7 @@ export default function App() {
   // so every open tab gets its own notice.
   const knownUserRef = useRef<StoredUser | null>(null)
 
-  // Read the cached user and decide whether the security-questions setup is required.
+  // Determines whether security-questions setup is required from the cached user.
   const refreshSetupGate = () => {
     try {
       const u = JSON.parse(localStorage.getItem('peso_current_user') || '{}')
@@ -297,8 +301,7 @@ export default function App() {
     } catch { setNeedsSetup(false) }
   }
 
-  // On load, ask the backend who is logged in. If a session cookie is still
-  // valid, restore it (survives a page refresh); otherwise show the login page.
+  // Restores the logged-in session from the backend on load.
   useEffect(() => {
     let active = true
     getMe()
@@ -313,16 +316,7 @@ export default function App() {
     return () => { active = false }
   }, [])
 
-  // Permissions are otherwise only loaded once, at the effect above -- an
-  // admin changing someone's access mid-session would silently do nothing
-  // for that signed-in tab until they next logged out and back in. This
-  // periodically re-checks and, if anything actually changed, holds the new
-  // value back (the cached copy stays in effect) until the user acknowledges
-  // it in PermissionChangeModal, rather than their buttons shifting under
-  // them with no explanation mid-task.
-  // Any request that discovers the account was deactivated or deleted raises
-  // one of these events (see services/axiosClient.ts) -- covers both the
-  // background check and a click on something that was then refused.
+  // Listens for account deactivation/deletion events.
   useEffect(() => {
     if (!isLoggedIn) return
     const onDeactivated = () => setAccountDeactivated(true)
@@ -335,11 +329,10 @@ export default function App() {
     }
   }, [isLoggedIn])
 
-  // A new login (or logging out) starts from a fresh baseline. Declared BEFORE
-  // the polling effect so that on login it runs first and the poller then reads
-  // a clean baseline.
+  // Resets the known-permissions baseline on login/logout.
   useEffect(() => { knownUserRef.current = null }, [isLoggedIn])
 
+  // Periodically polls for permission changes and queues them for acknowledgment.
   useEffect(() => {
     if (!isLoggedIn || needsSetup) return
     let cancelled = false
@@ -352,6 +345,7 @@ export default function App() {
       try { knownUserRef.current = JSON.parse(localStorage.getItem('peso_current_user') || '{}') } catch { knownUserRef.current = {} }
     }
 
+    // Checks the backend for permission changes since the last known state.
     const checkForChanges = () => {
       // Skip while the notice from a previous check is still waiting on the
       // user, and never overlap two checks (a slow server would pile them up).
@@ -404,10 +398,7 @@ export default function App() {
   }, [isLoggedIn, needsSetup, permissionChanges])
 
 
-  // Applies the change the user just acknowledged and reloads -- simplest way
-  // to guarantee every already-mounted screen (not just the next click)
-  // reflects the new permissions, matching how a DB restore elsewhere in the
-  // app also reloads rather than trying to patch every component's state.
+  // Applies an acknowledged permission change and reloads the app.
   const acknowledgePermissionChange = () => {
     // Drafts of a module they can no longer edit could never be opened again,
     // but would keep personal data in this browser -- remove them.
@@ -421,11 +412,12 @@ export default function App() {
       .finally(() => { window.location.reload() })
   }
 
+  // Opens the logout confirmation dialog.
   const handleLogout = () => setLogoutConfirm(true)
 
+  // Logs the user out and clears local session data.
   const confirmLogout = () => {
     setLogoutConfirm(false)
-    // End the backend session; ignore network errors so the UI still logs out.
     apiLogout().catch(() => { /* already effectively logged out */ })
     try { localStorage.removeItem('peso_current_user') } catch { /* quota */ }
     clearAllDrafts()

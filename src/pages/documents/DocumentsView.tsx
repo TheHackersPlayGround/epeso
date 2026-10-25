@@ -21,12 +21,7 @@ interface DocumentsViewProps {
 
 type SortKey = 'date' | 'name' | 'type' | 'size'
 
-// Hoisted to module scope rather than defined inside DocumentsView — if it
-// were a component defined inline in the render body, every re-render (e.g.
-// every keystroke in a modal's input) would give React a brand-new function
-// identity for it, which React treats as a different component type and
-// remounts entirely, including the input inside it (losing focus/selection
-// every keystroke). Same bug class already hit once in GIPMaintenanceForm.tsx.
+// Generic modal shell with a header, title, and close button.
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -41,9 +36,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
   )
 }
 
-// Reads a browser File as a base64 data URL — the backend's upload endpoint
-// (and every other module's document upload) expects that format, not
-// multipart form data.
+// Reads a browser File as a base64 data URL.
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -53,6 +46,7 @@ function readAsDataUrl(file: File): Promise<string> {
   })
 }
 
+// Renders the Documents module: folder tree, file grid/list, and CRUD modals.
 export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const { folders, files, refreshFolders, refreshDocuments, refreshIfStale } = useDocuments()
   useRefreshOnReturn(refreshIfStale)
@@ -111,13 +105,16 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const [filePreview, setFilePreview] = useState<{ isOpen: boolean; fileName: string; fileUrl: string; type: string }>({ isOpen: false, fileName: '', fileUrl: '', type: '' })
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
+  // Returns a folder's direct children, sorted by name.
   const getChildFolders = (parentId: string) =>
     folders
       .filter(f => f.parentId === parentId)
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
 
+  // Returns how many files are in a folder.
   const getFolderItemCount = (folderId: string) => files.filter(f => f.folderId === folderId).length
 
+  // Returns the selected folder's path from root.
   const getBreadcrumb = () => {
     const path: FolderItem[] = []
     let cur = selectedFolder
@@ -131,7 +128,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const toggleFolder = (id: string) =>
     setExpandedFolders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
-  // id itself plus every folder above it up to (and including) root.
+  // Returns a folder's id plus every ancestor folder's id up to root.
   const getAncestorIds = (id: string): string[] => {
     const ids: string[] = []
     let cur: string | null = id
@@ -157,6 +154,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     setFolderMenuPos(prev => (prev && prev.top === top && prev.right === folderMenuAnchor.right) ? prev : { top, right: folderMenuAnchor.right })
   }, [activeFolderMenuId, folderMenuAnchor])
 
+  // Opens or closes a folder's action menu at the clicked button's position.
   function toggleFolderMenu(e: React.MouseEvent, id: string) {
     if (activeFolderMenuId === id) {
       setActiveFolderMenuId(null)
@@ -169,6 +167,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     setActiveFolderMenuId(id)
   }
 
+  // Returns the icon for a file's type.
   const getFileIcon = (type: string, size = 40) => {
     switch (type) {
       case 'pdf': return <FileText size={size} className="text-red-500" />
@@ -182,17 +181,14 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
+  // Converts a formatted size string (e.g. "1.2 MB") to bytes.
   const sizeInBytes = (s: string) => {
     const v = parseFloat(s)
     return s.includes('MB') ? v * 1024 * 1024 : v * 1024
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────────
-  // Shared by the file picker and drag-and-drop — uploads sequentially so one
-  // failure (e.g. a bad file) doesn't abort the rest of the batch. skippedFolders
-  // (drag-and-drop only) is folded into the same result modal rather than a
-  // separate one, so the two don't race/overlap when both files and a folder
-  // are dropped together.
+  // Uploads a batch of files one at a time, reporting any failures.
   const uploadFiles = async (fileList: File[], skippedFolders = 0) => {
     if (fileList.length === 0) {
       if (skippedFolders > 0) {
@@ -241,11 +237,6 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     await uploadFiles(list)
   }
 
-  // Drag-and-drop onto the file area. Without preventDefault here, dropping a
-  // folder falls through to the browser's default action — navigating the
-  // whole tab to a local "Index of ..." directory listing. Folders are
-  // skipped (with a heads-up) rather than uploaded, since there's no bulk/
-  // recursive-folder upload — only individual files.
   const [isDraggingOver, setIsDraggingOver] = useState(false)
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -256,6 +247,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     e.preventDefault()
     setIsDraggingOver(false)
   }
+  // Uploads dropped files, skipping any dropped folders.
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDraggingOver(false)
@@ -279,6 +271,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   }
 
   // ── Folder CRUD ───────────────────────────────────────────────────────────────
+  // Creates a new folder and selects it.
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return
     const name = newFolderName.trim()
@@ -301,6 +294,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
+  // Renames a folder.
   const handleEditFolder = async () => {
     if (!folderToEdit || !editFolderName.trim()) return
     const folder = folderToEdit
@@ -317,10 +311,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
-  // Another user may have deleted (or moved) the item since this list was
-  // loaded. The backend answers 404 "Document not found." / "Folder not found."
-  // / "Parent folder not found."; say so plainly instead of a bare "not found",
-  // and refresh both lists so the stale entry disappears at once.
+  // Shows a friendly message for a 404 and refreshes the lists; returns whether it handled the error.
   const reportMissing = async (err: unknown): Promise<boolean> => {
     const e = err as { status?: number; message?: string }
     if (e?.status !== 404) return false
@@ -334,6 +325,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     return true
   }
 
+  // Moves a folder to the recycle bin.
   const handleDeleteFolder = async (folderId: string) => {
     setDeleteFolderConfirm({ open: false, id: null })
     try {
@@ -351,6 +343,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   }
 
   // ── File CRUD ─────────────────────────────────────────────────────────────────
+  // Moves a file to the recycle bin.
   const handleDeleteFile = async (fileId: string) => {
     setDeleteFileConfirm({ open: false, id: null })
     try {
@@ -363,11 +356,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
-  // A plain <a download> only forces a save when the URL is same-origin —
-  // the backend serves uploads/ from a different origin (localhost vs the
-  // Vite dev server), so the browser was ignoring `download` and just
-  // navigating to view the file instead. Fetching it into a blob first gives
-  // a same-origin blob: URL, which the browser will actually save.
+  // Downloads a file by fetching it into a same-origin blob URL.
   const handleDownloadFile = async (file: FileItem) => {
     if (!file.fileUrl) return
     try {
@@ -384,6 +373,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
+  // Moves a file to another folder.
   const handleMoveFile = async () => {
     if (!fileToMove) return
     const file = fileToMove
@@ -399,6 +389,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     }
   }
 
+  // Renames a file.
   const handleRenameFile = async () => {
     if (!fileToRename || !renameFileValue.trim()) return
     const file = fileToRename
@@ -436,6 +427,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     })()
   }, [docxPreview.isOpen, docxPreview.fileUrl])
 
+  // Opens the preview modal appropriate for a file's type.
   const handleViewFile = (file: FileItem) => {
     if (!file.fileUrl) return
     if (file.type === 'docx' || file.type === 'doc') {
@@ -468,6 +460,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     })
 
   // ── Folder tree ───────────────────────────────────────────────────────────────
+  // Recursively renders a folder and its expanded children.
   const renderFolderTree = (parentId: string, level = 0): React.ReactNode => {
     return getChildFolders(parentId).map(folder => {
       const hasChildren = getChildFolders(folder.id).length > 0
@@ -508,9 +501,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   }
 
   // ── File action menu shared ───────────────────────────────────────────────────
-  // align: which edge of the ⋮ button the menu hangs from. In the grid the button
-  // sits at the card's left, so the menu opens to the right (staying inside the
-  // card); in the list it sits at the row's right end, so it opens to the left.
+  // Renders a file's action menu (view/download/rename/move/delete).
   const FileMenu = ({ file, align = 'right' }: { file: FileItem; align?: 'left' | 'right' }) => (
     <>
       <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />

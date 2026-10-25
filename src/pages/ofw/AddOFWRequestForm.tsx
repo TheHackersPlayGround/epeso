@@ -262,7 +262,7 @@ export default function AddOFWRequestForm({ onClose, onSave, nextRefNumber }: Ad
               </div>
               <div>
                 <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
-                <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} placeholder="e.g. OFW-2026-00001" value={formData.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
+                <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={formData.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
                 {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
               </div>
             </div>

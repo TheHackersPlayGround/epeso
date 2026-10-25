@@ -103,14 +103,9 @@ export type Placement = {
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────────────
-// Employment Facilitation used to keep all five of its lists (applicants,
-// vacancies, referrals, placements, employers) inside the page and its tabs,
-// so leaving the module threw them away and re-entering refetched everything
-// behind a "Loading..." screen -- unlike every other program, whose data lives
-// in a provider mounted once at the app root (see App.tsx). Same fix here: the
-// lists load once, survive navigation, and every mutation refreshes whichever
-// lists it can affect (see the refresh calls in the tabs) instead of relying on
-// a fresh fetch at re-entry.
+// Keeps all five lists (applicants, vacancies, referrals, placements,
+// employers) loaded once and surviving navigation; mutations refresh only
+// the affected lists instead of refetching everything on re-entry.
 
 type ListKey = 'applicants' | 'vacancies' | 'employers' | 'referrals' | 'placements'
 
@@ -153,6 +148,8 @@ const EmploymentContext = createContext<EmploymentContextValue | null>(null)
 const allTrue = (): Record<ListKey, boolean> => ({ applicants: true, vacancies: true, employers: true, referrals: true, placements: true })
 const allFalse = (): Record<ListKey, boolean> => ({ applicants: false, vacancies: false, employers: false, referrals: false, placements: false })
 
+// Provides Employment Facilitation's applicants, vacancies, employers,
+// referrals, and placements to the app.
 export function EmploymentProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<Applicant[]>([])
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
@@ -173,6 +170,7 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
   const failed = useRef<Record<ListKey, boolean>>(allFalse())
   const lastFullRefresh = useRef(0)
 
+  // Loads one list and applies the result, discarding stale responses.
   const load = useCallback(async <T,>(key: ListKey, fetcher: () => Promise<T[]>, apply: (rows: T[]) => void) => {
     const mine = ++latest.current[key]
     inFlight.current[key]++
@@ -195,48 +193,49 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Reloads the list of applicants.
   const refreshApplicants = useCallback(() => load('applicants', listApplicants, setApplicants), [load])
+  // Reloads the list of vacancies.
   const refreshVacancies = useCallback(() => load('vacancies', listVacancies, setVacancies), [load])
-  // Industries are reloaded with the employers: saving an employer can add a new custom industry.
+  // Reloads the industry dropdown options.
   const refreshIndustries = useCallback(async () => {
     try { setIndustryOptions(await listIndustries()) } catch { /* keep the previous choices */ }
   }, [])
+  // Reloads the list of employers and their industry options.
   const refreshEmployers = useCallback(async () => {
     await Promise.all([load('employers', listEmployers, setEmployers), refreshIndustries()])
   }, [load, refreshIndustries])
+  // Reloads the list of referrals.
   const refreshReferrals = useCallback(() => load('referrals', listReferrals, setReferrals), [load])
+  // Reloads the list of placements.
   const refreshPlacements = useCallback(() => load('placements', listPlacements, setPlacements), [load])
 
-  // The setters handed to the tabs for optimistic edits (e.g. dropping a row
-  // the moment it's deleted). A refresh already in flight when the edit happens
-  // started BEFORE it, so its response could land afterwards and undo the edit
-  // (a removed row reappearing) -- and it may also carry other changes made a
-  // moment earlier. So if one is running, start a fresh fetch right after the
-  // edit: it supersedes the older one (see `latest`) and reflects both.
+  // Applies an optimistic referral edit, then re-syncs if a refresh was in flight.
   const setReferralsOptimistic = useCallback<Dispatch<SetStateAction<Referral[]>>>(value => {
     const pending = inFlight.current.referrals > 0
     setReferrals(value)
     if (pending) void refreshReferrals()
   }, [refreshReferrals])
+  // Applies an optimistic placement edit, then re-syncs if a refresh was in flight.
   const setPlacementsOptimistic = useCallback<Dispatch<SetStateAction<Placement[]>>>(value => {
     const pending = inFlight.current.placements > 0
     setPlacements(value)
     if (pending) void refreshPlacements()
   }, [refreshPlacements])
+  // Applies an optimistic employer edit, then re-syncs if a refresh was in flight.
   const setEmployersOptimistic = useCallback<Dispatch<SetStateAction<Employer[]>>>(value => {
     const pending = inFlight.current.employers > 0
     setEmployers(value)
     if (pending) void refreshEmployers()
   }, [refreshEmployers])
 
+  // Reloads every list.
   const refreshAll = useCallback(async () => {
     lastFullRefresh.current = Date.now()
     await Promise.all([refreshApplicants(), refreshVacancies(), refreshEmployers(), refreshReferrals(), refreshPlacements()])
   }, [refreshApplicants, refreshVacancies, refreshEmployers, refreshReferrals, refreshPlacements])
 
-  // A list whose last load FAILED is always retried on entry, however recent
-  // the last full refresh was -- otherwise a hiccup at login would leave it
-  // empty (the old per-tab fetch always retried on entry).
+  // Reloads every list, skipping if a recent refresh succeeded.
   const refreshIfStale = useCallback(async () => {
     const anyFailed = Object.values(failed.current).some(Boolean)
     if (!anyFailed && Date.now() - lastFullRefresh.current < REFRESH_GUARD_MS) return
@@ -258,6 +257,7 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the Employment context.
 export function useEmployment() {
   const ctx = useContext(EmploymentContext)
   if (!ctx) throw new Error('useEmployment must be used inside EmploymentProvider')

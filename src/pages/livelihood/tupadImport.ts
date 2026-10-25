@@ -11,8 +11,7 @@
 //      beneficiaries.barangay_id is NOT NULL), and POST each row through
 //      tupadService.createProfile.
 //
-// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
-// ExcelJS -- same split as the other modules' importers.
+// Reading the workbook uses SheetJS (xlsx); styling/validation on write uses ExcelJS.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -95,11 +94,13 @@ const TEMPLATE_VALIDATION_ROWS = 200
 const FIRST_DATA_ROW = 3
 
 const MAX_VALIDATION_ERROR_LEN = 200
+// Builds the dropdown's validation error message.
 function validationErrorMessage(options: string[]): string {
   const enumerated = `Please choose one of: ${options.join(', ')}`
   return enumerated.length <= MAX_VALIDATION_ERROR_LEN ? enumerated : 'Please choose a value from the dropdown list.'
 }
 
+// Generates and downloads the TUPAD beneficiary import template.
 export async function downloadImportTemplate(): Promise<void> {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Applicants')
@@ -189,15 +190,18 @@ export async function downloadImportTemplate(): Promise<void> {
 
 // ─── Parsing helpers ─────────────────────────────────────────────────────────
 
+// Normalizes a header or cell value for comparison.
 function norm(v: unknown): string {
   return String(v ?? '').replace(/\*/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
+// Returns the canonical option matching `value`, or "".
 function pickEnum(value: string, options: string[]): string {
   const n = norm(value)
   return options.find((o) => norm(o) === n) ?? ''
 }
 
+// Parses a date string into ISO (YYYY-MM-DD) format.
 function toIsoDate(v: string): string {
   const s = v.trim()
   if (!s) return ''
@@ -221,6 +225,7 @@ function toIsoDate(v: string): string {
 
 type Row = Record<string, string>
 
+// Reads one column's value from a parsed row.
 function get(row: Row, header: string): string {
   return (row[norm(header)] ?? '').trim()
 }
@@ -233,15 +238,18 @@ type ResolveCaches = {
   barangay: Map<string, LocationOption | null>
 }
 
+// Creates empty address-lookup caches.
 function makeCaches(): ResolveCaches {
   return { province: new Map(), city: new Map(), barangay: new Map() }
 }
 
+// Finds an option whose name matches exactly (case-insensitive).
 function exactMatch(options: LocationOption[], name: string): LocationOption | null {
   const target = norm(name)
   return options.find((o) => norm(o.name) === target) ?? null
 }
 
+// Resolves a province name to its dataset record.
 async function resolveProvince(name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = norm(name)
   if (caches.province.has(key)) return caches.province.get(key)!
@@ -250,6 +258,7 @@ async function resolveProvince(name: string, caches: ResolveCaches): Promise<Loc
   return match
 }
 
+// Resolves a city/municipality name within a province to its dataset record.
 async function resolveCity(provinceId: number, name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = `${provinceId}::${norm(name)}`
   if (caches.city.has(key)) return caches.city.get(key)!
@@ -258,6 +267,7 @@ async function resolveCity(provinceId: number, name: string, caches: ResolveCach
   return match
 }
 
+// Resolves a barangay name within a city to its dataset record.
 async function resolveBarangay(cityId: number, name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = `${cityId}::${norm(name)}`
   if (caches.barangay.has(key)) return caches.barangay.get(key)!
@@ -266,6 +276,7 @@ async function resolveBarangay(cityId: number, name: string, caches: ResolveCach
   return match
 }
 
+// Resolves a province/city/barangay triple to a barangay id, or throws.
 async function resolveAddress(
   provinceName: string,
   cityName: string,
@@ -292,6 +303,7 @@ async function resolveAddress(
 
 // ─── Row -> create-profile payload ───────────────────────────────────────────
 
+// Validates one spreadsheet row and converts it into a create-profile payload.
 async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<string, unknown>> {
   const lastName = get(row, 'Last Name')
   const firstName = get(row, 'First Name')
@@ -342,14 +354,17 @@ export type ImportResult = { total: number; succeeded: number; failed: ImportRow
 const EXAMPLE_SURNAME = 'dela cruz'
 const EXAMPLE_FIRST = 'juan'
 
+// Checks whether a row has no values at all.
 function isEmptyRow(row: Row): boolean {
   return Object.values(row).every((v) => String(v ?? '').trim() === '')
 }
 
+// Checks whether a row is the template's example row.
 function isExampleRow(row: Row): boolean {
   return norm(get(row, 'Last Name')) === EXAMPLE_SURNAME && norm(get(row, 'First Name')) === EXAMPLE_FIRST
 }
 
+// Parses an uploaded workbook and imports its rows as TUPAD applicants.
 export async function importTupadApplicants(
   file: File,
   onProgress?: (done: number, total: number) => void,
@@ -404,8 +419,7 @@ export async function importTupadApplicants(
     return { total, succeeded: 0, failed: [] }
   }
 
-  // Every row resolved locally — hand the whole batch to the backend, which
-  // writes it inside a single DB transaction: all rows land, or none do.
+  // Hand the resolved batch to the backend in one DB transaction.
   try {
     await importProfilesBulk(payloads)
     return { total, succeeded: total, failed: [] }

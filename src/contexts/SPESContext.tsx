@@ -97,24 +97,27 @@ interface SPESContextValue {
 
 const SPESContext = createContext<SPESContextValue | null>(null)
 
+// Provides SPES applicants and batches to the app.
 export function SPESProvider({ children }: { children: ReactNode }) {
   const [applicants, setApplicants] = useState<SPESApplicant[]>([])
   const [spesBatches, setSpesBatches] = useState<SPESBatch[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingBatches, setLoadingBatches] = useState(true)
 
+  // Reloads the list of SPES applicants.
   const refreshProfiles = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
       const res = await spesService.listProfiles()
       setApplicants(res.data ?? [])
     } catch {
-      // silent — show empty list rather than crashing
+      // silent
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
 
+  // Reloads the list of SPES batches.
   const refreshBatches = useCallback(async (silent = false) => {
     if (!silent) setLoadingBatches(true)
     try {
@@ -127,11 +130,8 @@ export function SPESProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Re-fetch (silently: no spinner, so an open form is never replaced) every
-  // time the module is opened or the window regains focus, so other staff
-  // members' changes show up. A call within REFRESH_GUARD_MS of the previous
-  // one is skipped: it is the same user action firing several triggers.
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes applicants and batches, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -151,6 +151,7 @@ export function SPESProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the SPES context.
 export function useSPES() {
   const ctx = useContext(SPESContext)
   if (!ctx) throw new Error('useSPES must be used inside SPESProvider')

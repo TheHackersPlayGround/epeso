@@ -1,7 +1,4 @@
-// Shared across every program module (starting with Skills Training) -- one
-// modal, backed by the one shared job_placements table, instead of a
-// separate placement form built per module. Any module's action menu can
-// open this the same way, passing that applicant's own beneficiaryServiceId.
+// Job placement modal shared by every program module.
 
 import { useState, useEffect } from 'react'
 import { X, Briefcase, Edit2, Trash2, Loader2, Plus } from 'lucide-react'
@@ -21,6 +18,7 @@ interface JobPlacementModalProps {
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder-gray-400'
 const labelCls = 'block text-sm font-medium text-gray-700 mb-1'
 
+// Returns a blank job placement form.
 function emptyFormState() {
   return { jobTitle: '', employer: '', dateHired: '', employmentType: '', remarks: '' }
 }
@@ -28,11 +26,13 @@ function emptyFormState() {
 // Mirrors job_placement_employment_type_enum (migration 057).
 const EMPLOYMENT_TYPE_OPTIONS = ['Full-time', 'Part-time', 'Contractual']
 
+// Extracts a readable error message from a failed request, or falls back.
 function errMsg(e: unknown, fallback: string) {
   return (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
     ?? (e as { message?: string })?.message ?? fallback
 }
 
+// Renders the job placement list and add/edit form for one applicant.
 export default function JobPlacementModal({ beneficiaryServiceId, applicantName, canManage, onClose }: JobPlacementModalProps) {
   const [placements, setPlacements] = useState<JobPlacement[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,12 +44,13 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; label: string } | null>(null)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
 
+  // Reloads this applicant's job placements.
   const load = async () => {
     setLoading(true)
     try {
       setPlacements(await jobPlacementService.listByApplicant(beneficiaryServiceId))
     } catch {
-      // silent — show empty list rather than crashing
+      // fail quietly
     } finally {
       setLoading(false)
     }
@@ -57,20 +58,25 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
 
   useEffect(() => { load() }, [beneficiaryServiceId])
 
+  // Opens the form to add a new placement.
   const openAdd = () => { setEditingId(null); setForm(emptyFormState()); setErrors({}); setFormOpen(true) }
+  // Opens the form pre-filled to edit an existing placement.
   const openEdit = (p: JobPlacement) => {
     setEditingId(p.id)
     setForm({ jobTitle: p.jobTitle, employer: p.employer, dateHired: p.dateHired, employmentType: p.employmentType, remarks: p.remarks })
     setErrors({})
     setFormOpen(true)
   }
+  // Closes the add/edit form.
   const closeForm = () => { setFormOpen(false); setEditingId(null) }
 
+  // Updates one form field and clears its error.
   const set = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
     setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
   }
 
+  // Validates the required form fields.
   const validate = () => {
     const errs: Record<string, string> = {}
     if (!form.jobTitle.trim()) errs.jobTitle = 'Job title is required'
@@ -80,6 +86,7 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
     return Object.keys(errs).length === 0
   }
 
+  // Creates or updates the job placement being edited.
   const handleSave = async () => {
     if (isSaving || !validate()) return
     setIsSaving(true)
@@ -99,6 +106,7 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
     }
   }
 
+  // Deletes the job placement pending confirmation.
   const handleDelete = async () => {
     if (!deleteConfirm) return
     try {

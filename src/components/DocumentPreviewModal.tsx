@@ -1,9 +1,6 @@
 import { X, FileText, FileSpreadsheet } from 'lucide-react'
 
-// Structural shape shared by DILPSavedDocument / TUPADSavedDocument /
-// SLPSavedDocument / CLPEPSavedDocument (and the legacy LivelihoodSavedDocument) --
-// each context defines its own type, but this is the subset the preview modal
-// actually needs, so any of them can be passed in as-is.
+// Minimal document shape needed to preview a file.
 export interface PreviewableDocument {
   id: string
   fileName: string
@@ -22,19 +19,15 @@ const IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i
 const PDF_RE = /\.pdf$/i
 const EXCEL_RE = /\.(xlsx|xls|csv)$/i
 
-// Rendered as a sibling outside the (possibly view-mode-dimmed) form fieldset --
-// a `fixed inset-0` modal nested inside an ancestor with `opacity`/`filter`/
-// `transform` stops being positioned relative to the viewport and gets
-// squashed into that ancestor's box instead.
+// Renders a modal preview of a document (image, PDF, or a fallback message).
 export default function DocumentPreviewModal({ doc, onClose }: DocumentPreviewModalProps) {
   const isImage = IMAGE_RE.test(doc.fileName)
   const isPdf = PDF_RE.test(doc.fileName)
   const isExcel = EXCEL_RE.test(doc.fileName)
   const src = doc.url || doc.dataUrl
 
-  // PDFs render via the browser's native viewer, which needs real room for its
-  // own toolbar/thumbnail sidebar -- so it gets a near-fullscreen modal, unlike
-  // the fixed, more modest box images/fallback content use (which just center-fit).
+  // PDFs get a near-fullscreen modal for the browser's native viewer toolbar;
+  // images/fallback content use a smaller, fixed box.
   const fullscreen = isPdf
 
   return (
@@ -59,12 +52,8 @@ export default function DocumentPreviewModal({ doc, onClose }: DocumentPreviewMo
           ) : isPdf ? (
             <iframe src={src} className="w-full h-full min-h-[600px] rounded-lg shadow-lg" title="PDF Preview" />
           ) : isExcel ? (
-            // Excel/CSV documents aren't accepted as supporting-document uploads
-            // (the file picker only offers PDF/JPG/PNG) -- this branch only
-            // exists so a pre-existing spreadsheet attachment (from before that
-            // restriction, or a manually renamed/uploaded file) shows a clear,
-            // specific message instead of silently falling into the generic
-            // "Preview not available" case below.
+            // Excel/CSV isn't an accepted upload type, but a pre-existing
+            // attachment can still have one; show a specific message for it.
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <FileSpreadsheet size={64} className="mb-4 text-gray-400" />
               <p className="text-lg font-medium mb-2">Excel preview isn't supported</p>

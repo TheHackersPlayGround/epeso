@@ -41,26 +41,30 @@ const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 // attach to.
 const ROOT_FOLDER: FolderItem = { id: 'root', name: 'Documents', parentId: null }
 
+// Guesses a file's type from its extension.
 function inferFileType(name: string): FileItem['type'] {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
   const known = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', ...IMAGE_TYPES]
   return (known.includes(ext) ? ext : 'other') as FileItem['type']
 }
 
+// Provides document folders and files to the app.
 export function DocumentsProvider({ children }: { children: ReactNode }) {
   const [folders, setFolders] = useState<FolderItem[]>([ROOT_FOLDER])
   const [files, setFiles]     = useState<FileItem[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Reloads the list of folders.
   const refreshFolders = useCallback(async () => {
     try {
       const res = await documentsService.listFolders()
       setFolders([ROOT_FOLDER, ...(res.data ?? [])])
     } catch {
-      // silent — show empty list rather than crashing
+      // ignore, keep list empty
     }
   }, [])
 
+  // Reloads the list of documents.
   const refreshDocuments = useCallback(async () => {
     try {
       const res = await documentsService.listDocuments()
@@ -71,10 +75,8 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Silent re-sync (these two never touch `loading`) every time the Documents
-  // tab is opened or the window regains focus. A call within REFRESH_GUARD_MS
-  // of the previous one is skipped (same user action, several triggers).
-  const lastLoad = useRef(0) // set when the initial load starts (below)
+  const lastLoad = useRef(0)
+  // Refreshes folders and documents, skipping if the last load was too recent.
   const refreshIfStale = useCallback(async () => {
     if (Date.now() - lastLoad.current < REFRESH_GUARD_MS) return
     lastLoad.current = Date.now()
@@ -94,6 +96,7 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Returns the Documents context.
 export function useDocuments() {
   const ctx = useContext(DocumentsContext)
   if (!ctx) throw new Error('useDocuments must be used inside DocumentsProvider')

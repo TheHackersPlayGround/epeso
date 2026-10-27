@@ -20,10 +20,8 @@ interface PermissionChangeModalProps {
   onAcknowledge: () => void
 }
 
-// Shown to a signed-in user when a background check (see App.tsx) notices an
-// administrator changed their permissions mid-session -- without this, their
-// buttons would silently stop matching their real access until they next
-// logged out and back in, with no indication anything had changed.
+// Shown when a background check (App.tsx) notices an admin changed this user's
+// permissions mid-session, so their buttons don't silently go stale.
 export default function PermissionChangeModal({ isOpen, changes, hasUnsavedForm = false, onAcknowledge }: PermissionChangeModalProps) {
   if (!isOpen || changes.length === 0) return null
   return (

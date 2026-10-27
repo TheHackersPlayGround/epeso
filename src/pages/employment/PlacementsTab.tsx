@@ -216,11 +216,8 @@ type PlacementsTableProps = {
 
 function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatus, onRecordPromotion }: PlacementsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the button's position; pos is the menu's final placement, corrected
+  // by measuring its real rendered height once mounted (see layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -241,9 +238,8 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the trigger; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the trigger; the layout effect corrects it
+    // to the real measured height right after it mounts.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
@@ -853,9 +849,7 @@ function RecordPromotionModal({ placement, onClose, onSave }: RecordPromotionMod
 export default function PlacementsTab({ onNavigateToVacancy }: {
   onNavigateToVacancy?: (id: number) => void
 } = {}) {
-  // The list lives in EmploymentProvider (shared with the other tabs and
-  // kept across visits to this module) -- see the refresh calls below for
-  // how a change here reaches the tabs it can affect.
+  // The list lives in EmploymentProvider, shared with and kept across the other tabs.
   const { placements, setPlacements, loading: listLoading, refreshPlacements, refreshApplicants, refreshVacancies } = useEmployment()
   const loading = listLoading.placements
   const [searchQuery, setSearchQuery] = useState('')

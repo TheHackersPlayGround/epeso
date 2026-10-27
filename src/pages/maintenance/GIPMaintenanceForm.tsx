@@ -53,10 +53,8 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 // ─── Field ────────────────────────────────────────────────────────────────────
-// Defined at module scope (not inside the form component) so its identity is
-// stable across renders — otherwise React treats it as a brand-new component
-// type on every keystroke and remounts the underlying <input>, losing focus
-// after a single character.
+// Defined at module scope so its identity stays stable across renders --
+// otherwise each keystroke remounts the <input> and loses focus.
 
 type WorkplaceFormState = Omit<GIPWorkplace, 'id'>
 
@@ -213,9 +211,7 @@ export default function GIPMaintenanceForm({
           id: Date.now().toString() + Math.random().toString(36),
           fileName: file.name,
           fileSize: formatFileSize(file.size),
-          // A blob: URL (not the data: dataUrl) so "View" works before the
-          // workplace is saved — Chrome/Brave block opening data: URIs in a
-          // new tab, which would otherwise show a blank "Untitled" tab.
+          // blob: URL, not data: -- Chrome/Brave block opening data: URIs in a new tab.
           url: URL.createObjectURL(file),
           dataUrl,
         }

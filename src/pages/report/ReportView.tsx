@@ -111,9 +111,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [fromDate, setFromDate] = useState(`${currentYear}-01-01`)
   const [toDate, setToDate] = useState(todayIso)
   const [generatedReport, setGeneratedReport] = useState<any>(null)
-  // Skills Training/CDSP/GIP Aging Reports share the same downstream
-  // handling (Excel/PDF/on-screen); CDSP adds a sub-service breakdown on top.
-  // Computed once here so handleExport and the JSX gates below stay in sync.
+  // Whether the generated report is an Aging report (Skills Training/CDSP/GIP).
   const isGeneratedReportAging = !!generatedReport && (
     (generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging')
     || (generatedReport.category === 'cdsp' && generatedReport.cdspReportType === 'aging')
@@ -128,9 +126,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false)
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
-  // Which row's Export dropdown is open (by _activityId/_batchId), plus its
-  // viewport position for a position:fixed menu so it isn't clipped by the
-  // scrollable table or stuck under sticky cells.
+  // Which row's Export dropdown is open, plus its viewport position for a fixed-position menu.
   const [rowExportMenuId, setRowExportMenuId] = useState<number | null>(null)
   const [rowExportMenuPos, setRowExportMenuPos] = useState<{ top: number; left: number } | null>(null)
   // Livelihood-only: which sub-program rowExportMenuId belongs to, since
@@ -182,9 +178,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
   }
 
-  // Forces every cell in the workbook to Times New Roman as a final pass,
-  // keeping each cell's existing bold/color/size. Not used by the PESO/LMI
-  // Monthly Report or General PESO Report, which patch a template directly.
+  // Forces every cell to Times New Roman, keeping existing bold/color/size.
+  // Not used by reports that patch a template directly.
   const EXCEL_FONT_NAME = 'Times New Roman'
   const applyExcelFont = (wb: ExcelJS.Workbook) => {
     wb.eachSheet(ws => {
@@ -203,9 +198,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     })
   }
 
-  // Splits usableWidth across columns by actual rendered text width
-  // (header vs. longest value), not a raw character count, so narrow
-  // columns like dates don't wrap unnecessarily.
+  // Splits usableWidth across columns by actual rendered text width, not raw character count.
   const computeColumnWidths = (
     doc: jsPDF,
     headerLabels: string[],
@@ -226,10 +219,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return colWeights.map(w => (w / totalWeight) * usableWidth)
   }
 
-  // Shared PDF builder for the per-activity/batch roster exports. Landscape,
-  // same Folio paper as the main report.
-  // cellFill is optional: only the Skills Training roster uses it, to color
-  // the Attendance column by Present/Absent.
+  // Shared PDF builder for per-activity/batch roster exports.
+  // cellFill is optional, used by Skills Training to color the Attendance column.
   const buildRosterPdf = (
     title: string,
     infoLines: { label: string; value: string | number }[][],
@@ -305,8 +296,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   // not remaining (see the Participants column for that).
   const SPES_BATCH_COLUMNS = ['Batch Name', 'Employer', 'Deployment Location', 'Start Date', 'End Date', 'Coordinator', 'Total Slots', 'Funding Source', 'Participants', 'Status']
   // Livelihood Project/Intervention List columns, one row per project/intervention.
-  // Each program's own columns match what that program actually stores; the
-  // combined "All Programs" view uses a shared column set across all four.
+  // "All Programs" uses a shared column set across all four.
   const LIVELIHOOD_DILP_PROJECT_COLUMNS = ['No.', 'Project ID', 'Project Name', 'Type of Project', 'Program Component',
     'Way of Implementation', 'Location', 'Assistance Amount', 'Release Date', 'Beneficiaries Assigned', 'Status']
   const LIVELIHOOD_TUPAD_PROJECT_COLUMNS = ['No.', 'Project Title', 'Description', 'Date', 'Location', 'Facilitator',
@@ -354,10 +344,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return { singular: 'Project/Intervention', plural: 'Projects/Interventions' }
   }
 
-  // Possible statuses per list, pre-seeded at 0 so an empty status still
-  // shows its own row. Each record type only lists statuses it can have;
-  // "Cancelled" isn't seeded since no Maintenance screen can set it, but a
-  // record that has it is still counted.
+  // Possible statuses per list, pre-seeded at 0 so an empty status still shows its own row.
   const CDSP_SESSION_STATUSES = ['Planned', 'Ongoing', 'Completed']
   const SPES_BATCH_STATUSES = ['Planned', 'Ongoing', 'Completed']
   const SKILLS_ACTIVITY_STATUSES = ['Planned', 'Ongoing', 'Completed']
@@ -415,9 +402,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return map[category] || []
   }
 
-  // Columns shown by default; the rest are optional (user turns them on via the
-  // Columns menu). Only CDSP/GIP distinguish default vs optional; others show all.
-  // "Status" is never on by default anywhere; still toggleable via the Columns menu.
+  // Default columns shown, rest toggleable via the Columns menu; only CDSP/GIP
+  // distinguish default vs optional, others show all. Status is never default.
   const getDefaultColumns = (category: ReportCategory): string[] => {
     const withoutStatus = (cols: string[]) => cols.filter(c => c !== 'Status')
     // CDSP Activity List: all columns shown by default.
@@ -780,9 +766,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 _projectId: p.id, // used only for the export, not rendered
               }))
           }
-          // All Programs: combined view. The four record types don't share a
-          // common shape (CLPEP has no assistance amount/release date), so
-          // fields a program doesn't store show "-".
+          // All Programs combined view; the four record types don't share a
+          // common shape, so fields a program doesn't store show "-".
           const rows: any[] = [
             ...dilpProjects.map(p => ({
               ...p, _program: 'DILEEP (DILP)', _name: p.projectName,
@@ -806,9 +791,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
             })),
           ]
           return rows
-            // Reaching here means programType is '' (All Programs); the four
-            // branches above already cover every specific program.
-            // DILP has no start date, so it filters on the date entered instead.
+            // Reached only for "All Programs"; DILP has no start date so it
+            // filters on the date entered instead.
             .filter(p => inSelectedPeriod(p._date) && matchesListStatus(p.status))
             .map((p, i) => ({
               'No.': i + 1,
@@ -826,9 +810,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
               _projectId: p.id,
             }))
         }
-        // Combines the four Livelihood sub-programs into one row shape, joining
-        // each applicant to their assigned project/intervention for assistance
-        // amount and release date.
+        // Combines the four Livelihood sub-programs into one row shape, joined
+        // to each applicant's assigned project/intervention.
         const rows: any[] = [
           ...dilpApplicants.map(a => ({ ...a, _program: 'DILEEP (DILP)', _projectName: a.assignedProjectName, _project: dilpProjects.find(p => p.id === a.assignedProjectId) })),
           ...tupadApplicants.map(a => ({ ...a, _program: 'DILEEP (TUPAD)', _projectName: a.assignedProjectName, _project: tupadProjects.find(p => p.id === a.assignedProjectId) })),
@@ -942,9 +925,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     }
   }
 
-  // General PESO Report: cross-program summary pulled live, scoped to the
-  // selected programs. Gets an on-screen preview; only Excel export is
-  // special-cased later to carry a real native chart.
+  // General PESO Report: cross-program summary for the selected programs.
+  // Only its Excel export is special-cased later to carry a real native chart.
   const handleGenerateGeneralPesoReport = async () => {
     if (selectedGeneralPrograms.length === 0) {
       setInfoModal({ isOpen: true, title: 'Error', message: 'Select at least one program to include.' })
@@ -1096,9 +1078,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     }
   }
 
-  // CDSP Aging Report: same shape as Skills Training's, plus a sub-service
-  // dimension. The "Program Type" dropdown doubles as the sub-service filter;
-  // "All Programs" adds a by-sub-service breakdown table.
+  // CDSP Aging Report: like Skills Training's, plus a sub-service dimension;
+  // "Program Type" dropdown doubles as the sub-service filter.
   const handleGenerateCdspAgingReport = async () => {
     setCdspAgingLoading(true)
     try {
@@ -1387,9 +1368,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     resolve(canvas.toDataURL('image/png'))
   })
 
-  // Report titles show the spelled-out program name alongside its abbreviation.
-  // CDSP's comes from the `services` table; GIP/SPES use the same wording as
-  // their own module pages. The rest already use a full name, not an abbreviation.
+  // Report titles pair the spelled-out program name with its abbreviation;
+  // CDSP's comes from the `services` table, GIP/SPES match their own pages.
   const FULL_PROGRAM_NAMES: Partial<Record<ReportCategory, string>> = {
     gip: 'Government Internship Program (GIP)',
     spes: 'Special Program for Employment of Students (SPES)',
@@ -1451,10 +1431,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         if (repeatHeader) ws.pageSetup.printTitlesRow = '1:1'
       }
 
-      // A properly-formatted data table: ALL-CAPS, bold, centered header (plain, no
-      // fill); bordered cells; auto-fit column widths; frozen header row.
-      // cellFill is optional; only the Aging Report uses it to color the
-      // "Time Since Completion" cell by bucket.
+      // Builds a formatted data table: caps bold header, bordered cells, auto-fit
+      // widths, frozen header row. cellFill lets Aging Report color cells by bucket.
       const addTable = (ws: ExcelJS.Worksheet, cols: string[], rows: any[], cellFill?: (col: string, row: any) => string | undefined) => {
         const header = ws.addRow(cols.map(c => c.toUpperCase()))
         header.height = 20
@@ -1465,9 +1443,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
           cell.border = BORDERS
         })
         rows.forEach(row => {
-          // Matches the "-" placeholder the PDF/on-screen table use for missing
-          // values (typeof-number guard first, so a legitimate 0 isn't blanked) --
-          // otherwise the Excel sheet shows an empty cell where PDF/preview show "-".
+          // Matches the "-" placeholder PDF/on-screen use for missing values;
+          // typeof-number guard keeps a legitimate 0 from being blanked.
           const r = ws.addRow(cols.map(c => { const v = row[c]; return typeof v === 'number' ? v : (v || '-') }))
           r.eachCell((cell, colIdx) => {
             cell.border = BORDERS; cell.alignment = { vertical: 'middle' }
@@ -1496,9 +1473,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const groupColHeader = a.groupLabel.replace(/^Participants by /i, '').replace(/^Beneficiaries by /i, '')
         // Breakdown by program is only meaningful when viewing all programs.
         const hasProgramTypeFilter = ['cdsp', 'livelihood'].includes(generatedReport.category)
-        // byGroup means "count by program type" normally, or aging buckets for
-        // Aging Reports (always shown). General PESO Report skips it since its
-        // Detailed Report is already one row per program.
+        // byGroup is program-type counts normally, or aging buckets for Aging
+        // Reports; General PESO Report skips it (already one row per program).
         const showBreakdown = generatedReport.category !== 'general-peso' && (isAgingReport || !hasProgramTypeFilter || !generatedReport.programType)
         // Aging gets its own title suffix so it's not confused with the plain
         // Participant List summary sharing this same sheet.
@@ -1520,9 +1496,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         const groupTableCategoryStartRow = aoa.length - a.byGroup.length + 1
         const groupTableSeriesNameRow = groupTableCategoryStartRow - 1
 
-        // Aging Report only: a second small table breaking each bucket down by
-        // sex, feeding the Excel stacked bar chart below. Only exists for Aging
-        // Report analytics, so this is computed inside the same guard.
+        // Aging Report only: a second table breaking each bucket down by sex,
+        // feeding the Excel stacked bar chart below.
         let sexTableCategoryStartRow = 0
         if (isAgingSummary) {
           aoa.push(
@@ -1532,9 +1507,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
           // Same idea as groupTableCategoryStartRow, captured now before any later append shifts aoa.length.
           sexTableCategoryStartRow = aoa.length - a.byGroupBySex.length + 1
         }
-        // CDSP Aging only: a plain text breakdown by sub-service, shown only
-        // with "All Programs" selected. Just a supplementary count table, not
-        // fed to a native chart.
+        // CDSP Aging only: supplementary sub-service count table, shown only
+        // with "All Programs" selected (not fed to a native chart).
         if (isAgingSummary && generatedReport.category === 'cdsp' && !generatedReport.programType && a.byGroupBySubService?.length > 0) {
           aoa.push(
             [], ['BENEFICIARIES BY SUB-SERVICE'], ['Sub-Service', 'Participants'],
@@ -1684,9 +1658,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         applyPrint(ws)
       }
 
-      // Livelihood Project/Intervention List summary sheet: same shape again.
-      // The "by Program Type" breakdown only applies to "All Programs"; a
-      // specific program has no Program Type column to break down.
+      // Livelihood Project/Intervention List summary sheet; "by Program Type"
+      // breakdown only applies to "All Programs".
       if (generatedReport.category === 'livelihood' && generatedReport.livelihoodReportType === 'projects') {
         const rows = generatedReport.data as any[]
         const unit = livelihoodUnitLabel(generatedReport.programType)
@@ -1991,10 +1964,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
       setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
 
     } else if (format === 'pdf') {
-      // Switch to landscape when the visible columns need more room than a
-      // Folio portrait page offers. General PESO Report is always landscape
-      // regardless of column count, to match its Excel/Word exports and fit
-      // its two side-by-side charts.
+      // Landscape when visible columns need more room than Folio portrait
+      // offers; General PESO Report is always landscape to fit its two charts.
       const visibleColsForOrientation = generatedReport.columns.filter((c: string) => visibleColumns[c])
       const MIN_COL_WIDTH_MM = 22
       const orientation: 'portrait' | 'landscape' =
@@ -2007,9 +1978,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const centerX = pageWidth / 2
       const usableWidth = pageWidth - 28 // 14mm margin on each side
       let y = 20
-      // Draws a plain bordered table for "label: value" or "category: count"
-      // rows, matching the Word export's small tables. Returns the y position
-      // just below the drawn table.
+      // Draws a bordered "label: value" table matching Word's; returns the y
+      // position just below it.
       const drawSummaryTable = (rows: (string | number)[][], startY: number, head?: (string | number)[]): number => {
         autoTable(doc, {
           startY,
@@ -2086,11 +2056,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
         doc.text('Detailed Employment Facilitation Report', 14, y); y += 6
 
       } else if (isAgingReport && generatedReport.analytics) {
-        // Matches the Excel/Word Summary exactly (same fields, same order) --
-        // this branch used to build its own bare-bones summary (just a Total/
-        // Placed/Not Yet Placed table) instead of reusing that shape, so it was
-        // missing the Program/Report Period/Program Type info table and the
-        // Status / Status-and-Sex breakdown tables Excel/Word both show.
+        // Matches the Excel/Word Summary exactly (same fields, same order),
+        // including the Status and Status-and-Sex breakdown tables.
         const a = generatedReport.analytics
         const hasProgramTypeFilter = generatedReport.category === 'cdsp'
         doc.setFontSize(12); doc.setFont(PDF_FONT_FAMILY, 'bold')
@@ -2185,8 +2152,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         (generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'activities')
       ) {
         // Matches the Excel summary for Activity/Batch/Project/Training List
-        // types. These rows are per-activity, not per-participant, so there's
-        // no Male/Female analytics; totals are computed directly from the data.
+        // types; these rows are per-activity, so there's no Male/Female analytics.
         const rows = generatedReport.data as any[]
         const isCdsp = generatedReport.category === 'cdsp'
         const isGip = generatedReport.category === 'gip'
@@ -2258,9 +2224,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
       // Shrink text as columns increase so a wide table still fits the page width.
       const tableFontSize = visibleCols.length > 14 ? 6 : visibleCols.length > 10 ? 7 : 8
       const bodyRows = filteredData.map((row: any) => visibleCols.map((col: string) => typeof row[col] === 'number' ? row[col] : (row[col] || '-')))
-      // Give each column a share of the width proportional to its actual
-      // rendered text, not an equal split or raw character count. Shares
-      // always sum to usableWidth.
+      // Splits usableWidth across columns by actual rendered text, not an
+      // equal split or raw character count.
       const columnWidths = computeColumnWidths(doc, visibleCols, bodyRows, usableWidth, tableFontSize + 1, tableFontSize)
       const columnStyles = Object.fromEntries(visibleCols.map((_: string, i: number) => [i, { cellWidth: columnWidths[i] }]))
       const agingTimeColIdx = isAgingReport ? visibleCols.indexOf('Time Since Completion') : -1
@@ -2295,9 +2260,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setIsExportMenuOpen(false)
   }
 
-  // Downloads the participant roster for a single CDSP session, with an
-  // activity-info header block above the table. Excel forces the Contact
-  // Number column to text so long digit strings don't turn into scientific notation.
+  // Downloads the participant roster for a single CDSP session; Excel forces
+  // Contact Number to text so digit strings don't become scientific notation.
   const handleExportSessionRoster = async (activityId: number, format: 'excel' | 'pdf' | 'word') => {
     const activity = cdspActivities.find(act => act.id === activityId)
     if (!activity) return
@@ -2404,9 +2368,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   // Downloads the intern list for a single GIP workplace/office, same shape
-  // as handleExportSessionRoster, adapted to workplace/intern terms: a workplace info block
-  // (Assigned Office, Workplace/Office Address, Coordinator, Supervisor, Allowance)
-  // instead of an activity info block (Venue, Facilitator, Counselor).
+  // as handleExportSessionRoster but with workplace fields instead of activity ones.
   const handleExportBatchInterns = async (workplaceId: number, format: 'excel' | 'pdf' | 'word') => {
     const workplace = gipWorkplaces.find(w => w.id === workplaceId)
     if (!workplace) return
@@ -2512,15 +2474,13 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   // Downloads the student list for a single SPES batch, same shape as
-  // handleExportBatchInterns, adapted to SPES's batch fields (Employer,
-  // Coordinator, Total Slots/Funding Source instead of Supervisor/Allowance).
+  // handleExportBatchInterns but with SPES's batch fields.
   const handleExportBatchStudents = async (batchId: number, format: 'excel' | 'pdf' | 'word') => {
     const batch = spesBatches.find(b => b.id === batchId)
     if (!batch) return
     const students = spesApplicants
-      // Withdrawn students keep their batch link for history but are no longer
-      // part of the batch, so they're left off the roster (matches the
-      // Participants column and slot count).
+      // Withdrawn students keep their batch link for history but are left off
+      // the roster, matching the Participants column and slot count.
       .filter(a => a.assignedBatchId === batchId && a.status !== 'Withdrawn')
       .map((a, i) => [
         i + 1,
@@ -2618,10 +2578,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     setTimeout(() => { document.body.removeChild(link); URL.revokeObjectURL(link.href) }, 100)
   }
 
-  // Shared ExcelJS roster workbook builder, factored out of the roster
-  // exports above to avoid repeating their ExcelJS boilerplate. `textColIndex`
-  // (1-based) forces one column to text so long digit strings don't turn into
-  // scientific notation.
+  // Shared ExcelJS roster workbook builder for the roster exports above.
+  // `textColIndex` (1-based) forces one column to text to avoid scientific notation.
   const buildRosterWorkbook = (
     sheetName: string,
     title: string,
@@ -2686,9 +2644,8 @@ export default function ReportView({ onBack }: ReportViewProps) {
     return wb
   }
 
-  // Downloads the beneficiary list for a single Livelihood project/intervention,
-  // same shape as the CDSP/GIP/SPES roster exports, but needs both the project's
-  // id and its program since DILP/TUPAD/SLP/CLPEP each have their own id sequence.
+  // Downloads the beneficiary list for one Livelihood project/intervention;
+  // needs both id and program since each sub-program has its own id sequence.
   const handleExportProjectBeneficiaries = async (projectId: number, program: string, format: 'excel' | 'pdf' | 'word') => {
     let projectTitle: string
     let unit = 'Project'
@@ -2792,8 +2749,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   // Downloads the participant list for a single Skills Training activity,
-  // same shape as handleExportSessionRoster, without CDSP's extra education/
-  // employment fields.
+  // same shape as handleExportSessionRoster minus CDSP's extra fields.
   const handleExportTrainingParticipants = async (activityId: number, format: 'excel' | 'pdf' | 'word') => {
     const activity = skillsActivities.find(act => act.id === activityId)
     if (!activity) return
@@ -3532,8 +3488,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                       })()}
                       {generatedReport.columns.filter((col: string) => visibleColumns[col]).map((col: string) => {
                         // Aging Report only: color the "Time Since Completion" cell by
-                        // its bucket (matches the chart's colors) so severity is visible
-                        // without reading the value.
+                        // its bucket, matching the chart's colors.
                         const isAgingCell = isGeneratedReportAging && col === 'Time Since Completion' && row._agingBucket
                         const agingColor = isAgingCell ? AGING_BUCKET_COLORS[row._agingBucket] : undefined
                         return (

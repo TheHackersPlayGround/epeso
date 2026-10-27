@@ -1,7 +1,5 @@
-// Shared across every program module (starting with Skills Training) --
-// one service, one backend table (job_placements), not a copy per module.
-// Any module's applicant list can call this the same way, passing that
-// applicant's own beneficiaryServiceId.
+// Shared across every program module -- one service, one backend table
+// (job_placements), called with that module's applicant's beneficiaryServiceId.
 
 import axiosClient from './axiosClient'
 import { ENDPOINTS } from '../config/api'

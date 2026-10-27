@@ -1,6 +1,5 @@
-// Reusable pagination footer for the Employment Facilitation tables.
-// Matches the "Show N per page" + chevron style used across GIP/SPES/CDSP/etc,
-// so Vacancies / Employers / Referrals / Placements share one consistent look.
+// Reusable pagination footer ("Show N per page" + chevrons) shared across the
+// Employment Facilitation tables.
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 

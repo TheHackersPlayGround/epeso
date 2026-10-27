@@ -1,7 +1,4 @@
-// Shared visual shell for the auth screens (Login look & feel).
-// Background image + dark overlay + two-panel card (navy left, blurred form right),
-// plus themed Input / Select / Button / Error / Link primitives so every auth
-// screen stays consistent with the Login page.
+// Shared visual shell for the auth screens, matching the Login page's look and feel.
 
 import type { ReactNode } from 'react'
 import logo1 from '../../assets/logo1.png'

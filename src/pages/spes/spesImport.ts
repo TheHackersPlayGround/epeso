@@ -1,12 +1,5 @@
-// Bulk applicant import for SPES.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the SPES Profile
-//      form section by section, matching the GIP/CDSP importer's look.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (province -> city -> barangay, required since
-//      beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      spesService.createProfile.
+// Bulk applicant import for SPES: generates the .xlsx template and parses
+// filled-in workbooks, resolving addresses via locationService before posting.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -454,9 +447,7 @@ export async function importSpesApplicants(
   const total = dataRows.length
   const caches = makeCaches()
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // All-or-nothing: resolve every row first, nothing is sent if any row fails.
   const meta: { sheetRow: number; name: string }[] = []
   const payloads: Record<string, unknown>[] = []
   const failed: ImportRowError[] = []

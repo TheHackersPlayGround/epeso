@@ -57,17 +57,12 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
   const [sortBy, setSortBy] = useState<SortKey>('date')
 
   const [expandedFolders, setExpandedFolders] = useState<string[]>(['root'])
-  // Set right after a folder is created so a one-shot effect can scroll its
-  // row into view once it's actually in the DOM (its ancestors may have just
-  // been expanded in the same update, adding rows above it).
+  // Set right after a folder is created so a one-shot effect can scroll its row into view.
   const [pendingScrollFolderId, setPendingScrollFolderId] = useState<string | null>(null)
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const [activeFolderMenuId, setActiveFolderMenuId] = useState<string | null>(null)
-  // anchor is the trigger button's own position, set immediately on click;
-  // pos is the menu's final placement, corrected once its real rendered
-  // height is measured (see the layout effect below) -- this is what lets
-  // the menu flip above the row instead of forcing the sidebar's scroll
-  // container to grow when there's no room below.
+  // anchor is the click position; pos is corrected to the real measured
+  // height so the menu can flip above the row instead of growing the sidebar.
   const [folderMenuAnchor, setFolderMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; right: number } | null>(null)
   const folderMenuRef = useRef<HTMLDivElement>(null)
@@ -433,9 +428,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     if (file.type === 'docx' || file.type === 'doc') {
       setDocxPreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl })
     } else {
-      // xls/xlsx are deliberately not previewed (a browser rendering can't match
-      // how the spreadsheet looks in Excel), so they land on this modal's
-      // "Preview not available" state with its Download button.
+      // xls/xlsx aren't previewed (browser rendering can't match Excel), so this
+      // just shows the "Preview not available" state with a Download button.
       setFilePreview({ isOpen: true, fileName: file.name, fileUrl: file.fileUrl, type: file.type })
     }
   }

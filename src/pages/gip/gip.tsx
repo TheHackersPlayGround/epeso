@@ -34,10 +34,7 @@ function GIPImportModal({ onClose, onImported }: { onClose: () => void; onImport
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The applicant list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes, so the page's shared loading flag doesn't unmount it early.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -190,9 +187,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
     { id: 'civilStatus',    label: 'Civil Status',    options: CIVIL_STATUS_OPTIONS },
     { id: 'education',      label: 'Education',       options: EDUCATION_OPTIONS },
     { id: 'course',         label: 'Course / Degree', type: 'text' as const },
-    // Time since their internship's completion, for anyone not yet placed --
-    // same buckets as the Aging Report, so this list and that report are
-    // always describing the same thing.
+    // Time since completion for anyone not yet placed, same buckets as the Aging Report.
     { id: 'aging',          label: 'Aging',           options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
 
@@ -244,12 +239,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed, which is exactly what cut this menu off after "Record Job
-  // Placement" made it taller than the old guess assumed.
+  // Anchor is the click position; pos is corrected to the menu's real measured height after mount.
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -382,9 +372,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
     }
   }
 
-  // Completing is final — a GIP applicant can only ever go through the
-  // program once, so unlike an assignment, a completed engagement is never
-  // reopened. It stays on record permanently.
+  // Completing is final -- a GIP applicant only goes through the program once,
+  // so unlike an assignment, it's never reopened.
   const handleCompleteAssignment = async (applicantId: number) => {
     if (isAssigning) return
     setIsAssigning(true)
@@ -427,10 +416,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
     setAssignSearch('')
   }
 
-  // Column order/names here must match gipImport.ts's expected headers
-  // exactly (Import looks columns up by name via get()/norm(), not
-  // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device).
+  // Column order/names must match gipImport.ts's expected headers exactly
+  // (lookup is by name, not position) so exports stay re-importable.
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email',
@@ -458,9 +445,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
           a.age, workplace?.workplaceName ?? '', deriveStatus(a),
         ]
       })
-      // Row 1 is left blank: Import always skips the physical first row
-      // (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2.
+      // Row 1 stays blank -- Import skips it since the Template has a
+      // merged section-label band there; real headers are row 2.
       const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
@@ -630,9 +616,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
       {viewWorkplaceTarget && (() => {
         const currentWorkplace = gipWorkplaces.find(w => w.id === viewWorkplaceTarget.assignedWorkplaceId)
         if (!currentWorkplace) return null
-        // Status/dates here are the applicant's OWN (not the workplace's) --
-        // the workplace is a reusable directory entry with no period of its
-        // own; each person carries their own assigned/completed dates.
+        // Status/dates belong to the applicant, not the workplace (a reusable
+        // directory entry with no period of its own).
         const isCompleted = viewWorkplaceTarget.status === 'Completed'
         const isWithdrawn = viewWorkplaceTarget.status === 'Withdrawn'
         const isOngoing = viewWorkplaceTarget.status === 'Ongoing'
@@ -902,10 +887,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         {activeFilters.includes('aging') && (
                           <td className="px-4 py-3 whitespace-nowrap">
                             {(() => {
-                              // A bare "—" would mean two very different things here --
-                              // "already placed" and "hasn't completed their internship
-                              // yet" -- so Placed gets its own labeled badge instead of
-                              // collapsing both into the same blank dash.
+                              // Placed gets its own badge so it isn't confused with the
+                              // "hasn't completed yet" blank dash.
                               if (applicant.placed) {
                                 return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
                               }
@@ -932,9 +915,8 @@ export default function GIPView({ onBack }: GIPViewProps) {
                             onClick={e => {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                               const right = window.innerWidth - rect.right
-                              // Provisional placement below the button; the layout
-                              // effect corrects this to the menu's real measured
-                              // height right after it mounts, before paint.
+                              // Provisional position; layout effect corrects it to the
+                              // menu's real measured height right after mount.
                               setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                               setMenuPos({ top: rect.bottom + 4, right })
                               setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)

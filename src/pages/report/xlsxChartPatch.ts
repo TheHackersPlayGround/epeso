@@ -1,8 +1,5 @@
-// Low-level OOXML chart-XML patching helpers, shared by every report that
-// embeds a native Excel chart into its export (generalPesoReport.ts,
-// skillsAgingChart.ts). These functions only edit existing, Excel-authored
-// chart XML in place (swap a range, rebuild a cache, recolor a fill); they
-// never generate a chart structure from scratch.
+// Low-level OOXML chart-XML helpers shared by every native-chart export (swap a
+// range, rebuild a cache, recolor a fill) -- edits existing chart XML, never builds one from scratch.
 
 // Escapes a value for safe use inside XML text.
 export const xmlEsc = (s: unknown): string =>

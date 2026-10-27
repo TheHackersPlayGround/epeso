@@ -36,9 +36,8 @@ interface DocumentsContextValue {
 
 const DocumentsContext = createContext<DocumentsContextValue | null>(null)
 
-// 'root' is a virtual folder — it never exists as a row in the backend, it's
-// just the tree's entry point that real top-level folders (parentId: 'root')
-// attach to.
+// 'root' is a virtual folder (no backend row) -- just the tree's entry point
+// that real top-level folders attach to.
 const ROOT_FOLDER: FolderItem = { id: 'root', name: 'Documents', parentId: null }
 
 // Guesses a file's type from its extension.

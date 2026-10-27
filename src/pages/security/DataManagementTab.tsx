@@ -32,15 +32,12 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
     if (!matches || isRestoring) return
     setIsRestoring(true)
     setError(null)
-    // Starting state before the first poll response arrives -- avoids
-    // briefly showing a stale "done" reading left over from a previous
-    // restore's progress file.
+    // Starting state before the first poll response, so a stale "done" from a
+    // previous restore doesn't flash briefly.
     setProgress({ step: 0, total: 1, label: 'Starting…' })
 
-    // The restore itself is one long blocking request with no way to stream
-    // progress back mid-request, so a separate interval polls a small
-    // status endpoint the backend updates as it goes through each real step
-    // (safety snapshot, reset schema, reload data, restore files).
+    // Restore is one long blocking request with no mid-request streaming, so a
+    // separate interval polls a status endpoint the backend updates per step.
     const pollId = window.setInterval(async () => {
       try {
         const p = await backupService.getRestoreProgress()
@@ -126,10 +123,8 @@ function RestoreConfirmModal({ target, onClose, onRestored }: {
   )
 }
 
-// Soft limit: past this many stored backups, "Backup Now" still works but asks
-// the admin to confirm first, since every backup is a full database + uploads
-// copy and they add up on the server's disk. Deliberately not a hard cap -- a
-// backup must never be refused right before a risky change.
+// Soft limit: past this many, "Backup Now" asks the admin to confirm first (backups
+// add up on disk), but it's deliberately never a hard cap.
 const BACKUP_WARNING_THRESHOLD = 20
 
 const BACKUPS_PER_PAGE = 5

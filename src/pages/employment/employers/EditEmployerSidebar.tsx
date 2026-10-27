@@ -89,9 +89,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
     barangay: 'companyAddress',
   };
 
-  // Deferred one tick so that a section switch (which may need to happen
-  // first when the failing field lives on a different tab) has re-rendered
-  // before we try to focus/scroll to the field.
+  // Deferred one tick so a section switch has re-rendered before focusing the field.
   const deferFocus = (fn: () => void) => () => setTimeout(fn, 0);
 
   function inputCls(base: string, key: keyof EmployerFormData) {

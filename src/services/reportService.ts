@@ -103,18 +103,15 @@ export type SkillsAgingRow = {
   dateHired: string | null
 }
 
-// One row per beneficiary who has genuinely completed (status Completed AND
-// attended) at least one Skills Training -- beneficiaries with no real
-// completion aren't included, since there's nothing to measure aging from.
+// One row per beneficiary who genuinely completed (status Completed AND attended)
+// at least one Skills Training -- others are excluded since there's nothing to measure.
 export async function fetchSkillsAgingReport(): Promise<SkillsAgingRow[]> {
   const res = await axiosClient.get<{ status: string; data: SkillsAgingRow[] }>(ENDPOINTS.skillsTraining.agingReport)
   return res.data.data ?? []
 }
 
-// ── CDSP Aging Report (live from the backend, not period-scoped) ──
-// Unlike Skills Training, CDSP has sub-services (Career Coaching /
-// Pre-Employment Coaching / Labor Employment for Graduating Students), so
-// each row also carries which one the beneficiary is enrolled under.
+// CDSP Aging Report (live, not period-scoped); each row also carries which
+// sub-service (Career Coaching / Pre-Employment / Labor Employment) applies.
 
 export type CdspAgingRow = {
   beneficiaryServiceId: number
@@ -130,18 +127,15 @@ export type CdspAgingRow = {
   dateHired: string | null
 }
 
-// One row per beneficiary who has genuinely completed (status Completed AND
-// attended) at least one CDSP activity -- beneficiaries with no real
-// completion aren't included, since there's nothing to measure aging from.
+// One row per beneficiary who genuinely completed (status Completed AND attended)
+// at least one CDSP activity -- others are excluded since there's nothing to measure.
 export async function fetchCdspAgingReport(): Promise<CdspAgingRow[]> {
   const res = await axiosClient.get<{ status: string; data: CdspAgingRow[] }>(ENDPOINTS.cdsp.agingReport)
   return res.data.data ?? []
 }
 
-// ── GIP Aging Report (live from the backend, not period-scoped) ──
-// GIP is one-shot -- an applicant only ever goes through the program once --
-// so unlike Skills Training/CDSP there's no "trainings/activities completed"
-// count worth showing here; it would always just be 1.
+// GIP Aging Report (live, not period-scoped) -- GIP is one-shot, so unlike
+// Skills Training/CDSP there's no "activities completed" count worth showing.
 
 export type GipAgingRow = {
   beneficiaryServiceId: number

@@ -1,10 +1,7 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 
-// Shared "Assigned <Activity / Project / Intervention>" detail dialog, so every
-// program shows an assignment the same way (modelled on CDSP's "Assigned
-// Activity"): blue header with the person, bold title + status pill, optional
-// description, a label/value list, and an action row ending in Close.
+// Shared "Assigned <Activity / Project / Intervention>" detail dialog used across programs.
 
 export interface AssignedItemRow {
   label: string

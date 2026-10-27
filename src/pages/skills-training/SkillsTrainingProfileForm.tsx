@@ -24,11 +24,8 @@ type AttachedDocsEditorProps = {
   onPreview: (doc: SkillsTrainingSavedDocument) => void
 }
 
-// previewDoc lives in the parent (SkillsTrainingProfileForm) and renders as a
-// sibling of the whole form, not nested inside this component -- a
-// `fixed inset-0` modal nested inside an ancestor with opacity/filter/transform
-// (a view-mode-dimmed fieldset) stops being positioned relative to the
-// viewport and gets squashed into that ancestor's box instead.
+// previewDoc renders as a sibling of the form, not nested here -- a nested
+// `fixed inset-0` modal would get squashed by a dimmed ancestor's filter/transform.
 function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -372,9 +369,8 @@ export default function SkillsTrainingProfileForm({
     clearFieldError('birthdate')
   }
 
-  // Sex, birthdate, civil status, and barangay are required by the underlying
-  // beneficiaries table (NOT NULL columns); name fields additionally reject
-  // digits/symbols.
+  // Sex, birthdate, civil status, and barangay are NOT NULL in the DB;
+  // name fields also reject digits/symbols.
   const handleSave = () => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()

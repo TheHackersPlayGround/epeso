@@ -62,10 +62,8 @@ export const emptyForm: Omit<GIPApplicant, 'id'> = {
 
 // ─── Exported helpers ──────────────────────────────────────────────────────────
 
-// The backend now maintains each applicant's own status directly (Active
-// while assigned, Completed once marked done, Inactive otherwise) -- a
-// workplace no longer has a status of its own to derive from, so this is a
-// straight pass-through kept only so call sites don't need to change shape.
+// Backend now sets the applicant's status directly; kept as a pass-through
+// so call sites don't need to change shape.
 export function deriveStatus(applicant: Omit<GIPApplicant, 'id'>): GIPApplicant['status'] {
   return applicant.status
 }
@@ -108,10 +106,8 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: { docs: GIPSavedDocum
         customName,
         fileName: file.name,
         fileSize: formatFileSize(file.size),
-        // A blob: URL (not the data: dataUrl) so "View" works before the
-        // record is saved — Chrome/Brave block opening data: URIs in a new
-        // tab as an anti-phishing measure, so a data:-based preview link
-        // would always show a blank "Untitled" tab.
+        // blob: URL, not the data: dataUrl -- Chrome/Brave block opening
+        // data: URIs in a new tab, which would show a blank tab.
         url: URL.createObjectURL(file),
         dataUrl,
       }])
@@ -338,10 +334,8 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
     clearFieldError('birthdate')
   }
 
-  // Sex, birthdate, civil status, and barangay are required by the underlying
-  // beneficiaries table (NOT NULL columns). Each section (I. Personal Info,
-  // II. Address) has at least one required field validated here; name fields
-  // additionally reject digits/symbols.
+  // Sex, birthdate, civil status, and barangay are NOT NULL in the DB;
+  // name fields also reject digits/symbols.
   const handleSave = () => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()

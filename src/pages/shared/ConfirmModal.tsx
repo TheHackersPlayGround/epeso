@@ -5,10 +5,8 @@ interface ConfirmModalProps {
   message: string
   confirmText?: string
   cancelText?: string
-  // Only relevant when type === 'confirm'. Defaults to 'danger' (red) to
-  // match every pre-existing call site — pass 'brand' for confirms that
-  // aren't destructive (logout, restore, moving forward a status), so the
-  // button color actually signals risk instead of always reading as delete.
+  // Only relevant when type === 'confirm'. Defaults to 'danger'; pass 'brand'
+  // for non-destructive confirms (logout, restore) so color signals real risk.
   confirmVariant?: 'danger' | 'brand'
   // Optional third action, rendered to the right of the confirm button
   // (used by the "Leave this form?" modal: Keep editing / Discard / Save as draft).

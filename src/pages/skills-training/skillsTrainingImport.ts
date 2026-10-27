@@ -1,18 +1,5 @@
-// Bulk applicant import for Skills Training.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the Skills
-//      Training Profile form section by section, matching the look of the
-//      CDSP/GIP/SPES/SLP import templates: a merged, colored section-label
-//      header row (row 1) above the individual field headers (row 2), with
-//      enum fields rendered as in-cell dropdowns.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs
-//      via locationService (cascade: province -> city -> barangay, required
-//      since beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      skillsTrainingService.createProfile.
-//
-// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
-// ExcelJS -- same split as the other modules' importers.
+// Bulk applicant import for Skills Training: generates the .xlsx template
+// (ExcelJS) and parses filled-in workbooks (SheetJS) into createProfile calls.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -150,9 +137,8 @@ export async function downloadImportTemplate(qualifications: string[], purposes:
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Applicants')
 
-  // Format every column as Text ("@") so Excel preserves leading zeros (e.g. the
-  // "0" in a contact number) and doesn't auto-convert dates/long numbers. The
-  // parser reads every cell as a string anyway, so text format is ideal.
+  // Text format ("@") preserves leading zeros and stops auto-converting
+  // dates/long numbers; the parser reads every cell as a string anyway.
   ws.columns = columns.map((c) => ({ width: c.width, style: { numFmt: '@' } }))
 
   const border = {
@@ -200,9 +186,8 @@ export async function downloadImportTemplate(qualifications: string[], purposes:
     cell.font = { italic: true, color: { argb: 'FF94A3B8' } }
   })
 
-  // Freeze both header rows, then apply dropdown validation to the enum columns.
-  // Dropdown values live on a hidden helper sheet (Excel's inline list formula
-  // tops out around 255 characters).
+  // Freeze both header rows, then apply dropdown validation to enum columns.
+  // Dropdown values live on a hidden helper sheet (inline lists cap at ~255 chars).
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   const lastRow = FIRST_DATA_ROW + TEMPLATE_VALIDATION_ROWS - 1
   const optionColumns = columns.filter((c) => c.options && c.options.length > 0)
@@ -456,9 +441,8 @@ export async function importSkillsTrainingApplicants(
   const sheet = wb.Sheets[wb.SheetNames[0]]
   if (!sheet) throw new Error('The file has no worksheets.')
 
-  // range:1 -> treat the SECOND row (the field headers) as the header row, so
-  // the merged section-label band in row 1 is ignored. raw:false -> formatted
-  // strings (preserves leading zeros, formats dates).
+  // range:1 skips row 1's merged section-label band, using row 2 as headers;
+  // raw:false keeps formatted strings (leading zeros, dates).
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: '',
     raw: false,
@@ -475,9 +459,7 @@ export async function importSkillsTrainingApplicants(
   const total = dataRows.length
   const caches = makeCaches()
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // All-or-nothing: resolve every row first, nothing is sent if any row fails.
   const meta: { sheetRow: number; name: string }[] = []
   const payloads: Record<string, unknown>[] = []
   const failed: ImportRowError[] = []

@@ -20,12 +20,8 @@ function errMsg(e: unknown, fallback: string) {
   return (e as { message?: string })?.message ?? fallback
 }
 
-// Backend stores the OWWA/ELPOR attachments as named document slots rather
-// than the display-shaped owwaWelfareFile/elporFiles fields on OFWProfile --
-// this converts the form's shape into that wire format. Including every
-// currently-set slot (not just freshly-uploaded ones) matters: the backend
-// treats an entirely absent key as "remove this slot", so an unchanged,
-// already-saved attachment must still be sent (with no dataUrl) to survive.
+// Converts the form's OWWA/ELPOR fields into the backend's named-slot wire
+// format; an absent key means "remove this slot", so every set slot must be sent.
 function buildNamedAttachments(elporFiles?: Record<string, OFWSavedAttachment>, owwaWelfareFile?: OFWSavedAttachment | null) {
   const named: Record<string, { fileName: string; dataUrl?: string }> = {}
   if (owwaWelfareFile) named['OWWA Welfare Case Form'] = { fileName: owwaWelfareFile.fileName, dataUrl: owwaWelfareFile.dataUrl }
@@ -82,10 +78,8 @@ interface ActionMenuProps {
 }
 
 function ActionMenu({ profile, pos, menuRef, onView, onEdit, onChangeStatus, onDelete, onClose }: ActionMenuProps) {
-  // The menu's height changes with the record's status (Approve/Reject vs.
-  // Start Processing vs. Mark as Completed), so a hardcoded guess drifts stale.
-  // Measure the real rendered height right after mount -- before the browser
-  // paints -- and flip above the button (or clamp) when it wouldn't fit below.
+  // Height varies by status, so measure it right after mount (before paint)
+  // and flip above the button, or clamp, when it wouldn't fit below.
   useLayoutEffect(() => {
     const el = menuRef.current
     if (!el) return

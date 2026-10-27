@@ -2,14 +2,8 @@ import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetSta
 import ConfirmModal from '../pages/shared/ConfirmModal'
 import { registerLeaveGuard } from './leaveGuard'
 
-// Shared "unsaved changes / draft" behaviour for the big Add / Edit forms.
-//
-//  - Closing or going back with changes → "Keep editing / Discard / Save as draft"
-//    (Edit forms get no "Save as draft": the saved record is the source of truth).
-//  - Opening an Add form while a draft exists → "Continue draft / Start new".
-//    No draft → the empty form opens straight away, no prompt.
-//  - Drafts live in localStorage, one per user per form type, and are removed on
-//    a successful save, on "Discard"/"Start new", and on logout.
+// Shared "unsaved changes / draft" behaviour for the big Add/Edit forms: prompts to
+// keep editing, discard, or save as draft, and restores drafts from localStorage per user.
 
 const PREFIX = 'peso_draft:'
 
@@ -54,9 +48,8 @@ export function clearAllDrafts() {
   } catch { /* storage unavailable */ }
 }
 
-// Which permission module each draft belongs to (see utils/permissions.ts), so
-// drafts can be removed when someone loses edit access to that module: they could
-// no longer open the form, but the personal data would stay in the browser.
+// Maps each draft to its permission module (utils/permissions.ts) so drafts are
+// cleared if the user loses edit access -- otherwise the personal data would linger.
 const DRAFT_MODULE: Record<string, string> = {
   'cdsp-applicant': 'cdsp',
   'gip-applicant': 'gip',
@@ -280,10 +273,8 @@ export function useFormDraft<T>({ draftKey, mode, snapshot, onRestore, onClose, 
   return { requestClose, wrapSave, markSubmitted, modals, dirty }
 }
 
-// Convenience wrapper for the applicant / beneficiary profile forms, which all
-// share the same shape: one record object + province/city picker ids + an
-// `attachedDocuments` list. Attached files are tracked by id only — their
-// base64 payloads are too big to diff on every render or keep in a draft.
+// Convenience wrapper for applicant/beneficiary profile forms (record + province/city
+// picker ids + attachedDocuments). Files are tracked by id only -- base64 is too big to diff/draft.
 interface ProfileDraftOptions<F extends { attachedDocuments?: { id: string }[] }> {
   draftKey: string
   mode: 'add' | 'edit' | 'view'

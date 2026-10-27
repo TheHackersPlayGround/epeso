@@ -232,9 +232,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null }>({ open: false, id: null })
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
-  // anchor is the button's own position, set on click; pos is the menu's
-  // final placement, corrected by measuring its real rendered height once
-  // mounted, instead of a hardcoded guess that goes stale as items change.
+  // anchor = button's click position; pos = menu's final placement, corrected
+  // after mount using its real measured height.
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -409,9 +408,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         a.dateApplicationReceived, a.receivedBy, a.remarks,
         a.age, a.assignedActivity, a.status,
       ])
-      // Row 1 is left blank: Import always skips the physical first row
-      // (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2.
+      // Row 1 stays blank -- Import skips it since the Template has a
+      // merged section-label band there; real headers are row 2.
       const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
@@ -1007,9 +1005,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                           onClick={(e) => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                             const right = window.innerWidth - rect.right
-                            // Provisional placement below the button; the layout
-                            // effect corrects this to the menu's real measured
-                            // height right after it mounts, before paint.
+                            // Provisional position; layout effect corrects it to the
+                            // menu's real measured height right after mount.
                             setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                             setMenuPos({ top: rect.bottom + 4, right })
                             setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)
@@ -1059,9 +1056,8 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       {openActionMenuId !== null && menuPos && (() => {
         const applicant = applicants.find((a) => a.id === openActionMenuId)
         if (!applicant) return null
-        // Only Planned/Ongoing locks the row into "View Assigned Activity";
-        // once Completed/Absent, "Assign Activity" reappears. Uses
-        // assignedActivityStatus, which is attendance-aware.
+        // Only Planned/Ongoing locks into "View Assigned Activity"; once
+        // Completed/Absent, "Assign Activity" reappears.
         const hasActive = !!applicant.assignedActivityId
           && (applicant.assignedActivityStatus === 'Planned' || applicant.assignedActivityStatus === 'Ongoing')
         const isCompleted = applicant.assignedActivityStatus === 'Completed'

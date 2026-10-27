@@ -1,12 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { checkDuplicateReferral } from '../services/referralService'
 
-// ConfirmModal is a React component, so unlike Swal.fire() it can't be
-// triggered from a plain async function — it has to be rendered somewhere in
-// the caller's own tree. This hook bundles the duplicate check together with
-// the modal it needs: call confirmReferralOk(...) from an event handler (it
-// resolves once the user picks an option) and render {modal} once, anywhere
-// in the calling component's JSX.
+// Bundles the duplicate-referral check with its confirm modal (ConfirmModal needs
+// to be rendered in the tree): call confirmReferralOk() and render {modal} once.
 export function useReferralGuard() {
   const [state, setState] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
   const resolveRef = useRef<((ok: boolean) => void) | null>(null)
@@ -17,9 +13,8 @@ export function useReferralGuard() {
     resolveRef.current = null
   }
 
-  // Returns true if it's OK to create the referral — either there's no
-  // duplicate, or the user confirmed the warning. Fails OPEN: if the check
-  // errors, it never blocks the referral.
+  // True if it's OK to create the referral -- no duplicate, or user confirmed.
+  // Fails open: an error in the check never blocks the referral.
   const confirmReferralOk = useCallback(async (applicantId: number, vacancyId: number, applicantName: string): Promise<boolean> => {
     let dup
     try {

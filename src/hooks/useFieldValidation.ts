@@ -1,10 +1,7 @@
 import { useState } from 'react'
 
-// Letters (incl. accented), spaces, hyphens, apostrophes, and periods only —
-// for genuine person-name fields (Last/First/Middle Name, Supervisor,
-// Coordinator, Facilitator, Contact Person Name, etc). Entity-name fields
-// (Batch Name, Company Name, Project Name...) legitimately contain numbers
-// and codes, so this is never applied to those.
+// Letters/spaces/hyphens/apostrophes/periods only, for real person-name fields --
+// never applied to entity-name fields (Batch/Company/Project), which can contain numbers.
 export const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ'.\-\s]+$/
 
 export type ValidationError = {
@@ -13,9 +10,8 @@ export type ValidationError = {
   focus: () => void
 }
 
-// Shared required-field validation UX: red border + a red message directly
-// under the field, and on Save, scroll to and focus the first invalid field —
-// no alert()/Swal popup. One hook so every form in the app behaves identically.
+// Shared required-field validation UX: red border + message under the field, and
+// on Save, scroll/focus the first invalid field instead of an alert popup.
 export function useFieldValidation() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 

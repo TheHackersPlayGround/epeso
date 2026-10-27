@@ -12,18 +12,12 @@ const axiosClient = axios.create({
   },
 })
 
-// Optional: surface backend error messages in a consistent shape. Also
-// carries through the backend's optional structured `detail` payload (see
-// core/response.php's error()) as `.detail` on the thrown Error, for callers
-// that need more than just a message (e.g. purge's "has history" warning).
+// Normalizes backend error messages into a consistent Error shape, carrying
+// through the optional structured `detail` payload (see core/response.php's error()).
 axiosClient.interceptors.response.use(
   (response) => {
-    // Every API route answers with JSON, which axios parses into an object. If
-    // we got plain text/HTML back instead, the backend crashed (a PHP fatal
-    // error or warning is printed as HTML but can still arrive as HTTP 200) --
-    // treat that as a failure so the UI never reports success for an action the
-    // server did not actually complete. File downloads (blob/arraybuffer) are
-    // exempt, and so is an empty body.
+    // A plain text/HTML response (instead of JSON) means the backend crashed, even
+    // if it returned HTTP 200 -- treat that as a failure, except blobs and empty bodies.
     const type = response.config?.responseType
     if (type !== 'blob' && type !== 'arraybuffer' && type !== 'text'
         && typeof response.data === 'string' && response.data.trim() !== '') {
@@ -48,9 +42,8 @@ axiosClient.interceptors.response.use(
     // A refused action may mean the user's access just changed: let the app
     // re-check their permissions straight away (see App.tsx).
     if (error.response?.status === 403) window.dispatchEvent(new Event('peso:forbidden'))
-    // The account was deactivated or deleted while signed in -- whichever request
-    // hit it first, tell the app so it can explain (with the right wording for
-    // which one happened) and sign the user out.
+    // Account was deactivated or deleted while signed in -- tell the app so it can
+    // explain (with the right wording) and sign the user out.
     const authCode = error.response?.data?.detail?.code
     if (error.response?.status === 401 && authCode === 'ACCOUNT_DEACTIVATED') {
       window.dispatchEvent(new Event('peso:deactivated'))

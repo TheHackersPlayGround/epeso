@@ -103,16 +103,12 @@ export type Placement = {
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────────────
-// Keeps all five lists (applicants, vacancies, referrals, placements,
-// employers) loaded once and surviving navigation; mutations refresh only
-// the affected lists instead of refetching everything on re-entry.
+// Keeps all five lists loaded once and surviving navigation; mutations refresh only the affected list.
 
 type ListKey = 'applicants' | 'vacancies' | 'employers' | 'referrals' | 'placements'
 
-// Entering the module (or returning to the window) always re-syncs silently so
-// other staff members' changes show up. A call within this window of the
-// previous full refresh is the same user action firing several triggers, so
-// it is skipped instead of hitting the server again.
+// Re-syncs silently on entering/returning to the module so other staff's changes
+// show up; calls within this window of the last refresh are skipped as duplicates.
 const REFRESH_GUARD_MS = 2_500
 
 interface EmploymentContextValue {
@@ -160,9 +156,8 @@ export function EmploymentProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<Record<ListKey, boolean>>(allTrue)
   const [loadFailed, setLoadFailed] = useState<Record<ListKey, boolean>>(allFalse)
 
-  // Per-list request bookkeeping: `latest` is the id of the most recently
-  // STARTED refresh, and only that one may write its result -- so a slow older
-  // response can never overwrite a newer one.
+  // `latest` tracks the id of the most recently started refresh per list -- only
+  // that one may write its result, so a slow older response can't overwrite a newer one.
   const latest = useRef<Record<ListKey, number>>({ applicants: 0, vacancies: 0, employers: 0, referrals: 0, placements: 0 })
   // How many refreshes of each list are currently running.
   const inFlight = useRef<Record<ListKey, number>>({ applicants: 0, vacancies: 0, employers: 0, referrals: 0, placements: 0 })

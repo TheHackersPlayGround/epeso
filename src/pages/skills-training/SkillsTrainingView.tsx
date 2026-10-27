@@ -45,10 +45,8 @@ function SkillsTrainingImportModal({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The applicant list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes -- doing it earlier would flip the shared
+  // loading flag and unmount this modal before the success message is seen.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -175,11 +173,8 @@ function ImportResultView({ result }: { result: ImportResult }) {
 }
 
 // ── Update Status Modal ───────────────────────────────────────────────────────
-// Quick status change (e.g. Waitlisted -> Accepted) without opening the full
-// Edit form -- mirrors Employment Facilitation's Update Status modal for
-// Placements/Referrals. Uses the same STATUS_OPTIONS (Waitlisted/Accepted only)
-// as the Add/Edit form -- the backend type/validation technically also allows
-// Pending/Rejected, but neither is ever surfaced anywhere in this module's UI.
+// Quick status change (Waitlisted/Accepted only) without opening the full
+// Edit form.
 
 type UpdateProfileStatusModalProps = {
   profile: SkillsTrainingProfile
@@ -300,11 +295,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const [errorModal, setErrorModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' })
 
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess (even a conditionally-adjusted one) drifts stale
-  // every time a menu item is added or removed.
+  // anchor = button's click position; pos = menu's final placement, corrected
+  // after mount using its real measured height.
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -330,9 +322,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     { id: 'sex',                 label: 'Sex',                  options: ['Male', 'Female'] },
     { id: 'age',                 label: 'Age',                  options: ['Below 20', '20–25', '26–30', '31–40', 'Above 40'] },
     { id: 'civilStatus',         label: 'Civil Status',         options: CIVIL_STATUS_OPTIONS },
-    // Time since their last genuinely completed training (Completed + attended),
-    // for anyone not yet placed -- same buckets as the Aging Report, so this
-    // list and that report are always describing the same thing.
+    // Time since their last completed training, same buckets as the Aging Report.
     { id: 'aging',               label: 'Aging',                options: AGING_BUCKET_ORDER.filter(b => b !== 'Placed') },
   ]
 
@@ -416,10 +406,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const trainingStatusBadge = (s: string) =>
     s === 'Planned' ? 'bg-yellow-100 text-yellow-700' : s === 'Ongoing' ? 'bg-green-100 text-green-700' : s === 'Completed' ? 'bg-blue-100 text-blue-700' : s === 'Absent' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-600'
 
-  // Column order/names here must match skillsTrainingImport.ts's expected
-  // headers exactly (Import does a header-name lookup via get()/norm(), not
-  // positional) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device).
+  // Column order/names must match skillsTrainingImport.ts's expected headers
+  // exactly (lookup is by name, not position) so exports stay re-importable.
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Province', 'City / Municipality', 'Barangay', 'Street / Purok #',
@@ -446,10 +434,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     setIsExporting(true)
     await new Promise(resolve => setTimeout(resolve, 0))
     try {
-      // Row 1 is left blank on purpose: the Import parser always skips the
-      // physical first row (range: 1), since the downloadable Template has a
-      // merged section-label band there. Real headers go on row 2, matching
-      // where Import actually looks for them.
+      // Row 1 stays blank -- Import skips it since the Template has a
+      // merged section-label band there; real headers are row 2.
       const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...exportRowsForImport(filteredProfiles)]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
@@ -505,10 +491,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
     }
   }
 
-  // Quick status-only change (Update Status modal) -- stUpdateProfile requires
-  // the full profile payload (name/sex/birthdate/etc. are all validated
-  // server-side), so this resends the profile's own current data unchanged and
-  // only overrides `status`, rather than needing a separate status-only endpoint.
+  // No status-only endpoint, so this resends the profile's current data
+  // unchanged and only overrides `status`.
   const handleUpdateProfileStatus = async (id: number, newStatus: SkillsTrainingProfile['status']) => {
     const p = profiles.find(x => x.id === id)
     if (!p) return
@@ -697,9 +681,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     </div>
                   ) : plannedTrainings.filter(t => assignSearch === '' || t.title.toLowerCase().includes(assignSearch.toLowerCase())).map(training => {
                     const isAssigned = assigningProfile.assignedTrainingId === training.id
-                    // participants doubles as the training's target slot count (see
-                    // the "Slots: assigned/participants" readout in step 2) -- 0 means
-                    // no slot count has been set yet, so there's nothing to assign into.
+                    // participants doubles as the target slot count; 0 means none set yet.
                     const noSlots = training.participants === 0
                     return (
                       <button
@@ -949,11 +931,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       {activeFilters.includes('civilStatus') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.civilStatus || '—'}</td>}
                       <td className="px-4 py-3">
                         {(() => {
-                          // A value entered only via "Others, please specify" (no
-                          // standard checkbox picked) must still show here -- reading
-                          // just `classification` left this cell blank whenever every
-                          // entry was a custom "Other" one, even though the profile
-                          // clearly has data (visible in View Profile as "Others: X").
+                          // Includes "Others" entries too, so a custom-only value
+                          // still shows instead of leaving this cell blank.
                           const items = [...profile.classification, ...profile.classificationOther.filter(Boolean).map(v => `Others: ${v}`)]
                           return (
                             <div className="flex flex-wrap gap-1">
@@ -1006,10 +985,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                       {activeFilters.includes('aging') && (
                         <td className="px-4 py-3 whitespace-nowrap">
                           {(() => {
-                            // A bare "—" would mean two very different things here --
-                            // "already placed" and "never completed anything" -- so
-                            // Placed gets its own labeled badge instead of collapsing
-                            // both into the same blank dash.
+                            // Placed gets its own badge so it isn't confused with the
+                            // "never completed" blank dash.
                             if (profile.placed) {
                               return <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: `${AGING_BUCKET_COLORS.Placed}22`, color: AGING_BUCKET_COLORS.Placed }}>Placed</span>
                             }
@@ -1038,9 +1015,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                           onClick={e => {
                             const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                             const right = window.innerWidth - rect.right
-                            // Provisional placement below the button; the layout
-                            // effect corrects this to the menu's real measured
-                            // height right after it mounts, before paint.
+                            // Provisional position; layout effect corrects it to the
+                            // menu's real measured height right after mount.
                             setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                             setMenuPos({ top: rect.bottom + 4, right })
                             setOpenActionMenuId(openActionMenuId === profile.id ? null : profile.id)
@@ -1098,10 +1074,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
               <button onClick={() => { setUpdatingStatusProfile(profile); setOpenActionMenuId(null) }} disabled={!canManage('skills')} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
               <div className="my-1 border-t border-gray-100" />
               {(() => {
-                // Only Planned/Ongoing locks the row into "View Assigned Training" --
-                // once it's Completed/Absent/Cancelled, "Assign Training" reappears
-                // so the person can be enrolled into another one (PESO allows
-                // availing more than one training), mirroring CDSP's isCompleted check.
+                // Only Planned/Ongoing locks into "View Assigned Training"; once
+                // Completed/Absent/Cancelled, "Assign Training" reappears.
                 const hasActive = !!profile.assignedTrainingId
                   && (profile.assignedTrainingStatus === 'Planned' || profile.assignedTrainingStatus === 'Ongoing')
                 if (hasActive) {

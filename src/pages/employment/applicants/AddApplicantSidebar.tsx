@@ -231,9 +231,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     return merged;
   });
 
-  // Draft / unsaved-changes guard. Uploaded files, saved-document payloads and
-  // the ID photo are base64 blobs: they are tracked by id / size only for the
-  // dirty check and are never written into a draft.
+  // Draft / unsaved-changes guard. Uploaded files, documents and the ID photo are
+  // base64 blobs, tracked by id/size only for the dirty check, never written to a draft.
   const draft = useFormDraft<{ form: Record<string, unknown>; hasDisabilityStatus: 'Yes' | 'No'; uploaded: string[]; photoSize: number }>({
     draftKey: 'employment-applicant',
     mode: isEditMode ? 'edit' : 'add',
@@ -289,9 +288,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   const ErrorMsg = ({ k }: { k: RequiredKey }) =>
     fieldMessage(k) ? <p className="text-red-500 text-xs mt-1">{fieldMessage(k)}</p> : null;
 
-  // Deferred one tick so the personalInfo section (which may not be the
-  // active tab when Save is pressed from a later section) has re-rendered
-  // before we try to focus/scroll to a field inside it.
+  // Deferred one tick so the personalInfo section has re-rendered before
+  // focusing/scrolling to a field inside it.
   const deferFocus = (fn: () => void) => () => setTimeout(fn, 0);
 
   function buildValidationErrors(): ValidationError[] {
@@ -1177,9 +1175,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                   {formData.jobPreferences.map((row, idx) => (
                     <tr key={idx}>
                       {(['occupation', 'localCity', 'overseasCountry'] as const).map(field => {
-                        // Each column's input is enabled only when its header
-                        // checkbox is selected (occupation ← employment type,
-                        // localCity ← Local, overseasCountry ← Overseas).
+                        // Each column is enabled only when its header checkbox is selected.
                         const disabled =
                           field === 'occupation'
                             ? formData.jobPrefEmploymentType.length === 0

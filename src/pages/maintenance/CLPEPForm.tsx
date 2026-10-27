@@ -67,9 +67,8 @@ const PARTNER_AGENCIES = [
 
 const STATUS_OPTIONS: CLPEPFormData['status'][] = ['Planned', 'Ongoing', 'Completed']
 
-// Previously-saved attachments (loaded back from the server) don't carry a
-// browser File's MIME type, only a fileName — fall back to the extension so
-// "View" still previews them correctly, not just freshly-uploaded ones.
+// Previously-saved attachments only carry a fileName, not a MIME type -- fall
+// back to the extension so "View" still previews them.
 function isImageAttachment(att: AttachmentItem) {
   return att.fileType.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(att.name)
 }

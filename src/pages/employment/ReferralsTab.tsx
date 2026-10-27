@@ -212,11 +212,8 @@ const EXTRA_COLUMNS: Record<string, { label: string; get: (r: Referral) => strin
 function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, onRemove }: ReferralsTableProps) {
   const extraCols = activeFilters.filter(f => f in EXTRA_COLUMNS)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the button's position; pos is the menu's final placement, corrected
+  // by measuring its real rendered height once mounted (see layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -237,9 +234,8 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the trigger; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the trigger; the layout effect corrects it
+    // to the real measured height right after it mounts.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
@@ -435,9 +431,7 @@ function UpdateStatusModal({ referral, onClose, onSave }: UpdateStatusModalProps
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ReferralsTab() {
-  // The list lives in EmploymentProvider (shared with the other tabs and
-  // kept across visits to this module) -- see the refresh calls below for
-  // how a change here reaches the tabs it can affect.
+  // The list lives in EmploymentProvider, shared with and kept across the other tabs.
   const { referrals, setReferrals, loading: listLoading, refreshApplicants, refreshPlacements, refreshVacancies } = useEmployment()
   const loading = listLoading.referrals
   const [searchQuery, setSearchQuery] = useState('')
@@ -500,9 +494,7 @@ export default function ReferralsTab() {
     if (newStatus === 'Hired') {
       // Hired referrals are removed from the list (they become placements)
       setReferrals(prev => prev.filter(r => r.id !== id))
-      // ...which means a new row in Placements and one fewer open slot on the
-      // vacancy -- both are shared lists now, so refresh them here instead of
-      // relying on a fresh fetch the next time the module is entered.
+      // Placements and Vacancies are shared lists too, so refresh them now.
       void refreshPlacements()
       void refreshVacancies()
     } else {

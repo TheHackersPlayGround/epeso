@@ -1,6 +1,5 @@
-// Shared "how long since completion" math -- used by the Skills Training list's
-// Aging filter, its 6-month re-assignment cooldown warning, and the Aging
-// Report, so all three can never quietly drift out of sync with each other.
+// Shared "how long since completion" math used by the Aging filter, the 6-month
+// cooldown warning, and the Aging Report, so all three stay in sync.
 
 // Whole calendar months between a past date (YYYY-MM-DD or timestamp) and today.
 export function monthsSince(dateStr: string): number {
@@ -31,9 +30,8 @@ export function agingBucket(months: number): AgingBucket {
   return '6+ months'
 }
 
-// Fixed display/legend order (Placed last), and the color each stage maps to
-// everywhere it's shown: the Aging Report's chart/cell highlights, and the
-// Skills Training list's Aging filter.
+// Fixed display/legend order (Placed last) and the color each stage maps to,
+// shared by the Aging Report's chart/highlights and the Aging filter.
 export const AGING_BUCKET_ORDER: (AgingBucket | 'Placed')[] = ['0-1 month', '1-3 months', '3-6 months', '6+ months', 'Placed']
 
 export const AGING_BUCKET_COLORS: Record<string, string> = {

@@ -266,9 +266,7 @@ export default function SkillsTrainingMaintenanceForm() {
     activity: SkillsTrainingActivity; nextStatus: TrainingStatus; label: string
   } | null>(null)
   const [trainingDeleteConfirm, setTrainingDeleteConfirm] = useState<number | null>(null)
-  // Blocks marking a training Ongoing while it has 0 actually-assigned
-  // participants (assignedCount -- the real linked-profiles count, not the
-  // manually-typed "Number of Participants/Beneficiaries" estimate field).
+  // Blocks marking a training Ongoing while assignedCount (real linked profiles) is 0.
   const [zeroParticipantsAlert, setZeroParticipantsAlert] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [attendanceIncompleteModal, setAttendanceIncompleteModal] = useState<{ isOpen: boolean; activity: SkillsTrainingActivity | null; unmarked: number }>({ isOpen: false, activity: null, unmarked: 0 })
@@ -290,9 +288,7 @@ export default function SkillsTrainingMaintenanceForm() {
   const recordStart = filteredTrainings.length === 0 ? 0 : (safePage - 1) * perPage + 1
   const recordEnd = Math.min(safePage * perPage, filteredTrainings.length)
 
-  // Batch names to offer in the filter dropdown -- there's no separate batch
-  // entity anymore, so this is simply every distinct name currently in use
-  // across trainings, not a fixed list.
+  // No separate batch entity anymore, so this is every distinct name currently in use.
   const knownBatchNames = Array.from(new Set(activities.map(a => a.batchName).filter(Boolean))).sort()
 
   // Load participants (with attendance) whenever the participants sub-view opens.

@@ -1,18 +1,5 @@
-// Bulk applicant import for Employment Facilitation.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the Add Applicant
-//      form section by section. Columns are grouped under a merged section-label
-//      header row (row 1, e.g. "I. PERSONAL INFORMATION"); the individual field
-//      headers sit in row 2. Enum fields render as in-cell dropdowns.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (cascade: province -> city -> barangay), build a valid
-//      ApplicantFormData per row, and submit the whole batch through
-//      importApplicantsBulk in one all-or-nothing transaction: if any row is
-//      invalid or fails to insert, none of the rows are saved.
-//
-// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
-// ExcelJS.
+// Bulk applicant import: generates the .xlsx template (ExcelJS) and parses a
+// filled-in workbook back into ApplicantFormData rows, all-or-nothing via importApplicantsBulk.
 
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
@@ -108,12 +95,8 @@ const SECTION_PERSONAL: TemplateSection = {
   ],
 };
 
-// Section II — Job Preference. A repeating sub-table in the form (occupation +
-// local city / overseas country, up to 3 rows by default) plus a single shared
-// employment-type preference. Flattened here into fixed numbered columns so it
-// stays one row per applicant. (The form's Local/Overseas checkboxes aren't
-// persisted by the backend, so they're omitted — the location is conveyed by
-// whether a Local City vs Overseas Country value is filled in.)
+// Section II — Job Preference. Repeating occupation + local city/overseas country
+// rows flattened into fixed numbered columns, one row per applicant.
 const JOB_PREF_ROWS = 3;
 const JOB_PREF_TYPE_OPTIONS = ["Part-time", "Full-time"]; // the individual values
 const EMPLOYMENT_TYPE_PREF_OPTIONS = ["Part-time", "Full-time", "Part-time, Full-time"]; // dropdown combos
@@ -133,10 +116,8 @@ const SECTION_JOBPREF: TemplateSection = {
   ],
 };
 
-// Section III — Language / Dialect Proficiency. A repeating table of
-// language + Read/Write/Speak/Understand. Flattened into numbered columns
-// (Language N + the four ability flags). Like Section II, the parser scans for
-// every "Language N" column so users can add rows by duplicating the columns.
+// Section III — Language / Dialect Proficiency. Flattened Language N + four
+// ability-flag columns; parser scans for every "Language N" column.
 const LANGUAGE_ROWS = 3;
 const DEFAULT_LANGUAGES = ["ENGLISH", "FILIPINO", "MANDARIN"];
 
@@ -154,11 +135,8 @@ const SECTION_LANGUAGE: TemplateSection = {
   ]).flat(),
 };
 
-// Section IV — Educational Background. Three fixed levels (Elementary /
-// Secondary / Tertiary) plus repeating Graduate Studies. Only fields the backend
-// actually stores are included: the Non-K12/K-12 "type" and "Level Reached" are
-// omitted because the backend doesn't persist them (Secondary keeps only its
-// Senior High Strand). School Name is stored per level (educations.school_name).
+// Section IV — Educational Background. Elementary/Secondary/Tertiary plus repeating
+// Graduate Studies; only fields the backend actually persists are included.
 const GRADUATE_STUDY_ROWS = 1;
 
 const SECTION_EDUCATION: TemplateSection = {
@@ -197,9 +175,8 @@ const SECTION_EDUCATION: TemplateSection = {
   ],
 };
 
-// Section V — Technical/Vocational and Other Training. A repeating table of
-// course + hours + institution + skills acquired + certificate. Flattened into
-// numbered columns; the parser scans for every "Training N - Course" column.
+// Section V — Technical/Vocational Training, flattened into numbered columns;
+// parser scans for every "Training N - Course" column.
 const TRAINING_ROWS = 1;
 
 const SECTION_TRAINING: TemplateSection = {
@@ -216,9 +193,8 @@ const SECTION_TRAINING: TemplateSection = {
   ]).flat(),
 };
 
-// Section VI — Eligibility / Professional License. Two repeating tables in one
-// section: eligibility + date taken, and professional license + valid until.
-// Each is flattened into numbered columns and scanned dynamically.
+// Section VI — Eligibility + Professional License, each flattened into
+// numbered columns and scanned dynamically.
 const ELIGIBILITY_ROWS = 3;
 const LICENSE_ROWS = 3;
 
@@ -239,9 +215,8 @@ const SECTION_ELIGIBILITY: TemplateSection = {
   ],
 };
 
-// Section VII — Work Experience. A repeating table of company + city + position
-// + months + status. The company city resolves to a dataset ID (optional), and
-// status is one of the backend's accepted values.
+// Section VII — Work Experience: company + city + position + months + status,
+// with company city resolving to an optional dataset ID.
 const WORK_EXPERIENCE_ROWS = 3;
 
 const SECTION_WORKEXP: TemplateSection = {
@@ -258,12 +233,8 @@ const SECTION_WORKEXP: TemplateSection = {
   ]).flat(),
 };
 
-// Section VIII — Other Skills Acquired Without Certificate. In the form this is
-// a grid of predefined skill checkboxes plus a free-text "Others" list. The
-// backend stores every skill (predefined or custom) as a plain skill row, so the
-// template uses a single comma-separated column; the parser splits each token
-// and routes it to the predefined list vs. the custom "others" list so the form
-// re-displays them correctly. The predefined names match the form's checkboxes.
+// Section VIII — Other Skills: one comma-separated column; parser splits tokens
+// into predefined vs. custom "others" so the form re-displays them correctly.
 const PREDEFINED_SKILLS = [
   "AUTO MECHANIC", "BEAUTICIAN", "CARPENTRY WORK", "COMPUTER LITERATE", "DOMESTIC CHORES",
   "DRIVER", "ELECTRICIAN", "EMBROIDERY", "GARDENING", "MASONRY", "PAINTER/ARTIST",
@@ -320,9 +291,8 @@ export async function downloadImportTemplate(): Promise<void> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Applicants");
 
-  // Format every column as Text ("@") so Excel preserves leading zeros (e.g. the
-  // "0" in a contact number) and doesn't auto-convert dates/long numbers. The
-  // parser reads every cell as a string anyway, so text format is ideal.
+  // Text format ("@") so Excel preserves leading zeros and doesn't auto-convert
+  // dates/long numbers; the parser reads every cell as a string anyway.
   ws.columns = TEMPLATE_COLUMNS.map((c) => ({ width: c.width, style: { numFmt: "@" } }));
 
   const border = {
@@ -415,9 +385,8 @@ function yesNo(v: string): "Yes" | "No" {
   return n === "yes" || n === "true" || n === "1" || n === "y" ? "Yes" : "No";
 }
 
-// Like yesNo, but a blank cell stays blank. Used for education "Graduated?"
-// flags: the backend treats a non-empty `graduated` as "this level has data" and
-// saves it, so leaving it blank avoids creating spurious empty education rows.
+// Like yesNo, but a blank cell stays blank -- avoids creating spurious empty
+// education rows (the backend saves any level with a non-empty `graduated`).
 function yesNoOrBlank(v: string): "Yes" | "No" | "" {
   return v.trim() ? yesNo(v) : "";
 }
@@ -428,9 +397,8 @@ function pickEnum(value: string, options: string[]): string {
   return options.find((o) => norm(o) === n) ?? "";
 }
 
-// Template columns ask for MM/DD/YYYY; ISO (YYYY-MM-DD) is still accepted for
-// backward compatibility. Validates the date is real (e.g. rejects 13/45/2005)
-// rather than letting the Date constructor silently roll it over.
+// Accepts MM/DD/YYYY (template format) or ISO; validates the date is real
+// instead of letting the Date constructor silently roll it over.
 function toIsoDate(v: string): string | null {
   const s = v.trim();
   const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -471,10 +439,8 @@ function makeCaches(): ResolveCaches {
   return { province: new Map(), city: new Map(), barangay: new Map(), workCity: new Map() };
 }
 
-// Resolve a work-experience company city via the flat all-cities search (names
-// come back as "City, Province"). Tolerant: matches the full "City, Province"
-// string, or — when unambiguous — just the city part. Returns null when not
-// found or ambiguous; the company city is optional, so callers don't fail.
+// Resolves a work-experience company city via the all-cities search; matches
+// "City, Province" or just the city when unambiguous. Returns null if not found.
 async function resolveWorkCity(name: string, caches: ResolveCaches): Promise<LocationOption | null> {
   const key = norm(name);
   if (caches.workCity.has(key)) return caches.workCity.get(key)!;
@@ -519,9 +485,8 @@ async function resolveBarangay(cityId: number, name: string, caches: ResolveCach
 
 type ResolvedAddress = { province: LocationOption; city: LocationOption; barangay: LocationOption };
 
-// Returns the resolved address, or the list of problems found (never both) --
-// callers accumulate these alongside their own field errors so a row reports
-// everything wrong with it in one pass instead of stopping at the first issue.
+// Returns the resolved address or the list of problems found (never both), so
+// a row can report everything wrong with it in one pass.
 async function resolveAddress(
   provinceName: string,
   cityName: string,
@@ -650,18 +615,14 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   fd.householdIdNo = get(row, "Household ID No.");
 
   // ── Section II — Job Preference ──
-  // Employment-type preference is a single shared value (comma list of
-  // Part-time / Full-time) applied to all preference rows by the backend.
+  // Employment-type preference is one shared comma-list value for all rows.
   fd.jobPrefEmploymentType = get(row, "Employment Type Preference")
     .split(",")
     .map((t) => pickEnum(t, JOB_PREF_TYPE_OPTIONS))
     .filter(Boolean);
 
-  // Occupation/location triples -> jobPreferences. The template ships with 3
-  // numbered triples, but we scan for *every* "Preferred Occupation N" column
-  // so a user can add more rows by duplicating the columns (Preferred
-  // Occupation 4 / Local City 4 / Overseas Country 4, …) — any N works. The
-  // backend only stores rows that have an occupation, so we keep those.
+  // Occupation/location triples -> jobPreferences; scans for every
+  // "Preferred Occupation N" column so users can add rows beyond the default 3.
   const prefIndices = new Set<number>();
   for (const key of Object.keys(row)) {
     const m = key.match(/^preferred occupation (\d+)$/); // keys are already normalized
@@ -680,8 +641,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   fd.jobPreferences = prefs;
 
   // ── Section III — Language / Dialect Proficiency ──
-  // Scan for every "Language N" column (so added rows work), keep ones that
-  // name a language. The backend stores only languages with ≥1 ability ticked.
+  // Scans for every "Language N" column; keeps rows that name a language.
   const langIndices = new Set<number>();
   for (const key of Object.keys(row)) {
     const m = key.match(/^language (\d+)$/); // bare language-name column (not "… - Read")
@@ -755,8 +715,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   fd.graduateStudies = graduateStudies;
 
   // ── Section V — Technical/Vocational and Other Training ──
-  // Scan for every "Training N - Course" column. The backend stores a training
-  // row only when it has a course, so we keep those.
+  // Scans for every "Training N - Course" column; keeps rows that have a course.
   const trainingIndices = new Set<number>();
   for (const key of Object.keys(row)) {
     const m = key.match(/^training (\d+) - course$/);
@@ -804,10 +763,8 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   }
   fd.professionalLicenses = professionalLicenses;
 
-  // ── Section VII — Work Experience ──
-  // Scan for every "Work Experience N - Company Name" column. The backend stores
-  // a row when it has a company name OR a position; the company city resolves to
-  // a dataset ID (optional — an unresolved city just leaves the ID null).
+  // ── Section VII — Work Experience ── scans for every "Work Experience N -
+  // Company Name" column; keeps rows with a company name or position.
   const weIndices = new Set<number>();
   for (const key of Object.keys(row)) {
     const m = key.match(/^work experience (\d+) - company name$/);
@@ -832,8 +789,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   fd.workExperiences = workExperiences;
 
   // ── Section VIII — Other Skills Acquired Without Certificate ──
-  // Split the comma list; route each token to a predefined skill (canonical
-  // name) or the custom "others" list. The backend stores both as skill rows.
+  // Splits the comma list; routes each token to a predefined skill or "others".
   const skillTokens = get(row, "Other Skills (comma-separated)")
     .split(",")
     .map((s) => s.trim())
@@ -881,17 +837,15 @@ export async function importApplicants(
   const sheet = wb.Sheets[wb.SheetNames[0]];
   if (!sheet) throw new Error("The file has no worksheets.");
 
-  // range:1 -> treat the SECOND row (the field headers) as the header row, so
-  // the merged section-label band in row 1 is ignored. raw:false -> formatted
-  // strings (preserves leading zeros, formats dates).
+  // range:1 skips the merged section-label band and uses row 2 as headers;
+  // raw:false keeps formatted strings (leading zeros, dates).
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
     raw: false,
     range: 1,
   });
 
-  // Re-key every row by normalized header and remember its spreadsheet row
-  // number for error reporting (data starts at FIRST_DATA_ROW).
+  // Re-keys each row by normalized header, keeping its spreadsheet row number for error reporting.
   const rows = rawRows.map((r, i) => {
     const data: Row = {};
     for (const [k, v] of Object.entries(r)) data[norm(k)] = String(v ?? "");
@@ -902,9 +856,8 @@ export async function importApplicants(
   const total = dataRows.length;
   const caches = makeCaches();
 
-  // All-or-nothing import: first resolve every row (address lookups etc.)
-  // without writing anything. If any row can't be resolved, nothing is sent
-  // to the backend at all.
+  // Resolves every row first (address lookups etc.) without writing anything;
+  // if any row fails, nothing is sent to the backend.
   const meta: { sheetRow: number; name: string }[] = [];
   const payloads: ApplicantFormData[] = [];
   const failed: ImportRowError[] = [];

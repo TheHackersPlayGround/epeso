@@ -1,7 +1,5 @@
-// Read-only modal showing one applicant's Employment Facilitation history as a
-// referral -> placement flow. One card per employer attempt, oldest first.
-// Each attempt reads: Referred (date) -> [referral status] -> [placement status]
-// (the placement leg only appears when the applicant was hired through it).
+// Read-only modal showing one applicant's referral -> placement history, one
+// card per employer attempt (oldest first); the placement leg only shows if hired.
 
 import { useEffect, useState } from 'react'
 import { X, ArrowRight } from 'lucide-react'

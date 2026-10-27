@@ -1,17 +1,5 @@
-// Bulk applicant import for TUPAD.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the TUPAD Profile
-//      form section by section, matching the look of the CDSP/SLP/CLPEP/Skills
-//      Training/DILP import templates: a merged, colored section-label header
-//      row (row 1) above the individual field headers (row 2), with enum
-//      fields rendered as in-cell dropdowns.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (cascade: province -> city -> barangay, required since
-//      beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      tupadService.createProfile.
-//
-// Reading the workbook uses SheetJS (xlsx); styling/validation on write uses ExcelJS.
+// Bulk applicant import for TUPAD: generates the .xlsx template and parses
+// filled-in workbooks, resolving addresses before posting each row.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -390,9 +378,7 @@ export async function importTupadApplicants(
   const total = dataRows.length
   const caches = makeCaches()
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // All-or-nothing: resolve every row locally first; if any fails, nothing is sent.
   const meta: { sheetRow: number; name: string }[] = []
   const payloads: Record<string, unknown>[] = []
   const failed: ImportRowError[] = []

@@ -37,10 +37,8 @@ export interface PermissionGroup {
   sections: PermissionSection[]
 }
 
-// Programs with their own "Maintenance" screen (batches/activities/projects)
-// get two independent sections -- Records (applicant/profile access) and
-// Maintenance (batch/activity/project management) -- so an admin can grant
-// either, or both, per staff member. Everything else keeps a single section.
+// Programs with their own Maintenance screen get two independent permission
+// sections (Records, Maintenance); everything else keeps a single section.
 const permissionGroups: PermissionGroup[] = [
   { title: 'EMPLOYMENT FACILITATION', sections: [
     { label: null, editorDescription: 'View, Add, Edit & Delete', permissions: [{ id: 'view-employment', label: 'View Employment Facilitation' }, { id: 'manage-employment', label: 'Manage Employment Facilitation' }] },

@@ -61,11 +61,8 @@ type EmployersTableProps = {
 
 function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, onDelete }: EmployersTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the button's position; pos is the menu's final placement, corrected
+  // by measuring its real rendered height once mounted (see layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -86,9 +83,8 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the trigger; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the trigger; the layout effect corrects it
+    // to the real measured height right after it mounts.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
@@ -357,10 +353,8 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The employer list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes -- doing it earlier would flip the shared
+  // loading flag and unmount this modal before the success message is seen.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -458,9 +452,7 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
 // ─── EmployersTab ──────────────────────────────────────────────────────────────
 
 export default function EmployersTab() {
-  // The list lives in EmploymentProvider (shared with the other tabs and
-  // kept across visits to this module) -- see the refresh calls below for
-  // how a change here reaches the tabs it can affect.
+  // The list lives in EmploymentProvider, shared with and kept across the other tabs.
   const { employers, industryOptions, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
   const loading = listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')

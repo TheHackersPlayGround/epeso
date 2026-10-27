@@ -100,9 +100,8 @@ function getOFWLabel(applicant: Applicant): string {
   return "Not OFW";
 }
 
-// Filters that render their own extra table column. Filters that map to an
-// existing default column (sex, educationalLevel, skills, trainingCourse,
-// jobPreference) are NOT here — they only filter, they don't add a column.
+// Filters that render their own extra table column (filters mapping to an
+// existing default column don't add one).
 const COLUMN_FILTER_IDS = ["disability", "civilStatus", "ofw", "4ps", "referredProgram", "barangay", "employmentStatus", "language", "collegeCourse"];
 
 // Active filters that add a column, in the order they were applied. Header and
@@ -179,11 +178,8 @@ function getFilterLabel(filterId: string): string {
 
 function ApplicantsTable({ applicants, activeFilters, isFiltered, onView, onEdit, onRefer, onShowHistory, onDelete }: ApplicantsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the button's position; pos is the menu's final placement, corrected
+  // by measuring its real rendered height once mounted (see layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -206,9 +202,8 @@ function ApplicantsTable({ applicants, activeFilters, isFiltered, onView, onEdit
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const right = window.innerWidth - rect.right;
-    // Provisional placement below the trigger; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the trigger; the layout effect corrects it
+    // to the real measured height right after it mounts.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right });
     setMenuPos({ top: rect.bottom + 4, right });
     setOpenMenuId(id);

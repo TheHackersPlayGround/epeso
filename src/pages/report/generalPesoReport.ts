@@ -1,8 +1,5 @@
-// Generates the General PESO Report's Excel export by patching a template
-// workbook with two native Excel charts authored directly in Excel.
-//
-// Patches the .xlsx zip directly with JSZip, since ExcelJS has no API for
-// native chart objects (only static images). Same technique as pesoMonthlyReport.ts.
+// Generates the General PESO Report's Excel export by patching a template workbook's
+// native charts directly with JSZip, since ExcelJS can't create native chart objects.
 import JSZip from 'jszip'
 import { GENERAL_PESO_PROGRAM_COLORS } from './generalPesoColors'
 import { setChartTitle } from './xlsxChartPatch'
@@ -56,9 +53,8 @@ function setNumCache(chartXml: string, values: number[]): string {
   })
 }
 
-// The pie's default per-slice theme colors vary by position, not program
-// identity. Replace them with explicit hex colors keyed by program name, so
-// the same program always gets the same color.
+// Pie slice colors default to position, not program identity -- replace them with
+// explicit hex colors keyed by program name instead.
 function setPieColors(chartXml: string, programs: string[]): string {
   const dPts = programs
     .map((name, i) => {
@@ -112,8 +108,7 @@ export async function generateGeneralPesoWorkbook(
   zip.file(SHEET_CHARTDATA, chartData)
 
   // ── Charts: shrink the range AND rebuild the cached values to match ──
-  // Titles match the Word export's chart captions instead of the template's
-  // auto-generated series name.
+  // Titles match the Word export's captions, not the template's auto series name.
   let bar = await zip.file(CHART_BAR)!.async('string')
   bar = setChartRange(bar, lastRow)
   bar = setStrCache(bar, names)

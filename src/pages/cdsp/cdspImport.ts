@@ -1,17 +1,5 @@
-// Bulk applicant import for CDSP.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the CDSP Profile
-//      form section by section, matching the look of the Employment Facilitation
-//      import template: a merged, colored section-label header row (row 1) above
-//      the individual field headers (row 2), with enum fields rendered as
-//      in-cell dropdowns.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (cascade: province -> city -> barangay, optional for
-//      CDSP), and POST each row through cdspService.createProfile.
-//
-// Reading the workbook uses SheetJS (xlsx); styling/validation on write needs
-// ExcelJS — same split as the EF applicant importer.
+// Bulk applicant import for CDSP: generates the .xlsx template (ExcelJS) and
+// parses filled-in workbooks (SheetJS) into cdspService.createProfile calls.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -176,9 +164,8 @@ export async function downloadImportTemplate(services: string[]): Promise<void> 
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Applicants')
 
-  // Format every column as Text ("@") so Excel preserves leading zeros (e.g. the
-  // "0" in a contact number) and doesn't auto-convert dates/long numbers. The
-  // parser reads every cell as a string anyway, so text format is ideal.
+  // Text format ("@") preserves leading zeros and stops auto-converting
+  // dates/long numbers; the parser reads every cell as a string anyway.
   ws.columns = columns.map((c) => ({ width: c.width, style: { numFmt: '@' } }))
 
   const border = {
@@ -226,9 +213,8 @@ export async function downloadImportTemplate(services: string[]): Promise<void> 
     cell.font = { italic: true, color: { argb: 'FF94A3B8' } }
   })
 
-  // Freeze both header rows, then apply dropdown validation to the enum columns.
-  // Long option lists go on a hidden helper sheet instead of an inline list
-  // formula, since Excel caps those at ~255 characters.
+  // Freeze both header rows, then apply dropdown validation to enum columns.
+  // Long option lists go on a hidden helper sheet (Excel caps inline lists at ~255 chars).
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   const lastRow = FIRST_DATA_ROW + TEMPLATE_VALIDATION_ROWS - 1
   const optionColumns = columns.filter((c) => c.options && c.options.length > 0)
@@ -513,9 +499,8 @@ export async function importCdspApplicants(
   const sheet = wb.Sheets[wb.SheetNames[0]]
   if (!sheet) throw new Error('The file has no worksheets.')
 
-  // range:1 -> treat the SECOND row (the field headers) as the header row, so
-  // the merged section-label band in row 1 is ignored. raw:false -> formatted
-  // strings (preserves leading zeros, formats dates).
+  // range:1 skips row 1's merged section-label band, using row 2 as headers;
+  // raw:false keeps formatted strings (leading zeros, dates).
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: '',
     raw: false,
@@ -532,9 +517,7 @@ export async function importCdspApplicants(
   const total = dataRows.length
   const caches = makeCaches()
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // All-or-nothing: resolve every row first, nothing is sent if any row fails.
   const meta: { sheetRow: number; name: string }[] = []
   const payloads: Record<string, unknown>[] = []
   const failed: ImportRowError[] = []

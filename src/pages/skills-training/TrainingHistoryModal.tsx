@@ -1,7 +1,5 @@
 // Shows every training a beneficiary has ever been assigned to, not just the
-// current one -- assignments are additive (see stAddParticipant), so someone
-// who finished one training and moved on to another still has both listed
-// here, each with its own status and attendance.
+// current one -- assignments are additive.
 
 import { useState, useEffect } from 'react'
 import { X, GraduationCap } from 'lucide-react'

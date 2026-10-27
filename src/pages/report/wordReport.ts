@@ -1,6 +1,5 @@
-// Builds the Reports module's Word (.docx) export. Purely mechanical docx
-// assembly: ReportView.tsx decides what content goes in, this file lays out
-// a title, a summary section, optional chart images, and data tables.
+// Builds the Reports module's Word (.docx) export -- purely mechanical layout;
+// ReportView.tsx decides the content, this lays out title/summary/charts/tables.
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   WidthType, AlignmentType, BorderStyle, ImageRun, PageOrientation,
@@ -12,9 +11,8 @@ import {
 const FOLIO_WIDTH_TWIP = convertMillimetersToTwip(215.9)
 const FOLIO_HEIGHT_TWIP = convertMillimetersToTwip(330.2)
 
-// Times New Roman set explicitly everywhere below instead of left to the
-// Word default. Renders the peso sign correctly on its own, unlike the PDF
-// export which needed a Unicode-safe font.
+// Times New Roman set explicitly instead of the Word default -- it renders the
+// peso sign fine on its own, unlike the PDF export which needed a special font.
 const BASE_FONT = 'Times New Roman'
 
 const BORDER_BLACK = '000000'
@@ -44,9 +42,8 @@ const textCell = (value: string | number, widthPct: number, fill?: string): Tabl
     children: [new Paragraph({ children: runsForText(String(value), { size: 18, bold: !!fill, color: fill ? 'FFFFFF' : undefined }) })],
   })
 
-// Converts the same array-of-rows shape the Excel Summary sheets build into
-// Word content: a blank row becomes spacing, a single-cell ALL-CAPS row
-// becomes a heading, and a run of same-width rows becomes a small table.
+// Converts the same array-of-rows shape the Excel sheets use into Word content:
+// blank row = spacing, single ALL-CAPS cell = heading, same-width rows = a table.
 function aoaToElements(aoa: (string | number)[][]): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = []
   let pendingRows: TableRow[] = []
@@ -93,9 +90,8 @@ function computeColumnWidthPcts(columns: string[]): number[] {
   return columns.map(c => NARROW_COLUMNS.has(c) ? NARROW_COLUMN_PCT : widePct)
 }
 
-// The main data tables: a bold plain-white header row, black text and
-// borders. cellFill is optional; only the Aging Report uses it, matching
-// the Excel/PDF highlight on "Time Since Completion".
+// Main data table: bold white header row, black text/borders. cellFill is
+// optional, used only by the Aging Report to match its Excel/PDF highlight.
 function buildDataTable(columns: string[], rows: Record<string, any>[], cellFill?: (col: string, row: any) => string | undefined): Table {
   const widths = computeColumnWidthPcts(columns)
   const header = new TableRow({
@@ -164,9 +160,8 @@ function buildChartsTable(charts: { dataUrl: string; aspect: number; label: stri
     const pair = charts.slice(i, i + 2)
     rows.push(new TableRow({ children: pair.map(c => buildChartCell(c, 100 / pair.length)) }))
   }
-  // TableBorders.NONE at the table level, not just on each cell, otherwise
-  // Word's default grid borders make this look like a continuation of the
-  // summary table above.
+  // TableBorders.NONE at the table level, not just per cell -- otherwise Word's
+  // default grid makes this look like a continuation of the summary table above.
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: TableBorders.NONE, rows })
 }
 

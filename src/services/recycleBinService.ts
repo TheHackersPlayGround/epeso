@@ -1,10 +1,5 @@
-// API calls for the app-wide recycle bin (soft-deleted records).
-// Deleting an EF applicant/employer/referral, a GIP applicant, a CDSP
-// applicant, a SPES applicant, or a DILP/TUPAD beneficiary now soft-deletes
-// it on the backend; these functions list, restore, or permanently delete
-// those records, merging results from every module that supports soft
-// delete. All requests go through axiosClient, which carries the PHP
-// session cookie.
+// API calls for the app-wide recycle bin: lists, restores, or permanently
+// deletes soft-deleted records, merged across every module that supports it.
 
 import axiosClient from './axiosClient'
 import { ENDPOINTS } from '../config/api'
@@ -72,18 +67,15 @@ export async function listDeleted(): Promise<RecycleBinRecord[]> {
   return merged
 }
 
-// POST {module}/restoreRecord  { recordType, id }
-// Returns the new name if the backend had to rename the record on restore
-// (Documents only: its name was reused while it sat in the bin), else null.
+// POST restoreRecord -- returns the new name if the backend had to rename it on
+// restore (Documents only, when its old name was reused), else null.
 export async function restoreRecord(recordType: RecycleRecordType, id: number): Promise<string | null> {
   const res = await axiosClient.post(endpointsFor(recordType).restoreRecord, { recordType, id })
   return res.data?.data?.renamedTo ?? null
 }
 
-// POST {module}/purgeRecord  { recordType, id, force? }  — permanent delete.
-// `force` is only meaningful for EF applicants with placement/referral
-// history — the backend blocks the first attempt (409, detail.code ===
-// 'has_history') unless force is true. Harmless no-op for every other type.
+// POST purgeRecord -- permanent delete. `force` only matters for EF applicants
+// with history (blocked with 409 unless true); a no-op for every other type.
 export async function purgeRecord(recordType: RecycleRecordType, id: number, force = false): Promise<void> {
   await axiosClient.post(endpointsFor(recordType).purgeRecord, { recordType, id, force })
 }

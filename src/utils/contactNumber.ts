@@ -1,10 +1,5 @@
-// Shared rules for every Contact Number field in the app.
-//
-// Accepts Philippine mobile numbers (09171234567, +63 917 123 4567) and
-// landlines with an area code ((088) 123-4567, 02 8123 4567, +63 88 123 4567),
-// plus a bare 7-8 digit local number. Spaces, hyphens and parentheses are
-// allowed while typing; only digits and a leading "+" are counted.
-// Deliberately not <input type="number">, which would drop the leading zero.
+// Shared rules for every Contact Number field: accepts PH mobile numbers,
+// landlines with area code, and bare local numbers; not type="number" (drops leading zero).
 
 export const CONTACT_NUMBER_MESSAGE = 'Enter a valid contact number.'
 

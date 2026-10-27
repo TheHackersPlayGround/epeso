@@ -132,9 +132,8 @@ export default function SearchableSelect({
           onChange={(e) => { setText(e.target.value); setOpen(true) }}
           onFocus={() => !disabled && setOpen(true)}
           onKeyDown={onKeyDown}
-          // Chrome ignores autoComplete="off" on address-like fields and still
-          // shows native autofill suggestions over this dropdown.
-          // "new-password" is the standard workaround Chrome actually honors.
+          // Chrome ignores autoComplete="off" here and still shows autofill over the dropdown;
+          // "new-password" is the workaround it actually honors.
           autoComplete="new-password"
           name="search-no-autofill"
           className={`${baseInput} ${stateInput}`}

@@ -143,9 +143,7 @@ function DocumentUpload({
           id: Date.now().toString() + Math.random().toString(36),
           fileName: file.name,
           fileSize: formatFileSize(file.size),
-          // A blob: URL (not the data: dataUrl) so "View" works before the
-          // batch is saved — Chrome/Brave block opening data: URIs in a new
-          // tab, which would otherwise show a blank "Untitled" tab.
+          // blob: URL, not data: -- Chrome/Brave block opening data: URIs in a new tab.
           url: URL.createObjectURL(file),
           dataUrl,
         }
@@ -313,11 +311,8 @@ export default function SPESMaintenanceForm({
     return !runValidation(errors)
   }
 
-  // Status here is just part of the whole-form save — the backend's
-  // spesCascadeBatchStatus() applies the actual side effects (stamping
-  // completed_at, flipping assigned applicants Active/Completed) on save.
-  // Quick one-off status transitions with a confirmation dialog are handled
-  // separately by the batch list's status wizard in Maintenance.tsx.
+  // Side effects (completed_at, applicant status) apply server-side via
+  // spesCascadeBatchStatus(); quick transitions use the list's own status wizard.
   const handleStatusChange = (newStatus: SPESBatch['status']) => {
     set('status', newStatus)
   }

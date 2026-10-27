@@ -265,9 +265,7 @@ function needsSecuritySetup(user: { role?: string; securityQuestionsSet?: boolea
   return user?.role === 'Administrator' && user?.securityQuestionsSet === false
 }
 
-// How often a signed-in tab re-checks its own permissions (an administrator may
-// have changed them). Also checked when the window regains focus, the browser
-// comes back online, or an action is refused (403).
+// How often a signed-in tab re-checks its own permissions (also checked on focus/online/403).
 const PERMISSION_CHECK_MS = 10_000
 const PERMISSION_CHECK_TIMEOUT_MS = 8_000
 const PERMISSION_RETRY_MS = 3_000
@@ -288,9 +286,7 @@ export default function App() {
   const [accountDeactivated, setAccountDeactivated] = useState(false)
   // An administrator deleted this account while it was in use.
   const [accountDeleted, setAccountDeleted] = useState(false)
-  // This tab's own last-known permissions. Compared against instead of the
-  // shared localStorage copy, which another tab may already have refreshed,
-  // so every open tab gets its own notice.
+  // This tab's own last-known permissions, so every open tab gets its own notice.
   const knownUserRef = useRef<StoredUser | null>(null)
 
   // Determines whether security-questions setup is required from the cached user.

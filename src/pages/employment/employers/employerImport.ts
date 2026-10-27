@@ -1,12 +1,5 @@
-// Bulk employer import for Employment Facilitation.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) grouped into four sections
-//      (Company Information / Contact Person / Company Address / Registration).
-//      Enum fields get in-cell dropdowns.
-//   2. Parse a filled-in workbook, resolve Province→City→Barangay to dataset IDs
-//      via locationService (with per-import caching), build a valid employer
-//      payload per row, and POST it through createEmployer.
+// Bulk employer import: generates the .xlsx template (four sections, ExcelJS)
+// and parses a filled-in workbook into employer payloads via createEmployer.
 
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
@@ -328,9 +321,8 @@ export async function importEmployers(
   const caches = makeCaches();
   let processed = 0;
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // Resolves every row first (address lookups etc.) without writing anything;
+  // if any row fails, nothing is sent to the backend.
   for (let i = 0; i < dataRows.length; i++) {
     const raw = dataRows[i] as unknown[];
     if (!raw.some((c) => String(c ?? "").trim())) continue;

@@ -84,10 +84,8 @@ function formatDisplayName(b: { lastName: string; firstName: string; middleName?
   return `${b.lastName}, ${given}`
 }
 
-// Table rows show just the middle initial (e.g. "Salvador" -> "S."), matching
-// the abbreviated-name convention used in list views elsewhere in the app
-// (e.g. the recycle bin). Modal headers and confirmation dialogs keep using
-// formatDisplayName's full middle name instead — this one is table-only.
+// Table rows show just the middle initial (e.g. "Salvador" -> "S."); modals and
+// confirmations keep using formatDisplayName's full middle name.
 function formatTableName(b: { lastName: string; firstName: string; middleName?: string; nameExtension?: string }): string {
   const middleInitial = b.middleName?.trim() ? `${b.middleName.trim().charAt(0)}.` : ''
   const given = [b.firstName, middleInitial, b.nameExtension].filter(Boolean).join(' ')
@@ -128,10 +126,8 @@ function DileepImportModal({
   const [result, setResult] = useState<DileepImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const programLabel = isDILP ? 'DILP' : 'TUPAD'
-  // The beneficiary list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes -- doing it earlier would flip the shared
+  // loading flag and unmount this modal before the success message is seen.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -509,9 +505,8 @@ type ViewAssignedProjectModalProps = {
 
 function ViewAssignedProjectModal({ beneficiary: b, program, projects, onChangeAssignment, onWithdraw, onClose }: ViewAssignedProjectModalProps) {
   const assignedProject = b.assignedProjectId ? projects.find(p => p.id === b.assignedProjectId) ?? null : null
-  // Matches the backend's unassign guard (dilp.php/tupad.php): once the
-  // project moves past Planned, changing/unassigning would erase the only
-  // record this assignment ever happened -- so only Planned can be changed.
+  // Matches the backend's unassign guard: only a Planned assignment can
+  // still be changed/unassigned without erasing its record.
   const canChange = assignedProject?.status === 'Planned'
   const money = (v?: string | null) => (v ? `\u20B1${Number(v).toLocaleString()}` : undefined)
 
@@ -610,11 +605,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | 'dateApplied_newest' | 'dateApplied_oldest' | ''>('')
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the click position; pos is corrected to the menu's real
+  // measured height once it mounts (see the layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -699,9 +691,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the button; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the button; the layout effect corrects it
+    // to the real measured height before paint.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(openMenuId === id ? null : id)
@@ -827,12 +818,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
 
   const menuBeneficiary = paginated.find(b => b.id === openMenuId) ?? null
 
-  // Column order/names here must match dilpImport.ts's / tupadImport.ts's
-  // expected headers exactly (Import looks columns up by name via
-  // get()/norm(), not position) -- this is what makes an exported .xlsx
-  // directly re-importable later. DILP and TUPAD have different field
-  // sets (DILP has Email/Classification/4Ps, TUPAD doesn't), so each gets
-  // its own header list and row shape.
+  // Must match dilpImport.ts's / tupadImport.ts's headers (looked up by name)
+  // so exports are re-importable; DILP and TUPAD have different field sets.
   const DILP_IMPORT_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email Address',
@@ -873,9 +860,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     setIsExporting(true)
     await new Promise(resolve => setTimeout(resolve, 0))
     try {
-      // Row 1 is left blank: Import always skips the physical first row
-      // (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2.
+      // Row 1 left blank: the Template has a merged section-label band there,
+      // and Import always skips the physical first row.
       const headers = isDILP ? DILP_IMPORT_HEADERS : TUPAD_IMPORT_HEADERS
       const aoa = [[], headers, ...buildImportCompatibleRows()]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -1260,13 +1246,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       {/* Context menu */}
       {openMenuId !== null && menuPos && menuBeneficiary && (() => {
         const isCompleted = menuBeneficiary.assignedProjectStatus === 'Completed'
-        // DILP is one-time-only: once assigned to any project, ever, the menu
-        // only ever offers to view it — never a fresh "Assign Project" again,
-        // even after it's Completed (mirrors GIP's hasAssignment gate). TUPAD
-        // supports a running history, so it keeps offering "Assign Project"
-        // once the current one is Completed.
-        // A TUPAD beneficiary who withdrew has no live assignment any more, so (like
-        // Completed) the menu goes back to offering "Assign Project".
+        // DILP is one-time-only (menu only offers to view once assigned); TUPAD
+        // allows a running history, offering "Assign Project" again once Completed or withdrawn.
         const isWithdrawn = !!(menuBeneficiary as TUPADApplicant).exitedAt
         const showViewAssigned = !!menuBeneficiary.assignedProjectName && (isDILP || (!isCompleted && !isWithdrawn))
         const canWithdraw = !isDILP && menuBeneficiary.status === 'Active' && menuBeneficiary.assignedProjectStatus === 'Ongoing'

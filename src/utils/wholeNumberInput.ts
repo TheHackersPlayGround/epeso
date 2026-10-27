@@ -1,7 +1,5 @@
-// Helpers for whole-number <input type="number"> fields (slot counts).
-// A number input normally accepts ".", ",", "e", "+" and "-". Use both together:
-//   <input type="number" min="1" onKeyDown={blockNonWholeNumberKeys}
-//          onChange={e => setValue(keepWholeNumber(e.target.value))} />
+// Helpers for whole-number <input type="number"> fields (slot counts) -- blocks
+// decimal/exponent/negative keys and strips them from pasted values.
 
 import type { KeyboardEvent } from 'react'
 

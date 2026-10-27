@@ -1,7 +1,5 @@
-// API calls for Employment Facilitation applicants.
-// An applicant is a beneficiary enrolled in the Employment Facilitation service;
-// the backend handles the full beneficiary spine in one transaction.
-// All requests go through axiosClient, which carries the PHP session cookie.
+// API calls for Employment Facilitation applicants; the backend handles the full
+// beneficiary spine in one transaction. All requests go through axiosClient.
 
 import axiosClient from './axiosClient'
 import { ENDPOINTS } from '../config/api'
@@ -16,9 +14,8 @@ export async function listApplicants(): Promise<Applicant[]> {
   return res.data.data ?? []
 }
 
-// GET /api/employment/getApplicantPhoto/{id} -> 2x2 photo as a base64 data URL
-// (or null). Used so the Resume Builder can embed the photo in the PDF without
-// cross-origin canvas tainting.
+// GET getApplicantPhoto/{id} -> 2x2 photo as a base64 data URL (or null), so the
+// Resume Builder can embed it in the PDF without cross-origin canvas tainting.
 export async function getApplicantPhoto(id: number): Promise<string | null> {
   const res = await axiosClient.get<{ status: string; data: { dataUrl: string | null } }>(
     `${ENDPOINTS.employment.getApplicantPhoto}/${id}`,
@@ -64,9 +61,8 @@ export async function createApplicant(formData: ApplicantFormData): Promise<numb
   return res.data.data.id
 }
 
-// POST /api/employment/importApplicantsBulk -> all-or-nothing batch create.
-// The backend validates every row and writes the whole batch in one DB
-// transaction; if any row fails, nothing is saved.
+// POST importApplicantsBulk -> all-or-nothing batch create; the backend validates
+// every row and writes the whole batch in one DB transaction.
 export async function importApplicantsBulk(rows: ApplicantFormData[]): Promise<{ ids: number[] }> {
   const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
     ENDPOINTS.employment.importApplicantsBulk,

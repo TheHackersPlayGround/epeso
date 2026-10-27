@@ -532,15 +532,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // PlacementsTab, consumed by VacanciesTab.
   const [pendingVacancyId, setPendingVacancyId] = useState<number | null>(null);
 
-  // The lists are held by EmploymentProvider, so entering this module shows
-  // them immediately. Both refreshes below are silent (no spinner):
-  //  - on entering the module / returning to the window, revalidate everything
-  //    (catches other staff members' changes; duplicate triggers within a
-  //    couple of seconds are collapsed by the provider);
-  //  - on RETURNING to the Applicants tab, re-fetch applicants so the computed
-  //    referralState (Refer/Referred/Hired) reflects status changes made in the
-  //    Referrals/Placements tabs. (Those tabs also refresh it themselves after
-  //    every change; this is the safety net.)
+  // Lists come from EmploymentProvider and both refreshes below are silent (no
+  // spinner): revalidate on entering/returning, and re-fetch applicants on tab return so referralState stays current.
   useRefreshOnReturn(refreshIfStale);
   const isFirstTabRun = useRef(true);
   useEffect(() => {
@@ -626,9 +619,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     setCurrentPage(1);
   }
 
-  // ── Export handlers ───────────────────────────────────────────────
-  // Computes how many repeating-section rows (job preference, language, etc.)
-  // the export needs, sized to the applicant with the most entries.
+  // ── Export handlers ── sizes repeating-section row counts to the applicant
+  // with the most entries.
   function buildImportCompatibleColumns() {
     const fds = filteredApplicants.map((a) => (a.fullFormData as ApplicantFormData | undefined));
     const maxOf = (get: (fd: ApplicantFormData) => number, min: number) =>

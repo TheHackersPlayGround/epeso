@@ -53,9 +53,8 @@ const emptyForm: Omit<CDSPApplicant, 'id'> = {
 
 // ─── Shared helpers (also used by main view) ──────────────────────────────────
 
-// The status is worked out on the server (Active while the current activity is
-// Planned/Ongoing, otherwise Inactive) so the page, reports and exports agree;
-// this just narrows the type.
+// Status is computed server-side (Active while the current activity is
+// Planned/Ongoing); this just narrows the type.
 export function getEffectiveStatus(applicant: Pick<CDSPApplicant, 'status'>): 'Active' | 'Inactive' {
   return applicant.status === 'Active' ? 'Active' : 'Inactive'
 }
@@ -126,9 +125,8 @@ function DocAttachSection({
         customName,
         fileName: file.name,
         fileSize: formatFileSize(file.size),
-        // A blob: URL (not the data: dataUrl) so "View" works before the
-        // record is saved — Chrome/Brave block opening data: URIs in a new
-        // tab, which would otherwise show a blank "Untitled" tab.
+        // blob: URL, not the data: dataUrl -- Chrome/Brave block opening
+        // data: URIs in a new tab, which would show a blank tab.
         url: URL.createObjectURL(file),
         dataUrl,
       }])
@@ -394,9 +392,8 @@ export default function CDSPProfileForm({
   const empStatusFieldRef = useRef<HTMLSelectElement>(null)
   const serviceAvailedWrapRef = useRef<HTMLDivElement>(null)
 
-  // Sex, birthdate, civil status, and barangay are required by the underlying
-  // beneficiaries table (NOT NULL columns); name fields additionally reject
-  // digits/symbols.
+  // Sex, birthdate, civil status, and barangay are NOT NULL in the DB;
+  // name fields also reject digits/symbols.
   const handleSave = () => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()

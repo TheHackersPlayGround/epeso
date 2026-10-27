@@ -53,10 +53,8 @@ interface PermissionGroupDef {
   sections: PermissionSection[]
 }
 
-// Programs with their own "Maintenance" screen (batches/activities/projects)
-// show two independent sections -- Records (applicant/profile access) and
-// Maintenance (batch/activity/project management) -- matching the Add/Edit
-// User screen in Security. Everything else keeps a single section.
+// Programs with their own Maintenance screen show two independent sections
+// (Records, Maintenance), matching the Security Add/Edit User screen.
 const PERMISSION_GROUPS: PermissionGroupDef[] = [
   { title: 'EMPLOYMENT FACILITATION', sections: [
     { label: null, viewPerm: 'view-employment', editorPerms: ['manage-employment'] },

@@ -12,9 +12,7 @@ import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachme
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
 
-// Display-only comma formatting for the Total Household Monthly Income input
-// -- the underlying value stays a plain numeric string (no commas), matching
-// what the backend expects.
+// Display-only comma formatting; the stored value stays a plain numeric string.
 function formatAmountDisplay(raw: string): string {
   if (!raw) return ''
   const [intPart, decPart] = raw.split('.')
@@ -41,11 +39,8 @@ type AttachedDocsEditorProps = {
   onPreview: (doc: LivelihoodSavedDocument) => void
 }
 
-// previewDoc lives in the parent (SLPProfileForm) and renders as a sibling of
-// the whole form, not nested inside this component -- a `fixed inset-0`
-// modal nested inside an ancestor with `opacity`/`filter`/`transform` (the
-// view-mode-dimmed fieldset) stops being positioned relative to the
-// viewport and gets squashed into that ancestor's box instead.
+// previewDoc renders in the parent, not nested here -- a view-mode-dimmed
+// ancestor's opacity/filter/transform would break this modal's fixed positioning.
 function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -312,9 +307,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     if (currentStep > 1) setCurrentStep(step => step - 1)
   }
 
-  // Focuses a field on Step 2 -- switches step first (fields on other steps
-  // aren't mounted/visible until then), then focuses once the step's render
-  // has actually happened.
+  // Switches to Step 2 first (field isn't mounted otherwise), then focuses after render.
   function focusOnStep(step: number, run: () => void) {
     setCurrentStep(step)
     setTimeout(run, 50)

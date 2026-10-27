@@ -1,7 +1,5 @@
-// Registry that lets navigation outside a form (page back arrows, tabs, the
-// navbar) ask "is a form open with unsaved changes?" before leaving. Forms
-// register themselves through useFormDraft; <NavLeaveGuard /> (mounted once in
-// App) shows the confirmation.
+// Registry so navigation (back arrows, tabs, navbar) can check "is a form open
+// with unsaved changes?" before leaving; forms register via useFormDraft.
 
 export interface LeaveGuard {
   isDirty: () => boolean

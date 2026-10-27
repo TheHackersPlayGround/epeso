@@ -131,11 +131,8 @@ export default function CDSPMaintenanceForm() {
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the click position; pos is corrected to the menu's real
+  // measured height once it mounts (see the layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -232,9 +229,7 @@ export default function CDSPMaintenanceForm() {
     setSearchQuery('')
   }
 
-  // Draft / unsaved-changes guard. This page swaps several actions in one
-  // component, so the guard is only active on the add / edit form and starts
-  // fresh whenever the action (or the activity being edited) changes.
+  // Draft guard is only active on the add/edit form, reset whenever the action changes.
   const draft = useFormDraft({
     draftKey: 'maintenance-cdsp-activity',
     mode: action === 'add_activity' ? 'add' : 'edit',
@@ -784,9 +779,8 @@ export default function CDSPMaintenanceForm() {
                         onClick={e => {
                           const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                           const right = window.innerWidth - rect.right
-                          // Provisional placement below the button; the layout
-                          // effect corrects this to the menu's real measured
-                          // height right after it mounts, before paint.
+                          // Provisional placement; the layout effect corrects
+                          // it to the real measured height before paint.
                           setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                           setMenuPos({ top: rect.bottom + 4, right })
                           setOpenMenuId(openMenuId === a.id ? null : a.id)

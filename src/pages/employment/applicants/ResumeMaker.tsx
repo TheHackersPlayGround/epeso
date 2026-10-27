@@ -219,10 +219,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load the applicant's photo when the selection changes. A freshly-uploaded
-  // photo is already a base64 data URL; a stored 2x2 comes back as a cross-origin
-  // http URL, which html2canvas can't embed in the PDF — so we re-fetch it as
-  // base64 from the API (same trusted origin) and use that instead.
+  // A stored 2x2 photo comes back as a cross-origin http URL that html2canvas
+  // can't embed in the PDF, so it's re-fetched as base64 from the API.
   useEffect(() => {
     const id = selectedApplicant?.id;
     const img = selectedApplicant?.profileImage ?? '';
@@ -237,9 +235,8 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
     return () => { cancelled = true; };
   }, [selectedApplicant?.id, selectedApplicant?.profileImage]);
 
-  // Re-paginate whenever the resume content changes: measure each section's
-  // natural height and greedily pack sections into A4-tall pages so a section is
-  // never split mid-line. Overflow simply continues onto the next page.
+  // Re-paginates on content change: measures each section and greedily packs
+  // them into A4-tall pages so no section splits mid-line.
   useLayoutEffect(() => {
     const container = measureRef.current;
     if (!container || !selectedApplicant) { setPages(prev => (prev.length ? [] : prev)); return; }

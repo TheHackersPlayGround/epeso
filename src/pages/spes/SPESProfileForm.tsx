@@ -89,12 +89,8 @@ export function BatchStatusBadge({ status }: { status: string }) {
 
 // ─── Internal helpers ──────────────────────────────────────────────────────────
 
-// Grade/Year Level options narrow down to whatever's actually applicable to
-// the selected School Type, instead of showing every level from Grade 7
-// through 5th Year regardless of context. Exported so the bulk importer
-// (spesImport.ts) can enforce the identical pairing on imported rows, since
-// a spreadsheet's Grade/Year Level column can't be a School-Type-conditional
-// dropdown the way the Add/Edit form's <select> can.
+// Grade/Year Level options narrow to whatever applies to the selected School
+// Type; exported so spesImport.ts can enforce the same pairing on imports.
 export function gradeYearLevelOptionsFor(schoolType: string): string[] {
   switch (schoolType) {
     case 'Junior High School':               return ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10']
@@ -128,10 +124,8 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: { docs: SPESSavedDocu
         customName,
         fileName: file.name,
         fileSize: formatFileSize(file.size),
-        // A blob: URL (not the data: dataUrl) so "View" works before the
-        // record is saved — Chrome/Brave block opening data: URIs in a new
-        // tab as an anti-phishing measure, so a data:-based preview link
-        // would always show a blank "Untitled" tab.
+        // blob: URL, not the data: dataUrl -- Chrome/Brave block opening
+        // data: URIs in a new tab, which would show a blank tab.
         url: URL.createObjectURL(file),
         dataUrl,
       }])
@@ -367,9 +361,8 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
     ? 'Withdrawn'
     : formData.assignedBatchId !== null ? 'Active' : 'Inactive'
 
-  // Sex, birthdate, civil status, and barangay are required by the underlying
-  // beneficiaries table (NOT NULL columns); name fields additionally reject
-  // digits/symbols.
+  // Sex, birthdate, civil status, and barangay are NOT NULL in the DB;
+  // name fields also reject digits/symbols.
   const handleSave = () => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()

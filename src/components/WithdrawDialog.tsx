@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import DatePicker from './DatePicker'
 
-// "Mark as withdrawn" dialog shared by SPES (batch) and SLP (project): records
-// that someone LEFT an already-started batch/project early. Different from
-// Unassign, which is a correction that only exists while it is still Planned.
+// "Mark as withdrawn" dialog (SPES/SLP) for someone who left an already-started
+// batch/project -- different from Unassign, which only applies while still Planned.
 
 export interface WithdrawDialogProps {
   personName: string

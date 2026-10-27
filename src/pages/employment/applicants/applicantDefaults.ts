@@ -1,7 +1,5 @@
-// A complete, empty ApplicantFormData. Used both by the Add Applicant form's
-// local state and by bulk import (so importer rows only need to override the
-// handful of fields they carry). Kept in its own module so AddApplicantSidebar
-// stays a component-only file (React Fast Refresh requirement).
+// A complete, empty ApplicantFormData, shared by the Add Applicant form and bulk
+// import. Own module so AddApplicantSidebar stays component-only (Fast Refresh).
 
 import type { ApplicantFormData } from "./AddApplicantSidebar";
 

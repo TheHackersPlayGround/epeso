@@ -26,9 +26,8 @@ import type { CLPEPFormData } from './CLPEPForm'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { formatProjectName } from '../../utils/projectName'
 
-// Each program's real id is offset so the four id sequences (DILP/TUPAD/
-// SLP/CLPEP each start back at 1 in their own table) never collide once
-// merged into one ProgramActivity[] list below.
+// Each program's real id is offset so the four id sequences never collide
+// once merged into one ProgramActivity[] list below.
 const DILP_ID_OFFSET = 700000
 const TUPAD_ID_OFFSET = 800000
 const CLPEP_ID_OFFSET = 900000
@@ -66,11 +65,8 @@ type Action =
   | 'view_projects'
   | 'view_participants'
 
-// DILP/TUPAD/SLP/CLPEP projects each live in their own backend-persisted
-// table (see DILPContext/TUPADContext/SLPContext/CLPEPContext) with their own
-// shape — this is the common shape they're converted into for this shared
-// "all Livelihood projects" table, so the table/filter/pagination code below
-// doesn't need four parallel implementations.
+// Common shape the four programs' own-shaped projects are converted into for
+// this shared table, so the table/filter/pagination code isn't duplicated four times.
 interface ProgramActivity {
   id: number
   title: string
@@ -233,11 +229,8 @@ export default function LivelihoodMaintenanceForm() {
 
   // Ellipsis menu
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the click position; pos is corrected to the menu's real
+  // measured height once it mounts (see the layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -263,9 +256,8 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  // CLPEP interventions converted to ProgramActivity shape for display (ID
-  // offset 900000) — the real data lives in CLPEPContext, backed by
-  // clpep_interventions, not this localStorage context.
+  // CLPEP interventions converted to ProgramActivity shape (ID offset 900000);
+  // real data lives in CLPEPContext.
   const clpepAsActivities: ProgramActivity[] = clpep.interventions.map(i => ({
     id: i.id + CLPEP_ID_OFFSET,
     program: 'Livelihood',
@@ -300,9 +292,8 @@ export default function LivelihoodMaintenanceForm() {
     slpTrack: p.slpTrack,
   }))
 
-  // DILP/TUPAD projects converted to ProgramActivity shape for display (ID
-  // offsets 700000/800000) — the real data lives in DILPContext/TUPADContext,
-  // backed by dilp_projects/tupad_projects, not this localStorage context.
+  // DILP/TUPAD projects converted to ProgramActivity shape (ID offsets
+  // 700000/800000); real data lives in DILPContext/TUPADContext.
   const dilpAsActivities: ProgramActivity[] = dilp.projects.map(p => ({
     id: p.id + DILP_ID_OFFSET,
     program: 'Livelihood',
@@ -454,13 +445,8 @@ export default function LivelihoodMaintenanceForm() {
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
-  // DILP/TUPAD projects are backend-persisted (dilp_projects/tupad_projects),
-  // not part of this component's localStorage ProgramActivity model — build
-  // and send the payload directly, then refresh the relevant context.
-  // Required-field validation (Project ID Number/Name/Type/Component/
-  // Implementation Type) now happens inside DILPForm itself -- it guards its
-  // own Save button and only calls this via onSave() once valid, so no
-  // duplicate checks are needed here.
+  // DILP/TUPAD projects are backend-persisted, not part of this component's
+  // localStorage model; required-field validation lives in DILPForm itself.
   const handleSaveDilpProject = async () => {
     if (isSaving) return
     const realId = editingId !== null ? editingId - DILP_ID_OFFSET : null
@@ -491,9 +477,7 @@ export default function LivelihoodMaintenanceForm() {
     }
   }
 
-  // Required-field / name-character validation now happens inside TUPADForm
-  // itself -- it guards its own Save button and only calls this via onSave()
-  // once valid, so no duplicate check is needed here.
+  // Required-field / name-character validation lives in TUPADForm itself.
   const handleSaveTupadProject = async () => {
     if (isSaving) return
     const realId = editingId !== null ? editingId - TUPAD_ID_OFFSET : null
@@ -560,14 +544,10 @@ export default function LivelihoodMaintenanceForm() {
     }
   }
 
-  // Required-field / name-character validation now happens inside SLPForm
-  // itself -- it guards its own Save button and only calls this via onSave()
-  // once valid, so no duplicate checks are needed here.
+  // Required-field / name-character validation lives in SLPForm itself.
   const handleSaveSlpProject = () => {
     if (isSaving) return
-    // Status is a manual staff judgment call, not derived -- this is a soft
-    // nudge (not a block) for the case where Ongoing/Completed is picked
-    // before the project's own Date Started has actually arrived yet.
+    // Soft nudge, not a block, for picking Ongoing/Completed before Date Started has arrived.
     if ((slpFormData.status === 'Ongoing' || slpFormData.status === 'Completed') && slpFormData.dateStarted > todayIso()) {
       setFutureDateConfirm(true)
       return
@@ -612,9 +592,8 @@ export default function LivelihoodMaintenanceForm() {
     if (selectedService === 'SLP') { handleSaveSlpProject(); return }
   }
 
-  // Offsets checked largest-first: CLPEP (900000) > TUPAD (800000) > DILP
-  // (700000) > SLP (600000) — checking TUPAD before CLPEP would misroute
-  // every CLPEP id (which is always >= 800000 too) to the TUPAD endpoint.
+  // Offsets checked largest-first (CLPEP > TUPAD > DILP > SLP) so CLPEP ids
+  // (always >= 800000 too) don't misroute to the TUPAD endpoint.
   const handleDelete = async (id: number) => {
     try {
       if (id >= CLPEP_ID_OFFSET) {
@@ -648,9 +627,7 @@ export default function LivelihoodMaintenanceForm() {
     await handleDelete(a.id)
   }
 
-  // DILP/TUPAD/SLP/CLPEP beneficiary status is all derived server-side from
-  // the assigned project/intervention's own status now — no client-side
-  // cascade write needed here for any of them.
+  // Beneficiary status is all derived server-side now -- no client-side cascade write needed.
   const handleStatusChange = async () => {
     if (!statusConfirm) return
     const { project, nextStatus } = statusConfirm
@@ -852,9 +829,7 @@ export default function LivelihoodMaintenanceForm() {
     return undefined
   }
 
-  // TUPAD's "Number of Participants" and CLPEP's "Target Beneficiaries" are
-  // both target headcounts the backend enforces as a cap — show
-  // "assigned/target" for those instead of a bare count.
+  // TUPAD/CLPEP targets are backend-enforced caps, so show "assigned/target" instead of a bare count.
   const getParticipantLabel = (a: ProgramActivity): string => {
     const count = getParticipantCount(a)
     if ((a.service === 'DILEEP (TUPAD)' || a.service === 'CLPEP') && a.participants != null) {
@@ -1072,9 +1047,8 @@ export default function LivelihoodMaintenanceForm() {
                         onClick={e => {
                           const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                           const right = window.innerWidth - rect.right
-                          // Provisional placement below the button; the layout
-                          // effect corrects this to the menu's real measured
-                          // height right after it mounts, before paint.
+                          // Provisional placement; the layout effect corrects
+                          // it to the real measured height before paint.
                           setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                           setMenuPos({ top: rect.bottom + 4, right })
                           setOpenMenuId(openMenuId === a.id ? null : a.id)
@@ -1135,10 +1109,8 @@ export default function LivelihoodMaintenanceForm() {
         .filter(b => b.assignedProjectId === realId)
         .map(b => ({ id: b.id, name: `${b.lastName}, ${b.firstName}`, service: 'DILEEP (DILP)', barangay: b.barangay, contactNumber: b.contactNumber, status: b.status }))
     } else {
-      // DILEEP (TUPAD) — unlike DILP, a beneficiary can move on to a new
-      // project after this one completes, so their *current* assignedProjectId
-      // may no longer point here. Check the full assignmentHistory instead,
-      // so a completed project keeps showing everyone who was ever part of it.
+      // TUPAD beneficiaries can move to a new project after completion, so check
+      // assignmentHistory instead of the current assignedProjectId.
       const realId = selectedProject.id - TUPAD_ID_OFFSET
       participants = tupad.applicants
         .filter(b => b.assignmentHistory.some(h => h.projectId === realId))

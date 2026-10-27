@@ -23,10 +23,8 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The applicant list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes -- doing it earlier would flip the shared
+  // loading flag and unmount this modal before the success message is seen.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -183,9 +181,7 @@ function formatTableName(b: { lastName: string; firstName: string; middleName?: 
   return `${b.lastName}, ${given}`
 }
 
-// Adapts an SLPApplicant (context/API shape) into the generic
-// LivelihoodBeneficiary shape SLPProfileForm expects -- field names match
-// almost 1:1 by design, this just adds the display `name`/`service`.
+// Adapts an SLPApplicant into the LivelihoodBeneficiary shape SLPProfileForm expects.
 function toFormRecord(a: SLPApplicant): Omit<LivelihoodBeneficiary, 'id'> {
   return {
     ...a,
@@ -373,10 +369,8 @@ function FilterBadges({
 }
 
 // ─── Update Assessment Result Modal ───────────────────────────────────────────
-// Quick change of just the Assessment Result, without opening the full Edit
-// form. The server refuses Not Qualified while the beneficiary is still
-// assigned to a Planned project; that message is shown here and the dialog
-// stays open.
+// Quick change of just the Assessment Result; the server refuses Not Qualified
+// while still assigned to a Planned project.
 
 type UpdateAssessmentModalProps = {
   beneficiary: SLPApplicant
@@ -483,10 +477,8 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
     : null
 
   const filtered = useMemo(() => {
-    // A project's SLP Track represents a distinct assistance mechanism from
-    // the applicant's own track (Individual/Association/Employment) -- only
-    // matching-track projects can ever be assigned, so mismatched ones are
-    // filtered out here rather than shown and then rejected on click.
+    // Only projects matching the applicant's own SLP Track can be assigned,
+    // so mismatched ones are filtered out here instead of rejected on click.
     const active = projects.filter(p => p.status === 'Planned' && p.slpTrack === beneficiary.slpTrack)
     if (!search.trim()) return active
     const q = search.toLowerCase()
@@ -783,11 +775,8 @@ type BeneficiaryTableProps = {
 
 function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, onView, onEdit, onRemove, onUpdateAssessment, onAssignProject, onViewAssignedProject, onWithdraw }: BeneficiaryTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the click position; pos is corrected to the menu's real
+  // measured height once it mounts (see the layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -812,9 +801,8 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
   function handleToggleMenu(e: React.MouseEvent, id: number) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the button; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the button; the layout effect corrects it
+    // to the real measured height before paint.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({
       top: rect.bottom + 4,
@@ -1144,10 +1132,8 @@ export default function SLPTab() {
 
   const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
 
-  // Column order/names here must match slpImport.ts's expected headers
-  // exactly (Import looks columns up by name via get()/norm(), not
-  // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device).
+  // Must match slpImport.ts's expected headers (looked up by name, not
+  // position) so an exported .xlsx is directly re-importable.
   const IMPORT_COMPATIBLE_HEADERS = [
     'SLP Participant ID Number', 'Participant Type', 'Eligibility Type', 'Referring Party (if Referral)',
     'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
@@ -1181,9 +1167,8 @@ export default function SLPTab() {
     setIsExporting(true)
     await new Promise(resolve => setTimeout(resolve, 0))
     try {
-      // Row 1 is left blank: Import always skips the physical first row
-      // (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2.
+      // Row 1 left blank: the Template has a merged section-label band there,
+      // and Import always skips the physical first row.
       const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...buildImportCompatibleRows()]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()

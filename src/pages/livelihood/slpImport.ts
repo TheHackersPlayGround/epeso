@@ -1,12 +1,5 @@
-// Bulk applicant import for SLP.
-//
-// Two responsibilities:
-//   1. Generate a styled .xlsx template (ExcelJS) that mirrors the SLP Profile
-//      form section by section, matching the look of the GIP/CDSP importers.
-//   2. Parse a filled-in workbook, resolve the address triple to dataset IDs via
-//      locationService (province -> city -> barangay, required since
-//      beneficiaries.barangay_id is NOT NULL), and POST each row through
-//      slpService.createProfile.
+// Bulk applicant import for SLP: generates the .xlsx template and parses
+// filled-in workbooks, resolving addresses before posting each row.
 
 import ExcelJS from 'exceljs'
 import * as XLSX from 'xlsx'
@@ -530,9 +523,7 @@ export async function importSlpApplicants(
   const total = dataRows.length
   const caches = makeCaches()
 
-  // All-or-nothing import: resolve every row locally first (address lookups
-  // etc.) without writing anything. If any row can't be resolved, nothing is
-  // sent to the backend at all.
+  // All-or-nothing: resolve every row locally first; if any fails, nothing is sent.
   const meta: { sheetRow: number; name: string }[] = []
   const payloads: Record<string, unknown>[] = []
   const failed: ImportRowError[] = []

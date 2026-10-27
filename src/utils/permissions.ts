@@ -1,10 +1,5 @@
-// Permission helper.
-// Reads the logged-in user (with permissions) that App.tsx stores in localStorage
-// after /auth/login or /auth/me, and answers whether the current user may manage
-// (add / edit / delete) a given dashboard module.
-//
-// Permission names arrive as 'view-<module>' / 'manage-<module>'. A user can manage
-// a module when they are an Administrator or hold 'manage-<module>'.
+// Permission helper: reads the logged-in user App.tsx stores in localStorage and
+// answers whether they may manage/view a module ('manage-<module>' / 'view-<module>').
 
 export interface StoredUser {
   role?: string
@@ -83,9 +78,8 @@ function levelFor(u: StoredUser, module: ModuleKey): PermissionLevel {
 
 export type PermissionChange = { module: ModuleKey; label: string; from: PermissionLevel; to: PermissionLevel }
 
-// Compares two {role, permissions} snapshots module-by-module and returns
-// only the ones whose effective level actually changed -- used to tell a
-// signed-in user exactly what an administrator just changed for them.
+// Compares two {role, permissions} snapshots module-by-module and returns only
+// the ones that changed, so a user can be told exactly what an admin changed.
 export function diffPermissionLevels(before: StoredUser, after: StoredUser): PermissionChange[] {
   const changes: PermissionChange[] = []
   for (const module of ALL_MODULE_KEYS) {

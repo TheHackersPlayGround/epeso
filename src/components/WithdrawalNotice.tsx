@@ -1,8 +1,7 @@
 import { fmtDate } from '../utils/formatDate'
 
-// One look for "this person withdrew" everywhere it is shown (SPES, SLP, TUPAD,
-// GIP): an orange banner at the TOP of the assignment dialog, plus a short note
-// above the footer.
+// Shared "withdrawn" UI used across SPES/SLP/TUPAD/GIP: an orange banner at the
+// top of the dialog plus a short note above the footer.
 
 export function WithdrawalBanner({ exitedAt, reason }: { exitedAt?: string | null; reason?: string }) {
   return (

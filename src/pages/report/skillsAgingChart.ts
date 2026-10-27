@@ -1,14 +1,5 @@
-// Grafts an Aging Report's bar+pie charts into an already-built ExcelJS
-// workbook as native Excel chart objects, not static pictures. Generic via
-// AgingChartOptions, shared by both Skills Training's and CDSP's Aging Reports.
-//
-// ExcelJS can't create native charts, so this works below that layer: it
-// takes the chart objects from general_peso_template.xlsx, retargets their
-// cell references at this workbook's own tables, and splices the resulting
-// parts into the ExcelJS zip directly at the OOXML level.
-//
-// The bar chart is converted from the template's single series into a
-// stacked-by-sex bar (Male/Female per bucket); the pie stays single-series.
+// Grafts native bar+pie charts (not static images) into an ExcelJS workbook by
+// splicing retargeted chart XML from general_peso_template.xlsx at the OOXML level.
 import JSZip from 'jszip'
 import {
   retargetChartRef, setStrCache, setNumCache, setPieColors, setPieShowPercent, setChartTitle, makeStackedBySexBarChart, addLegend,
@@ -122,9 +113,8 @@ export async function graftAgingCharts(mainBuffer: ArrayBuffer, opts: AgingChart
     femaleColor: opts.sexBar.femaleColor,
   })
   bar = setChartTitle(bar, 'Breakdown per Aging Status')
-  // The template's bar chart is single-series and has no legend of its own --
-  // now that it has two series (Male/Female), a legend is what tells the
-  // reader which color means which, same as the pie's legend below it.
+  // Template's bar chart was single-series with no legend -- now that it has
+  // two series (Male/Female), a legend is needed to tell them apart.
   bar = addLegend(bar)
 
   // ── Pie: single-series, pointed at the total-per-bucket table ──

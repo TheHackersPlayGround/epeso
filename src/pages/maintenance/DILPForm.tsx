@@ -54,10 +54,7 @@ const sectionHeadingCls = 'text-xs font-semibold uppercase tracking-widest text-
 
 const STATUS_OPTIONS: DILPFormData['status'][] = ['Planned', 'Ongoing', 'Completed']
 
-// Display-only comma formatting for the Assistance Amount input -- the
-// underlying value stays a plain numeric string (no commas), matching what
-// the backend expects (dilp.php's dilpMoneyOrNull strips commas anyway, but
-// keeping the stored value clean avoids depending on that).
+// Display-only comma formatting; the stored value stays a plain numeric string.
 function formatAmountDisplay(raw: string): string {
   if (!raw) return ''
   const [intPart, decPart] = raw.split('.')
@@ -71,9 +68,8 @@ function sanitizeAmountInput(v: string): string {
   return s
 }
 
-// Previously-saved attachments (loaded back from the server) don't carry a
-// browser File's MIME type, only a fileName — fall back to the extension so
-// "View" still previews them correctly, not just freshly-uploaded ones.
+// Previously-saved attachments only carry a fileName, not a MIME type -- fall
+// back to the extension so "View" still previews them.
 function isImageAttachment(att: AttachmentItem) {
   return att.fileType.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(att.name)
 }

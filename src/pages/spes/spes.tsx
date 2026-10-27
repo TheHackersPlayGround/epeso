@@ -34,10 +34,8 @@ function SPESImportModal({ onClose, onImported }: { onClose: () => void; onImpor
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The applicant list reload is deferred until the modal actually closes --
-  // triggering it while the modal is still open would flip the page's shared
-  // `loading` flag, which unmounts this whole modal (and its success message)
-  // before the user ever sees it.
+  // Deferred until the modal closes -- doing it earlier would flip the shared
+  // loading flag and unmount this modal before the success message is seen.
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   function pickFile(f: File | null) {
@@ -225,11 +223,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [isExporting, setIsExporting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor = button's click position; pos = menu's final placement, corrected
+  // after mount using its real measured height.
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -394,13 +389,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
     }
   }
 
-  // Column order/names here must match spesImport.ts's expected headers
-  // exactly (Import looks columns up by name via get()/norm(), not
-  // position) -- this is what makes an exported .xlsx directly
-  // re-importable later (e.g. after moving to a different device). Note
-  // spesImport.ts's address header is "Municipality/City" (no spaces),
-  // different from CDSP/GIP's "City / Municipality" -- must match this
-  // module's own importer exactly, not the others'.
+  // Must match spesImport.ts's headers exactly (lookup by name, not position)
+  // so exports stay re-importable; note "Municipality/City" differs from CDSP/GIP.
   const IMPORT_COMPATIBLE_HEADERS = [
     'Last Name', 'First Name', 'Middle Name', 'Sex', 'Birthdate (MM/DD/YYYY)', 'Civil Status',
     'Contact Number', 'Email',
@@ -427,9 +417,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
         a.dateApplicationReceived, a.receivedBy, a.remarks,
         a.age, batchNameFor(a), deriveStatus(a, spesBatches),
       ])
-      // Row 1 is left blank: Import always skips the physical first row
-      // (range: 1), since the downloadable Template has a merged
-      // section-label band there. Real headers go on row 2.
+      // Row 1 stays blank -- Import skips it since the Template has a
+      // merged section-label band there; real headers are row 2.
       const aoa = [[], IMPORT_COMPATIBLE_HEADERS, ...rows]
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
@@ -530,11 +519,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
       {viewingAssignedBatchFor && (() => {
         const batch = spesBatches.find(b => b.id === viewingAssignedBatchFor.assignedBatchId)
         const close = () => setViewingAssignedBatchFor(null)
-        // There's no separate assignment-history table — the only record that
-        // this applicant was ever in this batch is the live batch_id link.
-        // Once the batch moves past Planned (Ongoing/Completed), real
-        // progress has happened, so unassigning or changing batch would
-        // silently erase that record.
+        // No separate assignment-history table -- the live batch_id link is the only
+        // record, so changing/unassigning past Planned would erase it.
         const canChange = batch ? batch.status === 'Planned' : true
         // Withdrawn: left an Ongoing batch early. The assignment is a permanent record.
         const isWithdrawn = viewingAssignedBatchFor.status === 'Withdrawn'
@@ -941,9 +927,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                             onClick={e => {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
                               const right = window.innerWidth - rect.right
-                              // Provisional placement below the button; the layout
-                              // effect corrects this to the menu's real measured
-                              // height right after it mounts, before paint.
+                              // Provisional position; layout effect corrects it to the
+                              // menu's real measured height right after mount.
                               setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
                               setMenuPos({ top: rect.bottom + 4, right })
                               setOpenActionMenuId(openActionMenuId === applicant.id ? null : applicant.id)

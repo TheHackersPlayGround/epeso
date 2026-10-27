@@ -1,7 +1,5 @@
-// Shows a project name with its barangay beside it, e.g. "Cassava Production · Brgy I".
-// The barangay is lighter and not bold so the two read as different things.
-// Many barangays can run the same project, so the name alone is not enough to tell them apart.
-// The barangay is added only for display -- the saved project name stays exactly as typed.
+// Shows a project name with its barangay, e.g. "Cassava Production · Brgy I" --
+// barangay is just a display hint, since many barangays can share one project name.
 
 interface ProjectNameLabelProps {
   name: string

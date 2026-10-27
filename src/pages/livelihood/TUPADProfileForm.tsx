@@ -88,11 +88,8 @@ type AttachedDocsEditorProps = {
   onPreview: (doc: TUPADSavedDocument) => void
 }
 
-// previewDoc lives in the parent (TUPADProfileForm) and renders as a sibling
-// of the whole form, not nested inside this component -- a `fixed inset-0`
-// modal nested inside an ancestor with `opacity`/`filter`/`transform` (the
-// view-mode-dimmed fieldset) stops being positioned relative to the
-// viewport and gets squashed into that ancestor's box instead.
+// previewDoc renders in the parent, not nested here -- a view-mode-dimmed
+// ancestor's opacity/filter/transform would break this modal's fixed positioning.
 function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

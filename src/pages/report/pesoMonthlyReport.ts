@@ -1,10 +1,5 @@
-// Generates the PESO LMI/SPRS report by substituting live data into a real
-// template workbook (a cleaned copy of the official DOLE file). Because the
-// template keeps the exact layout, styles, logo, and the 5 native Excel charts,
-// the output IS the official report with fresh numbers — the charts stay live.
-//
-// We manipulate the .xlsx zip directly (JSZip) rather than round-tripping through
-// a workbook library, which would drop the chart parts.
+// Generates the PESO LMI/SPRS report by writing live data into a cleaned copy of
+// the official DOLE template, patching the .xlsx zip directly so its native charts survive.
 import JSZip from 'jszip'
 import type { EfMonthlyReport } from '../../services/reportService'
 
@@ -41,9 +36,8 @@ function setChartValues(chartXml: string, values: number[]): string {
   })
 }
 
-// Doughnut slices carry HARD-CACHED percentage labels (<c:dLbl>…<a:t>48%</a:t>),
-// not auto-computed ones — so we must recompute and overwrite each slice's label
-// text to match the new values, or the labels show the template's stale numbers.
+// Doughnut slice labels are hard-cached percentages, not auto-computed -- must be
+// recomputed and overwritten or they show the template's stale numbers.
 function setDoughnutLabels(chartXml: string, values: number[]): string {
   const total = values.reduce((a, b) => a + b, 0)
   return chartXml.replace(/<c:dLbl>(.*?)<\/c:dLbl>/gs, (block, inner: string) => {
@@ -51,9 +45,8 @@ function setDoughnutLabels(chartXml: string, values: number[]): string {
     if (!m) return block
     const i = Number(m[1])
     if (i >= values.length) return block
-    // A 0/0 doughnut has no real slice angle to place a label at, so Excel
-    // stacks both slices' labels on top of each other — blank them instead
-    // of writing two overlapping "0%"s.
+    // A 0/0 doughnut has no real slice angle, so Excel stacks both labels on top of
+    // each other -- blank them instead of showing two overlapping "0%"s.
     const text = total > 0 ? `${Math.round((values[i] / total) * 100)}%` : ''
     return `<c:dLbl>${inner.replace(/(<a:t>)[^<]*(<\/a:t>)/, `$1${text}$2`)}</c:dLbl>`
   })
@@ -133,9 +126,8 @@ export async function generatePesoMonthlyReport(data: EfMonthlyReport, periodLab
   s1 = setCell(s1, 'J44',
     `Based on the comparative data, the placement rate for ${periodLabel} is ${pct(c.current.placementRate)}, ` +
     `compared to ${pct(c.previous.placementRate)} for the same period in ${c.previousYear}.`, false)
-  // The LMI summary sheet has no print setup in the PESO template — give it one so
-  // the analysis + charts print as one clean landscape page. (The list sheets keep
-  // the PESO's own page sizes.) Only add if not already present, to stay idempotent.
+  // The LMI summary sheet has no print setup in the template -- add one landscape
+  // page setup here (idempotent) so the analysis + charts print cleanly as one page.
   if (!s1.includes('<pageSetup')) {
     if (!s1.includes('<sheetPr')) {
       s1 = s1.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>')
@@ -170,11 +162,8 @@ export async function generatePesoMonthlyReport(data: EfMonthlyReport, periodLab
     const titleMarker = '<a:t>LMI Graphical Presentation for'
     const titleStart = d.indexOf(titleMarker)
     if (titleStart !== -1) {
-      // The box is a FIXED width (spAutoFit only grows height, not width), sized
-      // for the original short placeholder ("JUNE 2026"). A custom-range label can
-      // run much longer and get clipped, so shrink the font to fit instead —
-      // scoped to just this shape's <xdr:txBody> so it can't touch other shapes'
-      // font sizes elsewhere in the drawing.
+      // The title box has a fixed width, sized for the short placeholder "JUNE 2026" --
+      // a longer custom-range label gets clipped, so shrink its font to fit instead.
       const bodyStart = d.lastIndexOf('<xdr:txBody>', titleStart)
       const bodyEnd = d.indexOf('</xdr:txBody>', titleStart) + '</xdr:txBody>'.length
       let body = d.slice(bodyStart, bodyEnd)

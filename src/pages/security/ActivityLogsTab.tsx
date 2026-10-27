@@ -15,9 +15,7 @@ interface ActivityLog {
   status: 'Success' | 'Failed'
 }
 
-// Backend module values are the same lowercase permission slugs used across the
-// app (e.g. 'cdsp', 'cdsp-maintenance', 'system') — mapped here to readable
-// labels for display/filtering. Falls back to the raw slug for anything unmapped.
+// Maps backend module slugs to readable labels; falls back to the raw slug if unmapped.
 const MODULE_LABELS: Record<string, string> = {
   system: 'System', security: 'Security', report: 'Report', documents: 'Documents',
   employment: 'Employment Facilitation', ofw: 'OFW',
@@ -31,9 +29,8 @@ function formatModule(slug: string): string {
   return MODULE_LABELS[slug] ?? slug
 }
 
-// Colors the action badge by verb prefix rather than an exact-match list, since
-// the real action vocabulary (Create/Update/Delete Profile|Batch|Activity|...)
-// is far larger than any fixed set.
+// Colors the badge by verb prefix rather than an exact-match list -- the real
+// action vocabulary is far larger than any fixed set.
 function actionBadgeClass(action: string): string {
   if (action === 'Login' || action === 'Logout') return 'bg-gray-100 text-gray-600'
   if (/^(Create|Add)\b/.test(action)) return 'bg-green-50 text-green-700'
@@ -71,9 +68,8 @@ export default function ActivityLogsTab({ isActive }: ActivityLogsTabProps) {
     title: string; message: string; confirmText?: string; cancelText?: string; onConfirm: () => void
   }>({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: () => {} })
 
-  // Filter option lists are derived from the real data rather than hardcoded,
-  // since the actual action/module vocabulary (Create/Update/Delete Profile|
-  // Batch|Activity across a dozen modules) is far larger than any fixed set.
+  // Filter options are derived from the real data, not hardcoded -- the actual
+  // action/module vocabulary is far larger than any fixed set.
   const logActions = useMemo(() => ['All', ...Array.from(new Set(logs.map(l => l.action))).sort()], [logs])
   const logModules = useMemo(() => ['All', ...Array.from(new Set(logs.map(l => l.module))).sort()], [logs])
 

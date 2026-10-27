@@ -201,11 +201,8 @@ function StatusBadge({ status }: { status: Vacancy['status'] }) {
 
 function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  // anchor is set immediately on click (button's own position); pos is the
-  // menu's actual final placement, corrected by measuring the menu's real
-  // rendered height once it mounts (see the layout effect below) -- a
-  // hardcoded height guess drifts stale every time a menu item is added or
-  // removed.
+  // anchor is the button's position; pos is the menu's final placement, corrected
+  // by measuring its real rendered height once mounted (see layout effect below).
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -231,9 +228,8 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const right = window.innerWidth - rect.right
-    // Provisional placement below the button; the layout effect corrects
-    // this to the menu's real measured height right after it mounts, before
-    // paint.
+    // Provisional placement below the button; the layout effect corrects it
+    // to the real measured height right after it mounts.
     setMenuAnchor({ top: rect.top, bottom: rect.bottom, right })
     setMenuPos({ top: rect.bottom + 4, right })
     setOpenMenuId(id)
@@ -441,9 +437,8 @@ function ViewVacancyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () 
   )
 }
 
-// ── Salary helpers ────────────────────────────────────────────────────────────
-// The salary form fields hold what the user typed; parse to a number on save
-// (₱, commas, spaces ignored). Display is derived from the numeric bounds.
+// ── Salary helpers ── parses the typed salary to a number on save (₱, commas,
+// spaces ignored); display is derived from the numeric bounds.
 
 function parseSalaryInput(s: string): number | undefined {
   const n = Number(s.replace(/[^\d.]/g, ''))
@@ -904,10 +899,8 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   focusVacancyId?: number | null
   onFocusHandled?: () => void
 } = {}) {
-  // Vacancies and the employer dropdown options both come from
-  // EmploymentProvider (shared with the other tabs and kept across visits to
-  // this module) -- see the refresh calls below for how a change here reaches
-  // the tabs it can affect.
+  // Vacancies and the employer dropdown options come from EmploymentProvider,
+  // shared with and kept across the other tabs.
   const { vacancies, employers: allEmployers, loading: listLoading, loadFailed, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
   const employers = useMemo<EmployerOption[]>(() => allEmployers.map(e => ({ id: e.id, companyName: e.companyName })), [allEmployers])
   const loading = listLoading.vacancies || listLoading.employers
@@ -950,9 +943,8 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   async function handleToggleStatus(id: number, currentStatus: Vacancy['status']) {
     try {
       await toggleVacancyStatus(id)
-      // Reload so the derived fields (effective status, remaining) recompute — a
-      // toggle can flip manual intent without changing effective status (e.g. a
-      // full vacancy stays Closed), so an optimistic single-field update is unsafe.
+      // Reloads so derived fields (effective status, remaining) recompute --
+      // an optimistic single-field update isn't safe here.
       await refreshVacancies()
       setConfirmModal({
         isOpen: true, type: 'success', title: 'Status Updated',
@@ -1034,9 +1026,8 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     [filtered, currentPage, perPage],
   )
 
-  // Jump to a specific vacancy when navigated here from Placements' Job
-  // Reference ID link (e.g. "V-2"): open its View modal, flip to whichever
-  // page it lands on, and flash-highlight its row for a few seconds.
+  // Jump to a vacancy from Placements' Job Reference ID link: open it, page
+  // to it, and flash-highlight its row.
   useEffect(() => {
     if (!focusVacancyId || vacancies.length === 0) return
     const match = vacancies.find(v => v.id === focusVacancyId)

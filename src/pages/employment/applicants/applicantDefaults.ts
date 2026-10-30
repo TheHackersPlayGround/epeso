@@ -2,6 +2,7 @@
 // import. Own module so AddApplicantSidebar stays component-only (Fast Refresh).
 
 import type { ApplicantFormData } from "./AddApplicantSidebar";
+import { todayIso } from "../../../utils/formatDate";
 
 export function createDefaultApplicantFormData(): ApplicantFormData {
   return {
@@ -79,6 +80,8 @@ export function createDefaultApplicantFormData(): ApplicantFormData {
     otherProgramName: "",
     otherProgramNo: "",
     documentType: "",
+    dateApplicationReceived: todayIso(),
+    receivedBy: "",
     documentOtherSpecify: "",
     savedDocuments: [],
   };

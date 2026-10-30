@@ -17,7 +17,7 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'workExperience',  label: 'VII. WORK EXPERIENCE' },
   { id: 'otherSkills',     label: 'VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE' },
   { id: 'referredProgram', label: 'IX. REFERRED PROGRAM' },
-  { id: 'documents',       label: 'X. DOCUMENTS / ATTACHMENTS' },
+  { id: 'documents',       label: 'X. FOR PESO OFFICE ONLY' },
 ];
 
 const OTHER_SKILLS_LIST = [
@@ -668,8 +668,12 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
         const docs: Array<{ id: string; documentType: string; customName?: string; fileName: string; fileSize: string; url?: string }> = sar('savedDocuments');
         return (
           <div className="space-y-6">
-            <SH>X. DOCUMENTS / ATTACHMENTS</SH>
+            <SH>X. FOR PESO OFFICE ONLY</SH>
             <div className="px-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <TF label="Date Applied" value={s('dateApplicationReceived')} />
+                <TF label="Received By" value={s('receivedBy')} />
+              </div>
               {docs.length === 0 ? (
                 <p className="text-sm text-gray-400 italic text-center py-8">No documents attached</p>
               ) : (

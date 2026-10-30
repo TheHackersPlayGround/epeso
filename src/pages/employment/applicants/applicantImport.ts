@@ -266,7 +266,21 @@ const SECTION_REFERRED: TemplateSection = {
   ],
 };
 
-// All sections, in order. (Sections X+ will be appended here as they're added.)
+// For PESO Office Only -- Date Applied + Received By. Both optional: a blank date means today and
+// a blank Received By means the person who runs the import.
+const SECTION_PESO_OFFICE: TemplateSection = {
+  label: "X. FOR PESO OFFICE ONLY",
+  fillArgb: "FF2980B9",
+  requiredArgb: "FF5B9BD5",
+  optionalArgb: "FF9DC3E6",
+  columns: [
+    { header: "Date Applied (MM/DD/YYYY)", width: 22, example: "" },
+    { header: "Received By", width: 24, example: "" },
+  ],
+};
+
+// All sections, in order. (Section X, Documents / Attachments, is not part of the template --
+// files cannot be imported -- but the PESO office fields that now share its place are.)
 const TEMPLATE_SECTIONS: TemplateSection[] = [
   SECTION_PERSONAL,
   SECTION_JOBPREF,
@@ -277,6 +291,7 @@ const TEMPLATE_SECTIONS: TemplateSection[] = [
   SECTION_WORKEXP,
   SECTION_OTHERSKILLS,
   SECTION_REFERRED,
+  SECTION_PESO_OFFICE,
 ];
 
 // Flat column list (widths / validation / examples / header lookup).
@@ -807,6 +822,18 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
   // ── Section IX — Referred Program ──
   fd.referredProgram = pickEnum(get(row, "Referred Program"), REFERRED_PROGRAM_OPTIONS);
   fd.referredProgramOther = get(row, "Referred Program (Other)");
+
+  // ── For PESO Office Only ──
+  const appliedRaw = get(row, "Date Applied (MM/DD/YYYY)");
+  if (appliedRaw) {
+    const applied = toIsoDate(appliedRaw);
+    if (!applied) errors.push(`Date Applied "${appliedRaw}" is not a valid date (use MM/DD/YYYY).`);
+    else if (applied > new Date().toISOString().slice(0, 10)) errors.push("Date Applied cannot be in the future.");
+    else fd.dateApplicationReceived = applied;
+  } else {
+    fd.dateApplicationReceived = ""; // blank: the backend uses today
+  }
+  fd.receivedBy = get(row, "Received By");
 
   return fd;
 }

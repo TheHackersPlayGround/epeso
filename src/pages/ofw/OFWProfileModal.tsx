@@ -132,6 +132,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
   const elporRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const lastNameRef = useRef<HTMLInputElement>(null)
+  const referenceNoRef = useRef<HTMLInputElement>(null)
   const firstNameRef = useRef<HTMLInputElement>(null)
   const middleNameRef = useRef<HTMLInputElement>(null)
   const contactNumberRef = useRef<HTMLInputElement>(null)
@@ -207,6 +208,10 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
       errors.push({ field: 'employmentStatus', message: 'Employment Status is required.', focus: () => employmentStatusRef.current?.focus() })
     }
 
+    if (!form.referenceNumber.trim()) {
+      errors.push({ field: 'referenceNumber', message: 'Reference Number is required.', focus: () => referenceNoRef.current?.focus() })
+    }
+
     if (!form.dateFiled) {
       errors.push({ field: 'dateFiled', message: 'Date Filed is required.', focus: () => dateFiledWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
     }
@@ -219,7 +224,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = form.suffix ? ' ' + form.suffix : ''
-    onSave({ ...form, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
+    onSave({ ...form, referenceNumber: form.referenceNumber.trim(), lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
   }
 
   const isView = mode === 'view'
@@ -419,8 +424,9 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                   {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
                 </div>
                 <div>
-                  <label className={lbl}>Reference No.</label>
-                  <input className={inp + ' bg-gray-50'} value={form.referenceNumber} readOnly />
+                  <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
+                  <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={form.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
+                  {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
                 </div>
                 <div>
                   <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>

@@ -160,6 +160,10 @@ interface ApplicantFormData {
   otherProgramName: string;
   otherProgramNo: string;
 
+  // For PESO Office Only
+  dateApplicationReceived: string;  // Date Applied (YYYY-MM-DD)
+  receivedBy: string;               // staff member who received the application
+
   // Documents / Attachments
   documentType: string;
   documentOtherSpecify: string;
@@ -261,7 +265,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     { id: 'workExperience' as Section, label: 'VII. WORK EXPERIENCE' },
     { id: 'otherSkills' as Section, label: 'VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE' },
     { id: 'referredProgram' as Section, label: 'IX. REFERRED PROGRAM' },
-    { id: 'documents' as Section, label: 'X. DOCUMENTS / ATTACHMENTS' },
+    { id: 'documents' as Section, label: 'X. FOR PESO OFFICE ONLY' },
   ];
 
   type RequiredKey = 'firstName' | 'surname' | 'dateOfBirth' | 'sex' | 'civilStatus' | 'contactNumber' | 'barangay' | 'municipality' | 'province';
@@ -2078,10 +2082,34 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         return (
           <div className="space-y-6">
             <div className="bg-brand-blue text-white px-4 py-3 font-bold uppercase text-sm">
-              X. DOCUMENTS / ATTACHMENTS
+              X. FOR PESO OFFICE ONLY
             </div>
 
             <div className="px-4 space-y-4">
+              {/* Date Applied + Received By (office use) */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-semibold">Date Applied</label>
+                  <DatePicker max={todayIso()}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 placeholder:text-gray-500"
+                    value={formData.dateApplicationReceived}
+                    onChange={(value) => setFormData({ ...formData, dateApplicationReceived: value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2 text-sm font-semibold">Received By</label>
+                  <input type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 placeholder:text-gray-500"
+                    value={formData.receivedBy}
+                    onChange={(e) => setFormData({ ...formData, receivedBy: e.target.value })}
+                    placeholder="Enter staff name"
+                  />
+                </div>
+              </div>
+
+              {/* Attached documents */}
+              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Attached Documents</h4>
+
               {/* Document Type Dropdown */}
               <div>
                 <label className="block text-gray-700 mb-2 text-sm font-semibold">Document Type</label>
@@ -2169,8 +2197,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
                   Accepted formats: {ATTACHMENT_ACCEPT_LABEL}
-                  {!currentDocType && ' â¢ Please select a document type first'}
-                  {currentDocType === 'Others (Specify)' && !currentCustomName.trim() && ' â¢ Please specify the document name'}
+                  {!currentDocType && ' · Please select a document type first'}
+                  {currentDocType === 'Others (Specify)' && !currentCustomName.trim() && ' · Please specify the document name'}
                 </p>
               </div>
 
@@ -2466,10 +2494,17 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         </div>
       )}
 
-      {/* Documents / Attachments */}
+      {/* For PESO Office Only (+ attached documents) */}
+      <div>
+        <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. For PESO Office Only</h4>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3">
+          <div><span className="font-semibold">Date Applied:</span> {formData.dateApplicationReceived || '—'}</div>
+          <div><span className="font-semibold">Received By:</span> {formData.receivedBy || '(your name)'}</div>
+        </div>
+      </div>
       {uploadedDocuments.length > 0 && (
         <div>
-          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. Documents / Attachments</h4>
+          <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">Attached Documents</h4>
           <div className="text-sm space-y-1">
             {uploadedDocuments.map((doc, idx) => (
               <div key={doc.id}>

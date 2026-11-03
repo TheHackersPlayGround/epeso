@@ -1,5 +1,7 @@
 import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
 import { Search, Plus, ChevronDown, X, Download, Upload, MoreHorizontal, Info, ChevronLeft, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { canManage } from '../../utils/permissions'
@@ -193,7 +195,7 @@ function toFormRecord(a: SLPApplicant): Omit<LivelihoodBeneficiary, 'id'> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type FilterOption = { id: string; label: string; options: string[] }
+type FilterOption = { id: string; label: string; options: string[]; type?: 'dateRange' }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
@@ -315,6 +317,22 @@ function FilterBadges({
       {activeFilters.map(filterId => {
         const filter = availableFilters.find(f => f.id === filterId)
         if (!filter) return null
+        if (filter.type === 'dateRange') {
+          return (
+            <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+              <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
+              <DateRangeFilterInput value={filterValues[filterId]} onChange={v => onFilterValueChange(filterId, v)} />
+              <button
+                type="button"
+                onClick={() => onRemoveFilter(filterId)}
+                aria-label={`Remove ${filter.label} filter`}
+                className="text-blue-700 hover:text-blue-900 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )
+        }
         const selectedValue = filterValues[filterId] ?? ''
         const isOpen = openDropdown === filterId
 
@@ -982,6 +1000,7 @@ export default function SLPTab() {
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   const availableFilters: FilterOption[] = useMemo(() => [
+    { id: 'dateApplied', label: 'Date Applied', options: [], type: 'dateRange' },
     { id: 'status', label: 'Status', options: ['Active', 'Inactive', 'Completed', 'Withdrawn'] },
     { id: 'sex', label: 'Sex', options: ['Male', 'Female'] },
     { id: 'civilStatus', label: 'Civil Status', options: ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'] },
@@ -1113,6 +1132,7 @@ export default function SLPTab() {
     for (const filterId of activeFilters) {
       const value = filterValues[filterId]
       if (!value) continue
+      if (filterId === 'dateApplied') result = result.filter(b => inDateRange(b.dateApplied, value))
       if (filterId === 'status') result = result.filter(b => b.status === value)
       if (filterId === 'sex') result = result.filter(b => b.sex === value)
       if (filterId === 'civilStatus') result = result.filter(b => b.civilStatus === value)

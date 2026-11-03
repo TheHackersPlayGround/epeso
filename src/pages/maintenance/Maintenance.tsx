@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 
 import { canManage } from '../../utils/permissions'
+import { fundingSourceLabel } from '../../utils/classification'
 import { useSPES } from '../../contexts/SPESContext'
 import type { SPESBatch } from '../../contexts/SPESContext'
 import { useGIP } from '../../contexts/GIPContext'
@@ -969,7 +970,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                                 : '—'}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                              {b.fundingSource || '—'}
+                              {fundingSourceLabel(b.fundingSource, b.fundingSourceOther) || '—'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${SPES_BATCH_STATUS_COLORS[b.status]}`}>

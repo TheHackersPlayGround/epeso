@@ -1,5 +1,7 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
 import ReactDOM from 'react-dom'
 import {
   ArrowLeft, Search, Plus, X, ChevronDown,
@@ -314,7 +316,8 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
   const purposeOptions = purposes.filter(p => p.name !== 'Other').map(p => p.name)
 
   const availableFilters = [
-    { id: 'classification',      label: 'Classification',       options: [...CLASSIFICATION_OPTIONS, 'Others'] },
+    { id: 'dateApplied',         label: 'Date Applied',         type: 'dateRange' as const },
+    { id: 'classification',      label: 'Classification',      options: [...CLASSIFICATION_OPTIONS, 'Others'] },
     { id: 'desiredQualification', label: 'Desired Qualification', options: [...qualificationOptions, 'Others'] },
     { id: 'purposeOfTraining',   label: 'Purpose of Training',  options: [...purposeOptions, 'Others'] },
     { id: 'status',              label: 'Status',               options: ['Accepted', 'Waitlisted'] },
@@ -365,6 +368,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       const val = filterValues[filterId]
       if (!val) return true
       switch (filterId) {
+        case 'dateApplied': return inDateRange(p.dateApplicationReceived, val)
         case 'classification': return p.classification.includes(val) || (val === 'Others' && p.classificationOther.filter(Boolean).length > 0)
         case 'desiredQualification': return p.desiredQualification.includes(val) || (val === 'Others' && p.qualificationOther.filter(Boolean).length > 0)
         case 'purposeOfTraining': return p.purposeOfTraining.includes(val) || (val === 'Others' && p.purposeOther.filter(Boolean).length > 0)
@@ -881,10 +885,14 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                   return (
                     <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                       <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                      <select value={filterValues[filterId] || ''} onChange={e => { setFilterValues(prev => ({ ...prev, [filterId]: e.target.value })); setCurrentPage(1) }} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
-                        <option value="">All</option>
-                        {filter?.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                      {filter?.type === 'dateRange' ? (
+                        <DateRangeFilterInput value={filterValues[filterId]} onChange={v => { setFilterValues(prev => ({ ...prev, [filterId]: v })); setCurrentPage(1) }} />
+                      ) : (
+                        <select value={filterValues[filterId] || ''} onChange={e => { setFilterValues(prev => ({ ...prev, [filterId]: e.target.value })); setCurrentPage(1) }} onClick={e => e.stopPropagation()} className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer">
+                          <option value="">All</option>
+                          {filter?.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      )}
                       <button onClick={() => handleRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900"><X size={14} /></button>
                     </div>
                   )

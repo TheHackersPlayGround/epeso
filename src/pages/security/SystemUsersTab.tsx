@@ -8,6 +8,11 @@ import ConfirmModal from '../shared/ConfirmModal'
 import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService'
 import { canManage } from '../../utils/permissions'
 
+// Same rule as the backend (users.php): 3-30 characters, letters/numbers/dot/underscore/dash,
+// starting with a letter or number. Leading/trailing spaces are ignored (the backend trims them).
+const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$/
+const USERNAME_MESSAGE = 'Username must be 3 to 30 characters and can only contain letters, numbers, dots, underscores and dashes (no spaces).'
+
 // Format the backend timestamp ("2026-06-26 16:21:41.5+08") into a readable string.
 function fmtLastLogin(v: string | null): string {
   if (!v) return 'Never'
@@ -144,6 +149,8 @@ function AccessLevelDropdown({ value, onChange, editorDescription, disabled }: {
 interface UserFormModalProps {
   isEdit: boolean
   formData: { firstName: string; lastName: string; username: string; email: string; password: string; role: string; status: string }
+  /** Edit only: the saved username. The format is only enforced once it is changed, so older accounts stay editable. */
+  originalUsername?: string
   selectedPermissions: string[]
   onClose: () => void
   onSubmit: (newPassword?: string) => void
@@ -152,7 +159,7 @@ interface UserFormModalProps {
   onSetGroupAccess: (groupPermissions: { id: string; label: string }[], level: GroupAccessLevel) => void
 }
 
-function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmit, onFormChange, onRoleChange, onSetGroupAccess }: UserFormModalProps) {
+function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions, onClose, onSubmit, onFormChange, onRoleChange, onSetGroupAccess }: UserFormModalProps) {
   function getGroupAccessLevel(groupPermissions: { id: string; label: string }[]): GroupAccessLevel {
     const ids = groupPermissions.map(p => p.id)
     return ids.filter(id => selectedPermissions.includes(id)).length === ids.length ? 'editor' : 'viewer'
@@ -170,7 +177,18 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
 
   // Validate the optional password change (edit only) before handing control to the parent.
   // The new password is passed up so it actually reaches the backend.
+  // Shown only after the user clicks Add/Save; cleared as soon as they edit the username again.
+  const [usernameError, setUsernameError] = useState('')
+  const usernameRef = useRef<HTMLInputElement>(null)
+
   const handleSubmitClick = () => {
+    const username = formData.username.trim()
+    // An empty username is reported by the parent's required-fields check.
+    if (username !== '' && !(isEdit && username === originalUsername) && !USERNAME_PATTERN.test(username)) {
+      setUsernameError(USERNAME_MESSAGE)
+      usernameRef.current?.focus()
+      return
+    }
     if (isEdit && changePassword) {
       if (newPassword.length < 8) { setPasswordError('New password must be at least 8 characters.'); return }
       if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return }
@@ -201,7 +219,10 @@ function UserFormModal({ isEdit, formData, selectedPermissions, onClose, onSubmi
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Username <span className="text-red-500">*</span></label>
-                <input type="text" value={formData.username} onChange={e => onFormChange('username', e.target.value)} className={inp} placeholder="Enter username" />
+                <input ref={usernameRef} type="text" value={formData.username}
+                  onChange={e => { onFormChange('username', e.target.value); setUsernameError('') }}
+                  className={usernameError ? `${inp} border-red-400` : inp} placeholder="Enter username" />
+                {usernameError && <p className="text-red-500 text-xs mt-1">{usernameError}</p>}
               </div>
 
               {!isEdit ? (
@@ -586,7 +607,7 @@ export default function SystemUsersTab({ isActive = true }: { isActive?: boolean
           onRoleChange={handleRoleChange} onSetGroupAccess={handleSetGroupAccess} />
       )}
       {showEditModal && (
-        <UserFormModal isEdit={true} formData={formData} selectedPermissions={selectedPermissions}
+        <UserFormModal isEdit={true} formData={formData} originalUsername={editingUser?.username} selectedPermissions={selectedPermissions}
           onClose={() => setShowEditModal(false)} onSubmit={handleSaveEdit}
           onFormChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
           onRoleChange={handleRoleChange} onSetGroupAccess={handleSetGroupAccess} />

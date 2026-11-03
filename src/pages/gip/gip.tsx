@@ -1,6 +1,9 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import WithdrawDialog from '../../components/WithdrawDialog'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
+import { classificationLabels } from '../../utils/classification'
 import ConfirmModal from '../shared/ConfirmModal'
 import JobPlacementModal from '../shared/JobPlacementModal'
 import {
@@ -180,6 +183,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
   const availableFilters = [
+    { id: 'dateApplied',    label: 'Date Applied',    type: 'dateRange' as const },
     { id: 'status',         label: 'Status',         options: ['Ongoing', 'Inactive', 'Completed', 'Withdrawn'] as string[] },
     { id: 'classification', label: 'Classification',  options: [...CLASSIFICATION_OPTIONS, 'Others'] },
     { id: 'sex',            label: 'Sex',             options: ['Male', 'Female'] },
@@ -265,6 +269,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
     const matchesFilters = activeFilters.every(filterId => {
       const val = filterValues[filterId]
       if (!val) return true
+      if (filterId === 'dateApplied') return inDateRange(a.dateApplicationReceived, val)
       if (filterId === 'status') return derivedStatus === val
       if (filterId === 'classification') return a.classification.includes(val) || (val === 'Others' && a.classificationOther !== '')
       if (filterId === 'sex') return a.sex === val
@@ -794,7 +799,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
                   return (
                     <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                       <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                      {filter?.type === 'text' ? (
+                      {filter?.type === 'dateRange' ? (
+                        <DateRangeFilterInput value={filterValues[filterId]} onChange={v => handleFilterValueChange(filterId, v)} />
+                      ) : filter?.type === 'text' ? (
                         <input
                           type="text"
                           value={filterValues[filterId] || ''}
@@ -869,12 +876,9 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         <td className="px-4 py-3 text-gray-600">{applicant.barangay}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
-                            {applicant.classification.slice(0, 1).map(c => (
+                            {classificationLabels(applicant.classification, applicant.classificationOther).map(c => (
                               <span key={c} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{c}</span>
                             ))}
-                            {applicant.classification.length > 1 && (
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-500 rounded text-xs">+{applicant.classification.length - 1}</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 max-w-[200px]">

@@ -1,6 +1,8 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import WithdrawDialog from '../../components/WithdrawDialog'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
 import ConfirmModal from '../shared/ConfirmModal'
 import {
   ArrowLeft, Search, Plus, X, Users,
@@ -181,6 +183,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
 
   const availableFilters = [
+    { id: 'dateApplied', label: 'Date Applied', type: 'dateRange' as const },
     { id: 'status',     label: 'Status',      options: STATUS_OPTIONS as string[] },
     { id: 'schoolType', label: 'School Type',  options: SCHOOL_TYPE_OPTIONS },
     { id: 'sex',        label: 'Sex',          options: ['Male', 'Female'] },
@@ -257,6 +260,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
     const matchesFilters = activeFilters.every(filterId => {
       const val = filterValues[filterId]
       if (!val) return true
+      if (filterId === 'dateApplied') return inDateRange(a.dateApplicationReceived, val)
       if (filterId === 'status') return derivedStatus === val
       if (filterId === 'schoolType') return a.schoolType === val
       if (filterId === 'sex') return a.sex === val
@@ -835,7 +839,9 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     return (
                       <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                         <span className="text-sm text-blue-700 font-medium">{filter?.label}:</span>
-                        {filter?.type === 'text' ? (
+                        {filter?.type === 'dateRange' ? (
+                          <DateRangeFilterInput value={filterValues[filterId]} onChange={v => handleFilterValueChange(filterId, v)} />
+                        ) : filter?.type === 'text' ? (
                           <input
                             type="text"
                             value={filterValues[filterId] || ''}

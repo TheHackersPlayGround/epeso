@@ -8,6 +8,8 @@ import { registerPdfFont, PDF_FONT_FAMILY } from './fonts/registerPdfFont'
 import ConfirmModal from '../shared/ConfirmModal'
 import { fetchEfReport, fetchGeneralPesoReport, fetchSkillsAgingReport, type SkillsAgingRow, fetchCdspAgingReport, type CdspAgingRow, fetchGipAgingReport, type GipAgingRow } from '../../services/reportService'
 import { monthsSince, relativeSince, agingBucket, AGING_BUCKET_ORDER, AGING_BUCKET_COLORS } from '../../utils/aging'
+import { requestTypeText } from '../../utils/ofwRequestType'
+import { classificationLabels, fundingSourceLabel } from '../../utils/classification'
 import { generatePesoMonthlyReport } from './pesoMonthlyReport'
 import { generateGeneralPesoWorkbook } from './generalPesoReport'
 import { generateWordReport, generateWordRoster } from './wordReport'
@@ -389,7 +391,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       'livelihood': ['No.', 'Beneficiary Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Civil Status',
                      'Date Applied', 'Contact Number', 'Barangay', 'Address', 'Assigned Project/Intervention',
                      'Assistance Amount', 'Release Date', 'Status', 'Remarks'],
-      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
+      'gip': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Classification', 'Highest Education', 'Assigned Office', 'Workplace/Office Address',
               'Date Assigned', 'Date Completed', 'Status', 'School Name', 'Course', 'Strand', 'Civil Status',
               'Contact Number', 'Barangay', 'Address', 'Supervisor', 'Allowance', 'Remarks'],
       'spes': ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'School Name', 'Grade/Year Level', 'Employer', 'Deployment Location',
@@ -413,7 +415,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     // CDSP: core fields on by default; date applied/occupation/civil status/remarks are optional.
     if (category === 'cdsp') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Program Type', 'Highest Education', 'Employment Status', 'Contact Number', 'Address']
     // GIP: identity, education, deployment office and period. Status is optional.
-    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Date Assigned', 'Date Completed', 'Contact Number', 'Address']
+    if (category === 'gip') return ['No.', 'Participant Name', 'Sex', 'Age', 'Birthdate', 'Classification', 'Highest Education', 'Assigned Office', 'Workplace/Office Address', 'Date Assigned', 'Date Completed', 'Contact Number', 'Address']
     // SPES Batch List: all columns shown by default.
     if (category === 'spes' && spesReportType === 'batches') return withoutStatus(SPES_BATCH_COLUMNS)
     // SPES: identity, school/year level, employer and period. Status is optional.
@@ -578,6 +580,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'Sex': a.sex || '-',
               'Age': a.age || '-',
               'Birthdate': a.birthdate || '-',
+              'Classification': classificationLabels(a.classification, a.classificationOther).join(', ') || '-',
               'Highest Education': a.highestEducation || '-',
               'Assigned Office': workplace?.workplaceName || '-',
               'Workplace/Office Address': workplace?.deploymentLocation || '-',
@@ -611,7 +614,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               'End Date': b.programEndDate || '-',
               'Coordinator': b.coordinator || '-',
               'Total Slots': b.availableSlots || '-',
-              'Funding Source': b.fundingSource || '-',
+              'Funding Source': fundingSourceLabel(b.fundingSource, b.fundingSourceOther) || '-',
               'Participants': b.assignedCount ?? 0,
               'Status': b.status,
               _batchId: b.id, // used only for the roster export, not rendered
@@ -754,13 +757,13 @@ export default function ReportView({ onBack }: ReportViewProps) {
               .map((p, i) => ({
                 'No.': i + 1,
                 'Intervention Name': p.interventionName || '-',
-                'Category': (p.interventionCategory === 'Others' ? p.interventionCategoryOther : p.interventionCategory) || '-',
+                'Category': (p.interventionCategory === 'Other' ? (p.interventionCategoryOther || 'Other') : p.interventionCategory) || '-',
                 'Description': p.description || '-',
                 'Target Beneficiaries': p.targetBeneficiaries || '-',
                 'Date': p.date || '-',
                 'Location': p.location || '-',
                 'Implementing Officer': p.implementingOfficer || '-',
-                'Partner Agency': (p.partnerAgency === 'Others' ? p.partnerAgencyOther : p.partnerAgency) || '-',
+                'Partner Agency': (p.partnerAgency === 'Other' ? (p.partnerAgencyOther || 'Other') : p.partnerAgency) || '-',
                 'Beneficiaries Assigned': p.assignedCount ?? 0,
                 'Status': p.status,
                 _projectId: p.id, // used only for the export, not rendered
@@ -786,7 +789,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             })),
             ...clpepInterventions.map(p => ({
               ...p, _program: 'CLPEP', _name: p.interventionName,
-              _category: p.interventionCategory === 'Others' ? p.interventionCategoryOther : p.interventionCategory,
+              _category: p.interventionCategory === 'Other' ? (p.interventionCategoryOther || 'Other') : p.interventionCategory,
               _desc: p.description, _date: p.date, _location: p.location, _facilitator: p.implementingOfficer,
             })),
           ]
@@ -856,7 +859,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             'Email': p.email || '-',
             'Address': formatAddress({ streetPurok: p.address, barangay: p.barangay, cityMunicipality: p.municipality, province: p.province }),
             'Barangay': p.barangay || '-',
-            'Type of Request': p.typeOfRequest.join(', '),
+            'Type of Request': requestTypeText(p),
             'Employment Status': p.employmentStatus,
             'Desired Position': p.desiredPosition || '-',
             'Type of Skill': p.typeOfSkill || '-',
@@ -2502,7 +2505,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       [{ label: 'Employer: ', value: batch.employer || '-' }, { label: '     Deployment Location: ', value: batch.deploymentLocation || '-' }],
       [{ label: 'Start Date: ', value: batch.programStartDate || '-' }, { label: '     End Date: ', value: batch.programEndDate || '-' }],
       [{ label: 'Coordinator: ', value: batch.coordinator || '-' }],
-      [{ label: 'Total Slots: ', value: batch.availableSlots || '-' }, { label: '     Funding Source: ', value: batch.fundingSource || '-' }],
+      [{ label: 'Total Slots: ', value: batch.availableSlots || '-' }, { label: '     Funding Source: ', value: fundingSourceLabel(batch.fundingSource, batch.fundingSourceOther) || '-' }],
       [{ label: 'Total Students: ', value: students.length }],
     ]
     const safeName = (batch.batchName || 'Batch').replace(/[^a-z0-9]+/gi, '_')
@@ -2694,7 +2697,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       beneficiaries = clpepApplicants.filter(a => a.assignedInterventionId === projectId)
       infoLines = [
         [{ label: 'Intervention: ', value: project.interventionName || '-' }],
-        [{ label: 'Category: ', value: (project.interventionCategory === 'Others' ? project.interventionCategoryOther : project.interventionCategory) || '-' }],
+        [{ label: 'Category: ', value: (project.interventionCategory === 'Other' ? (project.interventionCategoryOther || 'Other') : project.interventionCategory) || '-' }],
         [{ label: 'Date: ', value: project.date || '-' }, { label: '     Location: ', value: project.location || '-' }],
         [{ label: 'Total Beneficiaries: ', value: beneficiaries.length }],
       ]

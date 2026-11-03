@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { fmtDate } from '../../utils/formatDate'
 import SearchableSelect from '../../components/SearchableSelect'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
 import ProjectNameLabel from '../../components/ProjectNameLabel'
 import { formatProjectName } from '../../utils/projectName'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
@@ -70,7 +72,7 @@ function assignedBarangay(dilpProjects: DILPProject[], isDILP: boolean, b: DILEE
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type FilterOption = { id: string; label: string; options: string[] }
+type FilterOption = { id: string; label: string; options: string[]; type?: 'dateRange' }
 
 // One step of the Address filter (Province / City / Barangay): the picked place's ID and name.
 type AddressPick = { id: number; name: string } | null
@@ -639,7 +641,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   const programLabel = isDILP ? 'DILP' : 'TUPAD'
 
   const availableFilters: FilterOption[] = [
-    { id: 'status',      label: 'Status',       options: isDILP ? PROGRAM_STATUS_OPTIONS : TUPAD_STATUS_OPTIONS },
+    { id: 'dateApplied', label: 'Date Applied',  options: [], type: 'dateRange' },
+    { id: 'status',      label: 'Status',      options: isDILP ? PROGRAM_STATUS_OPTIONS : TUPAD_STATUS_OPTIONS },
     { id: 'sex',         label: 'Sex',           options: SEX_OPTIONS },
     { id: 'civilStatus', label: 'Civil Status',  options: CIVIL_STATUS_OPTIONS },
     // Address has three pickers instead of one dropdown, so it is drawn separately
@@ -792,8 +795,9 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     for (const filterId of activeFilters) {
       const value = filterValues[filterId]
       if (!value) continue
+      if (filterId === 'dateApplied') result = result.filter(b => inDateRange(b.dateApplied, value))
       if (filterId === 'status')      result = result.filter(b => b.status === value)
-      if (filterId === 'sex')         result = result.filter(b => b.sex === value)
+      if (filterId === 'sex')        result = result.filter(b => b.sex === value)
       if (filterId === 'civilStatus') result = result.filter(b => b.civilStatus === value)
     }
     return result
@@ -1104,15 +1108,19 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
                 return (
                   <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
                     <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
-                    <select
-                      value={filterValues[filterId] ?? ''}
-                      onChange={e => handleFilterValueChange(filterId, e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-                    >
-                      <option value="">All</option>
-                      {filter.options.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
+                    {filter.type === 'dateRange' ? (
+                      <DateRangeFilterInput value={filterValues[filterId]} onChange={v => handleFilterValueChange(filterId, v)} />
+                    ) : (
+                      <select
+                        value={filterValues[filterId] ?? ''}
+                        onChange={e => handleFilterValueChange(filterId, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
+                      >
+                        <option value="">All</option>
+                        {filter.options.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    )}
                     <button
                       onClick={() => handleRemoveFilter(filterId)}
                       aria-label={`Remove ${filter.label} filter`}

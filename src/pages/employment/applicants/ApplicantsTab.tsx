@@ -3,6 +3,8 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X, Loader2 } from "lucide-react";
 import { canManage } from "../../../utils/permissions";
+import { fmtDate } from "../../../utils/formatDate";
+import DateRangeFilterInput from "../../../components/DateRangeFilterInput";
 import TablePagination from "../shared/TablePagination";
 import type { Applicant } from "../../../contexts/EmploymentContext";
 export type { Applicant };
@@ -11,12 +13,14 @@ export type FilterOption = {
   id: string;
   label: string;
   // "select" (default) renders a dropdown of `options`; "text" renders a
-  // free-text box and matches by substring (for free-form fields like courses).
-  type?: "select" | "text";
+  // free-text box and matches by substring (for free-form fields like courses);
+  // "dateRange" renders From/To date pickers (value is "from|to", see below).
+  type?: "select" | "text" | "dateRange";
   options?: string[];
 };
 
 const AVAILABLE_FILTERS: FilterOption[] = [
+  { id: "dateApplied", label: "Date Applied", type: "dateRange" },
   { id: "disability", label: "PWD / Disability", options: ["Yes", "No"] },
   { id: "civilStatus", label: "Civil Status", options: ["Single", "Married", "Widowed", "Separated", "Annulled"] },
   // "Sex" intentionally omitted as a filter — it is already a default table column.
@@ -137,6 +141,7 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
       <td className="px-4 py-3 text-gray-600">{applicant.skills}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.trainingCourses || '—'}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.jobPreference || '—'}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
 
       {columnFilters(activeFilters).map((id) => (
         <td key={id} className={`px-4 py-3 text-gray-600 align-top ${id === "language" ? "min-w-[220px]" : "whitespace-nowrap"}`}>
@@ -170,7 +175,7 @@ type ApplicantsTableProps = {
   onDelete: (applicant: Applicant) => void;
 };
 
-const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Training Course", "Job Preference"];
+const DEFAULT_HEADERS = ["Name", "Age", "Sex", "Educational Background", "Skills", "Training Course", "Job Preference", "Date Applied"];
 
 function getFilterLabel(filterId: string): string {
   return AVAILABLE_FILTERS.find((f) => f.id === filterId)?.label ?? filterId;
@@ -299,7 +304,9 @@ function ApplicantsFilterBadges({ activeFilters, filterValues, onFilterValueChan
             <span className="text-sm text-blue-700 font-medium whitespace-nowrap">
               {filter?.label ?? filterId}:
             </span>
-            {filter?.type === "text" ? (
+            {filter?.type === "dateRange" ? (
+              <DateRangeFilterInput value={filterValues[filterId]} onChange={(v) => onFilterValueChange(filterId, v)} />
+            ) : filter?.type === "text" ? (
               <input
                 type="text"
                 value={filterValues[filterId] ?? ""}

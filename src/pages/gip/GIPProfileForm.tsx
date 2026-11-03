@@ -10,6 +10,7 @@ import { useProfileDraft } from '../../hooks/useFormDraft'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { classificationLabels } from '../../utils/classification'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -229,7 +230,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           <Sec num="III" title="Classification" />
           <div className="flex flex-wrap gap-2">
             {applicant.classification.length > 0
-              ? applicant.classification.map(c => <span key={c} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">{c}</span>)
+              ? classificationLabels(applicant.classification, applicant.classificationOther).map(c => <span key={c}className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">{c}</span>)
               : <span className="text-sm text-gray-400">—</span>}
           </div>
           <Sec num="IV" title="Educational Background" />

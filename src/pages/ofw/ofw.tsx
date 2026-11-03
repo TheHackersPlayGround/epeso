@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import { ArrowLeft, Plus, Download, ChevronDown, X, Search, Users, MoreHorizontal, ChevronLeft, ChevronRight, CheckCircle, PlayCircle, XCircle, Loader2 } from 'lucide-react'
-import DatePicker from '../../components/DatePicker'
+import DateRangeFilterInput from '../../components/DateRangeFilterInput'
+import { inDateRange } from '../../utils/dateRange'
+import { requestTypeText } from '../../utils/ofwRequestType'
 import ConfirmModal from '../shared/ConfirmModal'
 import { canManage } from '../../utils/permissions'
 import * as XLSX from 'xlsx'
@@ -38,9 +40,10 @@ function toApiPayload(data: Omit<OFWProfile, 'id'>) {
 
 type FilterKey = 'referenceNo' | 'dateFiled' | 'status' | 'employmentStatus' | 'address' | 'typeOfRequest'
 
-const FILTER_DEFS: { key: FilterKey; label: string; type: 'text' | 'date' | 'select'; options?: string[] }[] = [
+const FILTER_DEFS: { key: FilterKey; label: string; type: 'text' | 'dateRange' | 'select'; options?: string[] }[] = [
+  // OFW calls Date Applied "Date Filed".
+  { key: 'dateFiled',        label: 'Date Filed',          type: 'dateRange' },
   { key: 'referenceNo',      label: 'Reference No.',      type: 'text' },
-  { key: 'dateFiled',        label: 'Date Filed',          type: 'date' },
   { key: 'status',           label: 'Status',              type: 'select', options: ['Pending', 'Approved', 'Ongoing', 'Completed', 'Rejected'] },
   { key: 'employmentStatus', label: 'Employment Status',   type: 'select', options: EMPLOYMENT_STATUS_OPTIONS },
   { key: 'address',          label: 'Address',             type: 'text' },
@@ -288,7 +291,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
       if (!val) return true
       switch (key) {
         case 'referenceNo':      return p.referenceNumber.toLowerCase().includes(val.toLowerCase())
-        case 'dateFiled':        return p.dateFiled === val
+        case 'dateFiled':        return inDateRange(p.dateFiled, val)
         case 'status':           return p.status === val
         case 'employmentStatus': return p.employmentStatus === val
         case 'address':          return [p.address, p.barangay, p.municipality, p.province].join(' ').toLowerCase().includes(val.toLowerCase())
@@ -337,7 +340,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
         'Province': p.province,
         'Date Filed': p.dateFiled,
         'Employment Status': p.employmentStatus,
-        'Type of Request': p.typeOfRequest.join(', '),
+        'Type of Request': requestTypeText(p),
         'Status': p.status,
       }))
       const ws = XLSX.utils.json_to_sheet(data)
@@ -490,10 +493,9 @@ export default function OFWView({ onBack }: OFWViewProps) {
                         onChange={e => { setFilterValues(prev => ({ ...prev, [key]: e.target.value })); setCurrentPage(1) }}
                       />
                     )}
-                    {def.type === 'date' && (
-                      <DatePicker
-                        className="bg-transparent text-sm text-gray-700 outline-none"
-                        value={filterValues[key] ?? ''}
+                    {def.type === 'dateRange' && (
+                      <DateRangeFilterInput
+                        value={filterValues[key]}
                         onChange={v => { setFilterValues(prev => ({ ...prev, [key]: v })); setCurrentPage(1) }}
                       />
                     )}
@@ -551,8 +553,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.employmentStatus}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px]">
-                        <span className="block truncate" title={profile.typeOfRequest.join(', ')}>
-                          {profile.typeOfRequest.join(', ') || '—'}
+                        <span className="block break-words" title={requestTypeText(profile)}>
+                          {requestTypeText(profile) || '—'}
                         </span>
                         {/* Employment Referral sub-fields -- only shown when at least one is
                             filled in, so this stays blank for every other request type. */}

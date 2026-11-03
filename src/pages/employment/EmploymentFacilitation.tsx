@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
 import type { Applicant } from "./applicants/ApplicantsTab";
 import { ITEMS_PER_PAGE } from "./applicants/ApplicantsTab";
+import { inDateRange } from "../../utils/dateRange";
 import { createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { createReferral } from "../../services/referralService";
 import { useEmployment } from "../../contexts/EmploymentContext";
@@ -453,6 +454,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       const value = filterValues[filterId];
       if (!value) continue;
       switch (filterId) {
+        case "dateApplied":
+          result = result.filter((a) => inDateRange(a.dateApplicationReceived, value));
+          break;
         case "disability":
           result = result.filter((a) => value === "Yes" ? a.hasDisability : !a.hasDisability);
           break;

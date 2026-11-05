@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Eye, X } from 'lucide-react'
+import { Eye, Loader2, X } from 'lucide-react'
 import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
 import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
@@ -627,11 +627,13 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+                disabled={draft.saving}
+                className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                 style={{ backgroundColor: '#0077BE' }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0065A5')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0077BE')}
               >
+                {draft.saving && <Loader2 size={16} className="animate-spin" />}
                 Save Profile
               </button>
             </div>

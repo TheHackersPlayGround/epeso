@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Users, FileText, Upload, Eye } from 'lucide-react'
+import { X, Users, FileText, Upload, Eye, Loader2 } from 'lucide-react'
 import { useCDSP } from '../../contexts/CDSPContext'
 import type { CDSPApplicant, CDSPSavedDocument } from '../../contexts/CDSPContext'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -743,7 +743,8 @@ export default function CDSPProfileForm({
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
             <button onClick={draft.requestClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm">
+            <button onClick={handleSave} disabled={draft.saving} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+              {draft.saving && <Loader2 size={16} className="animate-spin" />}
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
           </div>

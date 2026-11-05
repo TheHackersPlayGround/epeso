@@ -155,10 +155,14 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
     setSaveConfirm(true);
   };
 
-  const confirmSave = () => {
-    setSaveConfirm(false);
-    // The parent persists, closes this sidebar, and shows the success alert.
-    onSave(formData);
+  const confirmSave = async () => {
+    // The parent persists, closes this sidebar, and shows the success alert. The pop-up stays
+    // open with a spinner until the server answers.
+    try {
+      await onSave(formData);
+    } finally {
+      setSaveConfirm(false);
+    }
   };
 
   const renderSectionContent = () => {

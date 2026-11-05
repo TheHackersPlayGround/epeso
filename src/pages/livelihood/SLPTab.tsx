@@ -16,6 +16,7 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import WithdrawDialog from '../../components/WithdrawDialog'
 import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
+import ImportDropZone from '../../components/ImportDropZone'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -76,18 +77,7 @@ function SLPImportModal({ onClose, onImported }: { onClose: () => void; onImport
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
-                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               {isImporting && progress && (
@@ -478,7 +468,7 @@ function UpdateAssessmentModal({ beneficiary, onClose, onSave }: UpdateAssessmen
 type AssignProjectModalProps = {
   beneficiary: SLPApplicant
   projects: SLPProject[]
-  onAssign: (projectId: number) => void
+  onAssign: (projectId: number) => void | Promise<void>
   onUnassign: () => void
   onClose: () => void
   isAssigning: boolean
@@ -700,7 +690,7 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
         message={confirmProject ? `Assign "${confirmProject.projectName}" to ${formatDisplayName(beneficiary)}?` : ''}
         confirmText="Yes, Assign"
         cancelText="Cancel"
-        onConfirm={() => { setConfirmingAssign(false); if (confirmProject) onAssign(confirmProject.id) }}
+        onConfirm={async () => { if (confirmProject) await onAssign(confirmProject.id); setConfirmingAssign(false) }}
         onCancel={() => setConfirmingAssign(false)}
       />
     </div>
@@ -1036,13 +1026,14 @@ export default function SLPTab() {
   async function proceedRemove() {
     if (!removeConfirm) return
     const { id, name } = removeConfirm
-    setRemoveConfirm(null)
     try {
       await slpService.deleteProfile(id)
       await refreshProfiles()
       setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: `${name} moved to the recycle bin.` })
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove beneficiary.') })
+    } finally {
+      setRemoveConfirm(null)
     }
   }
 

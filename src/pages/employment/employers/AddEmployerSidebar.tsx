@@ -89,12 +89,14 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
   };
 
   const handleConfirmSave = async () => {
-    setShowConfirmation(false);
+    // The review pop-up stays open (with a spinner on its button) until the server answers.
     try {
       // onSave persists to the backend; await so success only shows on success.
       await draft.wrapSave(onSave)(formData);
+      setShowConfirmation(false);
       setResultModal({ isOpen: true, type: 'success', message: 'Employer has been successfully added to the system.' });
     } catch {
+      setShowConfirmation(false);
       setResultModal({ isOpen: true, type: 'error', message: 'Could not save the employer. Please try again.' });
     }
   };

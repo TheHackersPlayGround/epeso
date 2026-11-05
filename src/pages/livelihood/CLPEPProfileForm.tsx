@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Users, Upload, FileText, Eye, Trash2, ChevronDown } from 'lucide-react'
+import { X, Users, Upload, FileText, Eye, Trash2, ChevronDown, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import SearchableSelect from '../../components/SearchableSelect'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
@@ -892,8 +892,10 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                   <button
                     type="button"
                     onClick={() => handleSubmit()}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                    disabled={draft.saving}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
+                    {draft.saving && <Loader2 size={16} className="animate-spin" />}
                     {mode === 'add' ? 'Save' : 'Save Changes'}
                   </button>
                 ) : (

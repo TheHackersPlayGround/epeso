@@ -21,6 +21,7 @@ import SPESProfileForm, {
 import { downloadImportTemplate, importSpesApplicants, type ImportResult } from './spesImport'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
+import ImportDropZone from '../../components/ImportDropZone'
 
 interface SPESViewProps {
   onBack: () => void
@@ -87,18 +88,7 @@ function SPESImportModal({ onClose, onImported }: { onClose: () => void; onImpor
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
-                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               {isImporting && progress && (
@@ -325,13 +315,14 @@ export default function SPESView({ onBack }: SPESViewProps) {
     if (!deleteConfirm) return
     const applicant = deleteConfirm
     const name = `${applicant.lastName}, ${applicant.firstName}${applicant.middleName ? ' ' + applicant.middleName.charAt(0) + '.' : ''}`
-    setDeleteConfirm(null)
     try {
       await spesApiService.deleteProfile(applicant.id)
       await refreshProfiles()
       setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: `${name} has been deleted and moved to the recycle bin.` })
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete profile.') })
+    } finally {
+      setDeleteConfirm(null)
     }
   }
 

@@ -22,6 +22,7 @@ import CDSPProfileForm, {
 } from './CDSPProfileForm'
 import { downloadImportTemplate, importCdspApplicants, type ImportResult } from './cdspImport'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import ImportDropZone from '../../components/ImportDropZone'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -83,18 +84,7 @@ function CDSPImportModal({ services, onClose, onImported }: { services: string[]
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
-                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               {isImporting && progress && (
@@ -792,7 +782,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
               confirmText="Yes, Assign"
               cancelText="Cancel"
               confirmVariant="brand"
-              onConfirm={() => { setConfirmingAssign(false); handleAssign(selectedActivity) }}
+              onConfirm={async () => { await handleAssign(selectedActivity); setConfirmingAssign(false) }}
               onCancel={() => setConfirmingAssign(false)}
             />
           </div>
@@ -1094,7 +1084,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         confirmText="Yes, Remove"
         cancelText="Cancel"
         confirmVariant="brand"
-        onConfirm={() => { if (unassignConfirm !== null) handleUnassign(unassignConfirm); setUnassignConfirm(null) }}
+        onConfirm={async () => { if (unassignConfirm !== null) await handleUnassign(unassignConfirm); setUnassignConfirm(null) }}
         onCancel={() => setUnassignConfirm(null)}
       />
       <ConfirmModal

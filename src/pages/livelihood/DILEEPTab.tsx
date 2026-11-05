@@ -27,6 +27,7 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import WithdrawDialog from '../../components/WithdrawDialog'
 import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
+import ImportDropZone from '../../components/ImportDropZone'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -181,18 +182,7 @@ function DileepImportModal({
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600 break-all">{file ? file.name : 'Click to upload or drag and drop'}</p>
-                <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               {isImporting && progress && (
@@ -263,7 +253,7 @@ type AssignProjectModalProps = {
   beneficiary: DILEEPApplicant
   program: DILEEPProgram
   projects: DILEEPProject[]
-  onAssign: (projectId: number, projectName: string) => void
+  onAssign: (projectId: number, projectName: string) => void | Promise<void>
   onUnassign: () => void
   onClose: () => void
   isAssigning: boolean
@@ -487,7 +477,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
         message={selectedProject ? `Assign "${formatProjectName(projectTitle(program, selectedProject), projectBarangay(program, selectedProject))}" to ${formatDisplayName(beneficiary)}?` : ''}
         confirmText="Yes, Assign"
         cancelText="Cancel"
-        onConfirm={() => { setConfirmingAssign(false); if (selectedProject) onAssign(selectedProject.id, formatProjectName(projectTitle(program, selectedProject), projectBarangay(program, selectedProject))) }}
+        onConfirm={async () => { if (selectedProject) await onAssign(selectedProject.id, formatProjectName(projectTitle(program, selectedProject), projectBarangay(program, selectedProject))); setConfirmingAssign(false) }}
         onCancel={() => setConfirmingAssign(false)}
       />
     </div>
@@ -711,7 +701,6 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
   async function proceedRemove() {
     if (!removeConfirm) return
     const { id, name } = removeConfirm
-    setRemoveConfirm(null)
     try {
       if (isDILP) await dilpService.deleteProfile(id)
       else await tupadService.deleteProfile(id)
@@ -719,6 +708,8 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       setResultModal({ isOpen: true, type: 'success', title: 'Removed', message: `${name} moved to the recycle bin.` })
     } catch (e: unknown) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to remove beneficiary.') })
+    } finally {
+      setRemoveConfirm(null)
     }
   }
 

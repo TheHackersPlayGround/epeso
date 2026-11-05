@@ -14,6 +14,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hook
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { requestLeave } from '../../hooks/leaveGuard'
+import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -336,8 +337,11 @@ export default function CDSPMaintenanceForm() {
   const proceedDelete = async () => {
     if (!deleteConfirm) return
     const id = deleteConfirm.id
-    setDeleteConfirm(null)
-    await handleDelete(id)
+    try {
+      await handleDelete(id)
+    } finally {
+      setDeleteConfirm(null)
+    }
   }
 
   const handleStatusChange = async () => {
@@ -374,6 +378,8 @@ export default function CDSPMaintenanceForm() {
       setStatusConfirm(null)
     }
   }
+
+  const statusAction = useAsyncAction(handleStatusChange)
 
   // ── Render: landing ───────────────────────────────────────────────────────
 
@@ -1016,16 +1022,19 @@ export default function CDSPMaintenanceForm() {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setStatusConfirm(null)}
-                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                  disabled={statusAction.busy}
+                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleStatusChange}
-                  className={`px-5 py-2 text-white rounded-lg transition-colors text-sm ${
+                  onClick={statusAction.run}
+                  disabled={statusAction.busy}
+                  className={`px-5 py-2 text-white rounded-lg transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
                     nextStatus === 'Completed' ? 'bg-green-600 hover:bg-green-700' : 'bg-brand-blue hover:bg-brand-blue-dark'
                   }`}
                 >
+                  {statusAction.busy && <Loader2 size={16} className="animate-spin" />}
                   {label}
                 </button>
               </div>

@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Loader2, X } from 'lucide-react'
 
 type ApplicantReviewModalProps = {
   isOpen: boolean
@@ -7,7 +7,8 @@ type ApplicantReviewModalProps = {
   message: string
   summaryContent?: ReactNode
   onBackToEdit: () => void
-  onConfirm: () => void
+  // If this returns a promise, both buttons stay locked and the confirm button shows a spinner until it settles.
+  onConfirm: () => unknown
 }
 
 export default function ApplicantReviewModal({
@@ -18,7 +19,18 @@ export default function ApplicantReviewModal({
   onBackToEdit,
   onConfirm,
 }: ApplicantReviewModalProps) {
+  const [saving, setSaving] = useState(false)
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
   if (!isOpen) return null
+
+  const handleConfirm = () => {
+    if (saving) return
+    const result = onConfirm()
+    if (typeof (result as { then?: unknown } | null)?.then !== 'function') return
+    setSaving(true)
+    ;(result as Promise<unknown>).then(() => undefined, () => undefined).then(() => { if (mounted.current) setSaving(false) })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -30,7 +42,8 @@ export default function ApplicantReviewModal({
           <button
             type="button"
             onClick={onBackToEdit}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={saving}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X size={20} />
           </button>
@@ -53,15 +66,18 @@ export default function ApplicantReviewModal({
           <button
             type="button"
             onClick={onBackToEdit}
-            className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+            disabled={saving}
+            className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Back to Edit
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium"
+            onClick={handleConfirm}
+            disabled={saving}
+            className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
+            {saving && <Loader2 size={16} className="animate-spin" />}
             Confirm &amp; Save
           </button>
         </div>

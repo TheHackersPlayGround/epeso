@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { X, Upload, Users, FileText, Eye, Trash2 } from 'lucide-react'
+import { X, Upload, Users, FileText, Eye, Trash2, Loader2 } from 'lucide-react'
 import type { DILPApplicant, DILPSavedDocument } from '../../contexts/DILPContext'
 import { canManage } from '../../utils/permissions'
 import DatePicker from '../../components/DatePicker'
@@ -772,8 +772,10 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                    disabled={draft.saving}
+                    className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
+                    {draft.saving && <Loader2 size={16} className="animate-spin" />}
                     {mode === 'add' ? 'Add Beneficiary' : 'Save Changes'}
                   </button>
                 ) : (

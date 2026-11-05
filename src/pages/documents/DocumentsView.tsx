@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import {
   ArrowLeft, Upload, FolderPlus, Search, MoreVertical, Download, Eye,
   Edit2, Move, Trash2, X, File, FileText, Image as ImageIcon,
-  FileSpreadsheet, Folder, ChevronRight, Grid3x3, List,
+  FileSpreadsheet, Folder, ChevronRight, Grid3x3, List, Loader2,
 } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
 import { canManage } from '../../utils/permissions'
+import { useAsyncAction } from '../../hooks/useAsyncAction'
 import type { FileItem, FolderItem } from '../../contexts/DocumentsContext'
 import { useDocuments, IMAGE_TYPES } from '../../contexts/DocumentsContext'
 import * as documentsService from '../../services/documentsService'
@@ -184,7 +185,16 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
 
   // ── Upload ────────────────────────────────────────────────────────────────────
   // Uploads a batch of files one at a time, reporting any failures.
+  const [isUploading, setIsUploading] = useState(false)
   const uploadFiles = async (fileList: File[], skippedFolders = 0) => {
+    setIsUploading(true)
+    try {
+      await uploadFilesNow(fileList, skippedFolders)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+  const uploadFilesNow = async (fileList: File[], skippedFolders = 0) => {
     if (fileList.length === 0) {
       if (skippedFolders > 0) {
         setErrorModal({ open: true, message: "Folders can't be dropped directly — open the folder on your device and drop its files instead." })
@@ -271,8 +281,6 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     if (!newFolderName.trim()) return
     const name = newFolderName.trim()
     const parentId = newFolderParent
-    setIsNewFolderModalOpen(false)
-    setNewFolderName('')
     try {
       const result = await documentsService.createFolder({ name, parentId })
       await refreshFolders()
@@ -286,6 +294,9 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     } catch (err) {
       if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to create the folder.' })
+    } finally {
+      setIsNewFolderModalOpen(false)
+      setNewFolderName('')
     }
   }
 
@@ -294,8 +305,6 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     if (!folderToEdit || !editFolderName.trim()) return
     const folder = folderToEdit
     const name = editFolderName.trim()
-    setIsEditFolderModalOpen(false)
-    setFolderToEdit(null)
     try {
       await documentsService.renameFolder(folder.id, name)
       await refreshFolders()
@@ -303,8 +312,13 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     } catch (err) {
       if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to rename the folder.' })
+    } finally {
+      setIsEditFolderModalOpen(false)
+      setFolderToEdit(null)
     }
   }
+  const createFolderAction = useAsyncAction(handleCreateFolder)
+  const renameFolderAction = useAsyncAction(handleEditFolder)
 
   // Shows a friendly message for a 404 and refreshes the lists; returns whether it handled the error.
   const reportMissing = async (err: unknown): Promise<boolean> => {
@@ -322,7 +336,6 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
 
   // Moves a folder to the recycle bin.
   const handleDeleteFolder = async (folderId: string) => {
-    setDeleteFolderConfirm({ open: false, id: null })
     try {
       await documentsService.deleteFolder(folderId)
       await refreshFolders()
@@ -334,13 +347,14 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
         open: true, folderId,
         message: err instanceof Error ? err.message : 'Failed to delete the folder.',
       })
+    } finally {
+      setDeleteFolderConfirm({ open: false, id: null })
     }
   }
 
   // ── File CRUD ─────────────────────────────────────────────────────────────────
   // Moves a file to the recycle bin.
   const handleDeleteFile = async (fileId: string) => {
-    setDeleteFileConfirm({ open: false, id: null })
     try {
       await documentsService.deleteDocument(fileId)
       await refreshDocuments()
@@ -348,6 +362,8 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
     } catch (err) {
       if (await reportMissing(err)) return
       setErrorModal({ open: true, message: err instanceof Error ? err.message : 'Failed to delete the file.' })
+    } finally {
+      setDeleteFileConfirm({ open: false, id: null })
     }
   }
 
@@ -584,7 +600,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Folder Name <span className="text-red-500">*</span></label>
               <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
+                onKeyDown={e => e.key === 'Enter' && createFolderAction.run()}
                 className={inpCls} style={inpStyle} placeholder="Enter folder name" />
             </div>
             <div>
@@ -599,9 +615,10 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
           <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
             <button onClick={() => { setIsNewFolderModalOpen(false); setNewFolderName('') }}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
-            <button onClick={handleCreateFolder} disabled={!canManage('documents')}
-              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            <button onClick={createFolderAction.run} disabled={!canManage('documents') || createFolderAction.busy}
+              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
+              {createFolderAction.busy && <Loader2 size={16} className="animate-spin" />}
               Create Folder
             </button>
           </div>
@@ -614,15 +631,16 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
           <div className="p-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Folder Name <span className="text-red-500">*</span></label>
             <input autoFocus value={editFolderName} onChange={e => setEditFolderName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleEditFolder()}
+              onKeyDown={e => e.key === 'Enter' && renameFolderAction.run()}
               className={inpCls} style={inpStyle} placeholder="Enter folder name" />
           </div>
           <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
             <button onClick={() => { setIsEditFolderModalOpen(false); setFolderToEdit(null) }}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
-            <button onClick={handleEditFolder}
-              className="px-6 py-2.5 text-white rounded-lg text-sm"
+            <button onClick={renameFolderAction.run} disabled={renameFolderAction.busy}
+              className="px-6 py-2.5 text-white rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               style={{ backgroundColor: BRAND }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
+              {renameFolderAction.busy && <Loader2 size={16} className="animate-spin" />}
               Rename
             </button>
           </div>
@@ -805,13 +823,13 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
             {/* Action bar */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <input type="file" id="doc-upload" multiple onChange={handleFileSelect} disabled={!canManage('documents')} className="hidden" />
-                <label htmlFor={canManage('documents') ? 'doc-upload' : undefined}
-                  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm ${canManage('documents') ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'}`}
+                <input type="file" id="doc-upload" multiple onChange={handleFileSelect} disabled={!canManage('documents') || isUploading} className="hidden" />
+                <label htmlFor={canManage('documents') && !isUploading ? 'doc-upload' : undefined}
+                  className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm ${isUploading ? 'opacity-70 cursor-wait pointer-events-none' : canManage('documents') ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'}`}
                   style={{ backgroundColor: BRAND }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = BRAND_DARK)}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = BRAND)}>
-                  <Upload size={18} /> Upload
+                  {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} {isUploading ? 'Uploading…' : 'Upload'}
                 </label>
                 <button onClick={() => { setNewFolderName(''); setNewFolderParent(selectedFolder); setIsNewFolderModalOpen(true) }} disabled={!canManage('documents')}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">

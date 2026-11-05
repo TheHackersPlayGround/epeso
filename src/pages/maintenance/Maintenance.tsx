@@ -182,8 +182,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const proceedDeleteSpesBatch = async () => {
     if (!deleteSpesBatchConfirm) return
     const b = deleteSpesBatchConfirm
-    setDeleteSpesBatchConfirm(null)
-    await handleDeleteSpesBatch(b.id)
+    try {
+      await handleDeleteSpesBatch(b.id)
+    } finally {
+      setDeleteSpesBatchConfirm(null)
+    }
   }
 
   // ── GIP handlers ───────────────────────────────────────────────────────────
@@ -242,8 +245,11 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   const proceedDeleteGipWorkplace = async () => {
     if (!deleteGipWorkplaceConfirm) return
     const w = deleteGipWorkplaceConfirm
-    setDeleteGipWorkplaceConfirm(null)
-    await handleDeleteGipWorkplace(w.id)
+    try {
+      await handleDeleteGipWorkplace(w.id)
+    } finally {
+      setDeleteGipWorkplaceConfirm(null)
+    }
   }
 
   // ── GIP filtered workplaces ─────────────────────────────────────────────────

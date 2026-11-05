@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import {
   UserPlus, Edit2, Trash2, Eye, EyeOff, CheckCircle,
-  X, Search, ChevronDown, ChevronLeft, ChevronRight,
+  X, Search, ChevronDown, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService'
@@ -153,7 +153,7 @@ interface UserFormModalProps {
   originalUsername?: string
   selectedPermissions: string[]
   onClose: () => void
-  onSubmit: (newPassword?: string) => void
+  onSubmit: (newPassword?: string) => void | Promise<void>
   onFormChange: (field: string, value: string) => void
   onRoleChange: (role: string) => void
   onSetGroupAccess: (groupPermissions: { id: string; label: string }[], level: GroupAccessLevel) => void
@@ -172,6 +172,7 @@ function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions
   const [newPassword,         setNewPassword]         = useState('')
   const [confirmPassword,     setConfirmPassword]     = useState('')
   const [passwordError,       setPasswordError]       = useState('')
+  const [isSubmitting,        setIsSubmitting]        = useState(false)
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] focus:border-transparent outline-none text-gray-900 placeholder:text-gray-400'
 
@@ -194,7 +195,8 @@ function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions
       if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return }
     }
     setPasswordError('')
-    onSubmit(isEdit && changePassword ? newPassword : undefined)
+    setIsSubmitting(true)
+    Promise.resolve(onSubmit(isEdit && changePassword ? newPassword : undefined)).finally(() => setIsSubmitting(false))
   }
 
   return (
@@ -328,8 +330,9 @@ function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-          <button onClick={handleSubmitClick} className="px-4 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors">
+          <button onClick={onClose} disabled={isSubmitting} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
+          <button onClick={handleSubmitClick} disabled={isSubmitting} className="px-4 py-2 text-sm bg-[#0077BE] text-white rounded-lg hover:bg-[#006699] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
             {isEdit ? 'Save Changes' : 'Add User'}
           </button>
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, X, ChevronDown, Upload } from "lucide-react";
+import { ArrowLeft, X, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { downloadImportTemplate, importApplicants, type ImportResult } from "./applicants/applicantImport";
 import type { Applicant } from "./applicants/ApplicantsTab";
@@ -22,6 +22,7 @@ import ResumeMaker, { type ApplicantData } from "./applicants/ResumeMaker";
 import ViewApplicantSidebar from "./applicants/ViewApplicantSidebar";
 import EmploymentHistoryPanel from "./applicants/EmploymentHistoryPanel";
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn';
+import ImportDropZone from '../../components/ImportDropZone'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -252,24 +253,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? "border-brand-blue bg-blue-50" : "border-gray-300 hover:border-brand-blue hover:bg-blue-50"}`}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                {file ? (
-                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
-                ) : (
-                  <>
-                    <p className="text-sm text-gray-600 break-all">Click to upload or drag and drop</p>
-                    <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                  </>
-                )}
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
@@ -577,7 +561,6 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   async function confirmDeleteApplicant() {
     const applicant = deleteApplicantConfirm;
     if (!applicant) return;
-    setDeleteApplicantConfirm(null);
     try {
       await deleteApplicant(applicant.id);
       await refreshApplicants();
@@ -588,6 +571,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : "Failed to delete applicant.";
       setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: msg });
+    } finally {
+      setDeleteApplicantConfirm(null);
     }
   }
 

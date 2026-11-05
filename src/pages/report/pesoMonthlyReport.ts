@@ -36,20 +36,30 @@ function setChartValues(chartXml: string, values: number[]): string {
   })
 }
 
-// Doughnut slice labels are hard-cached percentages, not auto-computed -- must be
-// recomputed and overwritten or they show the template's stale numbers.
+// The template stores some doughnut slice labels as fixed text ("48%"). Left alone, they keep
+// showing the old number when someone edits the table in Excel. Dropping the fixed text makes each
+// label an automatic percentage (showPercent is already on), so it always follows the cells.
+// With no data at all every label would read "0%" and stack on top of the others, so then a number
+// format hides zero percentages instead -- the labels stay automatic and appear once a value is typed in.
+const HIDE_ZERO_PERCENT = '<c:numFmt formatCode="0%;;;" sourceLinked="0"/>'
+
 function setDoughnutLabels(chartXml: string, values: number[]): string {
   const total = values.reduce((a, b) => a + b, 0)
-  return chartXml.replace(/<c:dLbl>(.*?)<\/c:dLbl>/gs, (block, inner: string) => {
+  let xml = chartXml.replace(/<c:dLbl>(.*?)<\/c:dLbl>/gs, (block, inner: string) => {
     const m = inner.match(/<c:idx val="(\d+)"/)
-    if (!m) return block
-    const i = Number(m[1])
-    if (i >= values.length) return block
-    // A 0/0 doughnut has no real slice angle, so Excel stacks both labels on top of
-    // each other -- blank them instead of showing two overlapping "0%"s.
-    const text = total > 0 ? `${Math.round((values[i] / total) * 100)}%` : ''
-    return `<c:dLbl>${inner.replace(/(<a:t>)[^<]*(<\/a:t>)/, `$1${text}$2`)}</c:dLbl>`
+    if (!m || Number(m[1]) >= values.length) return block
+    const automatic = inner.replace(/<c:tx>.*?<\/c:tx>/s, '')
+    return `<c:dLbl>${total === 0 ? automatic.replace('<c:showLegendKey', `${HIDE_ZERO_PERCENT}<c:showLegendKey`) : automatic}</c:dLbl>`
   })
+  if (total === 0) {
+    // Slices without their own label use the series-level label settings; hide their zeros too.
+    xml = xml.replace(/<c:dLbls>(?!<c:delete)(.*?)<\/c:dLbls>/gs, (_block, inner: string) => {
+      const at = inner.lastIndexOf('</c:dLbl>')
+      const cut = at === -1 ? 0 : at + '</c:dLbl>'.length
+      return `<c:dLbls>${inner.slice(0, cut)}${HIDE_ZERO_PERCENT}${inner.slice(cut)}</c:dLbls>`
+    })
+  }
+  return xml
 }
 
 // Build one <c> cell (number or inline string) with a given style index.

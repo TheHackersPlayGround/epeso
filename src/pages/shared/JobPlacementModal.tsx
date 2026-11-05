@@ -111,12 +111,12 @@ export default function JobPlacementModal({ beneficiaryServiceId, applicantName,
     if (!deleteConfirm) return
     try {
       await jobPlacementService.deletePlacement(deleteConfirm.id)
-      setDeleteConfirm(null)
       await load()
       setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'Job placement deleted.' })
     } catch (e: unknown) {
-      setDeleteConfirm(null)
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete job placement.') })
+    } finally {
+      setDeleteConfirm(null)
     }
   }
 

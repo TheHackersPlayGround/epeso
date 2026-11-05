@@ -200,7 +200,7 @@ type ReferralsTableProps = {
   isFiltered: boolean
   activeFilters: string[]
   onUpdateStatus: (r: Referral) => void
-  onRemove: (id: number) => void
+  onRemove: (id: number) => void | Promise<void>
 }
 
 // Active filters that map to a column NOT already shown by default get added to
@@ -251,10 +251,13 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
     setRemoveConfirm(true)
   }
 
-  function proceedRemove() {
-    if (menuReferral) onRemove(menuReferral.id)
-    setRemoveConfirm(false)
-    closeMenu()
+  async function proceedRemove() {
+    try {
+      if (menuReferral) await onRemove(menuReferral.id)
+    } finally {
+      setRemoveConfirm(false)
+      closeMenu()
+    }
   }
 
   return (

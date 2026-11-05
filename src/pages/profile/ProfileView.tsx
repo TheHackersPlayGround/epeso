@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
-import { ArrowLeft, LogOut, User, Pencil, Minus, Check, X } from 'lucide-react'
+import { ArrowLeft, LogOut, User, Pencil, Minus, Check, X, Loader2 } from 'lucide-react'
 import { updateUser } from '../../services/userService'
+import { useAsyncAction } from '../../hooks/useAsyncAction'
 import ConfirmModal from '../shared/ConfirmModal'
 
 interface ProfileUser {
@@ -216,6 +217,8 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
     }
   }
 
+  const saveAction = useAsyncAction(saveEdit)
+
   function cancelEdit() {
     setIsEditing(false)
   }
@@ -322,15 +325,17 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
                   {isEditing ? (
                     <>
                       <button
-                        onClick={saveEdit}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0077BE] text-white hover:bg-[#005f9e] transition-colors"
+                        onClick={saveAction.run}
+                        disabled={saveAction.busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0077BE] text-white hover:bg-[#005f9e] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                       >
-                        <Check size={13} />
+                        {saveAction.busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                         Save
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                        disabled={saveAction.busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <X size={13} />
                         Cancel

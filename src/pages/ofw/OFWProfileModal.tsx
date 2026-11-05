@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Eye } from 'lucide-react'
+import { Eye, Loader2 } from 'lucide-react'
 import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
 import DatePicker from '../../components/DatePicker'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -15,7 +15,7 @@ interface OFWProfileModalProps {
   profile: OFWProfile
   mode: 'view' | 'edit'
   onClose: () => void
-  onSave: (updated: OFWProfile) => void
+  onSave: (updated: OFWProfile) => void | Promise<void>
 }
 
 const STATUS_OPTIONS: OFWProfile['status'][] = ['Pending', 'Approved', 'Ongoing', 'Completed', 'Rejected']
@@ -121,6 +121,7 @@ function DownloadButton({ attachment, onPreview }: { attachment: OFWSavedAttachm
 
 export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWProfileModalProps) {
   const [form, setForm] = useState<OFWProfile>(profile)
+  const [isSaving, setIsSaving] = useState(false)
   const set = (updates: Partial<OFWProfile>) => setForm(f => ({ ...f, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
@@ -224,7 +225,9 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = form.suffix ? ' ' + form.suffix : ''
-    onSave({ ...form, referenceNumber: form.referenceNumber.trim(), lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
+    setIsSaving(true)
+    Promise.resolve(onSave({ ...form, referenceNumber: form.referenceNumber.trim(), lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }))
+      .finally(() => setIsSaving(false))
   }
 
   const isView = mode === 'view'
@@ -735,11 +738,12 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               {/* Buttons */}
               <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
                 <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
-                <button type="button" onClick={handleSave} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+                <button type="button" onClick={handleSave} disabled={isSaving} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   style={{ backgroundColor: '#0077BE' }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0065A5')}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0077BE')}
                 >
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
                   Save Changes
                 </button>
               </div>

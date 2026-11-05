@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import ConfirmModal from '../../shared/ConfirmModal'
-import { Search, Plus, ChevronDown, X, MoreHorizontal, Upload, Loader2 } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, MoreHorizontal, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useEmployment, type Employer } from '../../../contexts/EmploymentContext'
 import { canManage } from '../../../utils/permissions'
@@ -10,6 +10,7 @@ import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
 import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
+import ImportDropZone from '../../../components/ImportDropZone'
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
@@ -404,24 +405,7 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
                 <p className="text-xs text-gray-400 mt-1.5 text-center">Download the template file to ensure correct format.</p>
               </div>
 
-              <label className={`block w-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${file ? 'border-brand-blue bg-blue-50' : 'border-gray-300 hover:border-brand-blue hover:bg-blue-50'}`}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={isImporting}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-                <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-                {file ? (
-                  <p className="text-sm font-medium text-brand-blue break-all">{file.name}</p>
-                ) : (
-                  <>
-                    <p className="text-sm text-gray-600 break-all">Click to upload or drag and drop</p>
-                    <p className="text-xs text-gray-400 mt-1">.xlsx files only</p>
-                  </>
-                )}
-              </label>
+              <ImportDropZone file={file} onPick={pickFile} onReject={setError} disabled={isImporting} />
 
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
@@ -539,7 +523,6 @@ export default function EmployersTab() {
   async function confirmDeleteEmployer() {
     const id = deleteConfirmId
     if (id === null) return
-    setDeleteConfirmId(null)
     try {
       await deleteEmployer(id)
       setEmployers(prev => prev.filter(e => e.id !== id))
@@ -549,6 +532,8 @@ export default function EmployersTab() {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to delete employer.'
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
+    } finally {
+      setDeleteConfirmId(null)
     }
   }
 

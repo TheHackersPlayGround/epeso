@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Download, Loader2 } from 'lucide-react'
 import { useEmployment, type Vacancy } from '../../contexts/EmploymentContext'
 import { canManage } from '../../utils/permissions'
+import { fmtDate } from '../../utils/formatDate'
 import { createVacancy, updateVacancy, toggleVacancyStatus } from '../../services/vacancyService'
 import ConfirmModal from '../shared/ConfirmModal'
 import { useFormDraft } from '../../hooks/useFormDraft'
@@ -186,7 +187,7 @@ type VacanciesTableProps = {
   activeFilters: string[]
   onView: (v: Vacancy) => void
   onEdit: (v: Vacancy) => void
-  onToggleStatus: (id: number, currentStatus: Vacancy['status']) => void
+  onToggleStatus: (id: number, currentStatus: Vacancy['status']) => void | Promise<void>
   isFiltered: boolean
   highlightId?: number | null
 }
@@ -250,10 +251,13 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
     setStatusConfirm('reopen')
   }
 
-  function proceedStatusToggle() {
-    if (menuVacancy) onToggleStatus(menuVacancy.id, menuVacancy.status)
-    setStatusConfirm(null)
-    closeMenu()
+  async function proceedStatusToggle() {
+    try {
+      if (menuVacancy) await onToggleStatus(menuVacancy.id, menuVacancy.status)
+    } finally {
+      setStatusConfirm(null)
+      closeMenu()
+    }
   }
   const showIndustry = activeFilters.includes('industry')
   const showJobType = activeFilters.includes('jobType')
@@ -412,6 +416,10 @@ function ViewVacancyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () 
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Status</p>
               <StatusBadge status={vacancy.status} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Date Created</p>
+              <p className="text-sm font-medium text-gray-800">{fmtDate(vacancy.createdDate)}</p>
             </div>
           </div>
 
@@ -622,6 +630,19 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
               </div>
             </div>
           </div>
+
+          {vacancy.createdDate && (
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Date Created</label>
+              <input
+                type="text"
+                value={fmtDate(vacancy.createdDate)}
+                readOnly
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-500 bg-gray-50 cursor-not-allowed"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Description <span className="text-red-500">*</span></label>

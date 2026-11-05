@@ -350,10 +350,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
   };
 
   const handleConfirmSave = async () => {
-    setShowConfirmation(false);
+    // The review pop-up stays open (with a spinner on its button) until the server answers.
     try {
       // onSave persists to the backend; await so a failure doesn't show success.
       await draft.wrapSave(onSave)({ ...formData, profileImage });
+      setShowConfirmation(false);
       setResultModal({
         isOpen: true, type: 'success', title: 'Success!',
         message: isEditMode
@@ -361,6 +362,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
           : 'Applicant has been successfully added to the system.',
       });
     } catch {
+      setShowConfirmation(false);
       setResultModal({ isOpen: true, type: 'error', title: 'Save failed', message: 'Could not save the applicant. Please try again.' });
     }
   };

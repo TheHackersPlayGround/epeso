@@ -13,6 +13,7 @@ import * as skillsTrainingService from '../../services/skillsTrainingService'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { requestLeave } from '../../hooks/leaveGuard'
+import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -476,6 +477,9 @@ export default function SkillsTrainingMaintenanceForm() {
     }
   }
 
+  const statusAction = useAsyncAction(handleConfirmStatusChange)
+  const deleteAction = useAsyncAction(handleDeleteTraining)
+
   // ── Sub-view: participants ─────────────────────────────────────────────────
 
   if (action === 'view_trainings' && trainingSubView === 'view_participants' && selectedTraining) {
@@ -913,12 +917,14 @@ export default function SkillsTrainingMaintenanceForm() {
               </span>?
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setTrainingStatusConfirm(null)}
-                className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium">Cancel</button>
+              <button onClick={() => setTrainingStatusConfirm(null)} disabled={statusAction.busy}
+                className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
               <button
-                onClick={handleConfirmStatusChange}
-                className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white"
+                onClick={statusAction.run}
+                disabled={statusAction.busy}
+                className="px-6 py-2.5 rounded-lg transition-colors font-medium text-white disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                 style={{ backgroundColor: trainingStatusConfirm.nextStatus === 'Completed' ? '#16a34a' : BRAND_BLUE }}>
+                {statusAction.busy && <Loader2 size={16} className="animate-spin" />}
                 {trainingStatusConfirm.label}
               </button>
             </div>
@@ -936,9 +942,11 @@ export default function SkillsTrainingMaintenanceForm() {
             <h3 className="text-gray-800 mb-2">Delete Training</h3>
             <p className="text-gray-600 mb-6 text-sm">Are you sure? This will move the training to the recycle bin.</p>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => setTrainingDeleteConfirm(null)} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
-              <button onClick={handleDeleteTraining}
-                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Delete</button>
+              <button onClick={() => setTrainingDeleteConfirm(null)} disabled={deleteAction.busy} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
+              <button onClick={deleteAction.run} disabled={deleteAction.busy}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+                {deleteAction.busy && <Loader2 size={16} className="animate-spin" />}
+                Delete</button>
             </div>
           </div>
         </div>

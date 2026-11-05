@@ -180,8 +180,19 @@ export function useFormDraft<T>({ draftKey, mode, snapshot, onRestore, onClose, 
 
   /** Wrap the form's save call so a successful save clears its draft. */
   const markSubmitted = () => { submitted.current = true; userChoice.current = false }
+  // `saving` is true while an async save is still waiting on the server, so forms can show a spinner on Save.
+  const [saving, setSaving] = useState(false)
   const wrapSave = <A extends unknown[], R>(fn: (...args: A) => R) =>
-    (...args: A): R => { markSubmitted(); return fn(...args) }
+    (...args: A): R => {
+      markSubmitted()
+      const result = fn(...args)
+      if (typeof (result as { then?: unknown } | null)?.then === 'function') {
+        setSaving(true)
+        const done = () => setSaving(false)
+        ;(result as unknown as Promise<unknown>).then(done, done)
+      }
+      return result
+    }
 
   const keepEditing = () => setLeaving(false)
 
@@ -270,7 +281,7 @@ export function useFormDraft<T>({ draftKey, mode, snapshot, onRestore, onClose, 
     </>
   )
 
-  return { requestClose, wrapSave, markSubmitted, modals, dirty }
+  return { requestClose, wrapSave, markSubmitted, modals, dirty, saving }
 }
 
 // Convenience wrapper for applicant/beneficiary profile forms (record + province/city

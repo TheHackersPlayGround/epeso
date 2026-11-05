@@ -13,6 +13,7 @@ import * as ofwService from '../../services/ofwService'
 import AddOFWRequestForm, { EMPLOYMENT_STATUS_OPTIONS, REQUEST_TYPES } from './AddOFWRequestForm'
 import OFWProfileModal from './OFWProfileModal'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { useAsyncAction } from '../../hooks/useAsyncAction'
 
 interface OFWViewProps {
   onBack: () => void
@@ -248,13 +249,14 @@ export default function OFWView({ onBack }: OFWViewProps) {
   const confirmDeleteProfile = async () => {
     const profile = deleteConfirmProfile
     if (!profile) return
-    setDeleteConfirmProfile(null)
     try {
       await ofwService.deleteProfile(profile.id)
       await refreshProfiles()
       setResultModal({ isOpen: true, type: 'success', title: 'Deleted', message: 'The profile has been deleted and moved to the recycle bin.' })
     } catch (e) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to delete profile.') })
+    } finally {
+      setDeleteConfirmProfile(null)
     }
   }
 
@@ -278,6 +280,8 @@ export default function OFWView({ onBack }: OFWViewProps) {
       setResultModal({ isOpen: true, type: 'error', title: 'Error', message: errMsg(e, 'Failed to update status.') })
     }
   }
+
+  const statusAction = useAsyncAction(confirmStatusChange)
 
   // ── Filtering ─────────────────────────────────────────────────
   const filtered = profiles.filter(p => {
@@ -691,16 +695,19 @@ export default function OFWView({ onBack }: OFWViewProps) {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setPendingStatusChange(null)}
-                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                  disabled={statusAction.busy}
+                  className="px-5 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={confirmStatusChange}
-                  className={`px-5 py-2 text-white rounded-lg transition-colors text-sm ${
+                  onClick={statusAction.run}
+                  disabled={statusAction.busy}
+                  className={`px-5 py-2 text-white rounded-lg transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
                     isCompleted ? 'bg-green-600 hover:bg-green-700' : isRejected ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-blue hover:bg-brand-blue-dark'
                   }`}
                 >
+                  {statusAction.busy && <Loader2 size={16} className="animate-spin" />}
                   {label}
                 </button>
               </div>

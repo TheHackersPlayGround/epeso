@@ -6,6 +6,7 @@ import { updateReferralStatus, deleteReferral } from '../../services/referralSer
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { canManage } from '../../utils/permissions'
+import { logSheetExport } from '../../services/activityLogService'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -537,6 +538,7 @@ export default function ReferralsTab() {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Referrals')
       XLSX.writeFile(wb, 'referrals.xlsx')
+      logSheetExport('employment', 'Referrals list', ws, 1)
     } finally {
       setIsExporting(false)
     }

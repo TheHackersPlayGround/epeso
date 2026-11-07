@@ -841,7 +841,7 @@ async function rowToFormData(row: Row, caches: ResolveCaches): Promise<Applicant
 // ─── Public import entry point ───────────────────────────────────────────────
 
 export type ImportRowError = { row: number; name: string; error: string };
-export type ImportResult = { total: number; succeeded: number; failed: ImportRowError[] };
+export type ImportResult = { total: number; succeeded: number; failed: ImportRowError[]; skipped?: number };
 
 // Example-row values we skip so the sample doesn't get imported.
 const EXAMPLE_SURNAME = "dela cruz";
@@ -914,8 +914,8 @@ export async function importApplicants(
   // Every row resolved locally — hand the whole batch to the backend, which
   // writes it inside a single DB transaction: all rows land, or none do.
   try {
-    await importApplicantsBulk(payloads);
-    return { total, succeeded: total, failed: [] };
+    const saved = await importApplicantsBulk(payloads);
+    return { total, succeeded: saved.ids.length, skipped: saved.skipped, failed: [] };
   } catch (err) {
     const detail = (err as { detail?: unknown }).detail;
 

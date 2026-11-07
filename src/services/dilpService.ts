@@ -1,4 +1,5 @@
 import axiosClient from './axiosClient'
+import { postImportWithDuplicateCheck } from './duplicateService'
 import { ENDPOINTS } from '../config/api'
 
 export function listProjects() {
@@ -31,12 +32,8 @@ export function createProfile(data: Record<string, unknown>) {
 
 // All-or-nothing batch create: the backend validates every row and writes
 // the whole batch in one DB transaction; if any row fails, nothing is saved.
-export async function importProfilesBulk(rows: Record<string, unknown>[]): Promise<{ ids: number[] }> {
-  const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
-    ENDPOINTS.dilp.importProfilesBulk,
-    { rows },
-  )
-  return { ids: res.data.data.ids }
+export function importProfilesBulk(rows: Record<string, unknown>[]): Promise<{ ids: number[]; skipped: number }> {
+  return postImportWithDuplicateCheck(ENDPOINTS.dilp.importProfilesBulk, rows)
 }
 
 export function updateProfile(id: number, data: Record<string, unknown>) {

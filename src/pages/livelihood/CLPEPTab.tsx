@@ -15,6 +15,7 @@ import { downloadImportTemplate, importClpepApplicants, type ImportResult } from
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import AssignedItemModal, { type AssignedItemAction } from '../../components/AssignedItemModal'
 import ImportDropZone from '../../components/ImportDropZone'
+import { logSheetExport } from '../../services/activityLogService'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -119,7 +120,12 @@ function ImportResultView({ result }: { result: ImportResult }) {
       {result.total === 0 ? (
         <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
       ) : result.failed.length === 0 ? (
-        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+        <>
+          <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? 's' : ''} imported successfully.</p>
+          {(result.skipped ?? 0) > 0 && (
+            <p className="text-xs text-gray-500 text-center mt-1">{result.skipped} duplicate row{result.skipped !== 1 ? 's were' : ' was'} skipped.</p>
+          )}
+        </>
       ) : (
         <div className="mt-1">
           <p className="text-xs text-gray-500 mb-2">
@@ -1000,6 +1006,7 @@ export default function CLPEPTab() {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'CLPEP')
       XLSX.writeFile(wb, 'clpep_beneficiaries.xlsx')
+      logSheetExport('livelihood', 'CLPEP beneficiaries list', ws, 2)
     } finally {
       setIsExporting(false)
     }

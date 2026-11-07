@@ -8,6 +8,7 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { useProfileDraft } from '../../hooks/useFormDraft'
+import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
@@ -259,6 +260,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const dup = useDuplicateCheck('slp')
   const draft = useProfileDraft({
     draftKey: 'slp-beneficiary', mode: mode, formData, setFormData,
     provinceId, setProvinceId, cityId, setCityId, onClose,
@@ -372,7 +374,8 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
-    draft.wrapSave(onSave)({ ...formData, name: fullName })
+    void dup.confirmSave(mode, { firstName: formData.firstName ?? '', lastName: formData.lastName ?? '', birthdate: formData.birthdate ?? '' }, initial)
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)({ ...formData, name: fullName }) })
   }
 
   // ── Section header ─────────────────────────────────────────────────
@@ -1016,10 +1019,10 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
                   <button
                     type="button"
                     onClick={() => handleSubmit()}
-                    disabled={draft.saving}
+                    disabled={(draft.saving || dup.checking)}
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
-                    {draft.saving && <Loader2 size={16} className="animate-spin" />}
+                    {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
                     {mode === 'add' ? 'Save' : 'Save Changes'}
                   </button>
                 ) : (
@@ -1041,6 +1044,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+      {dup.modal}
     </>
   )
 }

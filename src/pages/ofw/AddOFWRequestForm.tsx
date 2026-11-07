@@ -7,6 +7,7 @@ import SearchableSelect from '../../components/SearchableSelect'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { useProfileDraft } from '../../hooks/useFormDraft'
+import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
@@ -112,6 +113,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
   const set = (updates: Partial<Omit<OFWProfile, 'id'>>) => setFormData(prev => ({ ...prev, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const dup = useDuplicateCheck('ofw')
   const draft = useProfileDraft({
     draftKey: 'ofw-request', mode: 'add', formData, setFormData,
     provinceId, setProvinceId, cityId, setCityId, onClose, keep: ['referenceNumber'],
@@ -217,7 +219,8 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
 
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = formData.suffix ? ' ' + formData.suffix : ''
-    draft.wrapSave(onSave)({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() })
+    void dup.confirmSave('add', { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }) })
   }
 
   const lbl = sublbl
@@ -627,13 +630,13 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={draft.saving}
+                disabled={(draft.saving || dup.checking)}
                 className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                 style={{ backgroundColor: '#0077BE' }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0065A5')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0077BE')}
               >
-                {draft.saving && <Loader2 size={16} className="animate-spin" />}
+                {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
                 Save Profile
               </button>
             </div>
@@ -642,6 +645,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {draft.modals}
+      {dup.modal}
     </div>
   )
 }

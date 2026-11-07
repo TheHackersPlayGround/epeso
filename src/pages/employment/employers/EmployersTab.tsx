@@ -11,6 +11,7 @@ import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
 import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
 import ImportDropZone from '../../../components/ImportDropZone'
+import { logSheetExport } from '../../../services/activityLogService'
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
@@ -609,6 +610,7 @@ export default function EmployersTab() {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Employers')
       XLSX.writeFile(wb, 'employers.xlsx')
+      logSheetExport('employment', 'Employers list', ws, 1)
     } finally {
       setIsExporting(false)
     }

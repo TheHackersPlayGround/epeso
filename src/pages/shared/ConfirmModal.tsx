@@ -29,7 +29,10 @@ function isPromise(value: unknown): value is Promise<unknown> {
 export default function ConfirmModal({ isOpen, type, title, message, confirmText = 'OK', cancelText, confirmVariant = 'danger', thirdText, onThird, onConfirm, onCancel, isLoading = false }: ConfirmModalProps) {
   const [pending, setPending] = useState(false)
   const mounted = useRef(true)
-  useEffect(() => () => { mounted.current = false }, [])
+  useEffect(() => {
+    mounted.current = true // React StrictMode mounts, unmounts and re-mounts in dev; without this the ref stays false
+    return () => { mounted.current = false }
+  }, [])
   if (!isOpen) return null
 
   const busy = pending || isLoading

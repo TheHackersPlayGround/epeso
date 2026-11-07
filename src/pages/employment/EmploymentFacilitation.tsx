@@ -23,6 +23,7 @@ import ViewApplicantSidebar from "./applicants/ViewApplicantSidebar";
 import EmploymentHistoryPanel from "./applicants/EmploymentHistoryPanel";
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn';
 import ImportDropZone from '../../components/ImportDropZone'
+import { logSheetExport } from '../../services/activityLogService';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -299,7 +300,12 @@ function ImportResultView({ result }: { result: ImportResult }) {
       {result.total === 0 ? (
         <p className="text-sm text-gray-500 text-center">No applicant rows were found in the file.</p>
       ) : result.failed.length === 0 ? (
-        <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? "s" : ""} imported successfully.</p>
+        <>
+          <p className="text-sm text-green-700 text-center">All {result.succeeded} applicant{result.succeeded !== 1 ? "s" : ""} imported successfully.</p>
+          {(result.skipped ?? 0) > 0 && (
+            <p className="text-xs text-gray-500 text-center mt-1">{result.skipped} duplicate row{result.skipped !== 1 ? 's were' : ' was'} skipped.</p>
+          )}
+        </>
       ) : (
         <div className="mt-1">
           <p className="text-xs text-gray-500 mb-2">
@@ -724,6 +730,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Applicants");
       XLSX.writeFile(wb, "applicants.xlsx");
+      logSheetExport('employment', 'Applicants list', ws, 2);
     } finally {
       setIsExporting(false);
     }
@@ -785,6 +792,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
               onClose={handleCloseSidebar}
               onSave={handleSaveApplicant}
               initialData={editingApplicant?.fullFormData as ApplicantFormData | undefined}
+              applicantId={editingApplicant?.id}
               isEditMode={!!editingApplicant}
             />
           ) : viewingApplicant ? (

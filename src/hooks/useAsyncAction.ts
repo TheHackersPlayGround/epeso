@@ -6,7 +6,10 @@ export function useAsyncAction<A extends unknown[]>(action: (...args: A) => unkn
   const [busy, setBusy] = useState(false)
   const running = useRef(false)
   const mounted = useRef(true)
-  useEffect(() => () => { mounted.current = false }, [])
+  useEffect(() => {
+    mounted.current = true // React StrictMode mounts, unmounts and re-mounts in dev; without this the ref stays false
+    return () => { mounted.current = false }
+  }, [])
 
   const run = async (...args: A) => {
     if (running.current) return

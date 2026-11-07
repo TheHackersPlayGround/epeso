@@ -2,6 +2,7 @@
 // beneficiary spine in one transaction. All requests go through axiosClient.
 
 import axiosClient from './axiosClient'
+import { postImportWithDuplicateCheck } from './duplicateService'
 import { ENDPOINTS } from '../config/api'
 import type { Applicant } from '../contexts/EmploymentContext'
 import type { ApplicantFormData } from '../pages/employment/applicants/AddApplicantSidebar'
@@ -63,12 +64,8 @@ export async function createApplicant(formData: ApplicantFormData): Promise<numb
 
 // POST importApplicantsBulk -> all-or-nothing batch create; the backend validates
 // every row and writes the whole batch in one DB transaction.
-export async function importApplicantsBulk(rows: ApplicantFormData[]): Promise<{ ids: number[] }> {
-  const res = await axiosClient.post<{ status: string; data: { ids: number[]; count: number } }>(
-    ENDPOINTS.employment.importApplicantsBulk,
-    { rows },
-  )
-  return { ids: res.data.data.ids }
+export function importApplicantsBulk(rows: ApplicantFormData[]): Promise<{ ids: number[]; skipped: number }> {
+  return postImportWithDuplicateCheck(ENDPOINTS.employment.importApplicantsBulk, rows as unknown as Record<string, unknown>[])
 }
 
 // POST /api/employment/updateApplicant/{id}

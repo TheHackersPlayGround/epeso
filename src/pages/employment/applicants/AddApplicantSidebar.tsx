@@ -1,6 +1,7 @@
 ﻿import { useState, useRef } from 'react';
 import { useFormDraft } from '../../../hooks/useFormDraft';
-import { X, Users, Plus, Upload, Trash2, FileText, Eye } from 'lucide-react';
+import { useDuplicateCheck } from '../../../hooks/useDuplicateCheck';
+import { X, Users, Plus, Upload, Trash2, FileText, Eye, Loader2 } from 'lucide-react';
 import DatePicker from '../../../components/DatePicker';
 import SearchableSelect from '../../../components/SearchableSelect';
 import { searchProvinces, searchCities, searchBarangaysByCity, searchAllCities } from '../../../services/locationService';
@@ -187,6 +188,8 @@ interface AddApplicantSidebarProps {
   onSave: (data: ApplicantFormData) => void | Promise<void>;
   onClose: () => void;
   initialData?: ApplicantFormData;
+  /** Id of the applicant being edited, so the duplicate check never flags the record itself. */
+  applicantId?: number;
   isEditMode?: boolean;
 }
 
@@ -203,7 +206,8 @@ interface UploadedDocument {
   url?: string;     // public URL for already-stored files
 }
 
-export default function AddApplicantSidebar({ onSave, onClose, initialData, isEditMode = false }: AddApplicantSidebarProps) {
+export default function AddApplicantSidebar({ onSave, onClose, initialData, applicantId, isEditMode = false }: AddApplicantSidebarProps) {
+  const dup = useDuplicateCheck('ef');
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' });
@@ -342,11 +346,21 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     return errors;
   }
 
+  // Opens the review step, first warning if this person is already recorded in Employment Facilitation.
+  const openReview = async () => {
+    const saved = initialData
+      ? { id: applicantId, firstName: initialData.firstName, lastName: initialData.surname, birthdate: initialData.dateOfBirth }
+      : undefined;
+    const proceed = await dup.confirmSave(isEditMode ? 'edit' : 'add',
+      { firstName: formData.firstName, lastName: formData.surname, birthdate: formData.dateOfBirth }, saved);
+    if (proceed) setShowConfirmation(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors = buildValidationErrors();
     if (errors.length > 0) { setActiveSection('personalInfo'); runValidation(errors); return; }
-    setShowConfirmation(true);
+    void openReview();
   };
 
   const handleConfirmSave = async () => {
@@ -378,7 +392,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
     } else {
       const errors = buildValidationErrors();
       if (errors.length > 0) { setActiveSection('personalInfo'); runValidation(errors); return; }
-      setShowConfirmation(true);
+      void openReview();
     }
   };
 
@@ -2574,8 +2588,10 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors"
+                disabled={dup.checking}
+                className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
+                {dup.checking && <Loader2 size={16} className="animate-spin" />}
                 {isLastSection() ? (isEditMode ? 'Update Profile' : 'Save Profile') : 'Next'}
               </button>
             </div>
@@ -2603,6 +2619,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, isEd
         confirmText="OK" onConfirm={() => setWarningModal(prev => ({ ...prev, isOpen: false }))} onCancel={() => setWarningModal(prev => ({ ...prev, isOpen: false }))}
       />
       {draft.modals}
+      {dup.modal}
 
       {/* Document Preview Modal */}
       {previewDocument && (

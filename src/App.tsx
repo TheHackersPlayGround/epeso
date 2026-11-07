@@ -30,6 +30,7 @@ import { CLPEPProvider } from './contexts/CLPEPContext'
 import { EmploymentProvider } from './contexts/EmploymentContext'
 import { logout as apiLogout, getMe } from './services/userService'
 import ConfirmModal from './pages/shared/ConfirmModal'
+import DuplicateHost from './components/DuplicateHost'
 import { clearAllDrafts, clearDraftsForModules } from './hooks/useFormDraft'
 import { requestLeave, hasDirtyForm } from './hooks/leaveGuard'
 import NavLeaveGuard from './components/NavLeaveGuard'
@@ -464,6 +465,7 @@ export default function App() {
           </GIPProvider>
         </CDSPProvider>
       )}
+      <DuplicateHost />
       <ConfirmModal
         isOpen={logoutConfirm} type="confirm" confirmVariant="brand"
         title="Log out?" message="Are you sure you want to log out?"

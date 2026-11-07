@@ -337,7 +337,7 @@ async function rowToPayload(row: Row, caches: ResolveCaches): Promise<Record<str
 // ─── Public import entry point ───────────────────────────────────────────────
 
 export type ImportRowError = { row: number; name: string; error: string }
-export type ImportResult = { total: number; succeeded: number; failed: ImportRowError[] }
+export type ImportResult = { total: number; succeeded: number; failed: ImportRowError[]; skipped?: number }
 
 const EXAMPLE_SURNAME = 'dela cruz'
 const EXAMPLE_FIRST = 'juan'
@@ -407,8 +407,8 @@ export async function importTupadApplicants(
 
   // Hand the resolved batch to the backend in one DB transaction.
   try {
-    await importProfilesBulk(payloads)
-    return { total, succeeded: total, failed: [] }
+    const saved = await importProfilesBulk(payloads)
+    return { total, succeeded: saved.ids.length, skipped: saved.skipped, failed: [] }
   } catch (err) {
     const detail = (err as { detail?: unknown }).detail
 

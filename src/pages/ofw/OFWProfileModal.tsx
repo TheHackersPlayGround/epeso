@@ -10,6 +10,7 @@ import { REQUEST_TYPES, ELPOR_FORMS, EMPLOYMENT_STATUS_OPTIONS, CIVIL_STATUS_OPT
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 
 interface OFWProfileModalProps {
   profile: OFWProfile
@@ -122,6 +123,7 @@ function DownloadButton({ attachment, onPreview }: { attachment: OFWSavedAttachm
 export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWProfileModalProps) {
   const [form, setForm] = useState<OFWProfile>(profile)
   const [isSaving, setIsSaving] = useState(false)
+  const dup = useDuplicateCheck('ofw')
   const set = (updates: Partial<OFWProfile>) => setForm(f => ({ ...f, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
@@ -226,7 +228,8 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = form.suffix ? ' ' + form.suffix : ''
     setIsSaving(true)
-    Promise.resolve(onSave({ ...form, referenceNumber: form.referenceNumber.trim(), lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }))
+    dup.confirmSave(mode, { firstName, lastName, birthdate: form.birthdate ?? '' }, profile)
+      .then(proceed => proceed ? onSave({ ...form, referenceNumber: form.referenceNumber.trim(), lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }) : undefined)
       .finally(() => setIsSaving(false))
   }
 
@@ -752,6 +755,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+      {dup.modal}
     </div>
   )
 }

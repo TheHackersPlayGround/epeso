@@ -21,7 +21,10 @@ export default function ApplicantReviewModal({
 }: ApplicantReviewModalProps) {
   const [saving, setSaving] = useState(false)
   const mounted = useRef(true)
-  useEffect(() => () => { mounted.current = false }, [])
+  useEffect(() => {
+    mounted.current = true // React StrictMode mounts, unmounts and re-mounts in dev; without this the ref stays false
+    return () => { mounted.current = false }
+  }, [])
   if (!isOpen) return null
 
   const handleConfirm = () => {

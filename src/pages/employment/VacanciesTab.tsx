@@ -8,6 +8,7 @@ import { createVacancy, updateVacancy, toggleVacancyStatus } from '../../service
 import ConfirmModal from '../shared/ConfirmModal'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
+import { logSheetExport } from '../../services/activityLogService'
 
 type FilterOption = { id: string; label: string; options: string[] }
 
@@ -998,6 +999,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
       XLSX.writeFile(wb, 'vacancies.xlsx')
+      logSheetExport('employment', 'Vacancies list', ws, 1)
     } finally {
       setIsExporting(false)
     }

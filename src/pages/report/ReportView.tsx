@@ -26,6 +26,7 @@ import { useSLP } from '../../contexts/SLPContext'
 import { useCLPEP } from '../../contexts/CLPEPContext'
 import { useEmployment } from '../../contexts/EmploymentContext'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { logExport, type ExportLogModule } from '../../services/activityLogService'
 
 interface ReportViewProps {
   onBack: () => void
@@ -920,6 +921,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     try {
       const data = await fetchEfReport(from, to)
       await generatePesoMonthlyReport(data, label, phrase)
+      logExport({ module: 'employment', name: `PESO LMI Report - ${label}.xlsx`, format: 'Excel' })
     } catch (err: unknown) {
       const msg = err instanceof Error && err.message ? err.message : 'Failed to generate the PESO report.'
       setInfoModal({ isOpen: true, title: 'Error', message: msg })
@@ -1384,6 +1386,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
   }
 
   // Exports the generated report to Excel, PDF, or Word.
+  // Which Activity Log module a report category's exports belong to.
+  const reportLogModule = (category: string): ExportLogModule => {
+    if (category === 'employment-facilitation') return 'employment'
+    if (category === 'ofw-services') return 'ofw'
+    if (category === 'skills-training') return 'skills'
+    if (category === 'cdsp' || category === 'gip' || category === 'spes' || category === 'livelihood') return category
+    return 'report'
+  }
+
   const handleExport = async (format: 'excel' | 'pdf' | 'word') => {
     if (!generatedReport) return
     const filteredData = generatedReport.data.map((row: any) => {
@@ -1409,6 +1420,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     // patching a template workbook), so it needs its own generator.
     if (format === 'excel' && generatedReport.category === 'general-peso') {
       await generateGeneralPesoWorkbook(generatedReport.generalPrograms, generatedReport.analytics, generatedReport.periodDetails, fileName)
+      logExport({ module: 'report', name: `${fileName}.xlsx`, format: 'Excel', rows: generatedReport.data.length })
       return
     }
 
@@ -1785,6 +1797,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `${fileName}.xlsx`
+      logExport({ module: reportLogModule(generatedReport.category), name: `${fileName}.xlsx`, format: 'Excel', rows: filteredData.length })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -1961,6 +1974,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `${fileName}.docx`
+      logExport({ module: reportLogModule(generatedReport.category), name: `${fileName}.docx`, format: 'Word', rows: filteredData.length })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2259,6 +2273,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         },
       })
       doc.save(`${fileName}.pdf`)
+      logExport({ module: reportLogModule(generatedReport.category), name: `${fileName}.pdf`, format: 'PDF', rows: filteredData.length })
     }
     setIsExportMenuOpen(false)
   }
@@ -2296,6 +2311,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (format === 'pdf') {
       const doc = buildRosterPdf('CDSP PARTICIPANT LIST', infoLines, headerLabels, roster)
       doc.save(`CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`)
+      logExport({ module: 'cdsp', name: `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`, format: 'PDF' })
       return
     }
     if (format === 'word') {
@@ -2303,6 +2319,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.docx`
+      logExport({ module: 'cdsp', name: `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.docx`, format: 'Word' })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2364,6 +2381,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`
+    logExport({ module: 'cdsp', name: `CDSP_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`, format: 'Excel' })
     link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
@@ -2408,6 +2426,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (format === 'pdf') {
       const doc = buildRosterPdf('GIP INTERN LIST', infoLines, headerLabels, interns)
       doc.save(`GIP_Interns_${safeName}_${exportDate}.pdf`)
+      logExport({ module: 'gip', name: `GIP_Interns_${safeName}_${exportDate}.pdf`, format: 'PDF' })
       return
     }
     if (format === 'word') {
@@ -2415,6 +2434,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `GIP_Interns_${safeName}_${exportDate}.docx`
+      logExport({ module: 'gip', name: `GIP_Interns_${safeName}_${exportDate}.docx`, format: 'Word' })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2470,6 +2490,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `GIP_Interns_${safeName}_${exportDate}.xlsx`
+    logExport({ module: 'gip', name: `GIP_Interns_${safeName}_${exportDate}.xlsx`, format: 'Excel' })
     link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
@@ -2513,6 +2534,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (format === 'pdf') {
       const doc = buildRosterPdf('SPES STUDENT LIST', infoLines, headerLabels, students)
       doc.save(`SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.pdf`)
+      logExport({ module: 'spes', name: `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.pdf`, format: 'PDF' })
       return
     }
     if (format === 'word') {
@@ -2520,6 +2542,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.docx`
+      logExport({ module: 'spes', name: `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.docx`, format: 'Word' })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2575,6 +2598,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.xlsx`
+    logExport({ module: 'spes', name: `SPES_Students_${safeName}_${batch.programStartDate || 'undated'}.xlsx`, format: 'Excel' })
     link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
@@ -2726,6 +2750,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (format === 'pdf') {
       const doc = buildRosterPdf(title, infoLines, headerLabels, roster)
       doc.save(`Livelihood_${safeTitle}_Beneficiaries.pdf`)
+      logExport({ module: 'livelihood', name: `Livelihood_${safeTitle}_Beneficiaries.pdf`, format: 'PDF' })
       return
     }
     if (format === 'word') {
@@ -2733,6 +2758,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `Livelihood_${safeTitle}_Beneficiaries.docx`
+      logExport({ module: 'livelihood', name: `Livelihood_${safeTitle}_Beneficiaries.docx`, format: 'Word' })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2745,6 +2771,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `Livelihood_${safeTitle}_Beneficiaries.xlsx`
+    logExport({ module: 'livelihood', name: `Livelihood_${safeTitle}_Beneficiaries.xlsx`, format: 'Excel' })
     link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
@@ -2790,6 +2817,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     if (format === 'pdf') {
       const doc = buildRosterPdf('SKILLS TRAINING PARTICIPANT LIST', infoLines, headerLabels, participants, attendanceCellFill)
       doc.save(`SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`)
+      logExport({ module: 'skills', name: `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.pdf`, format: 'PDF' })
       return
     }
     if (format === 'word') {
@@ -2797,6 +2825,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.docx`
+      logExport({ module: 'skills', name: `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.docx`, format: 'Word' })
       link.style.display = 'none'
       document.body.appendChild(link)
       link.click()
@@ -2809,6 +2838,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`
+    logExport({ module: 'skills', name: `SkillsTraining_Roster_${safeTitle}_${activity.date || 'undated'}.xlsx`, format: 'Excel' })
     link.style.display = 'none'
     document.body.appendChild(link)
     link.click()

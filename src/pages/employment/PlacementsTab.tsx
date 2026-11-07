@@ -16,6 +16,7 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { todayIso } from '../../utils/formatDate'
+import { logSheetExport } from '../../services/activityLogService'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -975,6 +976,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Placements')
       XLSX.writeFile(wb, 'placements.xlsx')
+      logSheetExport('employment', 'Placements list', ws, 1)
     } finally {
       setIsExporting(false)
     }

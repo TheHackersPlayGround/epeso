@@ -7,6 +7,7 @@ import DatePicker from '../../components/DatePicker'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { useProfileDraft } from '../../hooks/useFormDraft'
+import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
@@ -290,6 +291,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
   const [formData, setFormData] = useState(initial)
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const dup = useDuplicateCheck('gip')
   const draft = useProfileDraft({
     draftKey: 'gip-applicant', mode: mode, formData, setFormData,
     provinceId, setProvinceId, cityId, setCityId, onClose,
@@ -427,7 +429,8 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
 
     if (runValidation(errors)) return
 
-    draft.wrapSave(onSave)(formData)
+    void dup.confirmSave(mode, { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate }, initial)
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(formData) })
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
@@ -690,8 +693,8 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
 
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
             <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} disabled={draft.saving} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
-              {draft.saving && <Loader2 size={16} className="animate-spin" />}
+            <button onClick={handleSave} disabled={(draft.saving || dup.checking)} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+              {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
               {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
             </button>
           </div>
@@ -700,6 +703,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {draft.modals}
+      {dup.modal}
     </div>
   )
 }

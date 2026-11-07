@@ -8,6 +8,7 @@ import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { searchProvinces, searchCities, searchBarangaysByCity } from '../../services/locationService'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { useProfileDraft } from '../../hooks/useFormDraft'
+import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
@@ -191,6 +192,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   })
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
+  const dup = useDuplicateCheck('tupad')
   const draft = useProfileDraft({
     draftKey: 'tupad-beneficiary', mode: mode, formData, setFormData,
     provinceId, setProvinceId, cityId, setCityId, onClose,
@@ -276,7 +278,8 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
 
     if (runValidation(errors)) return
 
-    draft.wrapSave(onSave)(formData)
+    void dup.confirmSave(mode, { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate }, initial)
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(formData) })
   }
 
   function SectionHeader({ title }: { title: string }) {
@@ -549,8 +552,8 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
                   Cancel
                 </button>
                 {isLastStep ? (
-                  <button type="button" onClick={handleSubmit} disabled={draft.saving} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
-                    {draft.saving && <Loader2 size={16} className="animate-spin" />}
+                  <button type="button" onClick={handleSubmit} disabled={(draft.saving || dup.checking)} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+                    {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
                     {mode === 'add' ? 'Add Beneficiary' : 'Save Changes'}
                   </button>
                 ) : (
@@ -568,6 +571,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+      {dup.modal}
     </>
   )
 }

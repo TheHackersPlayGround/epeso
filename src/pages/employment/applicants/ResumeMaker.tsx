@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import ResumeCheckbox from './ResumeCheckbox';
 import { getApplicantPhoto } from '../../../services/applicantService';
+import { logExport } from '../../../services/activityLogService';
 
 // A4 page geometry. The preview and the generated PDF both use these so the
 // on-screen layout matches the printed/exported output exactly.
@@ -384,6 +385,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       }
       pdf.save(`${selectedApplicant.firstName}_${selectedApplicant.surname}_Resume.pdf`);
+      logExport({ module: 'employment', name: `Resume of ${selectedApplicant.firstName} ${selectedApplicant.surname}`, format: 'PDF' });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       alert(`Failed to generate PDF: ${msg}. Please try the Print button instead.`);

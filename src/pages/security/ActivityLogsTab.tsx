@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { Download, Search, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import { listActivityLogs } from '../../services/activityLogService'
+import { logSheetExport } from '../../services/activityLogService'
 
 interface ActivityLog {
   id: number
@@ -37,6 +38,8 @@ function actionBadgeClass(action: string): string {
   if (/^(Update|Edit)\b/.test(action)) return 'bg-blue-50 text-blue-700'
   if (/^(Delete|Purge)\b/.test(action)) return 'bg-red-50 text-red-700'
   if (/^Restore\b/.test(action)) return 'bg-teal-50 text-teal-700'
+  if (/^Import\b/.test(action)) return 'bg-indigo-50 text-indigo-700'
+  if (/^Export\b/.test(action)) return 'bg-amber-50 text-amber-700'
   return 'bg-gray-50 text-gray-600'
 }
 
@@ -109,6 +112,7 @@ export default function ActivityLogsTab({ isActive }: ActivityLogsTabProps) {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Activity Logs')
     XLSX.writeFile(wb, `ActivityLogs_${new Date().toISOString().split('T')[0]}.xlsx`)
+    logSheetExport('security', 'Activity logs', ws, 1)
   }
 
   return (

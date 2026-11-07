@@ -23,6 +23,9 @@ export const ENDPOINTS = {
     barangaysByCity: '/locations/barangaysByCity',
     allCities: '/locations/allCities',
   },
+  duplicates: {
+    check: '/duplicates/check',
+  },
   employment: {
     listApplicants: '/employment/listApplicants',
     getApplicant: '/employment/getApplicant',
@@ -232,6 +235,7 @@ export const ENDPOINTS = {
   },
   activityLogs: {
     list: '/activity_logs/list',
+    logExport: '/activity_logs/logExport',
   },
   documents: {
     listFolders:    '/documents/listFolders',

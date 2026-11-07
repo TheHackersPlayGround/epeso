@@ -14,6 +14,7 @@ import AddOFWRequestForm, { EMPLOYMENT_STATUS_OPTIONS, REQUEST_TYPES } from './A
 import OFWProfileModal from './OFWProfileModal'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { useAsyncAction } from '../../hooks/useAsyncAction'
+import { logSheetExport } from '../../services/activityLogService'
 
 interface OFWViewProps {
   onBack: () => void
@@ -351,6 +352,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'OFW Profiles')
       XLSX.writeFile(wb, `OFW_Profiles_${new Date().toISOString().split('T')[0]}.xlsx`)
+      logSheetExport('ofw', 'OFW profiles list', ws, 1)
     } finally {
       setIsExporting(false)
     }

@@ -283,7 +283,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   if (activeTab === 'SPES' && (spesBatchAction === 'view_batch' || spesBatchAction === 'edit_batch')) {
     const mode = spesBatchAction === 'view_batch' ? 'batch-view' : 'batch-edit'
     return (
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-4">
         <div className="mb-4">
           <button
             onClick={() => requestLeave(() => { setSpesBatchAction(''); setSelectedBatch(null) })}
@@ -315,7 +315,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     const spPStart = participants.length === 0 ? 0 : (spPsafe - 1) * spesParticipantPerPage + 1
     const spPEnd = Math.min(spPsafe * spesParticipantPerPage, participants.length)
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-4">
         <div className="mb-4">
           <button
             onClick={() => requestLeave(() => { setSpesBatchAction(''); setSelectedBatch(null) })}
@@ -324,7 +324,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <ArrowLeft size={16} /> Back to Batches
           </button>
         </div>
-        <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between">
+        <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div>
             <h3 className="text-white text-base font-semibold">{selectedBatch.batchName}</h3>
             <p className="text-white/80 text-sm mt-0.5">
@@ -341,6 +341,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="max-lg:overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-brand-blue">
@@ -372,6 +373,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 ))}
               </tbody>
             </table>
+            </div>
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rows per page:</span>
@@ -397,7 +399,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
   if (activeTab === 'GIP' && (gipWorkplaceAction === 'view_workplace' || gipWorkplaceAction === 'edit_workplace')) {
     return (
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-4">
         <div className="mb-4">
           <button
             onClick={() => requestLeave(() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) })}
@@ -428,7 +430,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
     const gpPStart = participants.length === 0 ? 0 : (gpPsafe - 1) * gipParticipantPerPage + 1
     const gpPEnd = Math.min(gpPsafe * gipParticipantPerPage, participants.length)
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-4">
         <div className="mb-4">
           <button
             onClick={() => requestLeave(() => { setGipWorkplaceAction(''); setSelectedGipWorkplace(null) })}
@@ -437,7 +439,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <ArrowLeft size={16} /> Back to Workplaces/Offices
           </button>
         </div>
-        <div className="rounded-xl px-6 py-4 mb-4 flex items-center justify-between" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
+        <div className="rounded-xl px-6 py-4 mb-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
           <div>
             <h3 className="text-white text-base font-semibold">{selectedGipWorkplace.workplaceName}</h3>
             <p className="text-white/80 text-sm mt-0.5">
@@ -451,6 +453,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="max-lg:overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
@@ -483,6 +486,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
                 ))}
               </tbody>
             </table>
+            </div>
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rows per page:</span>
@@ -507,7 +511,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
   // ── Main layout ────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-4">
 
       {/* Page header */}
       <div className="flex items-center gap-4 mb-6">
@@ -560,7 +564,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <p className="text-gray-500 mb-5">
               Select an action for <span className="font-medium" style={{ color: GIP_CONFIRM_COLOR }}>GIP</span>
             </p>
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
               {[
                 { key: 'add_workplace' as GIPAction, label: 'Add Workplace/Office', icon: <PlusCircle size={32} />, desc: 'Create a new GIP workplace/office' },
                 { key: 'view_workplaces' as GIPAction, label: 'View Workplaces/Offices', icon: <FolderOpen size={32} />, desc: 'Browse all GIP workplaces/offices' },
@@ -635,7 +639,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
 
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
                 {/* Table header */}
-                <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
+                <div className="px-6 py-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2" style={{ backgroundColor: GIP_CONFIRM_COLOR }}>
                   <div>
                     <h3 className="text-white m-0">GIP Workplaces/Offices</h3>
                   </div>
@@ -816,7 +820,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
             <p className="text-gray-500 mb-5">
               Select an action for <span className="text-brand-blue font-medium">SPES</span>
             </p>
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
               {[
                 { key: 'add_batch' as SPESAction, label: 'Add Batch', icon: <PlusCircle size={32} />, desc: 'Create a new SPES deployment batch' },
                 { key: 'view_batches' as SPESAction, label: 'View Batches', icon: <FolderOpen size={32} />, desc: 'Browse all batches' },
@@ -896,7 +900,7 @@ function MaintenanceInner({ onBack }: MaintenanceProps) {
               </div>
 
               <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
+                <div className="bg-brand-blue px-6 py-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
                   <div>
                     <h3 className="text-white m-0">SPES Batches</h3>
                   </div>

@@ -208,7 +208,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
@@ -223,7 +223,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
           {applicant.status === 'Withdrawn' && (
             <div className="mb-6 p-4 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-800">
@@ -232,7 +232,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             </div>
           )}
           <Sec num="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Last Name" value={applicant.lastName} />
             <Field label="First Name" value={applicant.firstName} />
             <Field label="Middle Name" value={applicant.middleName} />
@@ -244,7 +244,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Field label="Email" value={applicant.email} />
           </div>
           <Sec num="II" title="Address" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Region" value={applicant.region} />
             <Field label="Province" value={applicant.province} />
             <Field label="City / Municipality" value={applicant.cityMunicipality} />
@@ -261,19 +261,19 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <p className="text-sm text-gray-600 mt-2">Other: {applicant.classificationOther}</p>
           )}
           <Sec num="IV" title="Educational Information" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="School Name" value={applicant.schoolName} />
             <Field label="School Type" value={applicant.schoolType} />
             <Field label="Grade / Year Level" value={applicant.gradeYearLevel} />
             <Field label="Course / Program" value={applicant.course} />
           </div>
           <Sec num="V" title="Family / Economic Information" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Annual Family Income" value={applicant.annualFamilyIncome ? `₱${applicant.annualFamilyIncome}` : ''} />
             <Field label="Number of Dependents" value={applicant.numberOfDependents} />
           </div>
           <Sec num="VI" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
             <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
@@ -449,7 +449,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
@@ -464,11 +464,11 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
 
           <SectionDivider num="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
               <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
@@ -485,7 +485,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
               {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Sex <span className="text-red-500">*</span></label>
               <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={e => { set({ sex: e.target.value as SPESApplicant['sex'] }); clearFieldError('sex') }}>
@@ -504,7 +504,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
               <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
               <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={e => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
@@ -525,7 +525,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="II" title="Address" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Province</label>
               <SearchableSelect
@@ -574,7 +574,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="III" title="Classification" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             {CLASSIFICATION_OPTIONS.filter(o => o !== 'Other').map(opt => (
               <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleClassification(opt)} />
             ))}
@@ -588,7 +588,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           )}
 
           <SectionDivider num="IV" title="Educational Information" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div className="col-span-2">
               <label className={lbl}>School Name</label>
               <input className={inp} value={formData.schoolName} onChange={e => set({ schoolName: e.target.value })} placeholder="e.g. Tangub City College" />
@@ -616,7 +616,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="V" title="Family / Economic Information" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Annual Family Income (₱)</label>
               <input className={inp} value={formData.annualFamilyIncome} onChange={e => set({ annualFamilyIncome: e.target.value })} placeholder="e.g. 80,000" />
@@ -628,7 +628,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="VI" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
               <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
@@ -652,7 +652,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose }: {
             />
           </div>
 
-          <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
+          <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100 max-sm:flex-col">
             <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} disabled={(draft.saving || dup.checking)} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
               {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}

@@ -77,24 +77,24 @@ export default function AuthShell({ heading, subheading, children, brand = true,
       <div className="fixed inset-0 pointer-events-none" style={{ background: 'rgba(5,15,40,0.55)' }} />
 
       {/* Scrollable centering wrapper: centers when it fits, scrolls when taller than the viewport */}
-      <div className="relative min-h-full flex items-center justify-center py-8 px-4">
+      <div className="relative min-h-full flex items-center justify-center py-8 px-4 max-sm:px-3">
       {brand ? (
         /* ── Two-panel card (Login): navy brand panel + blurred form panel ── */
         <div
-          className="relative flex w-full overflow-hidden"
+          className="relative flex max-lg:flex-col w-full overflow-hidden max-lg:!min-h-0"
           style={{ maxWidth: '860px', minHeight: '520px', borderRadius: '18px', boxShadow: '0 24px 64px rgba(231,226,226,0.65)', margin: '1rem' }}
         >
           <div
-            className="relative flex flex-col items-center justify-center overflow-hidden"
+            className="relative flex flex-col items-center justify-center overflow-hidden max-lg:!w-full max-lg:!px-6 max-lg:!py-6"
             style={{ width: '45%', background: 'rgba(0,101,165,0.88)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', padding: '2.5rem 2rem 0' }}
           >
             <div className="absolute pointer-events-none" style={{ top: '-40px', right: '-30px', width: '90px', height: '340px', background: 'rgba(212,158,23,0.67)', transform: 'rotate(18deg)', borderRadius: '6px' }} />
             <div className="absolute pointer-events-none" style={{ top: '-60px', right: '20px', width: '32px', height: '320px', background: 'rgba(0,101,165,0.35)', transform: 'rotate(18deg)', borderRadius: '4px' }} />
 
             <div className="relative z-10 flex flex-col items-center text-center">
-              <div className="flex items-center gap-4 mb-5">
-                <img src={logo1} alt="PESO Logo" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '5px' }} />
-                <img src={logo2} alt="Tangub City Seal" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '1px' }} />
+              <div className="flex items-center gap-4 max-sm:gap-2 mb-5">
+                <img src={logo1} alt="PESO Logo" className="max-sm:!w-16 max-sm:!h-16" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '5px' }} />
+                <img src={logo2} alt="Tangub City Seal" className="max-sm:!w-16 max-sm:!h-16" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '1px' }} />
               </div>
               <div style={{ width: '48px', height: '3px', background: '#f5c518', borderRadius: '2px', marginBottom: '1.1rem' }} />
               <p style={{ color: '#ffffff', fontWeight: 800, fontSize: '1.45rem', lineHeight: '1.3', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
@@ -102,11 +102,11 @@ export default function AuthShell({ heading, subheading, children, brand = true,
               </p>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 z-10"><CityskylineSVG /></div>
+            <div className="absolute bottom-0 left-0 right-0 z-10 max-lg:static max-lg:w-full max-lg:mt-4"><CityskylineSVG /></div>
           </div>
 
           <div
-            className="flex flex-col justify-center"
+            className="flex flex-col justify-center max-lg:!w-full max-sm:!px-6 max-sm:!py-8"
             style={{ width: '55%', background: 'rgba(255,254,254,0.11)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', padding: '3rem 2.8rem', position: 'relative', overflow: 'hidden', borderLeft: '1px solid rgba(226,255,4,0.72)' }}
           >
             {formPanel}
@@ -115,7 +115,7 @@ export default function AuthShell({ heading, subheading, children, brand = true,
       ) : (
         /* ── Single blurred form panel (Forgot / Setup) ── */
         <div
-          className="relative flex flex-col justify-center w-full overflow-hidden"
+          className="relative flex flex-col justify-center w-full overflow-hidden max-lg:!min-h-0 max-sm:!px-6 max-sm:!py-8"
           style={{ maxWidth: '860px', minHeight: '520px', margin: '1rem', background: 'rgba(255,254,254,0.11)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', padding: '3rem 3.5rem', borderRadius: '18px', boxShadow: '0 24px 64px rgba(231,226,226,0.65)' }}
         >
           {formPanel}

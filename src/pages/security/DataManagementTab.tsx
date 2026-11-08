@@ -323,12 +323,12 @@ export default function DataManagementTab({ isActive = true }: { isActive?: bool
             <>
             <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
               {pagedBackups.map(b => (
-                <div key={b.name} className="flex items-center justify-between px-4 py-3">
+                <div key={b.name} className="flex items-center justify-between px-4 py-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{b.name}</p>
                     <p className="text-xs text-gray-500">{b.createdAt} · {b.size}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 max-sm:flex-wrap">
                     <button onClick={() => handleDownload(b.name)}
                       className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
                       <Download size={14} /> Download

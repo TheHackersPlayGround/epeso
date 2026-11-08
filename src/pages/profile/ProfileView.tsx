@@ -242,13 +242,13 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto py-8 px-8">
+      <div className="flex-1 overflow-y-auto py-8 px-8 max-sm:py-5 max-sm:px-4">
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
 
           {/* Profile header card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="h-2 bg-[#0077BE]" />
-            <div className="px-10 py-8 flex flex-col items-center text-center">
+            <div className="px-10 py-8 max-sm:px-5 max-sm:py-6 flex flex-col items-center text-center">
 
               {/* Avatar with photo controls */}
               <div className="relative mb-4 group">
@@ -310,8 +310,8 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
           </div>
 
           {/* Basic Information card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-6">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-6 max-sm:px-4 max-sm:py-5">
+            <div className="flex items-center justify-between mb-5 max-sm:flex-wrap max-sm:gap-2">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-5 rounded-full" style={{ background: '#0077BE' }} />
                 <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: '#0077BE' }}>
@@ -353,7 +353,7 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-x-8 gap-y-5">
+            <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-x-8 gap-y-5 max-sm:gap-y-4">
               {isEditing ? (
                 <>
                   <EditField label="First Name" value={field('firstName')} onChange={v => setDraft(d => ({ ...d, firstName: v }))} />
@@ -378,7 +378,7 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
           </div>
 
           {/* Access Control & Permissions card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-6 max-sm:px-4 max-sm:py-5">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-1 h-5 rounded-full" style={{ background: '#0077BE' }} />
               <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: '#0077BE' }}>
@@ -387,9 +387,9 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
             </div>
             <div className="divide-y divide-gray-50">
               {PERMISSION_GROUPS.map((group) => (
-                <div key={group.title} className="flex items-center justify-between py-3">
+                <div key={group.title} className="flex items-center justify-between py-3 max-sm:flex-col max-sm:items-start max-sm:gap-2">
                   <p className="text-xs font-semibold text-gray-500 tracking-wide">{group.title}</p>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 max-sm:flex-wrap max-sm:gap-2">
                     {group.sections.map((section) => (
                       <div key={section.label ?? '_'} className="flex items-center gap-2">
                         {section.label && <span className="text-xs text-gray-400">{section.label}</span>}
@@ -403,7 +403,7 @@ export default function ProfileView({ onBack, onLogout, onNameChange }: ProfileV
           </div>
 
           {/* Logout button */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-5">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-8 py-5 max-sm:px-4">
             <button
               onClick={onLogout}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-colors bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"

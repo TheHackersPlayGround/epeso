@@ -750,9 +750,9 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
           </div>
 
           {/* Main panels */}
-          <div className="flex gap-4 items-start">
+          <div className="flex gap-4 items-start max-lg:flex-col">
             {/* Left panel — unified card */}
-            <div className="w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-5rem)] bg-white rounded-2xl shadow border border-gray-200 flex flex-col">
+            <div className="w-72 max-lg:!w-full flex-shrink-0 sticky top-4 max-h-[calc(100vh-5rem)] max-lg:static max-lg:max-h-none bg-white rounded-2xl shadow border border-gray-200 flex flex-col">
               {/* Step 1 */}
               <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 overflow-visible">
                 <p className="mb-2 text-base font-bold text-gray-800">Step 1: Select Applicant</p>
@@ -897,7 +897,7 @@ export default function ResumeMaker({ applicants, onBack }: ResumeMakerProps) {
               <div className="flex-shrink-0 px-5 py-3 border-b border-gray-200">
                 <p className="text-sm font-semibold text-gray-700 m-0">Resume Preview</p>
               </div>
-              <div className="flex-1 overflow-y-auto p-8 bg-gray-100">
+              <div className="flex-1 overflow-y-auto max-sm:overflow-x-auto p-8 max-sm:p-4 bg-gray-100">
                 {!selectedApplicant ? (
                   <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                     <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

@@ -72,7 +72,7 @@ function VacanciesSearchBar({
         <Plus size={16} />
         Add Vacancy
       </button>
-      <div className="relative flex-1 min-w-48">
+      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -389,7 +389,7 @@ function ViewVacancyModal({ vacancy, onClose }: { vacancy: Vacancy; onClose: () 
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-5">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 max-sm:grid-cols-1">
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Job Title</p>
               <p className="text-sm font-medium text-gray-800">{vacancy.jobTitle}</p>
@@ -527,7 +527,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Job Title <span className="text-red-500">*</span></label>
               <input
@@ -576,7 +576,7 @@ function EditVacancyModal({ vacancy, onClose, onSave, employers }: { vacancy: Va
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Vacancies Count <span className="text-red-500">*</span></label>
               <input
@@ -764,7 +764,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Job Title <span className="text-red-500">*</span></label>
               <input
@@ -819,7 +819,7 @@ function AddVacancyModal({ onClose, onSave, employers }: AddVacancyModalProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-700 mb-1">Vacancies Count <span className="text-red-500">*</span></label>
               <input

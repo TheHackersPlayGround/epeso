@@ -238,7 +238,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
   return (
     <div className="h-full bg-brand-bg flex flex-col">
       {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DBEAFE' }}>
             <svg className="w-4 h-4" style={{ color: '#0077BE' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +260,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
 
           {/* Section bar */}
@@ -273,7 +273,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
             <div className="px-6 py-6 space-y-6">
 
               {/* Request Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <Field label="Reference No." value={profile.referenceNumber} />
                 <Field label="Date Filed" value={profile.dateFiled} />
                 <Field label="Employment Status" value={profile.employmentStatus} />
@@ -288,7 +288,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               <hr className="border-gray-100" />
 
               {/* Personal Info */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <Field label="Last Name" value={profile.lastName} />
                 <Field label="First Name" value={profile.firstName} />
                 <Field label="Middle Name" value={profile.middleName} />
@@ -330,7 +330,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                           <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#0077BE' }}>Employment Referral Details</p>
                             {(profile.desiredPosition || profile.typeOfSkill) && (
-                              <div className="grid grid-cols-2 gap-4 mb-2">
+                              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-2">
                                 {profile.desiredPosition && <Field label="Desired Position" value={profile.desiredPosition} />}
                                 {profile.typeOfSkill && <Field label="Type of Skill" value={profile.typeOfSkill} />}
                               </div>
@@ -398,7 +398,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <div className="-mx-6 px-6 py-2.5 mb-4" style={{ backgroundColor: '#EFF6FF' }}>
                   <p className="text-sm font-bold tracking-wide" style={{ color: '#0077BE' }}>FOR PESO OFFICE ONLY</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
                   <Field label="Received By" value={profile.receivedBy} />
                 </div>
                 <div>
@@ -421,7 +421,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
             <div className="px-6 py-6 space-y-5">
 
               {/* Request Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div ref={dateFiledWrapRef}>
                   <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
                   <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
@@ -451,7 +451,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               </div>
 
               {/* Personal Info */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div>
                   <label className={lbl}>Surname <span className="text-red-500">*</span></label>
                   <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={form.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} />
@@ -473,7 +473,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div ref={sexWrapRef}>
                   <label className={lbl}>Sex <span className="text-red-500">*</span></label>
                   <div className={`flex gap-6 mt-2 rounded-lg ${fieldMessage('sex') ? 'ring-2 ring-red-200 p-2' : ''}`}>
@@ -503,7 +503,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div>
                   <label className={lbl}>Contact Number <span className="text-red-500">*</span></label>
                   <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} placeholder="09XXXXXXXXX" value={form.contactNumber} inputMode="tel" onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} />
@@ -518,7 +518,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               {/* Address */}
               <div>
                 <p className={lbl}>Complete Address</p>
-                <div className="grid grid-cols-2 gap-4 mt-1">
+                <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mt-1">
                   <div>
                     <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Province</label>
                     <SearchableSelect
@@ -693,7 +693,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                 <div className="px-4 py-2 rounded-lg mb-4" style={{ backgroundColor: '#0077BE' }}>
                   <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-5">
+                <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-5">
                   <div>
                     <label className={lbl}>Received By</label>
                     <input className={inp} placeholder="Name of receiving officer" value={form.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />
@@ -739,7 +739,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
               </div>
 
               {/* Buttons */}
-              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 max-sm:flex-col">
                 <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
                 <button type="button" onClick={handleSave} disabled={isSaving} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   style={{ backgroundColor: '#0077BE' }}

@@ -25,30 +25,30 @@ export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClic
   }, [])
 
   return (
-    <nav className="bg-brand-blue shadow-md h-21">
-      <div className="px-6 py-2">
-        <div className="flex items-center justify-between">
+    <nav className="bg-brand-blue shadow-md h-21 max-lg:h-auto">
+      <div className="px-6 py-2 max-sm:px-3">
+        <div className="flex items-center justify-between max-sm:gap-2">
 
           {/* Left: Logo and Title */}
-          <div className="flex items-center gap-3">
-            <img src={logoImage} alt="PESO Logo" className="w-16 h-16 object-contain" />
-            <div>
-              <p className="text-white font-bold m-0 p-0 leading-tight" style={{ fontSize: 'var(--text-lg)' }}>
+          <div className="flex items-center gap-3 min-w-0 max-sm:gap-2">
+            <img src={logoImage} alt="PESO Logo" className="w-16 h-16 object-contain max-sm:w-10 max-sm:h-10 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-white font-bold m-0 p-0 leading-tight truncate" style={{ fontSize: 'var(--text-lg)' }}>
                 E-PESO TANGUB CITY
               </p>
-              <p className="text-white/90 m-0 p-0 leading-tight" style={{ fontSize: 'var(--text-md)' }}>
+              <p className="text-white/90 m-0 p-0 leading-tight truncate max-sm:hidden" style={{ fontSize: 'var(--text-md)' }}>
                 Profiling Management System
               </p>
             </div>
           </div>
 
           {/* Center: Navigation Tabs */}
-          <div className="flex gap-8">
+          <div className="flex gap-8 shrink-0 max-lg:gap-3">
             {['Dashboard', 'About PESO'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => onTabChange(tab)}
-                className={`px-2 py-1 transition-all relative ${
+                className={`px-2 py-1 transition-all relative whitespace-nowrap ${
                   activeTab === tab
                     ? 'text-white font-semibold'
                     : 'text-white/80 hover:text-white'
@@ -64,13 +64,13 @@ export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClic
           </div>
 
           {/* Right: Profile dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(prev => !prev)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 max-sm:px-2.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
             >
               <User size={18} />
-              <span style={{ fontSize: 'var(--text-base)' }}>{username}</span>
+              <span className="max-sm:hidden" style={{ fontSize: 'var(--text-base)' }}>{username}</span>
               <ChevronDown size={15} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 

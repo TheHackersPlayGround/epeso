@@ -73,19 +73,22 @@ export default function Login({ onLogin }: LoginProps) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center"
+      className="fixed inset-0 overflow-y-auto"
       style={{
         backgroundImage: `url(${bg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
     >
-      {/* Dark overlay on bg */}
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(5,15,40,0.55)' }} />
+      {/* Dark overlay on bg (fixed so it stays put while the card scrolls) */}
+      <div className="fixed inset-0 pointer-events-none" style={{ background: 'rgba(5,15,40,0.55)' }} />
+
+      {/* Scrollable centering wrapper: centers when it fits, scrolls when taller than the viewport */}
+      <div className="relative min-h-full flex items-center justify-center py-8 px-4 max-sm:px-3">
 
       {/* Main card */}
       <div
-        className="relative flex w-full overflow-hidden"
+        className="relative flex max-lg:flex-col w-full overflow-hidden max-lg:!min-h-0"
         style={{
           maxWidth: '860px',
           minHeight: '520px',
@@ -96,7 +99,7 @@ export default function Login({ onLogin }: LoginProps) {
       >
         {/* ── LEFT PANEL ── navy, content centered */}
         <div
-          className="relative flex flex-col items-center justify-center overflow-hidden"
+          className="relative flex flex-col items-center justify-center overflow-hidden max-lg:!w-full max-lg:!px-6 max-lg:!py-6"
           style={{
             width: '45%',
             background: 'rgba(0,101,165,0.88)',
@@ -131,15 +134,17 @@ export default function Login({ onLogin }: LoginProps) {
           {/* Centered content */}
           <div className="relative z-10 flex flex-col items-center text-center">
             {/* Logos */}
-            <div className="flex items-center gap-4 mb-5">
+            <div className="flex items-center gap-4 max-sm:gap-2 mb-5">
               <img
                 src={logo1}
                 alt="PESO Logo"
+                className="max-sm:!w-16 max-sm:!h-16"
                 style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '5px' }}
               />
               <img
                 src={logo2}
                 alt="Tangub City Seal"
+                className="max-sm:!w-16 max-sm:!h-16"
                 style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: 'white', padding: '1px' }}
               />
             </div>
@@ -161,15 +166,15 @@ export default function Login({ onLogin }: LoginProps) {
             </p>
           </div>
 
-          {/* City skyline pinned to bottom */}
-          <div className="absolute bottom-0 left-0 right-0 z-10">
+          {/* City skyline pinned to bottom on desktop; flows normally below the title on mobile so it can't overlap it */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 max-lg:static max-lg:w-full max-lg:mt-4">
             <CityskylineSVG />
           </div>
         </div>
 
         {/* ── RIGHT PANEL ── transparent blur */}
         <div
-          className="flex flex-col justify-center"
+          className="flex flex-col justify-center max-lg:!w-full max-sm:!px-6 max-sm:!py-8"
           style={{
             width: '55%',
             background: 'rgba(255, 254, 254, 0.11)',
@@ -346,6 +351,7 @@ export default function Login({ onLogin }: LoginProps) {
             </button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   )

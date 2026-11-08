@@ -29,7 +29,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-4">
       {/* Title row */}
       <div className="flex items-center gap-4 mb-6">
         <button
@@ -46,15 +46,15 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
 
       {/* Tabs card */}
       <div className="mb-6">
-        <div className="bg-white rounded-xl shadow-sm px-6">
-          <nav role="tablist" aria-label="Security tabs" className="flex gap-0">
+        <div className="bg-white rounded-xl shadow-sm px-6 max-sm:px-2 max-sm:overflow-x-auto">
+          <nav role="tablist" aria-label="Security tabs" className="flex gap-0 max-sm:gap-0">
             {(['users', 'data', 'logs', 'bin'] as const).map(tab => (
               <button
                 key={tab}
                 role="tab"
                 aria-selected={activeTab === tab}
                 onClick={() => openTab(tab)}
-                className={`px-6 py-4 text-base font-medium border-b-2 transition-colors ${
+                className={`px-6 py-4 max-sm:px-3 max-sm:py-3 whitespace-nowrap shrink-0 text-base font-medium border-b-2 transition-colors ${
                   activeTab === tab
                     ? 'border-brand-blue text-brand-blue'
                     : 'border-transparent text-gray-500 hover:text-gray-700'

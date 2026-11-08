@@ -227,7 +227,7 @@ function EmployersSearchBar({ searchQuery, activeFilters, availableFilters, isFi
 
   return (
     <div className="flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-48">
+      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -281,7 +281,7 @@ type ToolbarProps = {
 
 function EmployersToolbar({ onAdd, onImport, onExportExcel, isExporting }: ToolbarProps) {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 max-sm:flex-wrap">
       <button onClick={onAdd} disabled={!canManage('employment')}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
         <Plus size={16} />

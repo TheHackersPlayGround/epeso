@@ -797,7 +797,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       })()}
 
       <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-5">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -810,7 +810,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
 
         {/* Action Buttons */}
         <div className="bg-white rounded-xl shadow-md p-3 mb-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-sm:flex-wrap">
             <button onClick={() => setIsFormOpen(true)} disabled={!canManage('cdsp')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
               <Plus size={16} /><span>Add Applicant</span>
             </button>
@@ -836,7 +836,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
         {/* Search & Filter + Table */}
         <div className="bg-white rounded-xl shadow-md p-4">
           <div className="mb-4">
-          <div className="flex gap-3">
+          <div className="flex gap-3 max-lg:flex-col">
             <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input

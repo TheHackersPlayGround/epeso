@@ -171,7 +171,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY INFORMATION</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Company Name <span className="text-red-500">*</span></label>
                 <input ref={companyNameRef} type="text" value={formData.companyName}
@@ -222,7 +222,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">CONTACT PERSON</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Full Name <span className="text-red-500">*</span></label>
                 <input ref={contactPersonNameRef} type="text" value={formData.contactPersonName}
@@ -257,7 +257,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY ADDRESS</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Building No.</label>
                 <input type="text" value={formData.buildingNo}
@@ -323,7 +323,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">REGISTRATION DETAILS</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Status</label>
                 <select value={formData.status} onChange={e => handleChange('status', e.target.value)}
@@ -355,8 +355,8 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-md flex">
-        <div className="w-64 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6 overflow-y-auto flex-shrink-0">
+      <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
+        <div className="w-64 max-lg:!w-full bg-[#F8F9FA] border-r border-gray-200 max-lg:border-r-0 max-lg:border-b pt-[88px] max-lg:pt-6 px-6 max-sm:px-4 pb-6 overflow-y-auto flex-shrink-0">
           <nav className="space-y-2">
             {sections.map(section => (
               <button key={section.id} onClick={() => setActiveSection(section.id)}
@@ -370,7 +370,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+          <div className="flex items-center justify-between px-8 max-sm:px-4 py-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <Briefcase size={20} className="text-brand-blue" />
               <div>
@@ -383,11 +383,11 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-8 py-6">
+          <div className="flex-1 overflow-y-auto px-8 max-sm:px-4 py-6">
             {renderSectionContent()}
           </div>
 
-          <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
+          <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex justify-end gap-3 max-sm:flex-col">
             <button type="button" onClick={draft.requestClose}
               className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
               Cancel

@@ -164,7 +164,7 @@ export default function DILPForm({
       {/* ─── Project Information ──────────────────────────────────────────────── */}
       <div className="mb-6">
         <p className={sectionHeadingCls}>Project Information</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div className="col-span-2">
             <label className={labelCls}>Project ID Number</label>
             <input ref={projectIdRef} type="text" value={formData.projectIdNumber} readOnly={isView}
@@ -220,7 +220,7 @@ export default function DILPForm({
       <div className="border-t pt-5 mb-6">
         <p className={sectionHeadingCls}>Project Location</p>
         {isView ? (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             {[
               ['Region', formData.region],
               ['Province', formData.province],
@@ -235,7 +235,7 @@ export default function DILPForm({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div ref={provinceWrapRef}>
               <label className={labelCls}>Province <span className="text-red-500">*</span></label>
               <div className={`rounded-lg ${fieldMessage('province') ? 'ring-2 ring-red-200' : ''}`}>
@@ -301,7 +301,7 @@ export default function DILPForm({
       {/* ─── Assistance Information ───────────────────────────────────────────── */}
       <div className="border-t pt-5 mb-6">
         <p className={sectionHeadingCls}>Assistance Information</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label className={labelCls}>Assistance Amount</label>
             <div className="relative">

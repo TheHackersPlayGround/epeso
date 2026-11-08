@@ -210,7 +210,7 @@ function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
           <div>
             <h4 className="text-base font-semibold text-gray-700 mb-4">Basic Information</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.firstName} onChange={e => onFormChange('firstName', e.target.value)} className={inp} placeholder="Enter first name" />
@@ -303,9 +303,9 @@ function UserFormModal({ isEdit, formData, originalUsername, selectedPermissions
                 const isAdmin = formData.role === 'Administrator'
                 const securityForStaff = group.title === 'SECURITY' && !isAdmin
                 return (
-                  <div key={group.title} className="flex items-center justify-between px-4 py-3">
+                  <div key={group.title} className="flex items-center justify-between px-4 py-3 max-sm:flex-col max-sm:items-start max-sm:gap-2">
                     <span className="text-xs text-[#0077BE] font-medium">{group.title}</span>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 max-sm:flex-wrap max-sm:gap-2">
                       {securityForStaff ? (
                         <span className="text-xs text-gray-400 italic px-3 py-1.5">Administrator only</span>
                       ) : (
@@ -504,7 +504,7 @@ export default function SystemUsersTab({ isActive = true }: { isActive?: boolean
   return (
     <>
       <div className="bg-white rounded-xl shadow-md overflow-hidden min-h-[75vh]">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div className="flex items-center gap-3">
             <h3 className="text-gray-800 m-0">System Users</h3>
             <span className="text-sm text-gray-400">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found</span>
@@ -539,6 +539,7 @@ export default function SystemUsersTab({ isActive = true }: { isActive?: boolean
           </div>
         </div>
 
+        <div className="max-lg:overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -586,8 +587,9 @@ export default function SystemUsersTab({ isActive = true }: { isActive?: boolean
             ))}
           </tbody>
         </table>
+        </div>
 
-        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50 max-sm:flex-col max-sm:gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">Show</span>
             <select value={usersPerPage} onChange={e => { setUsersPerPage(Number(e.target.value)); setUserPage(1) }} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0077BE] outline-none bg-white">

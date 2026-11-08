@@ -205,7 +205,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-blue-600" />
@@ -221,11 +221,11 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
 
           <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Last Name" value={applicant.lastName} />
             <Field label="First Name" value={applicant.firstName} />
             <Field label="Middle Name" value={applicant.middleName} />
@@ -238,7 +238,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           </div>
 
           <SectionDivider numeral="II" title="Address" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Region" value={applicant.region} />
             <Field label="Province" value={applicant.province} />
             <Field label="City / Municipality" value={applicant.cityMunicipality} />
@@ -264,7 +264,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           {(() => {
             const { showYearLevel, showStrand, showCourse, showYearGraduated } = eduFieldFlags(applicant.highestEducation)
             return (
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
                 <Field label="Highest Attainment" value={applicant.highestEducation} />
                 <Field label="School / University" value={applicant.schoolName} />
                 {showYearLevel && <Field label="Year Level" value={applicant.yearLevel} />}
@@ -276,7 +276,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           })()}
 
           <SectionDivider numeral="V" title="Employment Status" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Employment Status" value={applicant.employmentStatus} />
             <Field label="Current Occupation" value={applicant.currentOccupation} />
           </div>
@@ -293,7 +293,7 @@ export function ViewApplicantPanel({ applicant, onClose }: { applicant: CDSPAppl
           </div>
 
           <SectionDivider numeral="VII" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
             <Field label="Status" value={getEffectiveStatus(applicant)} />
@@ -498,7 +498,7 @@ export default function CDSPProfileForm({
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
@@ -510,11 +510,11 @@ export default function CDSPProfileForm({
         <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
 
           <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
               <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={(e) => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
@@ -531,7 +531,7 @@ export default function CDSPProfileForm({
               {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Sex <span className="text-red-500">*</span></label>
               <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={(e) => { set({ sex: e.target.value as CDSPApplicant['sex'] }); clearFieldError('sex') }}>
@@ -551,7 +551,7 @@ export default function CDSPProfileForm({
               <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
               <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={(e) => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
@@ -572,7 +572,7 @@ export default function CDSPProfileForm({
           </div>
 
           <SectionDivider numeral="II" title="Address" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Province</label>
               <SearchableSelect
@@ -621,7 +621,7 @@ export default function CDSPProfileForm({
           </div>
 
           <SectionDivider numeral="III" title="Classification" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             {CLASSIFICATION_OPTIONS.filter((o) => o !== 'Other').map((opt) => (
               <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleClassification(opt)} />
             ))}
@@ -639,7 +639,7 @@ export default function CDSPProfileForm({
             const edu = formData.highestEducation
             const { showYearLevel, showStrand, showCourse, showYearGraduated } = eduFieldFlags(edu)
             return (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div className="col-span-2">
                   <label className={lbl}>Highest Educational Attainment <span className="text-red-500">*</span></label>
                   <select
@@ -686,7 +686,7 @@ export default function CDSPProfileForm({
           })()}
 
           <SectionDivider numeral="V" title="Employment Status" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
               <select
@@ -724,7 +724,7 @@ export default function CDSPProfileForm({
           {fieldMessage('serviceAvailed') && <p className="text-red-500 text-xs mb-4">{fieldMessage('serviceAvailed')}</p>}
 
           <SectionDivider numeral="VII" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
               <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={(value) => set({ dateApplicationReceived: value })} />
@@ -744,7 +744,7 @@ export default function CDSPProfileForm({
             <DocAttachSection documents={formData.attachedDocuments} onChange={(docs) => set({ attachedDocuments: docs })} onPreview={setPreviewDoc} />
           </div>
 
-          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3">
+          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end gap-3 max-sm:flex-col">
             <button onClick={draft.requestClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} disabled={(draft.saving || dup.checking)} className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
               {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}

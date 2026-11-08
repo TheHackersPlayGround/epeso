@@ -227,7 +227,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DBEAFE' }}>
             <svg className="w-4 h-4" style={{ color: '#0077BE' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +243,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
 
           {/* Section header */}
@@ -251,10 +251,10 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             <p className="text-white font-bold text-sm tracking-wide">PESO REQUEST FOR ASSISTANCE</p>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="p-6 max-sm:p-4 space-y-5">
 
             {/* Date Filed | Reference No. */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div ref={dateFiledWrapRef}>
                 <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
                 <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
@@ -270,7 +270,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             </div>
 
             {/* Surname | First Name | Middle Name | Suffix */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div>
                 <label className={lbl}>Surname <span className="text-red-500">*</span></label>
                 <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
@@ -293,7 +293,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             </div>
 
             {/* Sex | Birthdate | Civil Status */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div ref={sexWrapRef}>
                 <label className={lbl}>Sex <span className="text-red-500">*</span></label>
                 <div className={`flex gap-6 mt-2 rounded-lg ${fieldMessage('sex') ? 'ring-2 ring-red-200 p-2' : ''}`}>
@@ -324,7 +324,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             </div>
 
             {/* Contact Number | Email */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div>
                 <label className={lbl}>Contact Number <span className="text-red-500">*</span></label>
                 <input ref={contactNumberRef} className={`${inp} ${errCls('contactNumber')}`} value={formData.contactNumber} inputMode="tel" onChange={e => { set({ contactNumber: sanitizeContactNumber(e.target.value) }); clearFieldError('contactNumber') }} />
@@ -339,7 +339,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             {/* Complete Address */}
             <div>
               <p className={lbl}>Complete Address</p>
-              <div className="grid grid-cols-2 gap-4 mt-1">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mt-1">
                 <div>
                   <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Province</label>
                   <SearchableSelect
@@ -389,7 +389,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             </div>
 
             {/* Employment Status */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div>
                 <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
                 <select ref={employmentStatusRef} className={`${inp} bg-white ${errCls('employmentStatus')}`} value={formData.employmentStatus} onChange={e => { set({ employmentStatus: e.target.value }); clearFieldError('employmentStatus') }}>
@@ -559,7 +559,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
                 <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-5">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-5">
                 <div>
                   <label className={lbl}>Received By</label>
                   <input className={inp} placeholder="Name of receiving officer" value={formData.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />
@@ -619,7 +619,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
             </div>
 
             {/* Action buttons */}
-            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 max-sm:flex-col">
               <button
                 type="button"
                 onClick={draft.requestClose}

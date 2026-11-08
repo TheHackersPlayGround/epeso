@@ -308,7 +308,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                 <ChevronLeft size={14} /> Back to project list
               </button>
               <p className="text-xs font-bold text-brand-blue uppercase tracking-widest mb-3">Project Details</p>
-              <div className="grid grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3 max-h-56 overflow-y-auto pr-1">
                 {(program === 'DILEEP (TUPAD)'
                   ? [
                       ['Title', (selectedProject as TUPADProject).title],
@@ -957,7 +957,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
     <>
     <div className="flex flex-col gap-4">
       {/* Card 1 — Action buttons */}
-      <div className="bg-white rounded-xl shadow-sm px-5 py-4 flex items-center gap-3">
+      <div className="bg-white rounded-xl shadow-sm px-5 py-4 flex items-center gap-3 max-sm:flex-wrap">
         <button
           onClick={() => setIsAddOpen(true)}
           disabled={!canManage('livelihood')}
@@ -1133,6 +1133,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
           )}
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-blue">
@@ -1210,9 +1211,10 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             Show
             <select

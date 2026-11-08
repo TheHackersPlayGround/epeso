@@ -27,7 +27,7 @@ export default function LivelihoodView({ onBack }: LivelihoodViewProps) {
   return (
     <div className="min-h-full flex flex-col bg-brand-bg">
       {/* Title row */}
-      <div className="px-8 pt-7 pb-5 flex items-center gap-4">
+      <div className="px-8 pt-7 pb-5 flex items-center gap-4 max-sm:px-4 max-sm:pt-5 max-sm:pb-3">
         <button
           onClick={onBack}
           aria-label="Back to dashboard"
@@ -46,16 +46,16 @@ export default function LivelihoodView({ onBack }: LivelihoodViewProps) {
       </div>
 
       {/* Tabs card */}
-      <div className="px-7.5 pb-2">
-        <div className="bg-white rounded-xl shadow-sm px-6">
-          <nav role="tablist" aria-label="Livelihood program tabs" className="flex gap-0">
+      <div className="px-7.5 pb-2 max-sm:px-4">
+        <div className="bg-white rounded-xl shadow-sm px-6 max-sm:px-2 max-sm:overflow-x-auto">
+          <nav role="tablist" aria-label="Livelihood program tabs" className="flex gap-0 max-sm:w-max">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
                 onClick={() => requestLeave(() => setActiveTab(tab.id))}
-                className={`px-6 py-4 text-base font-medium border-b-2 transition-colors ${
+                className={`px-6 py-4 max-sm:px-4 max-sm:py-3 text-base font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-brand-blue text-brand-blue'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -69,7 +69,7 @@ export default function LivelihoodView({ onBack }: LivelihoodViewProps) {
       </div>
 
       {/* Tab content */}
-      <div className="p-6">
+      <div className="p-6 max-sm:p-3">
         {activeTab === 'dileep' && <DILEEPTab />}
         {activeTab === 'slp'    && <SLPTab />}
         {activeTab === 'clpep'  && <CLPEPTab />}

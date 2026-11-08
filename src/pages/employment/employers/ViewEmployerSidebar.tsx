@@ -54,7 +54,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY INFORMATION</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <ReadOnlyField label="Company Name" value={data.companyName} />
               <ReadOnlyField label="Industry" value={data.industry === 'Other' ? `Other - ${data.industryOther}` : data.industry} />
               <ReadOnlyField label="Business Type" value={data.businessType} />
@@ -67,7 +67,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">CONTACT PERSON</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <ReadOnlyField label="Full Name" value={data.contactPersonName} />
               <ReadOnlyField label="Position" value={data.position} />
               <ReadOnlyField label="Contact Number" value={data.contactNumber} />
@@ -80,7 +80,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">COMPANY ADDRESS</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <ReadOnlyField label="Building No." value={data.buildingNo} />
               <ReadOnlyField label="Street" value={data.street} />
               <ReadOnlyField label="Barangay" value={data.barangay} />
@@ -95,7 +95,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
         return (
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">REGISTRATION DETAILS</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <ReadOnlyField label="Status" value={data.status} />
               <ReadOnlyField label="Date Registered" value={data.dateRegistered} />
               {data.remarks && (
@@ -116,8 +116,8 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md flex">
-      <div className="w-64 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6 overflow-y-auto flex-shrink-0">
+    <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
+      <div className="w-64 max-lg:!w-full bg-[#F8F9FA] border-r border-gray-200 max-lg:border-r-0 max-lg:border-b pt-[88px] max-lg:pt-6 px-6 max-sm:px-4 pb-6 overflow-y-auto flex-shrink-0">
         <nav className="space-y-2">
           {sections.map(section => (
             <button key={section.id} onClick={() => setActiveSection(section.id)}
@@ -131,7 +131,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
       </div>
 
       <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-8 max-sm:px-4 py-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Eye size={20} className="text-brand-blue" />
             <h3 className="text-gray-800 m-0 text-base font-medium">View Employer Details</h3>
@@ -141,11 +141,11 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div className="flex-1 overflow-y-auto px-8 max-sm:px-4 py-6">
           {renderSectionContent()}
         </div>
 
-        <div className="border-t border-gray-200 px-8 py-4 flex justify-end">
+        <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex justify-end">
           <button type="button" onClick={onClose}
             className="px-8 py-2 text-white bg-brand-blue rounded-lg hover:bg-brand-blue-dark transition-colors">
             Close

@@ -77,15 +77,15 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
 
   return (
     <div className='bg-brand-bg'>
-    <div className="max-w-6xl mx-auto px-6 py-8 bg-brand-bg">
+    <div className="max-w-6xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-4 bg-brand-bg">
 
       {/* Hero Carousel */}
       <div
-        className="relative mb-8 rounded-2xl overflow-hidden"
+        className="relative mb-8 max-sm:mb-5 rounded-2xl overflow-hidden"
         style={{ boxShadow: 'var(--shadow-md)' }}
       >
         {/* Slides track */}
-        <div className="h-80 overflow-hidden">
+        <div className="h-80 max-lg:h-56 max-sm:h-44 overflow-hidden">
           <div
             className="flex h-full transition-transform duration-500 ease-in-out"
             style={{ transform: `translateX(-${current * 100}%)` }}
@@ -93,11 +93,11 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
             {bannerSlides.map((slide, i) => (
               <div key={i} className="relative h-full w-full shrink-0">
                 <img src={slide.image} alt={slide.title} className="w-full h-full object-cover" />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent pt-16 pb-8 px-12">
-                  <p className="text-white font-bold mb-1 drop-shadow-lg" style={{ fontSize: 'var(--text-xl)' }}>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent pt-16 pb-8 px-12 max-lg:pt-8 max-lg:pb-5 max-lg:px-5">
+                  <p className="text-white font-bold mb-1 drop-shadow-lg max-sm:text-sm" style={{ fontSize: 'var(--text-xl)' }}>
                     {slide.title}
                   </p>
-                  <p className="text-white/90 drop-shadow-md max-w-3xl" style={{ fontSize: 'var(--text-sm)' }}>
+                  <p className="text-white/90 drop-shadow-md max-w-3xl max-sm:hidden" style={{ fontSize: 'var(--text-sm)' }}>
                     {slide.description}
                   </p>
                 </div>
@@ -109,23 +109,23 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
         {/* Prev arrow */}
         <button
           onClick={prev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-3 transition-all"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-3 max-sm:p-2 transition-all"
           style={{ boxShadow: 'var(--shadow-sm)' }}
         >
-          <ChevronLeft size={24} className="text-gray-800" />
+          <ChevronLeft size={24} className="text-gray-800 max-sm:size-4" />
         </button>
 
         {/* Next arrow */}
         <button
           onClick={next}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-3 transition-all"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-3 max-sm:p-2 transition-all"
           style={{ boxShadow: 'var(--shadow-sm)' }}
         >
-          <ChevronRight size={24} className="text-gray-800" />
+          <ChevronRight size={24} className="text-gray-800 max-sm:size-4" />
         </button>
 
         {/* Dots */}
-        <div className="absolute bottom-5 right-10 z-20 flex gap-2">
+        <div className="absolute bottom-5 right-10 max-sm:right-4 max-sm:bottom-3 z-20 flex gap-2">
           {bannerSlides.map((_, i) => (
             <button
               key={i}
@@ -139,27 +139,27 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
       </div>
 
       {/* PESO Programs & Services */}
-      <div className="mb-12">
+      <div className="mb-12 max-sm:mb-8">
         <p className="text-gray-800 font-bold mb-5 text-left" style={{ fontSize: 'var(--text-xl)' }}>
           PESO Programs &amp; Services
         </p>
-        <div className="grid mt-5 grid-cols-4 gap-5">
+        <div className="grid mt-5 grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 gap-5 max-sm:gap-3">
           {pesoPrograms.map((module) => {
             const Icon = module.icon
             return (
               <button
                 key={module.id}
                 onClick={() => onModuleClick(module.id)}
-                className="bg-white rounded-2xl py-6 px-5 flex flex-col items-center gap-3 group hover:-translate-y-0.5 transition-all duration-300 border-2 border-transparent"
+                className="bg-white rounded-2xl py-6 px-5 max-sm:py-4 max-sm:px-3 flex flex-col items-center gap-3 group hover:-translate-y-0.5 transition-all duration-300 border-2 border-transparent"
                 style={{ boxShadow: 'var(--shadow-sm)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = '#0077BE' }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'transparent' }}
               >
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                  className="w-16 h-16 max-sm:w-12 max-sm:h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
                   style={{ backgroundColor: `${module.color}20` }}
                 >
-                  <Icon size={30} style={{ color: module.color }} strokeWidth={1.75} />
+                  <Icon size={30} className="max-sm:size-5" style={{ color: module.color }} strokeWidth={1.75} />
                 </div>
                 <span className="text-gray-700 text-center font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
                   {module.name}
@@ -175,23 +175,23 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
         <p className="text-gray-800 font-bold mb-5 text-left" style={{ fontSize: 'var(--text-xl)' }}>
           Quick Access
         </p>
-        <div className="grid mt-5 grid-cols-4 gap-5">
+        <div className="grid mt-5 grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 gap-5 max-sm:gap-3">
           {quickAccess.filter(module => module.id !== 'security' || canView('security')).map((module) => {
             const Icon = module.icon
             return (
               <button
                 key={module.id}
                 onClick={() => onModuleClick(module.id)}
-                className="bg-white rounded-2xl py-6 px-5 flex flex-col items-center gap-3 group hover:-translate-y-0.5 transition-all duration-300 border-2 border-transparent"
+                className="bg-white rounded-2xl py-6 px-5 max-sm:py-4 max-sm:px-3 flex flex-col items-center gap-3 group hover:-translate-y-0.5 transition-all duration-300 border-2 border-transparent"
                 style={{ boxShadow: 'var(--shadow-sm)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = '#0077BE' }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'transparent' }}
               >
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                  className="w-16 h-16 max-sm:w-12 max-sm:h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
                   style={{ backgroundColor: `${module.color}20` }}
                 >
-                  <Icon size={30} style={{ color: module.color }} strokeWidth={1.75} />
+                  <Icon size={30} className="max-sm:size-5" style={{ color: module.color }} strokeWidth={1.75} />
                 </div>
                 <span className="text-gray-700 text-center font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
                   {module.name}

@@ -48,7 +48,7 @@ export default function ConfirmModal({ isOpen, type, title, message, confirmText
 
   return (
     <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8 max-sm:p-5">
         <div className="flex flex-col items-center text-center mb-6">
           {type === 'success' ? (
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
@@ -78,7 +78,7 @@ export default function ConfirmModal({ isOpen, type, title, message, confirmText
           <h3 className="text-gray-900 font-semibold text-xl">{title}</h3>
           <p className="text-gray-500 text-base mt-2 whitespace-pre-line">{message}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 max-sm:flex-col">
           {type === 'confirm' && cancelText && (
             <button
               onClick={onCancel}

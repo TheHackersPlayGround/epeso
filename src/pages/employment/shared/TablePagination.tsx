@@ -28,7 +28,7 @@ export default function TablePagination({
   const lastItem = Math.min(safePage * itemsPerPage, totalItems);
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white max-sm:flex-col max-sm:gap-3 max-sm:px-3">
       <div className="flex items-center gap-2 text-sm text-gray-600">
         Show
         <select
@@ -42,7 +42,7 @@ export default function TablePagination({
         </select>
         per page
       </div>
-      <div className="flex items-center gap-3 text-sm text-gray-600">
+      <div className="flex items-center gap-3 text-sm text-gray-600 max-sm:flex-wrap max-sm:justify-center">
         <button
           onClick={() => onPageChange(Math.max(1, safePage - 1))}
           disabled={safePage === 1}
@@ -51,7 +51,7 @@ export default function TablePagination({
         >
           <ChevronLeft size={16} />
         </button>
-        <span>{firstItem} to {lastItem} of {totalItems} records</span>
+        <span className="text-center">{firstItem} to {lastItem} of {totalItems} records</span>
         <button
           onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
           disabled={safePage === totalPages}

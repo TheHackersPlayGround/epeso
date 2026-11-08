@@ -394,7 +394,7 @@ export default function CDSPMaintenanceForm() {
         <p className="text-gray-500 mb-5">
           Select an action for <span className="text-brand-blue font-medium">CDSP</span>
         </p>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
           {cards.map(card => (
             <button
               key={card.key}
@@ -496,7 +496,7 @@ export default function CDSPMaintenanceForm() {
               </div>
 
               <SectionHeader title="Schedule & Personnel" />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div ref={dateWrapRef}>
                   <label className={labelCls}>Date <span className="text-red-500">*</span></label>
                   <DatePicker className={`${inputCls} ${errCls('date')}`} value={formData.date} readOnly={isView}
@@ -511,7 +511,7 @@ export default function CDSPMaintenanceForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                 <div>
                   <label className={labelCls}>Person In Charge / Facilitator</label>
                   <input ref={facilitatorRef} type="text" value={formData.facilitator} readOnly={isView}
@@ -553,7 +553,7 @@ export default function CDSPMaintenanceForm() {
               </div>
 
               <SectionHeader title="Additional Counseling / Session Information" />
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
                 <div>
                   <label className={labelCls}>Counselor / Career Advisor</label>
                   <input ref={counselorRef} type="text" value={formData.counselor} readOnly={isView}
@@ -637,7 +637,7 @@ export default function CDSPMaintenanceForm() {
       </div>
 
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
+        <div className="bg-brand-blue px-6 py-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div>
             <h3 className="text-white m-0">CDSP Activities</h3>
           </div>
@@ -800,7 +800,7 @@ export default function CDSPMaintenanceForm() {
                 ))}
               </tbody>
             </table>
-            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 max-sm:flex-col max-sm:gap-2">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 Show
                 <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue">
@@ -850,7 +850,7 @@ export default function CDSPMaintenanceForm() {
           </button>
         </div>
 
-        <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between">
+        <div className="bg-brand-blue rounded-xl px-6 py-4 mb-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div>
             <h3 className="text-white text-base font-semibold m-0">{selectedActivity.title}</h3>
             <p className="text-white/80 text-sm mt-0.5">
@@ -872,6 +872,7 @@ export default function CDSPMaintenanceForm() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="max-lg:overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-brand-blue">
@@ -926,6 +927,7 @@ export default function CDSPMaintenanceForm() {
                 ))}
               </tbody>
             </table>
+            </div>
             <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rows per page:</span>

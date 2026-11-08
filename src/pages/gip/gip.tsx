@@ -579,7 +579,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                         <p className="font-semibold text-gray-800">{selectedWorkplace.workplaceName}</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                       <div><span className="text-gray-400">Address:</span> {selectedWorkplace.deploymentLocation || '—'}</div>
                       <div><span className="text-gray-400">Currently Assigned:</span> {selectedWorkplace.assignedCount}</div>
                       <div><span className="text-gray-400">Allowance:</span> {selectedWorkplace.allowance ? `₱${selectedWorkplace.allowance}/mo` : '—'}</div>
@@ -644,7 +644,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                       {isWithdrawn ? 'Withdrawn' : isCompleted ? 'Completed' : 'Ongoing'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                     <div><span className="text-gray-400">Address:</span> {currentWorkplace.deploymentLocation || '—'}</div>
                     <div><span className="text-gray-400">Allowance:</span> {currentWorkplace.allowance ? `₱${currentWorkplace.allowance}/mo` : '—'}</div>
                     {currentWorkplace.supervisor && <div><span className="text-gray-400">Supervisor:</span> {currentWorkplace.supervisor}</div>}
@@ -656,7 +656,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
                     to this person, not the (reusable, dateless) workplace. */}
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assignment Period</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                     <div><span className="text-gray-400">Start Date:</span> {viewWorkplaceTarget.assignmentHistory[0]?.assignedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].assignedDate) : '—'}</div>
                     <div><span className="text-gray-400">End Date:</span> {isWithdrawn && viewWorkplaceTarget.exitedAt ? fmtDate(viewWorkplaceTarget.exitedAt) : isCompleted && viewWorkplaceTarget.assignmentHistory[0]?.completedDate ? fmtDate(viewWorkplaceTarget.assignmentHistory[0].completedDate) : '—'}</div>
                   </div>
@@ -711,14 +711,14 @@ export default function GIPView({ onBack }: GIPViewProps) {
 
       {/* Main Content */}
       <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-5">
         <div className="mb-6 flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
           <p className="text-gray-800 font-bold" style={{ fontSize: 'var(--text-xl)' }}>Government Internship Program (GIP)</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-3 mb-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-sm:flex-wrap">
             <button onClick={() => setIsFormOpen(true)} disabled={!canManage('gip')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
               <Plus size={16} /><span>Add Applicant</span>
             </button>

@@ -2860,7 +2860,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
   return (
     <>
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-6 py-8 max-sm:px-3 max-sm:py-5">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -2870,7 +2870,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
       </div>
 
       {/* Configuration Card */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+      <div className="bg-white rounded-xl shadow-md p-6 max-sm:p-4 mb-6">
         <h3 className="text-gray-800 m-0 mb-4 flex items-center gap-2">
           <FileText size={20} className="text-[#0077BE]" />
           Report Configuration
@@ -3051,7 +3051,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             && !(reportCategory === 'gip' && gipReportType === 'aging') && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Select Report Period</label>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div className="relative">
                 <select value={reportPeriod} onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
                   className="appearance-none w-full pl-3 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0077BE] focus:border-transparent text-gray-900 text-sm">
@@ -3114,7 +3114,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <BarChart2 size={20} className="text-[#0077BE]" />
             Labor Market Information Summary
           </h3>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-5 max-lg:grid-cols-3 max-sm:grid-cols-2 gap-4">
             {[
               { label: 'Total Applicants', value: generatedReport.analytics.summary.totalApplicants, cls: 'blue' },
               { label: 'Total Vacancies', value: generatedReport.analytics.summary.totalVacancies, cls: 'purple' },
@@ -3135,7 +3135,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <BarChart2 size={20} className="text-[#0077BE]" />
             Labor Market Analytics
           </h3>
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-6 mb-6">
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">Placements Per Month</h4>
               <div className="space-y-3">
@@ -3180,7 +3180,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-6">
             {[
               { title: 'Top Job Vacancies', data: generatedReport.analytics.jobVacancyDistribution, color: '#3B82F6', key: 'jobTitle' },
               { title: 'Top Employers by Vacancies', data: generatedReport.analytics.employerParticipation, color: '#0066A3', key: 'employer' },
@@ -3216,7 +3216,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <BarChart2 size={20} className="text-[#0077BE]" />
             Report Analytics
           </h3>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-6">
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">Program / Service Participation</h4>
               <div className="space-y-3">
@@ -3272,7 +3272,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             <BarChart2 size={20} className="text-[#0077BE]" />
             Aging Analytics
           </h3>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-4 max-sm:gap-3 mb-6">
             <div className="rounded-lg border border-gray-200 p-4">
               <p className="text-sm text-gray-500 m-0">Placed</p>
               <p className="text-2xl font-bold text-emerald-600 m-0 mt-1">{generatedReport.analytics.placedCount}</p>
@@ -3282,7 +3282,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
               <p className="text-2xl font-bold text-amber-600 m-0 mt-1">{generatedReport.analytics.notPlacedCount}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 max-lg:grid-cols-1 gap-6">
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">Beneficiaries by Status</h4>
               <div className="space-y-3">
@@ -3364,7 +3364,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             {generatedReport.categoryName}
             {isGeneratedReportAging ? ' Aging Report' : ''} Summary
           </h3>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-4 mb-6">
             {[
               { label: 'Total Participants', value: generatedReport.analytics.total },
               { label: 'Male', value: generatedReport.analytics.male },
@@ -3437,7 +3437,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
         return (
         <>
         <div className="bg-white rounded-xl shadow-md">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="px-6 py-4 max-sm:px-4 border-b border-gray-200 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-3">
             <div>
               <h3 className="text-gray-800 m-0">Report Preview</h3>
               <p className="text-sm text-gray-500 m-0 mt-1">
@@ -3445,7 +3445,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
                 {generatedReport.programType && ` – ${generatedReport.programType}`}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-sm:w-full">
               <div className="relative">
                 <button onClick={() => setIsColumnMenuOpen(!isColumnMenuOpen)}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
@@ -3561,7 +3561,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
             </table>
           </div>
           {totalRows > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 rounded-b-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 rounded-b-xl max-sm:flex-col max-sm:items-start max-sm:gap-2">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 Show
                 <select
@@ -3609,7 +3609,7 @@ export default function ReportView({ onBack }: ReportViewProps) {
 
       {/* Empty State */}
       {!generatedReport && (
-        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+        <div className="bg-white rounded-xl shadow-md p-12 max-sm:p-6 text-center">
           <div className="flex justify-center mb-4">
             <BarChart2 size={64} className="text-gray-300" />
           </div>

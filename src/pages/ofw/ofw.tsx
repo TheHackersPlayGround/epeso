@@ -400,7 +400,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   return (
     <div className="h-full overflow-y-auto bg-brand-bg">
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-5">
 
         {/* Page title */}
         <div className="mb-6 flex items-center gap-4">
@@ -410,7 +410,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
         {/* Action buttons card */}
         <div className="bg-white rounded-xl shadow-md p-3 mb-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-sm:flex-wrap">
             <button
               onClick={() => setShowAddForm(true)}
               disabled={!canManage('ofw')}
@@ -431,7 +431,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
         {/* Search + Filter + Table card */}
         <div className="bg-white rounded-xl shadow-md p-4">
-          <div className="flex gap-3 mb-3">
+          <div className="flex gap-3 mb-3 max-lg:flex-col">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
@@ -694,7 +694,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                 <span className={`font-medium ${isCompleted ? 'text-green-600' : isRejected ? 'text-red-600' : 'text-brand-blue'}`}>{newStatus}</span>?
               </p>
 
-              <div className="flex gap-3 justify-end">
+              <div className="flex gap-3 justify-end max-sm:flex-col">
                 <button
                   onClick={() => setPendingStatusChange(null)}
                   disabled={statusAction.busy}

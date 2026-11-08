@@ -160,7 +160,7 @@ export default function CLPEPForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label htmlFor="clpep-interventionCategory" className={labelCls}>
               Intervention Category <span className="text-red-500">*</span>
@@ -211,7 +211,7 @@ export default function CLPEPForm({
       <div className="border-t pt-5 mb-6">
         <p className={sectionHeadingCls}>Implementation Details</p>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
           <div>
             <label htmlFor="clpep-date" className={labelCls}>
               Date <span className="text-red-500">*</span>
@@ -240,7 +240,7 @@ export default function CLPEPForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
           <div>
             <label htmlFor="clpep-partnerAgency" className={labelCls}>Partner Agency</label>
             <select

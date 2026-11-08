@@ -577,7 +577,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               I. PERSONAL INFORMATION
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Surname <span className="text-red-500">*</span></label>
                 <input
@@ -624,7 +624,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-5 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date of Birth <span className="text-red-500">*</span></label>
                 <div ref={dateOfBirthWrapRef}>
@@ -697,7 +697,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
 
             <div>
               <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Present Address</label>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-4 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">House No./Street</label>
                   <input
@@ -757,7 +757,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1">
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Has Disability?</label>
                 <select
@@ -774,7 +774,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   <option>Yes</option>
                   <option>No</option>
                 </select>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 max-sm:grid-cols-1">
                   <label className={`flex items-center text-sm ${hasDisabilityStatus === 'No' ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
                       type="checkbox"
@@ -898,7 +898,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
             {/* Employment Status / Type */}
             <div>
               <label className="block text-gray-700 mb-3 text-xs font-semibold uppercase">Employment Status / Type</label>
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1">
                 {/* Employed */}
                 <div>
                   <label className="flex items-center text-sm font-semibold mb-3">
@@ -1014,7 +1014,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <div className="flex items-center gap-4 mb-2">
                   <label className="block text-gray-700 text-xs font-semibold uppercase">An OFW?</label>
@@ -1087,7 +1087,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <div>
                 <div className="flex items-center gap-4 mb-2">
                   <label className="block text-gray-700 text-xs font-semibold uppercase">A 4Ps beneficiary?</label>
@@ -1245,7 +1245,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               III. LANGUAGE / DIALECT PROFICIENCY (check if applicable)
             </div>
             
-            <div className="border border-gray-300 rounded overflow-hidden">
+            <div className="max-lg:overflow-x-auto">
+            <div className="border border-gray-300 rounded overflow-hidden max-lg:min-w-[640px]">
               <div className="grid grid-cols-5 bg-brand-blue text-white">
                 <div className="px-4 py-3 border-r border-white font-bold uppercase text-xs">Language/Dialect</div>
                 <div className="px-4 py-3 border-r border-white font-bold uppercase text-xs text-center">Read</div>
@@ -1317,6 +1318,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   </div>
                 </div>
               ))}
+            </div>
             </div>
 
             <button
@@ -1399,7 +1401,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   <span>No</span>
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                   <input
@@ -1507,7 +1509,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   <span>No</span>
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                   <input
@@ -1590,7 +1592,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   <span>No</span>
                 </label>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                 <div>
                   <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                   <input
@@ -1662,7 +1664,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                       className="mr-1" /><span>No</span>
                   </label>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
                   <div>
                     <label className="block text-gray-600 mb-1 text-xs uppercase">Year Graduated</label>
                     <input type="text" value={gs.yearGraduated}
@@ -1706,7 +1708,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               V. TECHNICAL/VOCATIONAL AND OTHER TRAINING
             </div>
             
-            <div className="border border-gray-300 rounded overflow-hidden">
+            <div className="max-lg:overflow-x-auto">
+            <div className="border border-gray-300 rounded overflow-hidden max-lg:min-w-[900px]">
               <div className="grid grid-cols-5 bg-gray-200 text-black">
                 <div className="px-3 py-2 border-r border-gray-300 font-bold uppercase text-xs">Training/Vocational Course</div>
                 <div className="px-3 py-2 border-r border-gray-300 font-bold uppercase text-xs">Hours of Training</div>
@@ -1780,6 +1783,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                 </div>
               ))}
             </div>
+            </div>
 
             <button
               type="button"
@@ -1801,12 +1805,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
             
             {/* Eligibility Section */}
             <div className="border border-gray-300 rounded p-4">
-              <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded">
+              <div className="max-sm:overflow-x-auto">
+              <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded max-sm:min-w-[420px]">
                 <div className="text-black font-bold uppercase text-xs">Eligibility (Civil Service)</div>
                 <div className="text-black font-bold uppercase text-xs">Date Taken</div>
               </div>
               {formData.eligibilities.map((elig, index) => (
-                <div key={index} className="grid grid-cols-2 gap-4 mb-2">
+                <div key={index} className="grid grid-cols-2 gap-4 mb-2 max-sm:min-w-[420px]">
                   <input
                     type="text"
                     value={elig.eligibility}
@@ -1828,6 +1833,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   />
                 </div>
               ))}
+              </div>
               <button
                 type="button"
                 onClick={addEligibilityRow}
@@ -1840,12 +1846,13 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
 
             {/* Professional License Section */}
             <div className="border border-gray-300 rounded p-4">
-              <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded">
+              <div className="max-sm:overflow-x-auto">
+              <div className="grid grid-cols-2 gap-4 mb-3 bg-gray-200 p-3 rounded max-sm:min-w-[420px]">
                 <div className="text-black font-bold uppercase text-xs">Professional License (PRC)</div>
                 <div className="text-black font-bold uppercase text-xs">Valid Until</div>
               </div>
               {formData.professionalLicenses.map((license, index) => (
-                <div key={index} className="grid grid-cols-2 gap-4 mb-2">
+                <div key={index} className="grid grid-cols-2 gap-4 mb-2 max-sm:min-w-[420px]">
                   <input
                     type="text"
                     value={license.license}
@@ -1867,6 +1874,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   />
                 </div>
               ))}
+              </div>
               <button
                 type="button"
                 onClick={addProfessionalLicenseRow}
@@ -1887,7 +1895,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
             </div>
             
             <div className="border border-gray-300 rounded p-4">
-              <div className="text-black grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded">
+              <div className="max-lg:overflow-x-auto">
+              <div className="text-black grid grid-cols-5 gap-4 mb-3 bg-gray-200 p-3 rounded max-lg:min-w-[900px]">
                 <div className="font-bold uppercase text-xs">Company Name</div>
                 <div className="font-bold uppercase text-xs">Address (City/Municipality)</div>
                 <div className="font-bold uppercase text-xs">Position</div>
@@ -1895,7 +1904,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                 <div className="font-bold uppercase text-xs">Status</div>
               </div>
               {formData.workExperiences.map((exp, index) => (
-                <div key={index} className="grid grid-cols-5 gap-4 mb-2 items-start">
+                <div key={index} className="grid grid-cols-5 gap-4 mb-2 items-start max-lg:min-w-[900px]">
                   <input
                     type="text"
                     value={exp.companyName}
@@ -1955,6 +1964,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                   </select>
                 </div>
               ))}
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1982,7 +1992,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               VIII. OTHER SKILLS ACQUIRED WITHOUT CERTIFICATE
             </div>
             
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3 max-sm:grid-cols-1">
               {['AUTO MECHANIC', 'BEAUTICIAN', 'CARPENTRY WORK', 'COMPUTER LITERATE', 'DOMESTIC CHORES', 
                 'DRIVER', 'ELECTRICIAN', 'EMBROIDERY', 'GARDENING', 'MASONRY', 'PAINTER/ARTIST', 'PAINTING JOBS',
                 'PHOTOGRAPHY', 'PLUMBING', 'SEWING DRESSES', 'STENOGRAPHY', 'TAILORING'].map((skill) => (
@@ -2103,7 +2113,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
 
             <div className="px-4 space-y-4">
               {/* Date Applied + Received By (office use) */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
                 <div>
                   <label className="block text-gray-700 mb-2 text-sm font-semibold">Date Applied</label>
                   <DatePicker max={todayIso()}
@@ -2282,7 +2292,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
       {/* Personal Information */}
       <div>
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">I. Personal Information</h4>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm max-sm:grid-cols-1">
           <div><span className="font-semibold">Name:</span> {formData.surname}, {formData.firstName} {formData.middleName} {formData.suffix}</div>
           <div><span className="font-semibold">Date of Birth:</span> {formData.dateOfBirth}</div>
           <div><span className="font-semibold">Sex:</span> {formData.sex}</div>
@@ -2402,8 +2412,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
       {formData.trainings.some(t => t.course) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">V. Technical/Vocational and Other Training</h4>
-          <div className="border border-gray-300 rounded overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-gray-300 rounded overflow-hidden max-sm:overflow-x-auto">
+            <table className="w-full text-sm max-sm:min-w-[640px]">
               <thead>
                 <tr className="bg-gray-100 text-gray-700">
                   <th className="px-3 py-2 text-left font-semibold">Course</th>
@@ -2458,8 +2468,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
       {formData.workExperiences.some(e => e.companyName) && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">VII. Work Experience</h4>
-          <div className="border border-gray-300 rounded overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-gray-300 rounded overflow-hidden max-sm:overflow-x-auto">
+            <table className="w-full text-sm max-sm:min-w-[640px]">
               <thead>
                 <tr className="bg-gray-100 text-gray-700">
                   <th className="px-3 py-2 text-left font-semibold">Company Name</th>
@@ -2513,7 +2523,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
       {/* For PESO Office Only (+ attached documents) */}
       <div>
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. For PESO Office Only</h4>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3 max-sm:grid-cols-1">
           <div><span className="font-semibold">Date Applied:</span> {formData.dateApplicationReceived || '—'}</div>
           <div><span className="font-semibold">Received By:</span> {formData.receivedBy || '(your name)'}</div>
         </div>
@@ -2535,9 +2545,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-md flex">
+      <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
           {/* Left Navigation */}
-          <div className="w-72 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6 overflow-y-auto">
+          <div className="w-72 max-lg:!w-full bg-[#F8F9FA] border-r border-gray-200 max-lg:border-r-0 max-lg:border-b pt-[88px] max-lg:pt-6 px-6 max-sm:px-4 pb-6 overflow-y-auto">
             <nav className="space-y-2">
               {sections.map((section) => (
                 <button
@@ -2558,7 +2568,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
           {/* Right Content Area */}
           <div className="flex-1 flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+            <div className="flex items-center justify-between px-8 max-sm:px-4 py-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <Users size={20} className="text-brand-blue" />
                 <h3 className="text-gray-800 m-0 text-base font-medium">{isEditMode ? 'Edit applicant' : 'Add new applicant'}</h3>
@@ -2572,12 +2582,12 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
             </div>
 
             {/* Form Content */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-6">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 max-sm:px-4 py-6">
               {renderSectionContent()}
             </form>
 
             {/* Footer Actions */}
-            <div className="border-t border-gray-200 px-8 py-4 flex justify-end gap-3">
+            <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex justify-end gap-3 max-sm:flex-col">
               <button
                 type="button"
                 onClick={draft.requestClose}

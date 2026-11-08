@@ -208,7 +208,7 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EDE9FE' }}>
             <Users size={18} style={{ color: BRAND }} />
@@ -224,10 +224,10 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
+        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8 max-sm:p-4">
           <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Last Name" value={profile.lastName} />
             <Field label="First Name" value={profile.firstName} />
             <Field label="Middle Name" value={profile.middleName} />
@@ -281,7 +281,7 @@ export function ViewProfilePanel({ profile, onClose }: { profile: SkillsTraining
           </div>
 
           <SectionDivider numeral="V" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Date Applied" value={profile.dateApplicationReceived} />
             <Field label="Received By" value={profile.receivedBy} />
             <Field label="Status" value={profile.status} />
@@ -438,7 +438,7 @@ export default function SkillsTrainingProfileForm({
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EDE9FE' }}>
             <Users size={18} style={{ color: BRAND }} />
@@ -450,11 +450,11 @@ export default function SkillsTrainingProfileForm({
         <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
+        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8 max-sm:p-4">
 
           <SectionDivider numeral="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
               <input ref={lastNameRef} className={`${inpFocus} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter last name" />
@@ -471,7 +471,7 @@ export default function SkillsTrainingProfileForm({
               {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div ref={birthdateWrapRef}>
               <label className={lbl}>Birthdate <span className="text-red-500">*</span></label>
               <div className={`rounded-lg ${fieldMessage('birthdate') ? 'ring-2 ring-red-200' : ''}`}>
@@ -492,7 +492,7 @@ export default function SkillsTrainingProfileForm({
               {fieldMessage('civilStatus') && <p className="text-red-500 text-xs mt-1">{fieldMessage('civilStatus')}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div ref={sexWrapRef}>
               <label className={lbl}>Sex <span className="text-red-500">*</span></label>
               <div className={`flex gap-6 mt-2 rounded-lg ${fieldMessage('sex') ? 'ring-2 ring-red-200 p-2' : ''}`}>
@@ -513,7 +513,7 @@ export default function SkillsTrainingProfileForm({
           </div>
 
           <p className="text-xs font-bold text-gray-900 uppercase tracking-wide mt-6 mb-6">Address</p>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Province</label>
               <SearchableSelect
@@ -563,7 +563,7 @@ export default function SkillsTrainingProfileForm({
 
           <SectionDivider numeral="II" title="Classification" />
           <p className="text-xs text-gray-400 -mt-1 mb-3 italic">Please check the box(es) that best apply to you.</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             {CLASSIFICATION_OPTIONS.map(opt => (
               <CheckItem key={opt} label={opt} checked={formData.classification.includes(opt)} onChange={() => toggleArr('classification', opt)} />
             ))}
@@ -572,7 +572,7 @@ export default function SkillsTrainingProfileForm({
 
           <SectionDivider numeral="III" title="Desired Qualification" />
           <p className="text-xs text-gray-400 -mt-1 mb-3 italic">Select the qualification(s) you wish to train for.</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
             {qualificationOptions.map(opt => (
               <CheckItem key={opt} label={opt} checked={formData.desiredQualification.includes(opt)} onChange={() => toggleArr('desiredQualification', opt)} />
             ))}
@@ -589,7 +589,7 @@ export default function SkillsTrainingProfileForm({
           <OtherSpecifyField values={formData.purposeOther} placeholder="Specify other purpose..." onUpdate={vals => set({ purposeOther: vals })} />
 
           <SectionDivider numeral="V" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
               <DatePicker max={todayIso()} className={inpFocus} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />

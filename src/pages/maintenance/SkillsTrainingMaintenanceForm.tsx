@@ -496,7 +496,7 @@ export default function SkillsTrainingMaintenanceForm() {
           <p className="text-gray-500 mb-5">
             Select an action for <span className="text-brand-blue font-medium">Skills Training</span>
           </p>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); setTrainingSubView('') })}
                 disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
@@ -623,7 +623,7 @@ export default function SkillsTrainingMaintenanceForm() {
           <p className="text-gray-500 mb-5">
             Select an action for <span className="text-brand-blue font-medium">Skills Training</span>
           </p>
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             {ACTION_CARDS.map(card => (
               <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); setTrainingSubView('') })}
                 disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
@@ -664,7 +664,7 @@ export default function SkillsTrainingMaintenanceForm() {
         <p className="text-gray-500 mb-5">
           Select an action for <span className="text-brand-blue font-medium">Skills Training</span>
         </p>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
           {ACTION_CARDS.map(card => (
             <button key={card.key} onClick={() => requestLeave(() => { setAction(card.key); resetAdd(); setTrainingSubView('') })}
               disabled={card.label.startsWith('Add') && !canManage('skills-maintenance')}
@@ -730,7 +730,7 @@ export default function SkillsTrainingMaintenanceForm() {
           </div>
 
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="bg-brand-blue px-6 py-4 flex items-center justify-between">
+            <div className="bg-brand-blue px-6 py-4 flex items-center justify-between max-sm:flex-col max-sm:items-start max-sm:gap-2">
               <div>
                 <h3 className="text-white m-0">Training List</h3>
               </div>
@@ -803,7 +803,7 @@ export default function SkillsTrainingMaintenanceForm() {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 max-sm:flex-col max-sm:gap-2">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     Show
                     <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }} className="border border-gray-300 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:border-brand-blue">

@@ -75,7 +75,7 @@ function PlacementsSearchBar({
 
   return (
     <div className="flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-48">
+      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -363,7 +363,7 @@ function ViewPlacementModal({ placement, onClose, onNavigateToVacancy }: {
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 max-sm:grid-cols-1">
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Applicant Name</p>
               <p className="text-sm font-medium text-gray-800">{placement.applicantName}</p>
@@ -513,7 +513,7 @@ function EditPlacementModal({ placement, onClose, onSave }: EditPlacementModalPr
           </button>
         </div>
 
-        <div className="px-6 py-5 grid grid-cols-2 gap-x-6 gap-y-4 overflow-y-auto">
+        <div className="px-6 py-5 grid grid-cols-2 gap-x-6 gap-y-4 overflow-y-auto max-sm:grid-cols-1">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">Applicant Name</label>
             <input type="text" value={placement.applicantName} readOnly className={readOnlyCls} />

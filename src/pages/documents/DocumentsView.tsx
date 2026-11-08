@@ -784,9 +784,9 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
           </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex max-lg:flex-col overflow-hidden">
           {/* Left Sidebar */}
-          <div className="w-64 bg-white border-r-2 border-gray-300 flex-shrink-0 flex flex-col overflow-hidden">
+          <div className="w-64 max-lg:!w-full bg-white border-r-2 border-gray-300 max-lg:border-r-0 max-lg:border-b-2 flex-shrink-0 flex flex-col overflow-hidden max-lg:max-h-56">
             <p className="text-base font-bold text-gray-700 uppercase tracking-wide flex-shrink-0 px-4 pt-4 pb-3">Folders</p>
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               {renderFolderTree('root')}
@@ -822,7 +822,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Action bar */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 max-sm:flex-wrap">
                 <input type="file" id="doc-upload" multiple onChange={handleFileSelect} disabled={!canManage('documents') || isUploading} className="hidden" />
                 <label htmlFor={canManage('documents') && !isUploading ? 'doc-upload' : undefined}
                   className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm ${isUploading ? 'opacity-70 cursor-wait pointer-events-none' : canManage('documents') ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed pointer-events-none'}`}

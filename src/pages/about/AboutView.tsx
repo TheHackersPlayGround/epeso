@@ -22,14 +22,14 @@ export default function AboutView({ onBack }: AboutViewProps) {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="py-12 px-8">
+        <div className="py-12 px-8 max-sm:py-8 max-sm:px-4">
 
           {/* Header — logos side by side */}
-          <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-12">
-            <div className="flex items-center justify-center gap-6 mb-4">
-              <img src={logoImage} alt="PESO Logo" className="w-36 h-36 object-contain" />
-              <div className="w-px h-28 bg-gray-200" />
-              <img src={cityLogo} alt="City of Tangub Seal" className="w-36 h-36 object-contain" />
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-12 max-sm:mb-8">
+            <div className="flex items-center justify-center gap-6 max-sm:gap-3 mb-4">
+              <img src={logoImage} alt="PESO Logo" className="w-36 h-36 max-sm:w-20 max-sm:h-20 object-contain" />
+              <div className="w-px h-28 max-sm:h-16 bg-gray-200" />
+              <img src={cityLogo} alt="City of Tangub Seal" className="w-36 h-36 max-sm:w-20 max-sm:h-20 object-contain" />
             </div>
             <p className="text-gray-800 text-sm mb-0.5">PESO Tangub City</p>
             <p className="text-gray-400 text-xs">Public Employment Service Office</p>

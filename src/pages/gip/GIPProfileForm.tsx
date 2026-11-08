@@ -191,7 +191,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
@@ -206,10 +206,10 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
           <Sec num="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Last Name" value={applicant.lastName} />
             <Field label="First Name" value={applicant.firstName} />
             <Field label="Middle Name" value={applicant.middleName} />
@@ -221,7 +221,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             <Field label="Email" value={applicant.email} />
           </div>
           <Sec num="II" title="Address" />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Region" value={applicant.region} />
             <Field label="Province" value={applicant.province} />
             <Field label="City / Municipality" value={applicant.cityMunicipality} />
@@ -238,7 +238,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           {(() => {
             const { showYearLevel, showStrand, showCourse, showYearGraduated } = educationFieldFlags(applicant.highestEducation)
             return (
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
                 <Field label="Highest Education" value={applicant.highestEducation} />
                 <Field label="School / University" value={applicant.schoolName} />
                 {showStrand && <Field label="Strand" value={applicant.strand} />}
@@ -249,7 +249,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
             )
           })()}
           <Sec num="V" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
             <Field label="Status" value={applicant.status} />
@@ -460,7 +460,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
 
   return (
     <div className="h-full bg-brand-bg flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
@@ -472,11 +472,11 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
         <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
         <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
 
           <SectionDivider num="I" title="Personal Information" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Last Name <span className="text-red-500">*</span></label>
               <input ref={lastNameRef} className={`${inp} ${errCls('lastName')}`} value={formData.lastName} onChange={e => { set({ lastName: e.target.value }); clearFieldError('lastName') }} placeholder="Enter surname" />
@@ -493,7 +493,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
               {fieldMessage('middleName') && <p className="text-red-500 text-xs mt-1">{fieldMessage('middleName')}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
               <label className={lbl}>Sex <span className="text-red-500">*</span></label>
               <select ref={sexRef} className={`${sel} ${errCls('sex')}`} value={formData.sex} onChange={e => { set({ sex: e.target.value as GIPApplicant['sex'] }); clearFieldError('sex') }}>
@@ -512,7 +512,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
               <input type="number" className={`${inp} bg-gray-50`} value={formData.birthdate && formData.age >= 0 ? formData.age : ''} readOnly placeholder="From birthdate" />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Civil Status <span className="text-red-500">*</span></label>
               <select ref={civilStatusRef} className={`${sel} ${errCls('civilStatus')}`} value={formData.civilStatus} onChange={e => { set({ civilStatus: e.target.value }); clearFieldError('civilStatus') }}>
@@ -533,7 +533,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           </div>
 
           <SectionDivider num="II" title="Address" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Province</label>
               <SearchableSelect
@@ -584,7 +584,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           <SectionDivider num="III" title="Classification" />
           <div
             ref={classificationWrapRef}
-            className={`grid grid-cols-2 gap-3 p-2 -m-2 rounded-lg ${fieldErrors.classification ? 'ring-2 ring-red-200' : ''}`}
+            className={`grid grid-cols-2 max-sm:grid-cols-1 gap-3 p-2 -m-2 rounded-lg ${fieldErrors.classification ? 'ring-2 ring-red-200' : ''}`}
           >
             {CLASSIFICATION_OPTIONS.map(opt => (
               <CheckItem
@@ -614,7 +614,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           {(() => {
             const { showYearLevel, showStrand, showCourse, showYearGraduated } = educationFieldFlags(formData.highestEducation)
             return (
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
                 <div className="col-span-2">
                   <label className={lbl}>Highest Educational Attainment <span className="text-red-500">*</span></label>
                   <select
@@ -667,7 +667,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
           })()}
 
           <SectionDivider num="V" title="For PESO Office Only" gray />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
               <label className={lbl}>Date Applied</label>
               <DatePicker max={todayIso()} className={inp} value={formData.dateApplicationReceived} onChange={value => set({ dateApplicationReceived: value })} />
@@ -691,7 +691,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             />
           </div>
 
-          <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100">
+          <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100 max-sm:flex-col">
             <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button onClick={handleSave} disabled={(draft.saving || dup.checking)} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
               {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}

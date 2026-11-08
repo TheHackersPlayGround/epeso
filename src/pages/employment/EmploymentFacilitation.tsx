@@ -106,7 +106,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+        <div className="flex items-start justify-between px-6 pt-6 pb-4 max-sm:px-4 max-sm:pt-4 border-b border-gray-100">
           <div>
             <p className="text-xl font-bold text-gray-900">Refer Applicant to Job Vacancy</p>
             <p className="text-sm text-gray-500 mt-0.5">Applicant: {applicant.name}</p>
@@ -116,7 +116,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
           </button>
         </div>
 
-        <div className="px-6 py-6">
+        <div className="px-6 py-6 max-sm:px-4 max-sm:py-4">
           {referred ? (
             <div className="flex flex-col items-center gap-4 text-center py-4">
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -750,7 +750,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
     <>
     <div className="min-h-full flex flex-col bg-brand-bg">
       {/* Title row */}
-      <div className="px-8 pt-7 pb-5 flex items-center gap-4">
+      <div className="px-8 pt-7 pb-5 max-sm:px-4 max-sm:pt-5 max-sm:pb-3 flex items-center gap-4">
         <button onClick={onBack} aria-label="Back to dashboard" className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft size={24} /></button>
         <p className="text-2xl font-bold text-gray-800 m-0 p-0 leading-tight">
           Employment Facilitation
@@ -758,16 +758,16 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       </div>
 
       {/* Tabs card */}
-      <div className="px-7.5 pb-2">
-        <div className="bg-white rounded-xl shadow-sm px-6">
-          <nav role="tablist" aria-label="Employment Facilitation tabs" className="flex gap-0">
+      <div className="px-7.5 pb-2 max-sm:px-3">
+        <div className="bg-white rounded-xl shadow-sm px-6 max-sm:px-2 overflow-x-auto">
+          <nav role="tablist" aria-label="Employment Facilitation tabs" className="flex gap-0 w-max min-w-full">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 role="tab"
                 aria-selected={activeTab === tab.id}
                 onClick={() => requestLeave(() => { handleCloseSidebar(); setActiveTab(tab.id); })}
-                className={`px-6 py-4 text-base font-medium border-b-2 transition-colors ${
+                className={`px-6 py-4 max-sm:px-4 max-sm:py-3 whitespace-nowrap text-base font-medium border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? "border-brand-blue text-brand-blue"
                     : "border-transparent text-gray-500 hover:text-gray-700"
@@ -781,7 +781,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       </div>
 
       {/* Tab content */}
-      <div className="p-6">
+      <div className="p-6 max-sm:p-3">
         {activeTab === "applicants" && (
           isLoadingApplicants ? (
             <div className="flex items-center justify-center py-24 text-gray-400 text-sm">

@@ -375,7 +375,7 @@ function ApplicantsSearchBar({
 
   return (
     <div className="flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-48">
+      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -459,8 +459,8 @@ function ApplicantsToolbar({
   onShowResumeMaker,
 }: ApplicantsToolbarProps) {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex gap-2">
+    <div className="flex items-center justify-between max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+      <div className="flex gap-2 max-sm:flex-wrap">
         <button
           onClick={onAddApplicant}
           disabled={!canManage('employment')}

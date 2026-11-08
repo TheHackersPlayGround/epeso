@@ -736,7 +736,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                         {selectedTraining.status}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                       {selectedTraining.location && <div className="col-span-2"><span className="text-gray-400">Location: </span>{selectedTraining.location}</div>}
                       {selectedTraining.date && <div><span className="text-gray-400">Date: </span>{selectedTraining.date}</div>}
                       {selectedTraining.participants != null && <div><span className="text-gray-400">Slots: </span>{selectedTraining.assignedCount}/{selectedTraining.participants}</div>}
@@ -801,7 +801,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
       {/* Main scrollable content */}
       <div className="h-full overflow-y-auto bg-brand-bg">
-        <div className="w-full px-6 py-8">
+        <div className="w-full px-6 py-8 max-sm:px-3 max-sm:py-4">
 
           <div className="mb-6 flex items-center gap-4">
             <button onClick={onBack} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -813,7 +813,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
           </div>
 
           <div className="bg-white rounded-xl shadow-md p-3 mb-4">
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-sm:flex-wrap">
               <button onClick={() => setIsFormOpen(true)} disabled={!canManage('skills')} className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
                 <Plus size={16} /><span>Add Profile</span>
               </button>
@@ -829,7 +829,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
 
           <div className="bg-white rounded-xl shadow-md p-4">
             <div className="mb-4">
-            <div className="flex gap-3">
+            <div className="flex gap-3 max-sm:flex-wrap">
               <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
@@ -1036,7 +1036,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                 </tbody>
               </table>
               {sortedProfiles.length > 0 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 max-sm:flex-col max-sm:items-start max-sm:gap-2">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     Show
                     <select

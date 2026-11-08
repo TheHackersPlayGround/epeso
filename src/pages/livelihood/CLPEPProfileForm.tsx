@@ -341,7 +341,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="I. PERSONAL INFORMATION" />
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label htmlFor="clpep-lastName" className={labelClass}>
               Last Name <span className="text-red-500">*</span>
@@ -392,7 +392,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-4">
           <div ref={birthdateWrapRef}>
             <label htmlFor="clpep-birthdate" className={labelClass}>
               Birthdate <span className="text-red-500">*</span>
@@ -443,7 +443,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="II. ADDRESS INFORMATION" />
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-4">
           <div>
             <label className={labelClass}>Province</label>
             <SearchableSelect
@@ -579,7 +579,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label htmlFor="clpep-schoolName" className={labelClass}>{schoolNameLabel}</label>
             <input
@@ -623,7 +623,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label htmlFor="clpep-guardianRelationship" className={labelClass}>Relationship</label>
             <SelectDropdown
@@ -786,10 +786,10 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
 
   return (
     <>
-    <div className="bg-white rounded-xl shadow-md flex">
+    <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
       {/* Left sidebar — section stepper */}
-      <div className="w-72 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6">
+      <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
           {STEPS.map((step, stepIndex) => (
             <button
@@ -812,7 +812,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
             <h3 className="text-gray-800 m-0 text-base font-medium">{headerTitle}</h3>
@@ -828,7 +828,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
         </div>
 
         {/* Form content */}
-        <form onSubmit={handleSubmit} className="px-8 py-6">
+        <form onSubmit={handleSubmit} className="px-8 py-6 max-sm:px-4 max-sm:py-4">
           {/* CSS-based disabling instead of the native fieldset `disabled`
               attribute -- that cascades to every button inside it, including
               the document preview button, which should stay clickable even
@@ -839,7 +839,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
         </form>
 
         {/* Footer — navigation buttons */}
-        <div className="border-t border-gray-200 px-8 py-4 flex items-center justify-between gap-3">
+        <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
               <button

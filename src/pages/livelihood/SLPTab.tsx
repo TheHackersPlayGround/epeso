@@ -225,8 +225,8 @@ function SearchBar({
   const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
 
   return (
-    <div className="flex gap-3">
-      <div className="relative flex-1">
+    <div className="flex gap-3 max-sm:flex-wrap">
+      <div className="relative flex-1 max-sm:min-w-48">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
@@ -535,7 +535,7 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
                     {confirmProject.status}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                   <div><span className="text-gray-400">SLP Track:</span> {confirmProject.slpTrack || '—'}</div>
                   <div><span className="text-gray-400">Date Started:</span> {confirmProject.dateStarted || '—'}</div>
                   <div><span className="text-gray-400">Location:</span> {confirmProject.location || '—'}</div>
@@ -918,7 +918,7 @@ function BeneficiaryTable({ beneficiaries, projects, isFiltered, activeFilters, 
         </tbody>
       </table>
       {beneficiaries.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 max-sm:flex-col max-sm:items-start max-sm:gap-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             Show
             <select
@@ -1297,7 +1297,7 @@ export default function SLPTab() {
           <p className="text-gray-800 font-bold text-xl">SLP</p>
           <p className="text-gray-500 text-sm mt-0.5">Sustainable Livelihood Program</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 max-sm:flex-wrap">
         <button
           onClick={() => setIsAddOpen(true)}
           disabled={!canManage('livelihood')}

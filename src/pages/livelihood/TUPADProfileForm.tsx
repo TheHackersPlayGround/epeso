@@ -297,7 +297,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="I. PERSONAL INFORMATION" />
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label className={labelClass}>Last Name <span className="text-red-500">*</span></label>
             <input ref={lastNameRef} className={`${inputClass} ${errCls('lastName')}`} placeholder="Enter last name" value={formData.lastName ?? ''} onChange={e => { updateField({ lastName: e.target.value }); clearFieldError('lastName') }} />
@@ -319,7 +319,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-5 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label className={labelClass}>Sex <span className="text-red-500">*</span></label>
             <select ref={sexRef} className={`${selectClass} ${errCls('sex')}`} value={formData.sex ?? ''} onChange={e => { updateField({ sex: e.target.value as TUPADApplicant['sex'] }); clearFieldError('sex') }}>
@@ -363,7 +363,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       <div className="space-y-5">
         <SectionHeader title="II. ADDRESS INFORMATION" />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
           <div>
             <label className={labelClass}>Province</label>
             <SearchableSelect
@@ -465,10 +465,10 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
 
   return (
     <>
-    <div className="bg-white rounded-xl shadow-md flex">
+    <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
       {/* Left sidebar — step selector */}
-      <div className="w-72 bg-[#F8F9FA] border-r border-gray-200 pt-[88px] px-6 pb-6">
+      <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
           {STEPS.map((step, idx) => (
             <button
@@ -491,7 +491,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
             <h3 className="text-gray-800 m-0 text-base font-medium">{headerTitle}</h3>
@@ -514,7 +514,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         </div>
 
         {/* Step content */}
-        <div className="flex-1 px-8 py-6 overflow-y-auto">
+        <div className="flex-1 px-8 py-6 max-sm:px-4 max-sm:py-4 overflow-y-auto">
           {/* CSS-based disabling instead of the native fieldset `disabled`
               attribute -- that cascades to every button inside it, including
               the document preview button, which should stay clickable even
@@ -525,7 +525,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         </div>
 
         {/* Footer — navigation */}
-        <div className="border-t border-gray-200 px-8 py-4 flex items-center justify-between gap-3">
+        <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
               <button type="button" onClick={handlePrevious} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">

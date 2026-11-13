@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Users, Upload, Download, FileText, Eye, Loader2 } from 'lucide-react'
 import type { GIPApplicant, GIPSavedDocument } from '../../contexts/GIPContext'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -12,6 +12,9 @@ import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachme
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
 import { classificationLabels } from '../../utils/classification'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText, listText } from '../../kiosk/kioskReviewUtils'
 
 // ─── Exported constants ────────────────────────────────────────────────────────
 
@@ -171,9 +174,10 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: { docs: GIPSavedDocum
 
 // ─── Exported view panel ───────────────────────────────────────────────────────
 
-export function ViewApplicantPanel({ applicant, onClose }: {
+export function ViewApplicantPanel({ applicant, onClose, hideStatus = false }: {
   applicant: GIPApplicant
   onClose: () => void
+  hideStatus?: boolean
 }) {
   const [previewDoc, setPreviewDoc] = useState<GIPSavedDocument | null>(null)
   const Field = ({ label, value }: { label: string; value: string | number | undefined }) => (
@@ -202,7 +206,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge status={applicant.status} />
+          {!hideStatus && <StatusBadge status={applicant.status} />}
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
         </div>
       </div>
@@ -252,12 +256,14 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
             <Field label="Date Applied" value={applicant.dateApplicationReceived} />
             <Field label="Received By" value={applicant.receivedBy} />
-            <Field label="Status" value={applicant.status} />
+            {!hideStatus && <Field label="Status" value={applicant.status} />}
             <Field label="Remarks" value={applicant.remarks} />
           </div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mt-12 mb-4">Attached Documents</p>
+          {/* Same spacing as the other fields: a row gap above, and the value right under its label. */}
+          <div className="mt-5">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Attached Documents</p>
           {applicant.attachedDocuments && applicant.attachedDocuments.length > 0 ? (
-            <ul className="space-y-1.5">
+            <ul className="space-y-1.5 pt-2">
               {applicant.attachedDocuments.map((doc) => (
                 <li key={doc.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
                   <Download size={14} className="text-gray-400 rotate-180" />
@@ -273,6 +279,7 @@ export function ViewApplicantPanel({ applicant, onClose }: {
           ) : (
             <p className="text-sm text-gray-400">No documents attached.</p>
           )}
+          </div>
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
@@ -282,19 +289,31 @@ export function ViewApplicantPanel({ applicant, onClose }: {
 
 // ─── Default export: form ──────────────────────────────────────────────────────
 
-export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
+export default function GIPProfileForm({ initial, mode, onSave, onClose, kiosk = false, noDraft = false }: {
   initial: Omit<GIPApplicant, 'id'>
   mode: 'add' | 'edit'
   onSave: (data: Omit<GIPApplicant, 'id'>) => void
   onClose: () => void
+  /** Applicant self-service kiosk: no staff-only section, documents, drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }) {
-  const [formData, setFormData] = useState(initial)
+  // The kiosk shows the form one section per step. Staff always see the whole form.
+  const KIOSK_STEPS = 4
+  const [kStep, setKStep] = useState(1)
+  const topRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (kStep > 1) topRef.current?.scrollIntoView({ block: 'start' }) }, [kStep])
+  const [formData, setFormData] = useState(() => withDefaultReceivedBy(initial, mode === 'add' && !kiosk))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('gip')
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'gip-applicant', mode: mode, formData, setFormData,
     provinceId, setProvinceId, cityId, setCityId, onClose,
+    enabled: !kiosk && !noDraft,
   })
   const [previewDoc, setPreviewDoc] = useState<GIPSavedDocument | null>(null)
   const { fieldErrors, clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
@@ -339,7 +358,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
 
   // Sex, birthdate, civil status, and barangay are NOT NULL in the DB;
   // name fields also reject digits/symbols.
-  const handleSave = () => {
+  const handleSave = (advance = false) => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()
     const middleName = formData.middleName.trim()
@@ -427,10 +446,23 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk) {
+      const stepOf = (field: string) => ({ barangay: 2, classification: 3, classificationOther: 3, highestEducation: 4, schoolName: 4, strand: 4, course: 4 } as Record<string, number>)[field] ?? 1
+      if (advance) {
+        // Next: only this step's answers are checked, then on to the next step.
+        if (runValidation(errors.filter(e => stepOf(e.field) === kStep))) return
+        setKStep(Math.min(kStep + 1, KIOSK_STEPS))
+        return
+      }
+      // Submit: everything is checked; if something earlier is missing, go back to that step.
+      if (errors.length > 0) setKStep(Math.min(...errors.map(e => stepOf(e.field))))
+    }
     if (runValidation(errors)) return
 
+    // The kiosk has no staff data to check against; duplicates are flagged for staff in the Pending inbox.
+    if (kiosk) { setKioskPayload(formData); return }
     void dup.confirmSave(mode, { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate }, initial)
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)(formData) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy(formData, mode === 'add')) })
   }
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
@@ -458,23 +490,55 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
     </label>
   )
 
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'II', title: 'Address', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
+    { numeral: 'III', title: 'Classification', text: listText(f.classification, f.classificationOther) || 'None selected' },
+    { numeral: 'IV', title: 'Educational Background', rows: [['Highest Educational Attainment', f.highestEducation], ['School / University', f.schoolName], ['Strand', f.strand], ['Course', f.course], ['Year Level', f.yearLevel], ['Year Graduated', f.yearGraduated]] },
+    ]
+  }
+
   return (
     <div className="h-full bg-brand-bg flex flex-col">
+      {!kiosk && (
       <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             <Users size={18} className="text-brand-blue" />
           </div>
           <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>
-            {mode === 'edit' ? 'Edit Applicant Profile' : 'Add New Applicant — GIP'}
+            {kiosk ? 'Applicant Registration — GIP' : mode === 'edit' ? 'Edit Applicant Profile' : noDraft ? 'Review Kiosk Submission — GIP' : 'Add New Applicant — GIP'}
           </p>
         </div>
-        <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+        {!kiosk && <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>}
       </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8">
+      <div className={`flex-1 overflow-y-auto ${kiosk ? '' : 'p-8 max-sm:p-4'}`}>
+        <div className={`${kiosk ? 'w-full' : 'max-w-3xl'} mx-auto bg-white rounded-xl shadow-sm p-8`}>
+          <div ref={topRef} />
+          {kiosk && (
+            <div className="pb-4 mb-2 border-b border-gray-200">
+              <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <Users size={18} className="text-brand-blue" />
+          </div>
+                <p className="text-gray-800 font-semibold m-0" style={{ fontSize: 'var(--text-md)' }}>Applicant Registration — GIP</p>
+                <span className="ml-auto text-sm text-gray-500">Step {kStep} of {KIOSK_STEPS}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={KIOSK_STEPS} aria-valuenow={kStep}>
+                <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(kStep / KIOSK_STEPS) * 100}%` }} />
+              </div>
+            </div>
+          )}
 
+          {(!kiosk || kStep === 1) && (<>
           <SectionDivider num="I" title="Personal Information" />
           <div className="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
             <div>
@@ -532,6 +596,9 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
+          </>)}
+
+          {(!kiosk || kStep === 2) && (<>
           <SectionDivider num="II" title="Address" />
           <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
@@ -581,6 +648,9 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           </div>
 
+          </>)}
+
+          {(!kiosk || kStep === 3) && (<>
           <SectionDivider num="III" title="Classification" />
           <div
             ref={classificationWrapRef}
@@ -610,6 +680,9 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
           )}
 
+          </>)}
+
+          {(!kiosk || kStep === 4) && (<>
           <SectionDivider num="IV" title="Educational Background" />
           {(() => {
             const { showYearLevel, showStrand, showCourse, showYearGraduated } = educationFieldFlags(formData.highestEducation)
@@ -666,6 +739,9 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             )
           })()}
 
+          </>)}
+
+          {!kiosk && (<>
           <SectionDivider num="V" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
             <div>
@@ -674,7 +750,7 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
             </div>
             <div>
               <label className={lbl}>Received By</label>
-              <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} placeholder="Enter staff name" />
+              <input className={inp} value={formData.receivedBy} onChange={e => set({ receivedBy: e.target.value })} onBlur={() => set(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, mode === 'add' && !kiosk))} placeholder="Enter staff name" />
             </div>
             <div className="col-span-2">
               <label className={lbl}>Remarks</label>
@@ -690,19 +766,52 @@ export default function GIPProfileForm({ initial, mode, onSave, onClose }: {
               onPreview={setPreviewDoc}
             />
           </div>
+          </>)}
 
+          {kiosk ? (
+            <div className="mt-8 pt-4 border-t border-gray-200 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+              <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+                Cancel
+              </button>
+              <div className="flex gap-3 max-sm:w-full">
+                {kStep > 1 && (
+                  <button type="button" onClick={() => setKStep(kStep - 1)} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                    Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSave(kStep < KIOSK_STEPS)}
+                  disabled={draft.saving}
+                  className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+                >
+                  {kStep < KIOSK_STEPS ? 'Next' : 'Submit'}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-gray-100 max-sm:flex-col">
-            <button onClick={draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button onClick={handleSave} disabled={(draft.saving || dup.checking)} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+            <button onClick={kiosk ? onClose : draft.requestClose} className="px-6 py-2.5 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
+            <button onClick={() => handleSave()} disabled={(draft.saving || dup.checking)} className="px-8 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
               {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-              {mode === 'edit' ? 'Save Changes' : 'Save Profile'}
+              {kiosk ? 'Submit' : mode === 'edit' ? 'Save Changes' : noDraft ? 'Approve & Save' : 'Save Profile'}
             </button>
           </div>
+          )}
 
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </div>
   )

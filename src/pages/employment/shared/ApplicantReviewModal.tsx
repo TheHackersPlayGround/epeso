@@ -9,6 +9,9 @@ type ApplicantReviewModalProps = {
   onBackToEdit: () => void
   // If this returns a promise, both buttons stay locked and the confirm button shows a spinner until it settles.
   onConfirm: () => unknown
+  /** Button labels; default to "Confirm & Save" / "Back to Edit". */
+  confirmText?: string
+  backText?: string
 }
 
 export default function ApplicantReviewModal({
@@ -18,6 +21,8 @@ export default function ApplicantReviewModal({
   summaryContent,
   onBackToEdit,
   onConfirm,
+  confirmText = 'Confirm & Save',
+  backText = 'Back to Edit',
 }: ApplicantReviewModalProps) {
   const [saving, setSaving] = useState(false)
   const mounted = useRef(true)
@@ -72,7 +77,7 @@ export default function ApplicantReviewModal({
             disabled={saving}
             className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Back to Edit
+            {backText}
           </button>
           <button
             type="button"
@@ -81,7 +86,7 @@ export default function ApplicantReviewModal({
             className="flex-1 py-2.5 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
-            Confirm &amp; Save
+            {confirmText}
           </button>
         </div>
       </div>

@@ -15,6 +15,12 @@ export async function listApplicants(): Promise<Applicant[]> {
   return res.data.data ?? []
 }
 
+// GET /api/employment/getApplicant/{id} -> one saved applicant (summary + full form data)
+export async function getApplicant(id: number): Promise<Applicant> {
+  const res = await axiosClient.get<{ status: string; data: Applicant }>(`${ENDPOINTS.employment.getApplicant}/${id}`)
+  return res.data.data
+}
+
 // GET getApplicantPhoto/{id} -> 2x2 photo as a base64 data URL (or null), so the
 // Resume Builder can embed it in the PDF without cross-origin canvas tainting.
 export async function getApplicantPhoto(id: number): Promise<string | null> {
@@ -53,11 +59,13 @@ export async function getApplicantHistory(id: number): Promise<EmploymentHistory
   return res.data.data
 }
 
-// POST /api/employment/createApplicant -> new beneficiary id
-export async function createApplicant(formData: ApplicantFormData): Promise<number> {
+// POST /api/employment/createApplicant -> new beneficiary id.
+// Pass `submissionId` when approving a kiosk submission from the Pending inbox: the backend then
+// marks that submission Approved in the same transaction as the save.
+export async function createApplicant(formData: ApplicantFormData, submissionId?: number): Promise<number> {
   const res = await axiosClient.post<{ status: string; data: { id: number } }>(
     ENDPOINTS.employment.createApplicant,
-    formData,
+    submissionId !== undefined ? { ...formData, submissionId } : formData,
   )
   return res.data.data.id
 }

@@ -12,6 +12,9 @@ import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachme
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText, yesNo } from '../../kiosk/kioskReviewUtils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -195,23 +198,28 @@ type CLPEPProfileFormProps = {
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
+  /** Applicant self-service kiosk: only the applicant's own sections, no drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdit }: CLPEPProfileFormProps) {
+export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdit, kiosk = false, noDraft = false }: CLPEPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
-    ...EMPTY_CLPEP_RECORD,
-    ...initial,
-  })
+  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>(() => withDefaultReceivedBy({ ...EMPTY_CLPEP_RECORD, ...initial }, mode === 'add' && !kiosk))
   const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('clpep')
+  // The last section of every form is "PESO OFFICE ONLY": applicants at the kiosk never see it.
+  const steps = kiosk ? STEPS.slice(0, -1) : STEPS
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'clpep-beneficiary', mode: mode, formData, setFormData,
-    provinceId, setProvinceId, cityId, setCityId, onClose,
+    provinceId, setProvinceId, cityId, setCityId, onClose, enabled: !kiosk && !noDraft,
   })
 
   const isViewMode = mode === 'view'
@@ -239,7 +247,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   }
 
   function handleNext() {
-    if (currentStep < STEPS.length) setCurrentStep(step => step + 1)
+    if (currentStep < steps.length) setCurrentStep(step => step + 1)
   }
 
   function handlePrevious() {
@@ -253,7 +261,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     setTimeout(run, 50)
   }
 
-  function handleSubmit(event?: React.FormEvent) {
+  function handleSubmit(event?: React.FormEvent, advance = false) {
     event?.preventDefault()
     const errors: ValidationError[] = []
 
@@ -289,14 +297,22 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk && advance) {
+      // Next: only this step's answers are checked, then on to the next step.
+      const stepOf = (field: string) => (field === 'barangay' ? 2 : 1)
+      if (runValidation(errors.filter(e => stepOf(e.field) === currentStep))) return
+      handleNext()
+      return
+    }
     if (runValidation(errors)) return
 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension]
       .filter(Boolean)
       .join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
+    if (kiosk) { setKioskPayload({ ...formData, name: fullName }); return }
     void dup.confirmSave(mode, { firstName: formData.firstName ?? '', lastName: formData.lastName ?? '', birthdate: formData.birthdate ?? '' }, initial)
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)({ ...formData, name: fullName }) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy({ ...formData, name: fullName }, mode === 'add')) })
   }
 
   function handleDocumentUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -727,14 +743,26 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           )}
         </div>
 
-        <div>
-          <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
-          <DatePicker max={todayIso()}
-            id="clpep-dateApplied"
-            className={inputClass}
-            value={formData.dateApplied ?? ''}
-            onChange={value => updateField({ dateApplied: value })}
-          />
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="clpep-dateApplied" className={labelClass}>Date Applied</label>
+            <DatePicker max={todayIso()}
+              id="clpep-dateApplied"
+              className={inputClass}
+              value={formData.dateApplied ?? ''}
+              onChange={value => updateField({ dateApplied: value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="clpep-receivedBy" className={labelClass}>Received By</label>
+            <input
+              id="clpep-receivedBy"
+              className={inputClass}
+              placeholder="Enter name of receiver"
+              value={formData.receivedBy ?? ''}
+              onChange={e => updateField({ receivedBy: e.target.value })} onBlur={() => updateField(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, mode === 'add' && !kiosk))}
+            />
+          </div>
         </div>
 
         <div>
@@ -746,17 +774,6 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             placeholder="Enter remarks"
             value={formData.remarks ?? ''}
             onChange={e => updateField({ remarks: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="clpep-receivedBy" className={labelClass}>Received By</label>
-          <input
-            id="clpep-receivedBy"
-            className={inputClass}
-            placeholder="Enter name of receiver"
-            value={formData.receivedBy ?? ''}
-            onChange={e => updateField({ receivedBy: e.target.value })}
           />
         </div>
       </div>
@@ -774,13 +791,24 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     }
   }
 
-  const headerTitle = isViewMode
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex]] },
+    { numeral: 'II', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
+    { numeral: 'III', title: 'Child Labor Information', rows: [['Child Labor Status', f.childLaborStatus], ['Nature of Work', f.natureOfWork], ['Currently Working', yesNo(f.currentlyWorking)], ['Hours Worked Per Week', f.hoursWorkedPerWeek], ['School Status', f.schoolStatus], ['School Name', f.schoolName], ['Grade / Year Level', f.gradeYearLevel]] },
+    { numeral: 'IV', title: 'Parent / Guardian', rows: [['Name', f.guardianName], ['Relationship', f.guardianRelationship], ['Contact Number', f.guardianContactNumber]] },
+    ]
+  }
+
+  const headerTitle = kiosk ? 'Applicant Registration — CLPEP' : isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add'
       ? 'Add new profile - CLPEP'
       : 'Edit profile - CLPEP'
 
-  const isLastStep = currentStep === STEPS.length
+  const isLastStep = currentStep === steps.length
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -788,10 +816,11 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
     <>
     <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
-      {/* Left sidebar — section stepper */}
+      {/* Left sidebar — section stepper (staff only: applicants at the kiosk just go step by step) */}
+      {!kiosk && (
       <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
-          {STEPS.map((step, stepIndex) => (
+          {steps.map((step, stepIndex) => (
             <button
               key={step.id}
               type="button"
@@ -807,11 +836,31 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           ))}
         </nav>
       </div>
+      )}
 
       {/* Right content area */}
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
+        {kiosk ? (
+          <div className="px-8 max-sm:px-4 py-5 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Users size={22} className="text-brand-blue" />
+                <h3 className="text-gray-800 m-0 text-lg font-semibold">{headerTitle}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">Step {currentStep} of {steps.length}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={currentStep}>
+              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(currentStep / steps.length) * 100}%` }} />
+            </div>
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
@@ -819,13 +868,14 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
           </div>
           <button
             type="button"
-            onClick={draft.requestClose}
+            onClick={kiosk ? onClose : draft.requestClose}
             aria-label="Close form"
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X size={24} className="text-gray-600" />
           </button>
         </div>
+        )}
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6 max-sm:px-4 max-sm:py-4">
@@ -839,6 +889,28 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
         </form>
 
         {/* Footer — navigation buttons */}
+        {kiosk ? (
+          <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+            <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+              Cancel
+            </button>
+            <div className="flex gap-3 max-sm:w-full">
+              {currentStep > 1 && (
+                <button type="button" onClick={handlePrevious} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                  Back
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => (isLastStep ? handleSubmit() : handleSubmit(undefined, true))}
+                disabled={draft.saving}
+                className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+              >
+                {isLastStep ? 'Submit' : 'Next'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
@@ -857,7 +929,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -886,7 +958,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -899,7 +971,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
                     {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-                    {mode === 'add' ? 'Save' : 'Save Changes'}
+                    {kiosk ? 'Submit' : mode === 'add' ? (noDraft ? 'Approve & Save' : 'Save') : 'Save Changes'}
                   </button>
                 ) : (
                   <button
@@ -914,12 +986,22 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
             )}
           </div>
         </div>
+        )}
 
       </div>
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </>
   )

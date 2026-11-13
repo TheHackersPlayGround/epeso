@@ -48,7 +48,6 @@ const SECTION_SLP_INFO: TemplateSection = {
   requiredArgb: 'FF5B9BD5',
   optionalArgb: 'FF9DC3E6',
   columns: [
-    { header: 'SLP Participant ID Number', width: 22, example: 'SLP-2026-001' },
     { header: 'Participant Type', width: 16, example: 'Non-4Ps', required: true, options: PARTICIPANT_TYPE_OPTIONS },
     { header: 'Eligibility Type', width: 20, example: 'Regular', options: [...ELIGIBILITY_TYPE_OPTIONS] },
     { header: 'Referring Party (if Referral)', width: 24, example: '' },
@@ -112,7 +111,6 @@ const SECTION_ASSESSMENT: TemplateSection = {
     { header: 'Vulnerability Severity', width: 18, example: 'Low', options: [...VULNERABILITY_SEVERITY_OPTIONS] },
     { header: 'Assessment Result', width: 16, example: 'Qualified', options: [...ASSESSMENT_RESULT_OPTIONS] },
     { header: 'SLP Track', width: 20, example: 'Enterprise - Individual', options: [...SLP_TRACK_OPTIONS] },
-    { header: 'Remarks', width: 24, example: '' },
   ],
 }
 
@@ -122,8 +120,10 @@ const SECTION_OFFICE: TemplateSection = {
   requiredArgb: 'FF94A3B8',
   optionalArgb: 'FFCBD5E1',
   columns: [
+    { header: 'SLP Participant ID Number', width: 22, example: 'SLP-2026-001' },
     { header: 'Date Applied (MM/DD/YYYY)', width: 20, example: '' },
     { header: 'Received By', width: 20, example: '' },
+    { header: 'Remarks', width: 24, example: '' },
   ],
 }
 

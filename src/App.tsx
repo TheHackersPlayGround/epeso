@@ -12,11 +12,13 @@ import DocumentsView from './pages/documents/DocumentsView'
 import SkillsTrainingView from './pages/skills-training/SkillsTrainingView'
 import Maintenance from './pages/maintenance/Maintenance'
 import SecurityView from './pages/security/SecurityView'
-import { canView, diffPermissionLevels, type PermissionChange, type StoredUser } from './utils/permissions'
+import { canView, diffPermissionLevels, type ModuleKey, type PermissionChange, type StoredUser } from './utils/permissions'
 import LivelihoodView from './pages/livelihood/LivelihoodView'
 import ReportView from './pages/report/ReportView'
 import AboutView from './pages/about/AboutView'
 import ProfileView from './pages/profile/ProfileView'
+import PendingView from './pages/pending/PendingView'
+import { usePendingCount } from './hooks/usePendingCount'
 import { CDSPProvider } from './contexts/CDSPContext'
 import { GIPProvider } from './contexts/GIPContext'
 import { SPESProvider } from './contexts/SPESContext'
@@ -37,12 +39,15 @@ import NavLeaveGuard from './components/NavLeaveGuard'
 import PermissionChangeModal from './pages/shared/PermissionChangeModal'
 import './styles/App.css'
 
-type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile'
+type Page = 'dashboard' | 'cdsp' | 'gip' | 'spes' | 'ofw' | 'employment' | 'skills' | 'documents' | 'maintenance' | 'livelihood' | 'security' | 'report' | 'about' | 'profile' | 'pending'
 
 // Renders the current page and its navbar based on navigation state.
 function AppContent({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState('Dashboard')
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
+  // Kiosk submissions waiting for review: only people who can view Employment Facilitation see them.
+  const canSeePending = ['employment', 'cdsp', 'gip', 'spes', 'skills', 'livelihood', 'ofw'].some(m => canView(m as ModuleKey))
+  const { count: pendingCount, signature: pendingSignature, refresh: refreshPending } = usePendingCount(canSeePending)
 
   // Switches the current page by module id.
   const nav = (id: string) => {
@@ -77,10 +82,13 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
           setActiveTab(tab)
           if (tab === 'About PESO') setCurrentPage('about')
           if (tab === 'Dashboard') setCurrentPage('dashboard')
+          if (tab === 'Applications') setCurrentPage('pending')
         })}
         onLogout={onLogout}
         onProfileClick={() => requestLeave(() => setCurrentPage('profile'))}
         username={navUsername}
+        showPending={canSeePending}
+        pendingCount={pendingCount}
       />
       <NavLeaveGuard />
     </>
@@ -230,6 +238,28 @@ function AppContent({ onLogout }: { onLogout: () => void }) {
         {navbar}
         <div className="flex-1 overflow-y-auto bg-gray-50">
           <AboutView onBack={() => requestLeave(() => { setCurrentPage('dashboard'); setActiveTab('Dashboard') })} />
+        </div>
+      </div>
+    )
+  }
+
+  if (currentPage === 'pending') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {navbar}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          {canSeePending ? (
+            <PendingView
+              onBack={() => requestLeave(() => { setCurrentPage('dashboard'); setActiveTab('Dashboard') })}
+              onChanged={() => { void refreshPending() }}
+              refreshSignal={pendingSignature}
+            />
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-gray-800 text-lg font-semibold mb-1">Access denied</p>
+              <p className="text-gray-500 text-sm">You don't have permission to see pending applications.</p>
+            </div>
+          )}
         </div>
       </div>
     )

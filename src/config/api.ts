@@ -26,6 +26,28 @@ export const ENDPOINTS = {
   duplicates: {
     check: '/duplicates/check',
   },
+  // Public endpoints for the applicant kiosk (/apply/): no login.
+  kiosk: {
+    status: '/kiosk/status',
+    provinces: '/kiosk/provinces',
+    cities: '/kiosk/cities',
+    barangaysByCity: '/kiosk/barangaysByCity',
+    allCities: '/kiosk/allCities',
+    cdspServices: '/kiosk/cdspServices',
+    skillsOptions: '/kiosk/skillsOptions',
+    submit: '/kiosk/submit',
+  },
+  // Staff side of the kiosk: the Pending inbox.
+  submissions: {
+    list: '/submissions/list',
+    counts: '/submissions/counts',
+    get: '/submissions/get',
+    reject: '/submissions/reject',
+    delete: '/submissions/delete',
+    kioskSettings: '/submissions/kioskSettings',
+    setKiosk: '/submissions/setKiosk',
+    setKioskPrograms: '/submissions/setKioskPrograms',
+  },
   employment: {
     listApplicants: '/employment/listApplicants',
     getApplicant: '/employment/getApplicant',

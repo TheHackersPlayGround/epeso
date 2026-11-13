@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Briefcase,
-  Users,
-  Sprout,
-  Wrench,
-  Plane,
   Settings,
   Shield,
   FileText,
-  Building2,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   FolderOpen,
 } from 'lucide-react'
+// The same program logos the applicant kiosk uses, so both sides look alike.
+import efLogo from '../../kiosk/logos/ef.png'
+import cdspLogo from '../../kiosk/logos/cdsp.png'
+import gipLogo from '../../kiosk/logos/gip.png'
+import spesLogo from '../../kiosk/logos/spes.png'
+import livelihoodLogo from '../../kiosk/logos/livelihood.png'
+import skillsLogo from '../../kiosk/logos/skills.png'
+import ofwLogo from '../../kiosk/logos/ofw.png'
 import h1 from '../../assets/h1.png'
 import h2 from '../../assets/h2.jpg'
 import h3 from '../../assets/h3.jpg'
@@ -48,13 +49,13 @@ const bannerSlides = [
 ]
 
 const pesoPrograms = [
-  { id: 'employment', name: 'Employment Facilitation', icon: Briefcase,     color: '#F47C2C' },
-  { id: 'cdsp',       name: 'CDSP',                   icon: Users,          color: '#3B82F6' },
-  { id: 'gip',        name: 'GIP',                    icon: Building2,      color: '#0EA5E9' },
-  { id: 'spes',       name: 'SPES',                   icon: BookOpen,       color: '#EC4899' },
-  { id: 'livelihood', name: 'Livelihood',              icon: Sprout,         color: '#10B981' },
-  { id: 'skills',     name: 'Skills Training',         icon: Wrench, color: '#8B5CF6' },
-  { id: 'ofw',        name: 'OFW',                    icon: Plane,          color: '#F59E0B' },
+  { id: 'employment', name: 'Employment Facilitation', logo: efLogo },
+  { id: 'cdsp',       name: 'CDSP',                    logo: cdspLogo },
+  { id: 'gip',        name: 'GIP',                     logo: gipLogo },
+  { id: 'spes',       name: 'SPES',                    logo: spesLogo },
+  { id: 'livelihood', name: 'Livelihood',              logo: livelihoodLogo },
+  { id: 'skills',     name: 'Skills Training',         logo: skillsLogo },
+  { id: 'ofw',        name: 'OFW',                     logo: ofwLogo },
 ]
 
 const quickAccess = [
@@ -145,7 +146,6 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
         </p>
         <div className="grid mt-5 grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 gap-5 max-sm:gap-3">
           {pesoPrograms.map((module) => {
-            const Icon = module.icon
             return (
               <button
                 key={module.id}
@@ -155,11 +155,8 @@ export default function Dashboard({ onModuleClick }: DashboardProps) {
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = '#0077BE' }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'transparent' }}
               >
-                <div
-                  className="w-16 h-16 max-sm:w-12 max-sm:h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                  style={{ backgroundColor: `${module.color}20` }}
-                >
-                  <Icon size={30} className="max-sm:size-5" style={{ color: module.color }} strokeWidth={1.75} />
+                <div className="w-16 h-16 max-sm:w-12 max-sm:h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                  <img src={module.logo} alt="" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-gray-700 text-center font-semibold" style={{ fontSize: 'var(--text-sm)' }}>
                   {module.name}

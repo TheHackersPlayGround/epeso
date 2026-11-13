@@ -29,6 +29,8 @@ import AssignedItemModal, { type AssignedItemAction } from '../../components/Ass
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import dilpLogo from '../../kiosk/logos/dilp.png'
+import tupadLogo from '../../kiosk/logos/tupad.png'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1436,16 +1438,21 @@ export default function DILEEPTab() {
                 <button
                   key={program}
                   onClick={() => setActiveProgram(program)}
-                  className={`flex-1 py-5 rounded-xl border transition-colors ${
+                  className={`flex-1 py-4 px-5 rounded-xl border transition-colors ${
                     activeProgram === program
                       ? 'bg-brand-blue border-brand-blue text-white'
                       : 'bg-blue-50 border-brand-blue text-brand-blue hover:bg-blue-100'
                   }`}
                 >
-                  <p className="text-xl font-bold">{isDILP ? 'DILP' : 'TUPAD'}</p>
-                  <p className={`text-sm mt-1 font-normal ${activeProgram === program ? 'text-white/80' : 'text-brand-blue/70'}`}>
-                    {isDILP ? 'DOLE Integrated Livelihood Program' : 'Tulong Panghanapbuhay sa Ating Disadvantaged/Displaced Workers'}
-                  </p>
+                  <div className="flex items-center justify-center gap-4">
+                    <img src={isDILP ? dilpLogo : tupadLogo} alt="" className="h-[72px] w-[72px] object-contain shrink-0" />
+                    <span className="text-left">
+                      <p className="text-xl font-bold">{isDILP ? 'DILP' : 'TUPAD'}</p>
+                      <p className={`text-sm mt-1 font-normal ${activeProgram === program ? 'text-white/80' : 'text-brand-blue/70'}`}>
+                        {isDILP ? 'DOLE Integrated Livelihood Program' : 'Tulong Panghanapbuhay sa Ating Disadvantaged/Displaced Workers'}
+                      </p>
+                    </span>
+                  </div>
                 </button>
               )
             })}

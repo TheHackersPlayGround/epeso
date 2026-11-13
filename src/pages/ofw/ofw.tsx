@@ -7,7 +7,7 @@ import { requestTypeText } from '../../utils/ofwRequestType'
 import ConfirmModal from '../shared/ConfirmModal'
 import { canManage } from '../../utils/permissions'
 import * as XLSX from 'xlsx'
-import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
+import type { OFWProfile } from '../../contexts/OFWContext'
 import { useOFW } from '../../contexts/OFWContext'
 import * as ofwService from '../../services/ofwService'
 import AddOFWRequestForm, { EMPLOYMENT_STATUS_OPTIONS, REQUEST_TYPES } from './AddOFWRequestForm'
@@ -15,6 +15,7 @@ import OFWProfileModal from './OFWProfileModal'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { logSheetExport } from '../../services/activityLogService'
+import { toOfwApiPayload } from './ofwPayload'
 
 interface OFWViewProps {
   onBack: () => void
@@ -22,22 +23,6 @@ interface OFWViewProps {
 
 function errMsg(e: unknown, fallback: string) {
   return (e as { message?: string })?.message ?? fallback
-}
-
-// Converts the form's OWWA/ELPOR fields into the backend's named-slot wire
-// format; an absent key means "remove this slot", so every set slot must be sent.
-function buildNamedAttachments(elporFiles?: Record<string, OFWSavedAttachment>, owwaWelfareFile?: OFWSavedAttachment | null) {
-  const named: Record<string, { fileName: string; dataUrl?: string }> = {}
-  if (owwaWelfareFile) named['OWWA Welfare Case Form'] = { fileName: owwaWelfareFile.fileName, dataUrl: owwaWelfareFile.dataUrl }
-  for (const [type, att] of Object.entries(elporFiles ?? {})) {
-    named[type] = { fileName: att.fileName, dataUrl: att.dataUrl }
-  }
-  return named
-}
-
-function toApiPayload(data: Omit<OFWProfile, 'id'>) {
-  const { elporFiles, owwaWelfareFile, ...rest } = data
-  return { ...rest, namedAttachments: buildNamedAttachments(elporFiles, owwaWelfareFile) }
 }
 
 type FilterKey = 'referenceNo' | 'dateFiled' | 'status' | 'employmentStatus' | 'address' | 'typeOfRequest'
@@ -222,7 +207,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
   // ── Profile handlers ──────────────────────────────────────────
   const handleAddProfile = async (data: Omit<OFWProfile, 'id'>) => {
     try {
-      await ofwService.createProfile(toApiPayload(data))
+      await ofwService.createProfile(toOfwApiPayload(data))
       await refreshProfiles()
       setShowAddForm(false)
       setResultModal({ isOpen: true, type: 'success', title: 'Success', message: 'OFW profile has been added successfully.' })
@@ -233,7 +218,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
 
   const handleUpdateProfile = async (updated: OFWProfile) => {
     try {
-      await ofwService.updateProfile(updated.id, toApiPayload(updated))
+      await ofwService.updateProfile(updated.id, toOfwApiPayload(updated))
       await refreshProfiles()
       setEditProfile(null)
       setViewProfile(null)

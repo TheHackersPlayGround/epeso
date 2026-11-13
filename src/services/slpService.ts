@@ -26,8 +26,15 @@ export function listProfiles() {
   return axiosClient.get(ENDPOINTS.slp.listProfiles).then(r => r.data)
 }
 
-export function createProfile(data: Record<string, unknown>) {
-  return axiosClient.post(ENDPOINTS.slp.createProfile, data).then(r => r.data)
+// Pass `submissionId` when approving a kiosk submission from the Pending inbox: the backend then marks that
+// submission Approved in the same transaction as the save.
+export function createProfile(data: Record<string, unknown>, submissionId?: number) {
+  return axiosClient.post(ENDPOINTS.slp.createProfile, submissionId !== undefined ? { ...data, submissionId } : data).then(r => r.data)
+}
+
+// One saved profile (same shape as a list item), e.g. to show an approved kiosk submission as it is in the records.
+export function getProfile(id: number) {
+  return axiosClient.get(`${ENDPOINTS.slp.getProfile}/${id}`).then(r => r.data.data)
 }
 
 // All-or-nothing batch create: the backend validates every row and writes

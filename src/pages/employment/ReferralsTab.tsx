@@ -199,19 +199,11 @@ function ReferralsFilterBadges({
 type ReferralsTableProps = {
   referrals: Referral[]
   isFiltered: boolean
-  activeFilters: string[]
   onUpdateStatus: (r: Referral) => void
   onRemove: (id: number) => void | Promise<void>
 }
 
-// Active filters that map to a column NOT already shown by default get added to
-// the table. (Status is already a default column, so it is intentionally absent.)
-const EXTRA_COLUMNS: Record<string, { label: string; get: (r: Referral) => string }> = {
-  employer: { label: 'Employer', get: r => r.employer },
-}
-
-function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, onRemove }: ReferralsTableProps) {
-  const extraCols = activeFilters.filter(f => f in EXTRA_COLUMNS)
+function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: ReferralsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is the button's position; pos is the menu's final placement, corrected
   // by measuring its real rendered height once mounted (see layout effect below).
@@ -268,18 +260,16 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
           <tr className="bg-brand-blue">
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Applicant Name</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Job Title</th>
+            <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Employer</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Date Referred</th>
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
-            {extraCols.map(id => (
-              <th key={id} className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">{EXTRA_COLUMNS[id].label}</th>
-            ))}
             <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>
           {referrals.length === 0 ? (
             <tr>
-              <td colSpan={5 + extraCols.length} className="py-16 text-center">
+              <td colSpan={6} className="py-16 text-center">
                 <div className="flex flex-col items-center gap-3 text-gray-400">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
@@ -303,13 +293,11 @@ function ReferralsTable({ referrals, isFiltered, activeFilters, onUpdateStatus, 
               <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.applicantName}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.jobTitle}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.employer || '—'}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.referralDate}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <ReferralStatusBadge status={r.status} />
                 </td>
-                {extraCols.map(id => (
-                  <td key={id} className="px-4 py-3 text-gray-600 whitespace-nowrap">{EXTRA_COLUMNS[id].get(r) || '—'}</td>
-                ))}
                 <td className="px-4 py-3 whitespace-nowrap">
                   <button
                     onClick={e => handleToggleMenu(e, r.id)}
@@ -449,13 +437,10 @@ export default function ReferralsTab() {
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
 
-  const availableFilters: FilterOption[] = useMemo(() => {
-    const employers = [...new Set(referrals.map(r => r.employer).filter(Boolean))].sort()
-    return [
-      { id: 'status', label: 'Status', options: FILTER_STATUS_OPTIONS },
-      { id: 'employer', label: 'Employer', options: employers },
-    ]
-  }, [referrals])
+  // Employer is a default table column, so it is not a filter.
+  const availableFilters: FilterOption[] = useMemo(() => [
+    { id: 'status', label: 'Status', options: FILTER_STATUS_OPTIONS },
+  ], [])
 
   function handleAddFilter(id: string) {
     setActiveFilters(prev => [...prev, id])
@@ -562,7 +547,6 @@ export default function ReferralsTab() {
       const value = filterValues[filterId]
       if (!value) continue
       if (filterId === 'status') result = result.filter(r => r.status === value)
-      if (filterId === 'employer') result = result.filter(r => r.employer === value)
     }
 
     if (sortOrder) {
@@ -625,7 +609,6 @@ export default function ReferralsTab() {
         <ReferralsTable
           referrals={paginated}
           isFiltered={isFiltered}
-          activeFilters={activeFilters}
           onUpdateStatus={setUpdatingReferral}
           onRemove={handleRemoveReferral}
         />

@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { useFormDraft } from '../../../hooks/useFormDraft';
 import { useDuplicateCheck } from '../../../hooks/useDuplicateCheck';
 import { X, Users, Plus, Upload, Trash2, FileText, Eye, Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../h
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../../utils/attachments';
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
 import { todayIso } from '../../../utils/formatDate';
+import { currentUserFullName } from '../../../utils/currentUser';
 
 interface ApplicantFormData {
   // Personal Information
@@ -191,6 +192,10 @@ interface AddApplicantSidebarProps {
   /** Id of the applicant being edited, so the duplicate check never flags the record itself. */
   applicantId?: number;
   isEditMode?: boolean;
+  /** Applicant self-service kiosk: only the applicant-facing sections (I-VIII), step by step, nothing staff-only. */
+  kiosk?: boolean;
+  /** Staff reviewing a kiosk submission: no saved drafts (a draft from one submission would be offered for the next). */
+  noDraft?: boolean;
 }
 
 type Section = 'personalInfo' | 'jobPreference' | 'language' | 'education' | 'training' | 'eligibility' | 'workExperience' | 'otherSkills' | 'referredProgram' | 'documents';
@@ -206,7 +211,7 @@ interface UploadedDocument {
   url?: string;     // public URL for already-stored files
 }
 
-export default function AddApplicantSidebar({ onSave, onClose, initialData, applicantId, isEditMode = false }: AddApplicantSidebarProps) {
+export default function AddApplicantSidebar({ onSave, onClose, initialData, applicantId, isEditMode = false, kiosk = false, noDraft = false }: AddApplicantSidebarProps) {
   const dup = useDuplicateCheck('ef');
   const [activeSection, setActiveSection] = useState<Section>('personalInfo');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -225,6 +230,9 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
   const defaultFormData: ApplicantFormData = createDefaultApplicantFormData();
   const [formData, setFormData] = useState<ApplicantFormData>(() => {
     const merged = { ...defaultFormData, ...initialData };
+    // Received By starts as the logged-in staff member (still editable: the person encoding isn't always
+    // the one who took the form). An edit keeps whatever was saved; the kiosk applicant never sees the field.
+    if (!isEditMode && !kiosk && !merged.receivedBy) merged.receivedBy = currentUserFullName();
     // An applicant with no saved job preferences yet should still start with
     // the same blank rows the Add Applicant form shows, not an empty table.
     if (!merged.jobPreferences || merged.jobPreferences.length === 0) {
@@ -257,9 +265,11 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
     forDraft: (d) => ({ ...d, form: { ...d.form, savedDocuments: [] }, uploaded: [], photoSize: 0 }),
     draftNote: 'Uploaded documents and the ID photo are not kept in a draft.',
     onClose,
+    // The kiosk keeps nothing on the computer, and a reviewed submission must not offer another's draft.
+    enabled: !kiosk && !noDraft,
   });
 
-  const sections = [
+  const allSections = [
     { id: 'personalInfo' as Section, label: 'I. PERSONAL INFORMATION' },
     { id: 'jobPreference' as Section, label: 'II. JOB PREFERENCE' },
     { id: 'language' as Section, label: 'III. LANGUAGE / DIALECT PROFICIENCY' },
@@ -271,6 +281,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
     { id: 'referredProgram' as Section, label: 'IX. REFERRED PROGRAM' },
     { id: 'documents' as Section, label: 'X. FOR PESO OFFICE ONLY' },
   ];
+  // The kiosk leaves out the staff sections (Referred Program, For PESO Office Only / documents).
+  const sections = kiosk ? allSections.filter(s => s.id !== 'referredProgram' && s.id !== 'documents') : allSections;
 
   type RequiredKey = 'firstName' | 'surname' | 'dateOfBirth' | 'sex' | 'civilStatus' | 'contactNumber' | 'barangay' | 'municipality' | 'province';
 
@@ -348,6 +360,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
 
   // Opens the review step, first warning if this person is already recorded in Employment Facilitation.
   const openReview = async () => {
+    // The kiosk cannot (and must not) look anyone up; staff see duplicates in the Pending inbox.
+    if (kiosk) { setShowConfirmation(true); return; }
     const saved = initialData
       ? { id: applicantId, firstName: initialData.firstName, lastName: initialData.surname, birthdate: initialData.dateOfBirth }
       : undefined;
@@ -363,22 +377,45 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
     void openReview();
   };
 
+  // Received By falls back to the logged-in staff member whenever it is left empty: on Add, and on Edit when
+  // the applicant already had a name that was cleared. (An old record that never had one stays blank until
+  // someone types a name: the server keeps a blank on Edit as "unchanged", so we must send the name ourselves.)
+  const defaultsReceivedBy = !kiosk && (!isEditMode || !!initialData?.receivedBy);
+  const fillReceivedBy = (current: string) => (defaultsReceivedBy && !current.trim() ? currentUserFullName() : current);
+
   const handleConfirmSave = async () => {
     // The review pop-up stays open (with a spinner on its button) until the server answers.
     try {
       // onSave persists to the backend; await so a failure doesn't show success.
-      await draft.wrapSave(onSave)({ ...formData, profileImage });
+      await draft.wrapSave(onSave)({ ...formData, receivedBy: fillReceivedBy(formData.receivedBy), profileImage });
       setShowConfirmation(false);
+      // The kiosk shows its own thank-you screen (with the reference number) instead.
+      if (kiosk) { onClose(); return; }
       setResultModal({
         isOpen: true, type: 'success', title: 'Success!',
         message: isEditMode
           ? 'Applicant profile has been successfully updated.'
           : 'Applicant has been successfully added to the system.',
       });
-    } catch {
+    } catch (err) {
       setShowConfirmation(false);
-      setResultModal({ isOpen: true, type: 'error', title: 'Save failed', message: 'Could not save the applicant. Please try again.' });
+      const reason = err instanceof Error && err.message ? ` (${err.message})` : '';
+      setResultModal({
+        isOpen: true, type: 'error',
+        title: kiosk ? 'Could not submit' : 'Save failed',
+        message: kiosk
+          ? `Your application could not be submitted${reason}. Please try again, or ask the staff for help.`
+          : noDraft
+            ? `Could not approve this submission${reason}.`
+            : 'Could not save the applicant. Please try again.',
+      });
     }
+  };
+
+  // Kiosk only: go back one step (the wizard has no left-hand menu).
+  const handleBack = () => {
+    const currentIndex = sections.findIndex(s => s.id === activeSection);
+    if (currentIndex > 0) setActiveSection(sections[currentIndex - 1].id);
   };
 
   const handleNext = () => {
@@ -396,10 +433,14 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
     }
   };
 
-  const isLastSection = () => {
-    const currentIndex = sections.findIndex(s => s.id === activeSection);
-    return currentIndex === sections.length - 1;
-  };
+  const stepIndex = sections.findIndex(s => s.id === activeSection);
+  const isLastSection = () => stepIndex === sections.length - 1;
+
+  // Kiosk: scroll back to the top of the form when moving between steps.
+  const kioskTopRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (kiosk) kioskTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [kiosk, activeSection]);
 
   type CheckboxField = 'hasDisability' | 'otherSkills' | 'cdspPrograms' | 'livelihoodPrograms' | 'dileepPrograms';
   const toggleCheckbox = (field: CheckboxField, value: string) => {
@@ -2128,6 +2169,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none text-sm text-gray-900 placeholder:text-gray-500"
                     value={formData.receivedBy}
                     onChange={(e) => setFormData({ ...formData, receivedBy: e.target.value })}
+                    // Leaving it empty puts the logged-in name back (see fillReceivedBy).
+                    onBlur={() => setFormData(prev => ({ ...prev, receivedBy: fillReceivedBy(prev.receivedBy) }))}
                     placeholder="Enter staff name"
                   />
                 </div>
@@ -2510,8 +2553,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
         </div>
       )}
 
-      {/* Referred Program */}
-      {formData.referredProgram && (
+      {/* Referred Program (staff only) */}
+      {!kiosk && formData.referredProgram && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">IX. Referred Program</h4>
           <div className="text-sm">
@@ -2520,15 +2563,17 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
         </div>
       )}
 
-      {/* For PESO Office Only (+ attached documents) */}
+      {/* For PESO Office Only (+ attached documents): staff only */}
+      {!kiosk && (
       <div>
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. For PESO Office Only</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3 max-sm:grid-cols-1">
           <div><span className="font-semibold">Date Applied:</span> {formData.dateApplicationReceived || '—'}</div>
-          <div><span className="font-semibold">Received By:</span> {formData.receivedBy || '(your name)'}</div>
+          <div><span className="font-semibold">Received By:</span> {fillReceivedBy(formData.receivedBy) || '(your name)'}</div>
         </div>
       </div>
-      {uploadedDocuments.length > 0 && (
+      )}
+      {!kiosk && uploadedDocuments.length > 0 && (
         <div>
           <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">Attached Documents</h4>
           <div className="text-sm space-y-1">
@@ -2546,7 +2591,8 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
   return (
     <>
       <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
-          {/* Left Navigation */}
+          {/* Left Navigation (staff only; the kiosk shows a step bar instead) */}
+          {!kiosk && (
           <div className="w-72 max-lg:!w-full bg-[#F8F9FA] border-r border-gray-200 max-lg:border-r-0 max-lg:border-b pt-[88px] max-lg:pt-6 px-6 max-sm:px-4 pb-6 overflow-y-auto">
             <nav className="space-y-2">
               {sections.map((section) => (
@@ -2564,14 +2610,34 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               ))}
             </nav>
           </div>
+          )}
 
           {/* Right Content Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Header */}
+            {kiosk ? (
+              <div ref={kioskTopRef} className="px-8 max-sm:px-4 py-5 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <Users size={22} className="text-brand-blue" />
+                    <h3 className="text-gray-800 m-0 text-lg font-semibold">Applicant Registration</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500">Step {stepIndex + 1} of {sections.length}</span>
+                    <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                      <X size={24} />
+                    </button>
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={sections.length} aria-valuenow={stepIndex + 1}>
+                  <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${((stepIndex + 1) / sections.length) * 100}%` }} />
+                </div>
+              </div>
+            ) : (
             <div className="flex items-center justify-between px-8 max-sm:px-4 py-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <Users size={20} className="text-brand-blue" />
-                <h3 className="text-gray-800 m-0 text-base font-medium">{isEditMode ? 'Edit applicant' : 'Add new applicant'}</h3>
+                <h3 className="text-gray-800 m-0 text-base font-medium">{isEditMode ? 'Edit applicant' : noDraft ? 'Review kiosk submission' : 'Add new applicant'}</h3>
               </div>
               <button
                 onClick={draft.requestClose}
@@ -2580,6 +2646,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                 <X size={24} className="text-gray-600" />
               </button>
             </div>
+            )}
 
             {/* Form Content */}
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 max-sm:px-4 py-6">
@@ -2587,13 +2654,42 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
             </form>
 
             {/* Footer Actions */}
+            {kiosk ? (
+            <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full"
+              >
+                Cancel
+              </button>
+              <div className="flex gap-3 max-sm:w-full">
+                {stepIndex > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1"
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1"
+                >
+                  {isLastSection() ? 'Review & Submit' : 'Next'}
+                </button>
+              </div>
+            </div>
+            ) : (
             <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex justify-end gap-3 max-sm:flex-col">
               <button
                 type="button"
                 onClick={draft.requestClose}
                 className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                Back to Applicants List
+                {noDraft ? 'Back to Pending' : 'Back to Applicants List'}
               </button>
               <button
                 type="button"
@@ -2602,20 +2698,25 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
                 className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
                 {dup.checking && <Loader2 size={16} className="animate-spin" />}
-                {isLastSection() ? (isEditMode ? 'Update Profile' : 'Save Profile') : 'Next'}
+                {isLastSection() ? (isEditMode ? 'Update Profile' : noDraft ? 'Approve & Save' : 'Save Profile') : 'Next'}
               </button>
             </div>
+            )}
           </div>
       </div>
 
 
       <ApplicantReviewModal
         isOpen={showConfirmation}
-        title={isEditMode ? "Confirm Update" : "Confirm Applicant Details"}
-        message={isEditMode ? "Please review the changes before saving. Are all details correct?" : "Please review the information before saving. Are all details correct?"}
+        title={kiosk ? 'Please check your information' : isEditMode ? "Confirm Update" : "Confirm Applicant Details"}
+        message={kiosk
+          ? 'Please review your answers. If everything is correct, press Submit. Staff will review your application.'
+          : isEditMode ? "Please review the changes before saving. Are all details correct?" : "Please review the information before saving. Are all details correct?"}
         summaryContent={renderSummary()}
         onBackToEdit={() => setShowConfirmation(false)}
         onConfirm={handleConfirmSave}
+        confirmText={kiosk ? 'Submit' : undefined}
+        backText={kiosk ? 'Go back and edit' : undefined}
       />
 
       <ConfirmModal

@@ -12,6 +12,9 @@ import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText, listText } from '../../kiosk/kioskReviewUtils'
 
 // Display-only comma formatting; the stored value stays a plain numeric string.
 function formatAmountDisplay(raw: string): string {
@@ -184,7 +187,7 @@ const STEPS = [
   { id: 3, label: 'ADDRESS INFORMATION' },
   { id: 4, label: 'SECTOR CLASSIFICATION' },
   { id: 5, label: 'ASSESSMENT SUMMARY' },
-  { id: 6, label: 'ATTACHMENTS' },
+  { id: 6, label: 'PESO OFFICE ONLY' },
 ] as const
 
 // ─── Shared CSS class strings ─────────────────────────────────────────────────
@@ -248,22 +251,27 @@ type SLPProfileFormProps = {
   onSave: (data: Omit<LivelihoodBeneficiary, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
+  /** Applicant self-service kiosk: only the applicant's own sections, no drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit }: SLPProfileFormProps) {
+export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit, kiosk = false, noDraft = false }: SLPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>({
-    ...EMPTY_SLP_RECORD,
-    ...initial,
-  })
+  const [formData, setFormData] = useState<Omit<LivelihoodBeneficiary, 'id'>>(() => withDefaultReceivedBy({ ...EMPTY_SLP_RECORD, ...initial }, mode === 'add' && !kiosk))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('slp')
+  // The last section of every form is "PESO OFFICE ONLY": applicants at the kiosk never see it.
+  const steps = kiosk ? STEPS.slice(0, -1) : STEPS
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'slp-beneficiary', mode: mode, formData, setFormData,
-    provinceId, setProvinceId, cityId, setCityId, onClose,
+    provinceId, setProvinceId, cityId, setCityId, onClose, enabled: !kiosk && !noDraft,
   })
   const [previewDoc, setPreviewDoc] = useState<LivelihoodSavedDocument | null>(null)
   const isViewMode = mode === 'view'
@@ -302,7 +310,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   }
 
   function handleNext() {
-    if (currentStep < STEPS.length) setCurrentStep(step => step + 1)
+    if (currentStep < steps.length) setCurrentStep(step => step + 1)
   }
 
   function handlePrevious() {
@@ -315,7 +323,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     setTimeout(run, 50)
   }
 
-  function handleSubmit(event?: React.FormEvent) {
+  function handleSubmit(event?: React.FormEvent, advance = false) {
     event?.preventDefault()
     const lastName = (formData.lastName ?? '').trim()
     const firstName = (formData.firstName ?? '').trim()
@@ -370,12 +378,20 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk && advance) {
+      // Next: only this step's answers are checked, then on to the next step.
+      const stepOf = (field: string) => (field === 'barangay' ? 3 : 2)
+      if (runValidation(errors.filter(e => stepOf(e.field) === currentStep))) return
+      handleNext()
+      return
+    }
     if (runValidation(errors)) return
 
     const givenNames = [formData.firstName, formData.middleName, formData.nameExtension].filter(Boolean).join(' ')
     const fullName = `${formData.lastName}, ${givenNames}`
+    if (kiosk) { setKioskPayload({ ...formData, name: fullName }); return }
     void dup.confirmSave(mode, { firstName: formData.firstName ?? '', lastName: formData.lastName ?? '', birthdate: formData.birthdate ?? '' }, initial)
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)({ ...formData, name: fullName }) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy({ ...formData, name: fullName }, mode === 'add')) })
   }
 
   // ── Section header ─────────────────────────────────────────────────
@@ -394,19 +410,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     return (
       <div className="space-y-5">
         <SectionHeader title="I. SLP INFORMATION" />
-
-        <div>
-          <label htmlFor="slp-participantId" className={labelClass}>
-            SLP Participant ID Number
-          </label>
-          <input
-            id="slp-participantId"
-            className={inputClass}
-            placeholder="Enter participant ID number"
-            value={formData.slpParticipantIdNumber ?? ''}
-            onChange={e => updateField({ slpParticipantIdNumber: e.target.value })}
-          />
-        </div>
 
         <div>
           <label className={labelClass}>
@@ -428,6 +431,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           </div>
         </div>
 
+        {!kiosk && (
         <div>
           <label htmlFor="slp-eligibilityType" className={labelClass}>Eligibility Type</label>
           <select
@@ -451,6 +455,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             />
           )}
         </div>
+        )}
       </div>
     )
   }
@@ -770,6 +775,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           </div>
         </div>
 
+        {!kiosk && (<>
         <div>
           <label htmlFor="slp-vulnerabilityScore" className={labelClass}>
             Household Vulnerability Score
@@ -826,17 +832,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             ))}
           </select>
         </div>
-
-        <div>
-          <label htmlFor="slp-remarks" className={labelClass}>Remarks</label>
-          <textarea
-            id="slp-remarks"
-            className={inputClass + ' resize-none'}
-            rows={3}
-            value={formData.remarks ?? ''}
-            onChange={e => updateField({ remarks: e.target.value })}
-          />
-        </div>
+        </>)}
 
       </div>
     )
@@ -845,7 +841,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
   function renderStep6() {
     return (
       <div className="space-y-5">
-        <SectionHeader title="VI. ATTACHMENTS" />
+        <SectionHeader title="VI. PESO OFFICE ONLY" />
 
         <div>
           <p className={labelClass}>Supporting Documents</p>
@@ -857,6 +853,19 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             docs={formData.attachedDocuments ?? []}
             onChange={attachedDocuments => updateField({ attachedDocuments })}
             onPreview={setPreviewDoc}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="slp-participantId" className={labelClass}>
+            SLP Participant ID Number
+          </label>
+          <input
+            id="slp-participantId"
+            className={inputClass}
+            placeholder="Enter participant ID number"
+            value={formData.slpParticipantIdNumber ?? ''}
+            onChange={e => updateField({ slpParticipantIdNumber: e.target.value })}
           />
         </div>
 
@@ -878,9 +887,20 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               className={inputClass}
               placeholder="Name of receiving officer"
               value={formData.receivedBy ?? ''}
-              onChange={e => updateField({ receivedBy: e.target.value })}
+              onChange={e => updateField({ receivedBy: e.target.value })} onBlur={() => updateField(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, mode === 'add' && !kiosk))}
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="slp-remarks" className={labelClass}>Remarks</label>
+          <textarea
+            id="slp-remarks"
+            className={inputClass + ' resize-none'}
+            rows={3}
+            value={formData.remarks ?? ''}
+            onChange={e => updateField({ remarks: e.target.value })}
+          />
         </div>
       </div>
     )
@@ -898,13 +918,25 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     }
   }
 
-  const headerTitle = isViewMode
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'SLP Information', rows: [['Participant Type', f.is4PsBeneficiary ? '4Ps' : 'Non-4Ps']] },
+    { numeral: 'II', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'III', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
+    { numeral: 'IV', title: 'Sector Classification', rows: [['Sector', listText(f.sector, f.sectorOthersSpecify) || 'None selected'], ['Indigenous Group', f.sectorIpGroupSpecify], ['Disability', f.sectorDisabilitySpecify], ['Educational Attainment', f.educationalAttainment]] },
+    { numeral: 'V', title: 'Assessment Summary', rows: [['Source of Income', f.sourceOfIncome], ['Total Household Monthly Income', f.totalHouseholdMonthlyIncome]] },
+    ]
+  }
+
+  const headerTitle = kiosk ? 'Applicant Registration — SLP' : isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add'
       ? 'Add new profile - SLP'
       : 'Edit profile - SLP'
 
-  const isLastStep = currentStep === STEPS.length
+  const isLastStep = currentStep === steps.length
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -912,10 +944,11 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
     <>
     <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
-      {/* Left sidebar — section stepper */}
+      {/* Left sidebar — section stepper (staff only: applicants at the kiosk just go step by step) */}
+      {!kiosk && (
       <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
-          {STEPS.map((step, stepIndex) => (
+          {steps.map((step, stepIndex) => (
             <button
               key={step.id}
               type="button"
@@ -931,11 +964,31 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           ))}
         </nav>
       </div>
+      )}
 
       {/* Right content area */}
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
+        {kiosk ? (
+          <div className="px-8 max-sm:px-4 py-5 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Users size={22} className="text-brand-blue" />
+                <h3 className="text-gray-800 m-0 text-lg font-semibold">{headerTitle}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">Step {currentStep} of {steps.length}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={currentStep}>
+              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(currentStep / steps.length) * 100}%` }} />
+            </div>
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
@@ -943,13 +996,14 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
           </div>
           <button
             type="button"
-            onClick={draft.requestClose}
+            onClick={kiosk ? onClose : draft.requestClose}
             aria-label="Close form"
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X size={24} className="text-gray-600" />
           </button>
         </div>
+        )}
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6 max-sm:px-4 max-sm:py-4">
@@ -963,6 +1017,28 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
         </form>
 
         {/* Footer — navigation buttons */}
+        {kiosk ? (
+          <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+            <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+              Cancel
+            </button>
+            <div className="flex gap-3 max-sm:w-full">
+              {currentStep > 1 && (
+                <button type="button" onClick={handlePrevious} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                  Back
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => (isLastStep ? handleSubmit() : handleSubmit(undefined, true))}
+                disabled={draft.saving}
+                className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+              >
+                {isLastStep ? 'Submit' : 'Next'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
@@ -981,7 +1057,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -1010,7 +1086,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -1023,7 +1099,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
                     {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-                    {mode === 'add' ? 'Save' : 'Save Changes'}
+                    {kiosk ? 'Submit' : mode === 'add' ? (noDraft ? 'Approve & Save' : 'Save') : 'Save Changes'}
                   </button>
                 ) : (
                   <button
@@ -1038,12 +1114,22 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit 
             )}
           </div>
         </div>
+        )}
 
       </div>
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </>
   )

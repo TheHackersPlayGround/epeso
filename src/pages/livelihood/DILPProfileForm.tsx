@@ -12,6 +12,9 @@ import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText, yesNo } from '../../kiosk/kioskReviewUtils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -84,6 +87,10 @@ type DILPProfileFormProps = {
   onSave: (data: Omit<DILPApplicant, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
+  /** Applicant self-service kiosk: only the applicant's own sections, no drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }
 
 // ─── Document upload section (base64, matches SPES/GIP's backend contract) ───
@@ -196,18 +203,19 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorPro
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit }: DILPProfileFormProps) {
+export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit, kiosk = false, noDraft = false }: DILPProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<DILPApplicant, 'id'>>({
-    ...EMPTY_DILP_RECORD,
-    ...initial,
-  })
+  const [formData, setFormData] = useState<Omit<DILPApplicant, 'id'>>(() => withDefaultReceivedBy({ ...EMPTY_DILP_RECORD, ...initial }, mode === 'add' && !kiosk))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('dilp')
+  // The last section of every form is "PESO OFFICE ONLY": applicants at the kiosk never see it.
+  const steps = kiosk ? STEPS.slice(0, -1) : STEPS
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'dilp-beneficiary', mode: mode, formData, setFormData,
-    provinceId, setProvinceId, cityId, setCityId, onClose,
+    provinceId, setProvinceId, cityId, setCityId, onClose, enabled: !kiosk && !noDraft,
   })
   const [previewDoc, setPreviewDoc] = useState<DILPSavedDocument | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
@@ -238,14 +246,14 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
   }
 
   function handleNext() {
-    if (currentStep < STEPS.length) setCurrentStep(step => step + 1)
+    if (currentStep < steps.length) setCurrentStep(step => step + 1)
   }
 
   function handlePrevious() {
     if (currentStep > 1) setCurrentStep(step => step - 1)
   }
 
-  function handleSubmit(event: React.FormEvent) {
+  function handleSubmit(event: React.FormEvent, advance = false) {
     event.preventDefault()
 
     const lastName = (formData.lastName ?? '').trim()
@@ -296,10 +304,18 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk && advance) {
+      // Next: only this step's answers are checked, then on to the next step.
+      const stepOf = (field: string) => (field === 'barangay' ? 2 : 1)
+      if (runValidation(errors.filter(e => stepOf(e.field) === currentStep))) return
+      handleNext()
+      return
+    }
     if (runValidation(errors)) return
 
+    if (kiosk) { setKioskPayload(formData); return }
     void dup.confirmSave(mode, { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate }, initial)
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)(formData) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy(formData, mode === 'add')) })
   }
 
   // ── Section header — inset block matching AddApplicantSidebar style ──
@@ -608,14 +624,26 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
           />
         </div>
 
-        <div>
-          <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
-          <DatePicker max={todayIso()}
-            id="dilp-dateApplied"
-            className={inputClass}
-            value={formData.dateApplied ?? ''}
-            onChange={value => updateField({ dateApplied: value })}
-          />
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="dilp-dateApplied" className={labelClass}>Date Applied</label>
+            <DatePicker max={todayIso()}
+              id="dilp-dateApplied"
+              className={inputClass}
+              value={formData.dateApplied ?? ''}
+              onChange={value => updateField({ dateApplied: value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="dilp-receivedBy" className={labelClass}>Received By</label>
+            <input
+              id="dilp-receivedBy"
+              className={inputClass}
+              placeholder="Enter name"
+              value={formData.receivedBy ?? ''}
+              onChange={e => updateField({ receivedBy: e.target.value })} onBlur={() => updateField(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, mode === 'add' && !kiosk))}
+            />
+          </div>
         </div>
 
         <div>
@@ -626,17 +654,6 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             rows={3}
             value={formData.remarks ?? ''}
             onChange={e => updateField({ remarks: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="dilp-receivedBy" className={labelClass}>Received By</label>
-          <input
-            id="dilp-receivedBy"
-            className={inputClass}
-            placeholder="Enter name"
-            value={formData.receivedBy ?? ''}
-            onChange={e => updateField({ receivedBy: e.target.value })}
           />
         </div>
       </div>
@@ -652,13 +669,22 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
     }
   }
 
-  const headerTitle = isViewMode
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email], ['Beneficiary Classification', f.beneficiaryClassification === 'Others' && f.beneficiaryClassificationOther ? `Others: ${f.beneficiaryClassificationOther}` : f.beneficiaryClassification], ['4Ps Beneficiary', yesNo(f.is4PsBeneficiary)], ['Year Graduated from 4Ps', f.yearGraduated4Ps]] },
+    { numeral: 'II', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
+    ]
+  }
+
+  const headerTitle = kiosk ? 'Applicant Registration — DILP' : isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add'
       ? 'Add new profile - DILP'
       : 'Edit profile - DILP'
 
-  const isLastStep = currentStep === STEPS.length
+  const isLastStep = currentStep === steps.length
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -666,10 +692,11 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
     <>
     <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
-      {/* Left sidebar — section stepper */}
+      {/* Left sidebar — section stepper (staff only: applicants at the kiosk just go step by step) */}
+      {!kiosk && (
       <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
-          {STEPS.map((step, stepIndex) => (
+          {steps.map((step, stepIndex) => (
             <button
               key={step.id}
               type="button"
@@ -685,11 +712,31 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
           ))}
         </nav>
       </div>
+      )}
 
       {/* Right content area */}
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
+        {kiosk ? (
+          <div className="px-8 max-sm:px-4 py-5 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Users size={22} className="text-brand-blue" />
+                <h3 className="text-gray-800 m-0 text-lg font-semibold">{headerTitle}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">Step {currentStep} of {steps.length}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={currentStep}>
+              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(currentStep / steps.length) * 100}%` }} />
+            </div>
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
@@ -708,7 +755,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             )}
             <button
               type="button"
-              onClick={draft.requestClose}
+              onClick={kiosk ? onClose : draft.requestClose}
               aria-label="Close form"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -716,6 +763,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             </button>
           </div>
         </div>
+        )}
 
         {/* Form content */}
         <form onSubmit={handleSubmit} className="px-8 py-6 max-sm:px-4 max-sm:py-4">
@@ -729,6 +777,28 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
         </form>
 
         {/* Footer — navigation buttons */}
+        {kiosk ? (
+          <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+            <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+              Cancel
+            </button>
+            <div className="flex gap-3 max-sm:w-full">
+              {currentStep > 1 && (
+                <button type="button" onClick={handlePrevious} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                  Back
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={e => (isLastStep ? handleSubmit(e as unknown as React.FormEvent) : handleSubmit(e as unknown as React.FormEvent, true))}
+                disabled={draft.saving}
+                className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+              >
+                {isLastStep ? 'Submit' : 'Next'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
@@ -747,7 +817,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Close
@@ -766,7 +836,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
               <>
                 <button
                   type="button"
-                  onClick={draft.requestClose}
+                  onClick={kiosk ? onClose : draft.requestClose}
                   className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
@@ -779,7 +849,7 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
                     className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
                     {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-                    {mode === 'add' ? 'Add Beneficiary' : 'Save Changes'}
+                    {kiosk ? 'Submit' : mode === 'add' ? (noDraft ? 'Approve & Save' : 'Add Beneficiary') : 'Save Changes'}
                   </button>
                 ) : (
                   <button
@@ -794,12 +864,22 @@ export default function DILPProfileForm({ initial, mode, onSave, onClose, onEdit
             )}
           </div>
         </div>
+        )}
 
       </div>
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </>
   )

@@ -298,6 +298,8 @@ interface ProfileDraftOptions<F extends { attachedDocuments?: { id: string }[] }
   onClose: () => void
   /** Fields that must keep their current value when a draft is restored (e.g. a freshly issued reference number). */
   keep?: (keyof F)[]
+  /** False for forms that must neither offer nor keep drafts (the applicant kiosk, or staff reviewing a kiosk submission). */
+  enabled?: boolean
 }
 
 type ProfileDraftShape = { form: Record<string, unknown>; provinceId: number | null; cityId: number | null }
@@ -323,5 +325,6 @@ export function useProfileDraft<F extends { attachedDocuments?: { id: string }[]
     forDraft: (d) => ({ ...d, form: { ...d.form, attachedDocuments: [] } }),
     draftNote: 'Attached documents are not kept in a draft.',
     onClose: o.onClose,
+    enabled: o.enabled,
   })
 }

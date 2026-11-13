@@ -20,6 +20,11 @@ export type ModuleKey =
   | 'cdsp-maintenance' | 'spes-maintenance' | 'gip-maintenance'
   | 'livelihood-maintenance' | 'skills-maintenance'
 
+// True if the current user is an Administrator.
+export function isAdministrator(): boolean {
+  return currentUser().role === 'Administrator'
+}
+
 // True if the current user may add/edit/delete in this module (Editor or Administrator).
 export function canManage(module: ModuleKey): boolean {
   const u = currentUser()

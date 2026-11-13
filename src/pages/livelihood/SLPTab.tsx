@@ -18,6 +18,7 @@ import AssignedItemModal, { type AssignedItemAction } from '../../components/Ass
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import slpLogo from '../../kiosk/logos/slp.png'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -1293,9 +1294,12 @@ export default function SLPTab() {
 
       {/* Top action card */}
       <div className="bg-white rounded-xl shadow-sm px-6 py-4">
-        <div className="mb-3">
-          <p className="text-gray-800 font-bold text-xl">SLP</p>
-          <p className="text-gray-500 text-sm mt-0.5">Sustainable Livelihood Program</p>
+        <div className="mb-3 flex items-center gap-3">
+          <img src={slpLogo} alt="" className="h-12 w-12 object-contain shrink-0" />
+          <div>
+            <p className="text-gray-800 font-bold text-xl">SLP</p>
+            <p className="text-gray-500 text-sm mt-0.5">Sustainable Livelihood Program</p>
+          </div>
         </div>
         <div className="flex items-center gap-3 max-sm:flex-wrap">
         <button

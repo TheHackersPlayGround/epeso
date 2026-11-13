@@ -176,8 +176,12 @@ export function CDSPProvider({ children }: { children: ReactNode }) {
 }
 
 // Returns the CDSP context.
-export function useCDSP() {
+// `{ optional: true }` returns null outside the provider instead of throwing: the applicant kiosk shows
+// the CDSP form without any staff data loaded, so it supplies the service names itself.
+export function useCDSP(): CDSPContextValue
+export function useCDSP(opts: { optional: true }): CDSPContextValue | null
+export function useCDSP(opts?: { optional?: boolean }) {
   const ctx = useContext(CDSPContext)
-  if (!ctx) throw new Error('useCDSP must be used inside CDSPProvider')
+  if (!ctx && !opts?.optional) throw new Error('useCDSP must be used inside CDSPProvider')
   return ctx
 }

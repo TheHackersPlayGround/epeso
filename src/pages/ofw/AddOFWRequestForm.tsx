@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Eye, Loader2, X } from 'lucide-react'
 import type { OFWProfile, OFWSavedAttachment } from '../../contexts/OFWContext'
 import DatePicker from '../../components/DatePicker'
@@ -11,10 +11,20 @@ import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { emptyOFWForm } from './ofwDefaults'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText } from '../../kiosk/kioskReviewUtils'
 
 interface AddOFWRequestFormProps {
   onClose: () => void
-  onSave: (data: Omit<OFWProfile, 'id'>) => void
+  onSave: (data: Omit<OFWProfile, 'id'>) => void | Promise<void>
+  /** Starting data, e.g. a kiosk submission the staff are reviewing. */
+  initial?: Omit<OFWProfile, 'id'>
+  /** Applicant self-service kiosk: only the applicant's own part, no attachments, drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }
 
 export const REQUEST_TYPES = [
@@ -41,26 +51,6 @@ export const ELPOR_FORMS = ['ELPOR Form A', 'ELPOR Form A2', 'ELPOR Form B', 'EL
 export const EMPLOYMENT_STATUS_OPTIONS = ['Employed', 'Unemployed', 'Self Employed', 'Underemployed']
 export const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced']
 
-const emptyOFWForm: Omit<OFWProfile, 'id'> = {
-  beneficiaryServiceId: 0,
-  referenceNumber: '',
-  lastName: '', firstName: '', middleName: '', suffix: '',
-  name: '',
-  sex: '', birthdate: '', civilStatus: '',
-  contactNumber: '', email: '',
-  address: '', barangay: '', barangayId: 0, municipality: '', province: '', region: '',
-  dateFiled: new Date().toISOString().split('T')[0],
-  employmentStatus: '',
-  typeOfRequest: [],
-  status: 'Pending',
-  desiredPosition: '', typeOfSkill: '', agencies: [],
-  inquirySpecify: '', otherProgramSpecify: '',
-  owwaWelfareFile: null,
-  elporFiles: {},
-  receivedBy: '',
-  attachedDocuments: [],
-}
-
 function formatFileSize(bytes: number) {
   if (bytes <= 0) return '0 Bytes'
   const units = ['Bytes', 'KB', 'MB', 'GB']
@@ -82,6 +72,15 @@ function readFileAsAttachment(file: File, name: string): Promise<OFWSavedAttachm
 
 const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none placeholder:text-gray-400'
 const sublbl = 'block text-xs uppercase tracking-wide text-gray-600 font-semibold mb-1'
+
+function SectionDivider({ numeral, title, gray }: { numeral: string; title: string; gray?: boolean }) {
+  return (
+    <div className={`flex items-center gap-2 mt-3 rounded px-4 py-2.5 ${gray ? 'bg-gray-500' : 'bg-brand-blue'}`}>
+      <span className="text-white text-xs font-bold">{numeral}.</span>
+      <span className="text-white text-xs font-bold uppercase tracking-wide">{title}</span>
+    </div>
+  )
+}
 
 function AttachIcon() {
   return (
@@ -108,15 +107,22 @@ export function ClearButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestFormProps) {
-  const [formData, setFormData] = useState<Omit<OFWProfile, 'id'>>({ ...emptyOFWForm })
+export default function AddOFWRequestForm({ onClose, onSave, initial, kiosk = false, noDraft = false }: AddOFWRequestFormProps) {
+  // The kiosk shows the form one section per step. Staff always see the whole form.
+  const KIOSK_STEPS = 4
+  const [kStep, setKStep] = useState(1)
+  const topRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (kStep > 1) topRef.current?.scrollIntoView({ block: 'start' }) }, [kStep])
+  const [formData, setFormData] = useState<Omit<OFWProfile, 'id'>>(() => withDefaultReceivedBy({ ...emptyOFWForm, ...initial }, !kiosk))
   const set = (updates: Partial<Omit<OFWProfile, 'id'>>) => setFormData(prev => ({ ...prev, ...updates }))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('ofw')
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'ofw-request', mode: 'add', formData, setFormData,
-    provinceId, setProvinceId, cityId, setCityId, onClose, keep: ['referenceNumber'],
+    provinceId, setProvinceId, cityId, setCityId, onClose, keep: ['referenceNumber'], enabled: !kiosk && !noDraft,
   })
   const [previewDoc, setPreviewDoc] = useState<OFWSavedAttachment | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
@@ -155,7 +161,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
     set({ attachedDocuments: (formData.attachedDocuments ?? []).map(d => d.id === id ? { ...att, id, name: d.name } : d) })
   }
 
-  const handleSave = () => {
+  const handleSave = (advance = false) => {
     const lastName = formData.lastName.trim()
     const firstName = formData.firstName.trim()
     const middleName = formData.middleName.trim()
@@ -203,11 +209,11 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
       errors.push({ field: 'employmentStatus', message: 'Employment Status is required.', focus: () => employmentStatusRef.current?.focus() })
     }
 
-    if (!formData.referenceNumber.trim()) {
+    if (!kiosk && !formData.referenceNumber.trim()) {
       errors.push({ field: 'referenceNumber', message: 'Reference Number is required.', focus: () => referenceNoRef.current?.focus() })
     }
 
-    if (!formData.dateFiled) {
+    if (!kiosk && !formData.dateFiled) {
       errors.push({ field: 'dateFiled', message: 'Date Filed is required.', focus: () => dateFiledWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) })
     }
 
@@ -215,18 +221,43 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk) {
+      const stepOf = (field: string) => ({ barangay: 2, employmentStatus: 3 } as Record<string, number>)[field] ?? 1
+      if (advance) {
+        // Next: only this step's answers are checked, then on to the next step.
+        if (runValidation(errors.filter(e => stepOf(e.field) === kStep))) return
+        setKStep(Math.min(kStep + 1, KIOSK_STEPS))
+        return
+      }
+      // Submit: everything is checked; if something earlier is missing, go back to that step.
+      if (errors.length > 0) setKStep(Math.min(...errors.map(e => stepOf(e.field))))
+    }
     if (runValidation(errors)) return
 
     const mi = middleName ? ' ' + middleName.charAt(0) + '.' : ''
     const sfx = formData.suffix ? ' ' + formData.suffix : ''
+    const full = { ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }
+    if (kiosk) { setKioskPayload(full); return }
     void dup.confirmSave('add', { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate })
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy({ ...formData, lastName, firstName, middleName, name: `${lastName}, ${firstName}${mi}${sfx}`.trim() }, true)) })
   }
 
   const lbl = sublbl
 
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.suffix)], ['Sex', f.sex], ['Birthdate', f.birthdate], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'II', title: 'Address', text: joinText(f.address, f.barangay, f.municipality, f.province) },
+    { numeral: 'III', title: 'Employment Status', text: f.employmentStatus },
+    { numeral: 'IV', title: 'Type of Request', rows: [['Requests', f.typeOfRequest.join(', ') || 'None selected'], ['Desired Position', f.desiredPosition], ['Type of Skill', f.typeOfSkill], ['Agencies', (f.agencies ?? []).filter(Boolean).join(', ')], ['Inquiry', f.inquirySpecify], ['Other DOLE Program', f.otherProgramSpecify]] },
+    ]
+  }
+
   return (
     <div className="h-full bg-brand-bg flex flex-col">
+      {!kiosk && (
       <div className="bg-white border-b border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DBEAFE' }}>
@@ -234,40 +265,45 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>Add New Request — OFW</p>
+          <p className="text-gray-800 font-semibold" style={{ fontSize: 'var(--text-md)' }}>{kiosk ? 'Applicant Registration — OFW' : 'Add New Request — OFW'}</p>
         </div>
-        <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        {!kiosk && (
+          <button onClick={draft.requestClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
+      )}
 
-      <div className="flex-1 overflow-y-auto p-8 max-sm:p-4">
-        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
-
-          {/* Section header */}
-          <div className="px-6 py-3" style={{ backgroundColor: '#0077BE' }}>
-            <p className="text-white font-bold text-sm tracking-wide">PESO REQUEST FOR ASSISTANCE</p>
+      <div className={`flex-1 overflow-y-auto ${kiosk ? '' : 'p-8 max-sm:p-4'}`}>
+        <div className={`${kiosk ? 'w-full' : 'max-w-4xl'} mx-auto bg-white rounded-xl shadow-sm p-8 max-sm:p-4`}>
+          <div ref={topRef} />
+          {kiosk && (
+            <div className="pb-4 mb-2 border-b border-gray-200">
+              <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DBEAFE' }}>
+            <svg className="w-4 h-4" style={{ color: '#0077BE' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
           </div>
-
-          <div className="p-6 max-sm:p-4 space-y-5">
-
-            {/* Date Filed | Reference No. */}
-            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
-              <div ref={dateFiledWrapRef}>
-                <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
-                <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
-                  <DatePicker max={todayIso()} className={inp} value={formData.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
-                </div>
-                {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
+                <p className="text-gray-800 font-semibold m-0" style={{ fontSize: 'var(--text-md)' }}>Applicant Registration — OFW</p>
+                <span className="ml-auto text-sm text-gray-500">Step {kStep} of {KIOSK_STEPS}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
               </div>
-              <div>
-                <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
-                <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={formData.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
-                {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={KIOSK_STEPS} aria-valuenow={kStep}>
+                <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(kStep / KIOSK_STEPS) * 100}%` }} />
               </div>
             </div>
+          )}
+
+          <div className="flex flex-col gap-5">
+
+          {(!kiosk || kStep === 1) && (<>
+            <SectionDivider numeral="I" title="Personal Information" />
 
             {/* Surname | First Name | Middle Name | Suffix */}
             <div className="grid grid-cols-4 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
@@ -336,9 +372,13 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               </div>
             </div>
 
+          </>)}
+
+          {(!kiosk || kStep === 2) && (<>
+            <SectionDivider numeral="II" title="Address" />
+
             {/* Complete Address */}
             <div>
-              <p className={lbl}>Complete Address</p>
               <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mt-1">
                 <div>
                   <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Province</label>
@@ -388,6 +428,11 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               </div>
             </div>
 
+          </>)}
+
+          {(!kiosk || kStep === 3) && (<>
+            <SectionDivider numeral="III" title="Employment Status" />
+
             {/* Employment Status */}
             <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
               <div>
@@ -400,9 +445,13 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               </div>
             </div>
 
+          </>)}
+
+          {(!kiosk || kStep === 4) && (<>
+            <SectionDivider numeral="IV" title="Type of Request" />
+
             {/* Type of Request */}
             <div>
-              <p className={lbl}>Type of Request</p>
               <div className="mt-2">
                 {REQUEST_TYPES.map(type => (
                   <div key={type}>
@@ -465,7 +514,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
                     )}
 
                     {/* OWWA Welfare Case sub-panel */}
-                    {type === 'OWWA Welfare Case' && formData.typeOfRequest.includes('OWWA Welfare Case') && (
+                    {!kiosk && type === 'OWWA Welfare Case' && formData.typeOfRequest.includes('OWWA Welfare Case') && (
                       <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <AttachIcon />
@@ -509,7 +558,7 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
                     )}
 
                     {/* Livelihood sub-panel */}
-                    {type === 'livelihood' && formData.typeOfRequest.includes('livelihood') && (
+                    {!kiosk && type === 'livelihood' && formData.typeOfRequest.includes('livelihood') && (
                       <div className="ml-6 mt-1 mb-2 bg-gray-50 rounded-lg border border-gray-200 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <AttachIcon />
@@ -553,16 +602,29 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
               </div>
             </div>
 
-            {/* PESO Office Only */}
-            <div className="border-t border-gray-200 pt-5">
-              <div className="px-4 py-2 rounded-lg mb-4" style={{ backgroundColor: '#0077BE' }}>
-                <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
-              </div>
+          </>)}
+
+            {/* PESO Office Only: staff fill this in, so it is not on the kiosk */}
+            {!kiosk && (
+            <div className="flex flex-col gap-5">
+              <SectionDivider numeral="V" title="For PESO Office Only" gray />
 
               <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-5">
+                <div ref={dateFiledWrapRef}>
+                  <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
+                  <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
+                    <DatePicker max={todayIso()} className={inp} value={formData.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
+                  </div>
+                  {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
+                </div>
+                <div>
+                  <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
+                  <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={formData.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
+                  {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
+                </div>
                 <div>
                   <label className={lbl}>Received By</label>
-                  <input className={inp} placeholder="Name of receiving officer" value={formData.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />
+                  <input className={inp} placeholder="Name of receiving officer" value={formData.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} onBlur={() => set(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, !kiosk))} />
                 </div>
               </div>
 
@@ -617,34 +679,58 @@ export default function AddOFWRequestForm({ onClose, onSave }: AddOFWRequestForm
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Action buttons */}
-            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 max-sm:flex-col">
+            {/* Action buttons (same style as the other program forms) */}
+            {kiosk ? (
+              <div className="mt-8 pt-4 border-t border-gray-200 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+                <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+                  Cancel
+                </button>
+                <div className="flex gap-3 max-sm:w-full">
+                  {kStep > 1 && (
+                    <button type="button" onClick={() => setKStep(kStep - 1)} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                      Back
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleSave(kStep < KIOSK_STEPS)}
+                    disabled={draft.saving}
+                    className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+                  >
+                    {kStep < KIOSK_STEPS ? 'Next' : 'Submit'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+            <div className="mt-3 pt-6 border-t border-gray-100 flex justify-end gap-3 max-sm:flex-col">
+              <button type="button" onClick={kiosk ? onClose : draft.requestClose} className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
               <button
                 type="button"
-                onClick={draft.requestClose}
-                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={(draft.saving || dup.checking)}
-                className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                style={{ backgroundColor: '#0077BE' }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0065A5')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#0077BE')}
+                className="px-8 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
                 {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-                Save Profile
+                {kiosk ? 'Submit' : noDraft ? 'Approve & Save' : 'Save Profile'}
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>
       {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
       {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </div>
   )

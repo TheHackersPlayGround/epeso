@@ -8,9 +8,12 @@ interface NavbarProps {
   onLogout: () => void
   onProfileClick: () => void
   username?: string
+  /** Show the "Applications" tab (kiosk submissions waiting for review) for users who may see them. */
+  showPending?: boolean
+  pendingCount?: number
 }
 
-export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClick, username = 'User' }: NavbarProps) {
+export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClick, username = 'User', showPending = false, pendingCount = 0 }: NavbarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -44,7 +47,7 @@ export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClic
 
           {/* Center: Navigation Tabs */}
           <div className="flex gap-8 shrink-0 max-lg:gap-3">
-            {['Dashboard', 'About PESO'].map((tab) => (
+            {['Dashboard', 'About PESO', ...(showPending ? ['Applications'] : [])].map((tab) => (
               <button
                 key={tab}
                 onClick={() => onTabChange(tab)}
@@ -56,6 +59,14 @@ export default function Navbar({ activeTab, onTabChange, onLogout, onProfileClic
                 style={{ fontSize: 'var(--text-md)' }}
               >
                 {tab}
+                {tab === 'Applications' && pendingCount > 0 && (
+                  <span
+                    className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand-orange text-white text-xs font-semibold align-middle"
+                    aria-label={`${pendingCount} pending`}
+                  >
+                    {pendingCount > 99 ? '99+' : pendingCount}
+                  </span>
+                )}
                 {activeTab === tab && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
                 )}

@@ -17,6 +17,8 @@ interface OFWProfileModalProps {
   mode: 'view' | 'edit'
   onClose: () => void
   onSave: (updated: OFWProfile) => void | Promise<void>
+  /** The Pending page shows the saved record without its request status (that belongs to the OFW page). */
+  hideStatus?: boolean
 }
 
 const STATUS_OPTIONS: OFWProfile['status'][] = ['Pending', 'Approved', 'Ongoing', 'Completed', 'Rejected']
@@ -120,7 +122,7 @@ function DownloadButton({ attachment, onPreview }: { attachment: OFWSavedAttachm
   )
 }
 
-export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWProfileModalProps) {
+export default function OFWProfileModal({ profile, mode, onClose, onSave, hideStatus = false }: OFWProfileModalProps) {
   const [form, setForm] = useState<OFWProfile>(profile)
   const [isSaving, setIsSaving] = useState(false)
   const dup = useDuplicateCheck('ofw')
@@ -274,15 +276,15 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Request Info */}
               <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
-                <Field label="Reference No." value={profile.referenceNumber} />
-                <Field label="Date Filed" value={profile.dateFiled} />
                 <Field label="Employment Status" value={profile.employmentStatus} />
+                {!hideStatus && (
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Status</p>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[profile.status]}`}>
                     {profile.status}
                   </span>
                 </div>
+                )}
               </div>
 
               <hr className="border-gray-100" />
@@ -399,6 +401,8 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                   <p className="text-sm font-bold tracking-wide" style={{ color: '#0077BE' }}>FOR PESO OFFICE ONLY</p>
                 </div>
                 <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
+                  <Field label="Date Filed" value={profile.dateFiled} />
+                  <Field label="Reference No." value={profile.referenceNumber} />
                   <Field label="Received By" value={profile.receivedBy} />
                 </div>
                 <div>
@@ -422,18 +426,6 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
 
               {/* Request Info */}
               <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
-                <div ref={dateFiledWrapRef}>
-                  <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
-                  <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
-                    <DatePicker max={todayIso()} className={inp} value={form.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
-                  </div>
-                  {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
-                </div>
-                <div>
-                  <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
-                  <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={form.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
-                  {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
-                </div>
                 <div>
                   <label className={lbl}>Employment Status <span className="text-red-500">*</span></label>
                   <select ref={employmentStatusRef} className={`${inp} bg-white ${errCls('employmentStatus')}`} value={form.employmentStatus} onChange={e => { set({ employmentStatus: e.target.value }); clearFieldError('employmentStatus') }}>
@@ -694,6 +686,18 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave }: OFWP
                   <p className="text-white font-bold text-sm tracking-wide">FOR PESO OFFICE ONLY</p>
                 </div>
                 <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-5">
+                  <div ref={dateFiledWrapRef}>
+                    <label className={lbl}>Date Filed <span className="text-red-500">*</span></label>
+                    <div className={`rounded-lg ${fieldMessage('dateFiled') ? 'ring-2 ring-red-200' : ''}`}>
+                      <DatePicker max={todayIso()} className={inp} value={form.dateFiled} onChange={value => { set({ dateFiled: value }); clearFieldError('dateFiled') }} />
+                    </div>
+                    {fieldMessage('dateFiled') && <p className="text-red-500 text-xs mt-1">{fieldMessage('dateFiled')}</p>}
+                  </div>
+                  <div>
+                    <label className={lbl}>Reference No. <span className="text-red-500">*</span></label>
+                    <input ref={referenceNoRef} className={`${inp} ${errCls('referenceNumber')}`} value={form.referenceNumber} onChange={e => { set({ referenceNumber: e.target.value }); clearFieldError('referenceNumber') }} />
+                    {fieldMessage('referenceNumber') && <p className="text-red-500 text-xs mt-1">{fieldMessage('referenceNumber')}</p>}
+                  </div>
                   <div>
                     <label className={lbl}>Received By</label>
                     <input className={inp} placeholder="Name of receiving officer" value={form.receivedBy ?? ''} onChange={e => set({ receivedBy: e.target.value })} />

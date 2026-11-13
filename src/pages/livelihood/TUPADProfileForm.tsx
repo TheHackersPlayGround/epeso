@@ -12,6 +12,9 @@ import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
 import { todayIso } from '../../utils/formatDate'
+import { withDefaultReceivedBy } from '../../utils/currentUser'
+import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
+import { fullName, joinText } from '../../kiosk/kioskReviewUtils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,6 +64,10 @@ type TUPADProfileFormProps = {
   onSave: (data: Omit<TUPADApplicant, 'id'>) => void
   onClose: () => void
   onEdit?: () => void
+  /** Applicant self-service kiosk: only the applicant's own sections, no drafts or duplicate check. */
+  kiosk?: boolean
+  /** Staff reviewing a kiosk submission: no saved drafts (one submission's draft would be offered for the next). */
+  noDraft?: boolean
 }
 
 // ─── Shared CSS ───────────────────────────────────────────────────────────────
@@ -184,18 +191,19 @@ function AttachedDocsEditor({ docs, onChange, onPreview }: AttachedDocsEditorPro
 
 // ─── Main Wizard Component ────────────────────────────────────────────────────
 
-export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdit }: TUPADProfileFormProps) {
+export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdit, kiosk = false, noDraft = false }: TUPADProfileFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<Omit<TUPADApplicant, 'id'>>({
-    ...EMPTY_TUPAD_RECORD,
-    ...initial,
-  })
+  const [formData, setFormData] = useState<Omit<TUPADApplicant, 'id'>>(() => withDefaultReceivedBy({ ...EMPTY_TUPAD_RECORD, ...initial }, mode === 'add' && !kiosk))
   const [provinceId, setProvinceId] = useState<number | null>(null)
   const [cityId, setCityId] = useState<number | null>(null)
   const dup = useDuplicateCheck('tupad')
+  // The last section of every form is "PESO OFFICE ONLY": applicants at the kiosk never see it.
+  const steps = kiosk ? STEPS.slice(0, -1) : STEPS
+  // Kiosk: the finished form, shown on the "check your information" screen before it is sent.
+  const [kioskPayload, setKioskPayload] = useState<Parameters<typeof onSave>[0] | null>(null)
   const draft = useProfileDraft({
     draftKey: 'tupad-beneficiary', mode: mode, formData, setFormData,
-    provinceId, setProvinceId, cityId, setCityId, onClose,
+    provinceId, setProvinceId, cityId, setCityId, onClose, enabled: !kiosk && !noDraft,
   })
   const [previewDoc, setPreviewDoc] = useState<TUPADSavedDocument | null>(null)
   const { clearFieldError, errCls, fieldMessage, runValidation } = useFieldValidation()
@@ -210,7 +218,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   const barangayWrapRef = useRef<HTMLDivElement>(null)
 
   const isViewMode = mode === 'view'
-  const isLastStep = currentStep === STEPS.length
+  const isLastStep = currentStep === steps.length
 
   function updateField(fields: Partial<Omit<TUPADApplicant, 'id'>>) {
     if (isViewMode) return
@@ -224,10 +232,10 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
     updateField({ birthdate: value, age: ageCalculated })
   }
 
-  function handleNext() { if (currentStep < STEPS.length) setCurrentStep(s => s + 1) }
+  function handleNext() { if (currentStep < steps.length) setCurrentStep(s => s + 1) }
   function handlePrevious() { if (currentStep > 1) setCurrentStep(s => s - 1) }
 
-  function handleSubmit() {
+  function handleSubmit(advance = false) {
     const lastName = (formData.lastName ?? '').trim()
     const firstName = (formData.firstName ?? '').trim()
     const middleName = (formData.middleName ?? '').trim()
@@ -276,10 +284,18 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
       errors.push({ field: 'birthdate', message: 'Birthdate cannot be in the future.', focus: () => {} })
     }
 
+    if (kiosk && advance) {
+      // Next: only this step's answers are checked, then on to the next step.
+      const stepOf = (field: string) => (field === 'barangay' ? 2 : 1)
+      if (runValidation(errors.filter(e => stepOf(e.field) === currentStep))) return
+      handleNext()
+      return
+    }
     if (runValidation(errors)) return
 
+    if (kiosk) { setKioskPayload(formData); return }
     void dup.confirmSave(mode, { firstName: formData.firstName, lastName: formData.lastName, birthdate: formData.birthdate }, initial)
-      .then(proceed => { if (proceed) draft.wrapSave(onSave)(formData) })
+      .then(proceed => { if (proceed) draft.wrapSave(onSave)(withDefaultReceivedBy(formData, mode === 'add')) })
   }
 
   function SectionHeader({ title }: { title: string }) {
@@ -430,19 +446,20 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           />
         </div>
 
-        <div>
-          <label className={labelClass}>Date Applied</label>
-          <DatePicker max={todayIso()} className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <div>
+            <label className={labelClass}>Date Applied</label>
+            <DatePicker max={todayIso()} className={inputClass} value={formData.dateApplied ?? ''} onChange={value => updateField({ dateApplied: value })} />
+          </div>
+          <div>
+            <label className={labelClass}>Received By</label>
+            <input className={inputClass} placeholder="Staff name" value={formData.receivedBy ?? ''} onChange={e => updateField({ receivedBy: e.target.value })} onBlur={() => updateField(withDefaultReceivedBy({ receivedBy: formData.receivedBy ?? '' }, mode === 'add' && !kiosk))} />
+          </div>
         </div>
 
         <div>
           <label className={labelClass}>Remarks</label>
           <textarea rows={3} className={inputClass + ' resize-none'} value={formData.remarks ?? ''} onChange={e => updateField({ remarks: e.target.value })} />
-        </div>
-
-        <div>
-          <label className={labelClass}>Received By</label>
-          <input className={inputClass} placeholder="Staff name" value={formData.receivedBy ?? ''} onChange={e => updateField({ receivedBy: e.target.value })} />
         </div>
       </div>
     )
@@ -457,7 +474,16 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
     }
   }
 
-  const headerTitle = isViewMode
+  // What the applicant entered, grouped like the form's sections, for the kiosk review.
+  const kioskSections = (): ReviewSection[] => {
+    const f = formData
+    return [
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber]] },
+    { numeral: 'II', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
+    ]
+  }
+
+  const headerTitle = kiosk ? 'Applicant Registration — TUPAD' : isViewMode
     ? `${formData.lastName ?? ''}, ${formData.firstName ?? ''}`
     : mode === 'add' ? 'Add new profile - TUPAD' : 'Edit profile - TUPAD'
 
@@ -467,10 +493,11 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
     <>
     <div className="bg-white rounded-xl shadow-md flex max-lg:flex-col">
 
-      {/* Left sidebar — step selector */}
+      {/* Left sidebar — step selector (staff only: applicants at the kiosk just go step by step) */}
+      {!kiosk && (
       <div className="w-72 max-lg:w-full bg-[#F8F9FA] border-r border-gray-200 pt-[88px] max-lg:pt-6 px-6 pb-6 max-lg:pb-3">
         <nav className="space-y-2">
-          {STEPS.map((step, idx) => (
+          {steps.map((step, idx) => (
             <button
               key={step.id}
               type="button"
@@ -486,11 +513,31 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           ))}
         </nav>
       </div>
+      )}
 
       {/* Right content area */}
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
+        {kiosk ? (
+          <div className="px-8 max-sm:px-4 py-5 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Users size={22} className="text-brand-blue" />
+                <h3 className="text-gray-800 m-0 text-lg font-semibold">{headerTitle}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">Step {currentStep} of {steps.length}</span>
+                <button type="button" onClick={onClose} aria-label="Close form" className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={currentStep}>
+              <div className="h-full bg-brand-blue rounded-full transition-all" style={{ width: `${(currentStep / steps.length) * 100}%` }} />
+            </div>
+          </div>
+        ) : (
         <div className="flex items-center justify-between px-8 py-6 max-sm:px-4 max-sm:py-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <Users size={20} className="text-brand-blue" />
@@ -507,11 +554,12 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
                 Edit
               </button>
             )}
-            <button type="button" onClick={draft.requestClose} aria-label="Close form" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button type="button" onClick={kiosk ? onClose : draft.requestClose} aria-label="Close form" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={24} className="text-gray-600" />
             </button>
           </div>
         </div>
+        )}
 
         {/* Step content */}
         <div className="flex-1 px-8 py-6 max-sm:px-4 max-sm:py-4 overflow-y-auto">
@@ -525,6 +573,28 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
         </div>
 
         {/* Footer — navigation */}
+        {kiosk ? (
+          <div className="border-t border-gray-200 px-8 max-sm:px-4 py-4 flex items-center justify-between gap-3 max-sm:flex-col-reverse">
+            <button type="button" onClick={onClose} className="px-6 py-3 text-base text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors max-sm:w-full">
+              Cancel
+            </button>
+            <div className="flex gap-3 max-sm:w-full">
+              {currentStep > 1 && (
+                <button type="button" onClick={handlePrevious} className="px-8 py-3 text-base text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors max-sm:flex-1">
+                  Back
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => (isLastStep ? handleSubmit() : handleSubmit(true))}
+                disabled={draft.saving}
+                className="px-10 py-3 text-base font-medium bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors max-sm:flex-1 disabled:opacity-70"
+              >
+                {isLastStep ? 'Submit' : 'Next'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="border-t border-gray-200 px-8 py-4 max-sm:px-4 flex items-center justify-between gap-3">
           <div>
             {currentStep > 1 && (
@@ -537,7 +607,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
           <div className="flex items-center gap-3">
             {isViewMode ? (
               <>
-                <button type="button" onClick={draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <button type="button" onClick={kiosk ? onClose : draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                   Close
                 </button>
                 {!isLastStep && (
@@ -548,13 +618,13 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
               </>
             ) : (
               <>
-                <button type="button" onClick={draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <button type="button" onClick={kiosk ? onClose : draft.requestClose} className="px-6 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                   Cancel
                 </button>
                 {isLastStep ? (
-                  <button type="button" onClick={handleSubmit} disabled={(draft.saving || dup.checking)} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
+                  <button type="button" onClick={() => handleSubmit()} disabled={(draft.saving || dup.checking)} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
                     {(draft.saving || dup.checking) && <Loader2 size={16} className="animate-spin" />}
-                    {mode === 'add' ? 'Add Beneficiary' : 'Save Changes'}
+                    {kiosk ? 'Submit' : mode === 'add' ? (noDraft ? 'Approve & Save' : 'Add Beneficiary') : 'Save Changes'}
                   </button>
                 ) : (
                   <button type="button" onClick={handleNext} className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-[#01a0ff] transition-colors">
@@ -565,12 +635,22 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
             )}
           </div>
         </div>
+        )}
 
       </div>
     </div>
 
     {previewDoc && <DocumentPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     {draft.modals}
+    {kiosk && (
+      <KioskReview
+        open={kioskPayload !== null}
+        sections={kioskSections()}
+        onBack={() => setKioskPayload(null)}
+        onSubmit={() => draft.wrapSave(onSave)(kioskPayload!)}
+        onDone={onClose}
+      />
+    )}
       {dup.modal}
     </>
   )

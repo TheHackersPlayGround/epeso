@@ -48,6 +48,25 @@ export const ENDPOINTS = {
     setKiosk: '/submissions/setKiosk',
     setKioskPrograms: '/submissions/setKioskPrograms',
   },
+  // Employer portal, staff side (Employers tab): portal logins (administrators only) and the requests employers send.
+  employerAccounts: {
+    get: '/employer_accounts/get',
+    create: '/employer_accounts/create',
+    resetPassword: '/employer_accounts/resetPassword',
+    setStatus: '/employer_accounts/setStatus',
+    activity: '/employer_accounts/activity',
+  },
+  employerUpdates: {
+    list: '/employer_updates/list',
+    counts: '/employer_updates/counts',
+    accept: '/employer_updates/accept',
+    reject: '/employer_updates/reject',
+  },
+  // Which uploaded documents are sent to the employer for a referral (staff choose).
+  referralDocuments: {
+    list: '/referral_documents/list',
+    set: '/referral_documents/set',
+  },
   employment: {
     listApplicants: '/employment/listApplicants',
     getApplicant: '/employment/getApplicant',

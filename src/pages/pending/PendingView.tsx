@@ -26,6 +26,7 @@ import { toOfwApiPayload } from '../ofw/ofwPayload'
 import TablePagination, { EF_ITEMS_PER_PAGE } from '../employment/shared/TablePagination'
 import ConfirmModal from '../shared/ConfirmModal'
 import KioskPanel from './KioskPanel'
+import { fmtDateTime } from '../../utils/formatDate'
 import { useEmployment, type Applicant } from '../../contexts/EmploymentContext'
 import { useCDSP, type CDSPApplicant } from '../../contexts/CDSPContext'
 import { useGIP, type GIPApplicant } from '../../contexts/GIPContext'
@@ -75,8 +76,8 @@ type StatusFilter = SubmissionStatus | 'all'
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback)
 
-// "2026-11-10 16:50:01.66" -> "2026-11-10 16:50" (same yyyy-mm-dd style as the other tables).
-const fmtWhen = (v: string | null) => (v ? v.slice(0, 16) : '—')
+// "2026-11-10 16:50:01.66" -> "11/10/2026 4:50 PM" (the same date and time style as the Employer Updates and the employer portal).
+const fmtWhen = fmtDateTime
 
 // A read-only "Applicant" built from an Employment Facilitation submission, so the normal View Applicant screen can show it.
 function toViewApplicant(d: SubmissionDetail): Applicant {

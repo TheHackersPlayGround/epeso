@@ -307,7 +307,10 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
                   ref={v.id === highlightId ? highlightRowRef : undefined}
                   className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${v.id === highlightId ? 'bg-amber-50 ring-2 ring-inset ring-amber-300' : ''}`}
                 >
-                  <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{v.jobTitle}</td>
+                  <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">
+                    {v.jobTitle}
+                    {v.source === 'Employer' && <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 border border-blue-200 text-blue-700 align-middle" title="Requested by the employer through the employer portal and accepted by staff">Employer request</span>}
+                  </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.employer}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.vacanciesCount}</td>
                   <td className="px-4 py-3 whitespace-nowrap">

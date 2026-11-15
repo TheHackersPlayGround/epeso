@@ -3,6 +3,7 @@
 import { useState, useRef, useLayoutEffect } from "react";
 import { MoreHorizontal, Search, Plus, ChevronDown, X, Loader2 } from "lucide-react";
 import { canManage } from "../../../utils/permissions";
+import { fmtDate } from "../../../utils/formatDate";
 import DateRangeFilterInput from "../../../components/DateRangeFilterInput";
 import TablePagination from "../shared/TablePagination";
 import type { Applicant } from "../../../contexts/EmploymentContext";
@@ -140,7 +141,7 @@ function ApplicantsTableRow({ applicant, activeFilters, onToggleMenu }: Applican
       <td className="px-4 py-3 text-gray-600">{applicant.skills}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.trainingCourses || '—'}</td>
       <td className="px-4 py-3 text-gray-600">{applicant.jobPreference || '—'}</td>
-      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{applicant.dateApplicationReceived?.slice(0, 10) || '—'}</td>
+      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(applicant.dateApplicationReceived)}</td>
 
       {columnFilters(activeFilters).map((id) => (
         <td key={id} className={`px-4 py-3 text-gray-600 align-top ${id === "language" ? "min-w-[220px]" : "whitespace-nowrap"}`}>

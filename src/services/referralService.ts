@@ -9,10 +9,11 @@ export async function listReferrals(): Promise<Referral[]> {
   return res.data.data ?? []
 }
 
-export async function createReferral(applicantId: number, vacancyId: number): Promise<number> {
+// documentIds: the applicant's uploaded documents the PESO chose to send to the employer (none are sent unless listed).
+export async function createReferral(applicantId: number, vacancyId: number, documentIds: number[] = []): Promise<number> {
   const res = await axiosClient.post<{ status: string; data: { id: number } }>(
     ENDPOINTS.employment.createReferral,
-    { applicantId, vacancyId },
+    { applicantId, vacancyId, documentIds },
   )
   return res.data.data.id
 }

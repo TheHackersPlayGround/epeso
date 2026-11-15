@@ -6,6 +6,8 @@ import { updateReferralStatus, deleteReferral } from '../../services/referralSer
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { canManage } from '../../utils/permissions'
+import { fmtDate } from '../../utils/formatDate'
+import SharedDocumentsDialog from './shared/SharedDocumentsDialog'
 import { logSheetExport } from '../../services/activityLogService'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
@@ -200,10 +202,11 @@ type ReferralsTableProps = {
   referrals: Referral[]
   isFiltered: boolean
   onUpdateStatus: (r: Referral) => void
+  onShareDocuments: (r: Referral) => void
   onRemove: (id: number) => void | Promise<void>
 }
 
-function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: ReferralsTableProps) {
+function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onShareDocuments, onRemove }: ReferralsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is the button's position; pos is the menu's final placement, corrected
   // by measuring its real rendered height once mounted (see layout effect below).
@@ -294,7 +297,7 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{r.applicantName}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.jobTitle}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.employer || '—'}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.referralDate}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(r.referralDate)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <ReferralStatusBadge status={r.status} />
                 </td>
@@ -322,6 +325,7 @@ function ReferralsTable({ referrals, isFiltered, onUpdateStatus, onRemove }: Ref
             className="w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 overflow-y-auto"
           >
             <button onClick={() => { onUpdateStatus(menuReferral); closeMenu() }} disabled={!canManage('employment')} className="w-full px-3 py-2 text-left text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Update Status</button>
+            <button onClick={() => { onShareDocuments(menuReferral); closeMenu() }} className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Shared Documents</button>
             <button
               onClick={handleConfirmRemove}
               disabled={!canManage('employment')}
@@ -433,6 +437,7 @@ export default function ReferralsTab() {
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
+  const [sharingReferral, setSharingReferral] = useState<Referral | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
@@ -610,6 +615,7 @@ export default function ReferralsTab() {
           referrals={paginated}
           isFiltered={isFiltered}
           onUpdateStatus={setUpdatingReferral}
+          onShareDocuments={setSharingReferral}
           onRemove={handleRemoveReferral}
         />
         <TablePagination
@@ -621,6 +627,20 @@ export default function ReferralsTab() {
         />
       </div>
 
+      {sharingReferral && (
+        <SharedDocumentsDialog
+          referralId={sharingReferral.id}
+          applicantId={sharingReferral.applicantId}
+          applicantName={sharingReferral.applicantName}
+          jobTitle={sharingReferral.jobTitle}
+          employer={sharingReferral.employer}
+          onClose={() => setSharingReferral(null)}
+          onSaved={count => {
+            setSharingReferral(null)
+            setResultModal({ isOpen: true, type: 'success', title: 'Saved', message: count > 0 ? `${count} document${count === 1 ? ' is' : 's are'} now available to the employer.` : 'No documents are shared with the employer for this referral.' })
+          }}
+        />
+      )}
       {updatingReferral && (
         <UpdateStatusModal
           referral={updatingReferral}

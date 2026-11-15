@@ -7,6 +7,8 @@ import { ITEMS_PER_PAGE } from "./applicants/ApplicantsTab";
 import { inDateRange } from "../../utils/dateRange";
 import { createApplicant, updateApplicant, deleteApplicant } from "../../services/applicantService";
 import { createReferral } from "../../services/referralService";
+import { listShareableDocuments, type ShareableDocument } from "../../services/referralDocumentService";
+import DocumentPicker from "./shared/DocumentPicker";
 import { useEmployment } from "../../contexts/EmploymentContext";
 import { useReferralGuard } from "../../utils/referralGuard";
 import ConfirmModal from "../shared/ConfirmModal";
@@ -15,6 +17,8 @@ import VacanciesTab from "./VacanciesTab";
 import ReferralsTab from "./ReferralsTab";
 import PlacementsTab from "./PlacementsTab";
 import EmployersTab from "./employers/EmployersTab";
+import { useEmployerUpdatesCount } from "../../hooks/useEmployerUpdatesCount";
+import { canView } from "../../utils/permissions";
 import { requestLeave } from "../../hooks/leaveGuard";
 import AddApplicantSidebar from "./applicants/AddApplicantSidebar";
 import type { ApplicantFormData } from "./applicants/AddApplicantSidebar";
@@ -67,6 +71,19 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const { confirmReferralOk, referralGuardModal } = useReferralGuard()
+  // The applicant's uploaded documents: staff tick the ones to send to the employer. Resume, Application Letter and Biodata start ticked.
+  const [docs, setDocs] = useState<ShareableDocument[] | null>(null)
+  const [docError, setDocError] = useState("")
+  const [chosenDocs, setChosenDocs] = useState<Set<number>>(new Set())
+  const [sentCount, setSentCount] = useState(0)
+  useEffect(() => {
+    let alive = true
+    listShareableDocuments(applicant.id)
+      .then(d => { if (alive) { setDocs(d); setChosenDocs(new Set(d.filter(x => x.suggested).map(x => x.id))) } })
+      .catch(e => { if (alive) setDocError(e instanceof Error && e.message ? e.message : "Could not load the applicant's documents.") })
+    return () => { alive = false }
+  }, [applicant.id])
+  const toggleDoc = (id: number) => setChosenDocs(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   // The options come straight from the shared list; this silently re-syncs it
   // each time the panel opens so the "N slots" counts are current.
@@ -89,7 +106,8 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
     setSubmitting(true)
     setError("")
     try {
-      await createReferral(applicant.id, selected.id)
+      await createReferral(applicant.id, selected.id, [...chosenDocs])
+      setSentCount(chosenDocs.size)
       setReferred(true)
       // A new referral changes this applicant's Refer/Referred state and adds a row to the Referrals tab.
       void refreshApplicants()
@@ -125,7 +143,7 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
                 </svg>
               </div>
               <p className="text-lg font-semibold text-gray-800">Referral Submitted</p>
-              <p className="text-sm text-gray-500">{applicant.name} has been referred to the selected vacancy.</p>
+              <p className="text-sm text-gray-500">{applicant.name} has been referred to the selected vacancy.{sentCount > 0 ? ` ${sentCount} document${sentCount === 1 ? '' : 's'} will be available to the employer.` : ' No documents were sent to the employer.'}</p>
               <button onClick={onClose} className="mt-2 px-6 py-2 bg-brand-blue text-white rounded-lg text-sm hover:bg-brand-blue-dark transition-colors">
                 Done
               </button>
@@ -173,6 +191,12 @@ function ReferApplicantPanel({ applicant, onClose }: ReferApplicantPanelProps) {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-gray-700">Documents to send to the employer</label>
+                <p className="text-xs text-gray-500 m-0">Select the documents to send to the employer.</p>
+                <DocumentPicker docs={docs} chosen={chosenDocs} onToggle={toggleDoc} disabled={submitting} error={docError} />
               </div>
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -522,6 +546,9 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
   // ── Modal states ──────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabType>("applicants");
 
+  // Requests employers sent from their portal, waiting for staff: a badge on the Employers tab (checked every 5 s).
+  const { count: updatesCount, signature: updatesSignature, refresh: refreshUpdates } = useEmployerUpdatesCount(canView("employment"));
+
   // Cross-tab "jump to record" state for Placements' Linked Vacancy, set by
   // PlacementsTab, consumed by VacanciesTab.
   const [pendingVacancyId, setPendingVacancyId] = useState<number | null>(null);
@@ -774,6 +801,11 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
                 }`}
               >
                 {tab.label}
+                {tab.id === "employers" && updatesCount > 0 && (
+                  <span className="ml-2 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand-orange text-white text-xs font-semibold inline-flex items-center justify-center align-middle" aria-label={`${updatesCount} employer updates waiting`}>
+                    {updatesCount > 99 ? "99+" : updatesCount}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -851,7 +883,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
           />
         </div>
         <div className={activeTab === "employers" ? "" : "hidden"}>
-          <EmployersTab />
+          <EmployersTab updatesCount={updatesCount} updatesSignature={updatesSignature} onUpdatesChanged={() => { void refreshUpdates() }} />
         </div>
       </div>
 

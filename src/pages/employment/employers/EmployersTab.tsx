@@ -3,12 +3,14 @@ import ConfirmModal from '../../shared/ConfirmModal'
 import { Search, Plus, ChevronDown, X, MoreHorizontal, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useEmployment, type Employer } from '../../../contexts/EmploymentContext'
-import { canManage } from '../../../utils/permissions'
+import { canManage, isAdministrator } from '../../../utils/permissions'
 import { createEmployer, updateEmployer, deleteEmployer } from '../../../services/employerService'
 import { downloadImportTemplate, importEmployers, type ImportResult } from './employerImport'
 import AddEmployerSidebar from './AddEmployerSidebar'
 import EditEmployerSidebar from './EditEmployerSidebar'
 import ViewEmployerSidebar from './ViewEmployerSidebar'
+import EmployerUpdatesPanel from './EmployerUpdatesPanel'
+import EmployerPortalModal from './EmployerPortalModal'
 import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
 import ImportDropZone from '../../../components/ImportDropZone'
 import { logSheetExport } from '../../../services/activityLogService'
@@ -59,9 +61,11 @@ type EmployersTableProps = {
   onView: (e: Employer) => void
   onEdit: (e: Employer) => void
   onDelete: (id: number) => void
+  /** Administrators only: manage the employer's portal login. */
+  onPortal?: (e: Employer) => void
 }
 
-function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, onDelete }: EmployersTableProps) {
+function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, onDelete, onPortal }: EmployersTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is the button's position; pos is the menu's final placement, corrected
   // by measuring its real rendered height once mounted (see layout effect below).
@@ -163,6 +167,10 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
               className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">View</button>
             <button onClick={() => { onEdit(menuEmployer); closeMenu() }} disabled={!canManage('employment')}
               className="w-full px-3 py-2 text-left text-xs text-brand-blue hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Edit</button>
+            {onPortal && (
+              <button onClick={() => { onPortal(menuEmployer); closeMenu() }}
+                className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50">Portal Account</button>
+            )}
             <button onClick={() => { onDelete(menuEmployer.id); closeMenu() }} disabled={!canManage('employment')}
               className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">Delete</button>
           </div>
@@ -436,7 +444,16 @@ function EmployerImportModal({ onClose, onImported }: { onClose: () => void; onI
 
 // ─── EmployersTab ──────────────────────────────────────────────────────────────
 
-export default function EmployersTab() {
+type EmployersTabProps = {
+  /** Employer requests waiting for staff (badge on the "Employer Updates" option). */
+  updatesCount?: number
+  /** Changes whenever the list of employer requests changes, so the Employer Updates list can reload itself. */
+  updatesSignature?: string
+  /** Called after a request is accepted or rejected, so the badge and the other tabs refresh. */
+  onUpdatesChanged?: () => void
+}
+
+export default function EmployersTab({ updatesCount = 0, updatesSignature = '', onUpdatesChanged }: EmployersTabProps = {}) {
   // The list lives in EmploymentProvider, shared with and kept across the other tabs.
   const { employers, industryOptions, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
   const loading = listLoading.employers
@@ -453,6 +470,10 @@ export default function EmployersTab() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  // 'employers' = the company list; 'updates' = what employers asked for in their portal (waiting for staff).
+  const [view, setView] = useState<'employers' | 'updates'>('employers')
+  const [portalEmployer, setPortalEmployer] = useState<Employer | null>(null)
+  const admin = isAdministrator()
 
   // Industry filter: the standard industries plus any custom ones employers use (e.g. "Mining").
   const availableFilters = useMemo<FilterOption[]>(
@@ -616,8 +637,33 @@ export default function EmployersTab() {
     }
   }
 
+  // An employer's request was accepted or rejected: refresh the badge, and the lists the accepted change touches.
+  function handleUpdatesChanged() {
+    onUpdatesChanged?.()
+    void refreshEmployers(); void refreshVacancies(); void refreshReferrals(); void refreshPlacements()
+  }
+
   return (
     <div className="flex flex-col gap-5">
+      <div className="bg-white rounded-xl shadow-md p-3 flex gap-2" role="tablist" aria-label="Employers view">
+        {([['employers', 'Employers'], ['updates', 'Employer Updates']] as const).map(([id, label]) => (
+          <button
+            key={id} role="tab" aria-selected={view === id} onClick={() => setView(id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2 ${view === id ? 'bg-brand-blue text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            {label}
+            {id === 'updates' && updatesCount > 0 && (
+              <span className={`min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-semibold inline-flex items-center justify-center ${view === id ? 'bg-white text-brand-blue' : 'bg-brand-orange text-white'}`} aria-label={`${updatesCount} waiting`}>
+                {updatesCount > 99 ? '99+' : updatesCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {view === 'updates' && <EmployerUpdatesPanel signature={updatesSignature} onChanged={handleUpdatesChanged} />}
+
+      {view === 'employers' && (<>
       <div className="bg-white rounded-xl shadow-md p-3">
         <EmployersToolbar
           onAdd={() => setShowAdd(true)}
@@ -661,6 +707,7 @@ export default function EmployersTab() {
           onView={openView}
           onEdit={openEdit}
           onDelete={handleDelete}
+          onPortal={admin ? setPortalEmployer : undefined}
         />
         <TablePagination
           currentPage={currentPage}
@@ -670,7 +717,9 @@ export default function EmployersTab() {
           onItemsPerPageChange={n => { setPerPage(n); setCurrentPage(1) }}
         />
       </div>
+      </>)}
 
+      {portalEmployer && <EmployerPortalModal employer={portalEmployer} onClose={() => setPortalEmployer(null)} />}
       {isImportModalOpen && (
         <EmployerImportModal
           onClose={() => setIsImportModalOpen(false)}

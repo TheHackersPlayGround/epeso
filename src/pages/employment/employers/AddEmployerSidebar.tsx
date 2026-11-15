@@ -9,7 +9,7 @@ import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../h
 import { useFormDraft } from '../../../hooks/useFormDraft';
 import { useEmployment } from '../../../contexts/EmploymentContext';
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
-import { todayIso } from '../../../utils/formatDate';
+import { fmtDate, todayIso } from '../../../utils/formatDate';
 
 interface EmployerFormData {
   companyName: string;
@@ -235,7 +235,7 @@ export default function AddEmployerSidebar({ onSave, onClose }: AddEmployerSideb
         <h4 className="text-sm font-bold mb-3 bg-brand-blue text-white px-3 py-2 uppercase">Registration Details</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm max-sm:grid-cols-1">
           <div><span className="font-semibold">Status:</span> {formData.status}</div>
-          <div><span className="font-semibold">Date Registered:</span> {formData.dateRegistered}</div>
+          <div><span className="font-semibold">Date Registered:</span> {fmtDate(formData.dateRegistered)}</div>
           {formData.remarks && (
             <div className="col-span-2"><span className="font-semibold">Remarks:</span> {formData.remarks}</div>
           )}

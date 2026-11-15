@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Eye } from 'lucide-react';
+import { fmtDate } from '../../../utils/formatDate';
 
 interface EmployerFormData {
   companyName: string;
@@ -97,7 +98,7 @@ export default function ViewEmployerSidebar({ data, onClose }: ViewEmployerSideb
             <h3 className="text-sm font-bold text-gray-700 mb-4 uppercase tracking-wide">REGISTRATION DETAILS</h3>
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <ReadOnlyField label="Status" value={data.status} />
-              <ReadOnlyField label="Date Registered" value={data.dateRegistered} />
+              <ReadOnlyField label="Date Registered" value={fmtDate(data.dateRegistered)} />
               {data.remarks && (
                 <div className="col-span-2">
                   <label className="block text-gray-700 mb-1 text-xs font-semibold uppercase">Remarks</label>

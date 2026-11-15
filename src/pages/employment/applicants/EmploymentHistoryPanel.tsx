@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { X, ArrowRight } from 'lucide-react'
 import type { Applicant } from '../../../contexts/EmploymentContext'
+import { fmtDate } from '../../../utils/formatDate'
 import {
   getApplicantHistory,
   type EmploymentHistory,
@@ -94,13 +95,13 @@ export default function EmploymentHistoryPanel({ applicant, onClose }: Props) {
                     </p>
                   </div>
                   <div className="flex items-center flex-wrap gap-2">
-                    <FlowNode label="Referred" sub={entry.referralDate} />
+                    <FlowNode label="Referred" sub={fmtDate(entry.referralDate)} />
                     <ArrowRight size={16} className="text-gray-400 shrink-0" />
                     <ReferralBadge status={entry.status} />
                     {entry.placement && (
                       <>
                         <ArrowRight size={16} className="text-gray-400 shrink-0" />
-                        <FlowNode label="Placement" sub={`Hired ${entry.placement.dateHired}`} />
+                        <FlowNode label="Placement" sub={`Hired ${fmtDate(entry.placement.dateHired)}`} />
                         <PlacementBadge status={entry.placement.status} />
                       </>
                     )}

@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #0077BE;
+  --color-brand-blue-dark: #0065A5;
+  --color-brand-orange: #F47C2C;
+  --color-brand-orange-dark: #D96218;
+  --color-brand-bg: #E6E7E8;
+}
+
+/* Same look and sizing as the staff system (Poppins, 18px base), always in light mode. */
+:root {
+  --sans: 'Poppins', system-ui, sans-serif;
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light;
+  color: #374151;
+  background: #E6E7E8;
+}
+
+/* The staff system's type scale (src/styles/index.css). Tailwind's text-xs / text-sm / text-base ... read these, so text sizes match the staff pages. */
+:root {
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 15px;
+  --text-md:   17px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+}
+
+html, body, #root { min-height: 100%; margin: 0; }
+body { background: #E6E7E8; }
+/* No global margin/colour rules for p, h1-h3 or button here: unlayered CSS would override Tailwind's utility classes. */
+/* The staff system's minimal blue scrollbar. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #0077BE; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #0065A5; }
+* { scrollbar-width: thin; scrollbar-color: #0077BE transparent; }
+
+/* Sign-in fields on the glass card: keep the text dark when the browser autofills them. */
+.glass-input:-webkit-autofill,
+.glass-input:-webkit-autofill:hover,
+.glass-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827;
+  caret-color: #111827;
+  transition: background-color 99999s ease-in-out 0s;
+}
+
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }

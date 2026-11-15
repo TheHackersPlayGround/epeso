@@ -431,7 +431,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit,
           </div>
         </div>
 
-        {!kiosk && (
         <div>
           <label htmlFor="slp-eligibilityType" className={labelClass}>Eligibility Type</label>
           <select
@@ -455,7 +454,6 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit,
             />
           )}
         </div>
-        )}
       </div>
     )
   }
@@ -922,7 +920,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit,
   const kioskSections = (): ReviewSection[] => {
     const f = formData
     return [
-    { numeral: 'I', title: 'SLP Information', rows: [['Participant Type', f.is4PsBeneficiary ? '4Ps' : 'Non-4Ps']] },
+    { numeral: 'I', title: 'SLP Information', rows: [['Participant Type', f.is4PsBeneficiary ? '4Ps' : 'Non-4Ps'], ['Eligibility Type', f.eligibilityType === 'Referral' && f.referringParty ? `Referral (${f.referringParty})` : f.eligibilityType]] },
     { numeral: 'II', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
     { numeral: 'III', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
     { numeral: 'IV', title: 'Sector Classification', rows: [['Sector', listText(f.sector, f.sectorOthersSpecify) || 'None selected'], ['Indigenous Group', f.sectorIpGroupSpecify], ['Disability', f.sectorDisabilitySpecify], ['Educational Attainment', f.educationalAttainment]] },

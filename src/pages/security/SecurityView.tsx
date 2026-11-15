@@ -3,15 +3,22 @@ import { ArrowLeft } from 'lucide-react'
 import SystemUsersTab from './SystemUsersTab'
 import DataManagementTab from './DataManagementTab'
 import ActivityLogsTab from './ActivityLogsTab'
+import EmployerActivityTab from './EmployerActivityTab'
 import RecycleBinTab from './RecycleBinTab'
 import { listDeleted } from '../../services/recycleBinService'
+import { isAdministrator } from '../../utils/permissions'
+
+type SecurityTab = 'users' | 'data' | 'bin' | 'logs' | 'employers'
+const TAB_LABELS: Record<SecurityTab, string> = { users: 'System Users', data: 'Backup', logs: 'Activity Logs', employers: 'Employer Activity', bin: 'Recycle Bin' }
 
 interface SecurityViewProps {
   onBack: () => void
 }
 
 export default function SecurityView({ onBack }: SecurityViewProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'data' | 'bin' | 'logs'>('users')
+  const [activeTab, setActiveTab] = useState<SecurityTab>('users')
+  // Employer Activity (what employers did in their portal) is for administrators only; the server refuses everyone else.
+  const tabs: SecurityTab[] = isAdministrator() ? ['users', 'data', 'logs', 'employers', 'bin'] : ['users', 'data', 'logs', 'bin']
 
   // Count shown on the Recycle Bin tab. Loaded up front so the badge is visible
   // before the tab is opened; RecycleBinTab keeps it current after that.
@@ -23,7 +30,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
   // A tab is built the first time it is opened and then kept (just hidden) when
   // you switch away, so coming back is instant and keeps its search/filters.
   const [visited, setVisited] = useState<Set<string>>(new Set(['users']))
-  const openTab = (tab: 'users' | 'data' | 'bin' | 'logs') => {
+  const openTab = (tab: SecurityTab) => {
     setVisited(prev => new Set(prev).add(tab))
     setActiveTab(tab)
   }
@@ -48,7 +55,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
       <div className="mb-6">
         <div className="bg-white rounded-xl shadow-sm px-6 max-sm:px-2 max-sm:overflow-x-auto">
           <nav role="tablist" aria-label="Security tabs" className="flex gap-0 max-sm:gap-0">
-            {(['users', 'data', 'logs', 'bin'] as const).map(tab => (
+            {tabs.map(tab => (
               <button
                 key={tab}
                 role="tab"
@@ -60,7 +67,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {tab === 'users' ? 'System Users' : tab === 'data' ? 'Backup' : tab === 'logs' ? 'Activity Logs' : 'Recycle Bin'}
+                {TAB_LABELS[tab]}
                 {tab === 'bin' && binCount > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-red-500 text-white">{binCount}</span>
                 )}
@@ -76,6 +83,7 @@ export default function SecurityView({ onBack }: SecurityViewProps) {
         {visited.has('data')  && <div className={activeTab === 'data'  ? '' : 'hidden'}><DataManagementTab isActive={activeTab === 'data'} /></div>}
         {visited.has('bin')   && <div className={activeTab === 'bin'   ? '' : 'hidden'}><RecycleBinTab isActive={activeTab === 'bin'} onCountChange={setBinCount} /></div>}
         {visited.has('logs')  && <div className={activeTab === 'logs'  ? '' : 'hidden'}><ActivityLogsTab isActive={activeTab === 'logs'} /></div>}
+        {visited.has('employers') && <div className={activeTab === 'employers' ? '' : 'hidden'}><EmployerActivityTab isActive={activeTab === 'employers'} /></div>}
       </div>
     </div>
   )

@@ -11,7 +11,7 @@ import { createDefaultApplicantFormData } from './applicantDefaults';
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../../hooks/useFieldValidation';
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../../utils/attachments';
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../../utils/contactNumber';
-import { todayIso } from '../../../utils/formatDate';
+import { fmtDate, todayIso } from '../../../utils/formatDate';
 import { currentUserFullName } from '../../../utils/currentUser';
 
 interface ApplicantFormData {
@@ -2337,7 +2337,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">I. Personal Information</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm max-sm:grid-cols-1">
           <div><span className="font-semibold">Name:</span> {formData.surname}, {formData.firstName} {formData.middleName} {formData.suffix}</div>
-          <div><span className="font-semibold">Date of Birth:</span> {formData.dateOfBirth}</div>
+          <div><span className="font-semibold">Date of Birth:</span> {fmtDate(formData.dateOfBirth)}</div>
           <div><span className="font-semibold">Sex:</span> {formData.sex}</div>
           <div><span className="font-semibold">Civil Status:</span> {formData.civilStatus}</div>
           <div><span className="font-semibold">Contact:</span> {formData.contactNumber}</div>
@@ -2491,7 +2491,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               e.eligibility && (
                 <div key={idx}>
                   <span className="font-semibold">{e.eligibility}</span>
-                  {e.dateTaken && <span className="text-gray-600"> · {e.dateTaken}</span>}
+                  {e.dateTaken && <span className="text-gray-600"> · {fmtDate(e.dateTaken)}</span>}
                 </div>
               )
             ))}
@@ -2568,7 +2568,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
       <div>
         <h4 className="text-sm font-bold text-white bg-brand-blue px-3 py-2 uppercase mb-3">X. For PESO Office Only</h4>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mb-3 max-sm:grid-cols-1">
-          <div><span className="font-semibold">Date Applied:</span> {formData.dateApplicationReceived || '—'}</div>
+          <div><span className="font-semibold">Date Applied:</span> {fmtDate(formData.dateApplicationReceived)}</div>
           <div><span className="font-semibold">Received By:</span> {fillReceivedBy(formData.receivedBy) || '(your name)'}</div>
         </div>
       </div>

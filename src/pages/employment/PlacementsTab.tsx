@@ -15,7 +15,7 @@ import ConfirmModal from '../shared/ConfirmModal'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { logSheetExport } from '../../services/activityLogService'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ function PlacementsTable({ placements, isFiltered, onView, onEdit, onUpdateStatu
                 <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{p.applicantName}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.currentJobTitle}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.employer}</td>
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{p.dateHired}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(p.dateHired)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <PlacementStatusBadge status={p.status} />
                 </td>
@@ -385,7 +385,7 @@ function ViewPlacementModal({ placement, onClose, onNavigateToVacancy }: {
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Date Hired</p>
-              <p className="text-sm font-medium text-gray-800">{placement.dateHired || '-'}</p>
+              <p className="text-sm font-medium text-gray-800">{fmtDate(placement.dateHired)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Status</p>
@@ -428,7 +428,7 @@ function ViewPlacementModal({ placement, onClose, onNavigateToVacancy }: {
                   <li key={pr.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-gray-800">{pr.newJobTitle}</span>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">{pr.promotionDate}</span>
+                      <span className="text-xs text-gray-500 whitespace-nowrap">{fmtDate(pr.promotionDate)}</span>
                     </div>
                     {pr.newSalaryRange && (
                       <p className="text-xs text-gray-500 mt-0.5">New salary: {pr.newSalaryRange}</p>

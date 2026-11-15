@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Eye, FileText } from 'lucide-react';
 import type { Applicant } from '../../../contexts/EmploymentContext';
+import { fmtDate } from '../../../utils/formatDate';
 
 type Section =
   | 'personalInfo' | 'jobPreference' | 'language' | 'education'
@@ -97,7 +98,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
 
             {/* DOB / Sex / Religion / Civil / Height — grid grid-cols-5 gap-4 */}
             <div className="grid grid-cols-5 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
-              <TF label="Date of Birth" value={s('dateOfBirth')} />
+              <TF label="Date of Birth" value={fmtDate(s('dateOfBirth'))} />
               <TF label="Sex"           value={s('sex')} />
               <TF label="Religion"      value={s('religion')} />
               <TF label="Civil Status"  value={s('civilStatus')} />
@@ -550,7 +551,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
                 <div key={idx} className="grid grid-cols-2 gap-4 mb-2 max-sm:min-w-[420px]">
                   <input type="text" readOnly value={e.eligibility}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
-                  <input type="text" readOnly value={e.dateTaken}
+                  <input type="text" readOnly value={fmtDate(e.dateTaken)}
                     className="text-black px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-default outline-none text-sm" />
                 </div>
               ))}
@@ -681,7 +682,7 @@ export default function ViewApplicantSidebar({ applicant, onClose }: { applicant
             <SH>X. FOR PESO OFFICE ONLY</SH>
             <div className="px-4 space-y-4">
               <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-                <TF label="Date Applied" value={s('dateApplicationReceived')} />
+                <TF label="Date Applied" value={fmtDate(s('dateApplicationReceived'))} />
                 <TF label="Received By" value={s('receivedBy')} />
               </div>
               {docs.length === 0 ? (

@@ -74,6 +74,7 @@ export type Vacancy = {
   requirements: string
   status: 'Open' | 'Closed'   // effective status (Closed when manually closed OR full)
   manualStatus?: 'Open' | 'Closed'  // officer's open/close intent (drives the toggle)
+  source?: 'Staff' | 'Employer'     // where the opening came from: entered by the PESO, or requested by the employer and accepted by staff
   createdDate?: string        // YYYY-MM-DD the vacancy was entered (read-only; the LMI report counts by it)
 }
 

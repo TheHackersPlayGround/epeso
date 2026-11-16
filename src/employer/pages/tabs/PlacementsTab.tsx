@@ -2,9 +2,9 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
 import { listPlacements, submitRequest, withdrawRequest, type Placement } from '../../api'
-import { Badge, Card, EmptyState, Notice, Spinner, WaitingPill } from '../../components/ui'
+import { Badge, Card, EmptyState, ExportButton, Notice, Spinner, WaitingPill } from '../../components/ui'
 import { StatusRequestDialog, WithdrawDialog } from '../../components/dialogs'
-import { btnSmall, fmtDate, useData, usePaged } from '../../lib'
+import { btnSmall, exportToExcel, fmtDate, useData, usePaged } from '../../lib'
 import TablePagination from '../../../pages/employment/shared/TablePagination'
 
 const STATUSES = ['Active', 'Resigned', 'Terminated', 'Completed']
@@ -50,6 +50,10 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
           </select>
           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
         </div>
+        {/* Exports what the table shows: the current search and status, every page. */}
+        <ExportButton disabled={rows.length === 0} onExport={() => exportToExcel('placements.xlsx', 'Placements', rows.map(p => ({
+          Employee: p.applicantName, Position: p.jobTitle ?? '', 'Date hired': p.dateHired ? fmtDate(p.dateHired) : '', Status: p.status,
+        })))} />
       </div>
 
       {error && !data && <p role="alert" className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</p>}

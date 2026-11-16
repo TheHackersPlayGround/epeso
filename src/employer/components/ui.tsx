@@ -1,6 +1,6 @@
 // Small shared pieces: status badges, dialogs.
-import type { ReactNode } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Download, Loader2, X } from 'lucide-react'
 import ConfirmModal from '../../pages/shared/ConfirmModal'   // the staff system's message popup, so messages look the same on both sides
 
 const BADGE: Record<string, string> = {
@@ -38,6 +38,26 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
       <p className="text-base font-medium text-gray-500">{title}</p>
       {hint && <p className="text-sm mt-1">{hint}</p>}
     </div>
+  )
+}
+
+// The Export button of the list pages (same look as the staff system's). `onExport` saves the file; the button shows "Exporting…" meanwhile.
+export function ExportButton({ onExport, disabled = false }: { onExport: () => Promise<void>; disabled?: boolean }) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  async function run() {
+    setBusy(true); setFailed(false)
+    try { await onExport() } catch { setFailed(true) } finally { setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => void run()} disabled={disabled || busy} title={disabled ? 'Nothing to export' : 'Download what the table shows as an Excel file'}
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors whitespace-nowrap text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+        {busy ? 'Exporting…' : 'Export'}
+      </button>
+      {failed && <span role="alert" className="text-xs text-red-600">Could not export. Please try again.</span>}
+    </>
   )
 }
 

@@ -2,11 +2,11 @@
 // nothing changes until the PESO accepts the request.
 import { useMemo, useState } from 'react'
 import { ChevronDown, Loader2, Plus, Search } from 'lucide-react'
-import { listRequests, listVacancies, submitRequest, withdrawRequest, type PortalRequest, type Vacancy } from '../../api'
-import { Badge, Card, Dialog, EmptyState, Notice, Spinner, WaitingPill } from '../../components/ui'
+import { listPlacements, listRequests, listVacancies, submitRequest, withdrawRequest, type PortalRequest, type Vacancy } from '../../api'
+import { Badge, Card, Dialog, EmptyState, ExportButton, Notice, Spinner, WaitingPill } from '../../components/ui'
 import { WithdrawDialog } from '../../components/dialogs'
 import TablePagination from '../../../pages/employment/shared/TablePagination'
-import { btnGhost, btnPrimary, btnSmall, errText, inputCls, labelCls, useData, usePaged } from '../../lib'
+import { btnGhost, btnPrimary, btnSmall, errText, exportToExcel, inputCls, labelCls, useData, usePaged } from '../../lib'
 
 const peso = (n: number | null) => (n === null ? null : `₱${n.toLocaleString('en-PH', { maximumFractionDigits: 0 })}`)
 function salary(min: number | null, max: number | null) {
@@ -36,9 +36,10 @@ interface Row {
   openRequestId: number | null   // a request waiting for the PESO (changes, or the new opening itself)
 }
 
-export default function VacanciesTab({ tick, onChanged }: { tick: number; onChanged: () => void }) {
+export default function VacanciesTab({ tick, onViewHired, onChanged }: { tick: number; onViewHired: (vacancyId: number, title: string) => void; onChanged: () => void }) {
   const vac = useData(listVacancies, tick)
   const reqs = useData(listRequests, tick)
+  const placements = useData(listPlacements, tick)
   const [dialog, setDialog] = useState<{ mode: 'new' } | { mode: 'edit'; vacancy: Vacancy } | null>(null)
   const [withdraw, setWithdraw] = useState<{ id: number; what: string } | null>(null)
   const [detailKey, setDetailKey] = useState<string | null>(null)
@@ -72,6 +73,11 @@ export default function VacanciesTab({ tick, onChanged }: { tick: number; onChan
   }, [all, search, status])
   const pg = usePaged(rows, `${search}|${status}`)
   const detail = detailKey ? all.find(r => r.key === detailKey) ?? null : null
+  // People currently hired into the opening shown in the details window: the same people the "Hired" number counts (active placements only).
+  const hiredHere = useMemo(
+    () => (detail?.vacancy ? (placements.data ?? []).filter(p => p.vacancyId === detail.vacancy!.id && p.status === 'Active') : []),
+    [placements.data, detail],
+  )
 
   function reloadAll() { vac.reload(); reqs.reload(); onChanged() }
 
@@ -92,6 +98,10 @@ export default function VacanciesTab({ tick, onChanged }: { tick: number; onChan
           </select>
           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
         </div>
+        {/* Exports what the table shows: the current search and status, every page. */}
+        <ExportButton disabled={rows.length === 0} onExport={() => exportToExcel('vacancies.xlsx', 'Vacancies', rows.map(r => ({
+          'Job title': r.title, 'Job type': r.jobType ?? '', Salary: r.salary, Hired: r.hired, Status: r.status ?? 'Waiting for the PESO',
+        })))} />
         <button type="button" onClick={() => setDialog({ mode: 'new' })} className={btnPrimary}><Plus size={16} />Request a new opening</button>
       </div>
 
@@ -161,6 +171,15 @@ export default function VacanciesTab({ tick, onChanged }: { tick: number; onChan
           </dl>
           <div><p className={labelCls}>Description</p><p className="m-0 text-sm text-gray-700 whitespace-pre-line break-words">{detail.description || '—'}</p></div>
           <div><p className={labelCls}>Requirements</p><p className="m-0 text-sm text-gray-700 whitespace-pre-line break-words">{detail.requirements || '—'}</p></div>
+          {detail.vacancy && (
+            <div>
+              <p className={labelCls}>Hired applicants</p>
+              {placements.loading && !placements.data ? <p className="m-0 text-sm text-gray-500">Loading…</p>
+                : placements.error && !placements.data ? <p className="m-0 text-sm text-red-600">Could not load the hired applicants.</p>
+                : hiredHere.length === 0 ? <p className="m-0 text-sm text-gray-500">No one hired yet.</p>
+                : <button type="button" onClick={() => { const v = detail.vacancy!; setDetailKey(null); onViewHired(v.id, detail.title) }} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View hired applicants ({hiredHere.length})</button>}
+            </div>
+          )}
         </Dialog>
       )}
 

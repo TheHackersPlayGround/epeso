@@ -47,7 +47,7 @@ export default function SharedDocumentsDialog({ referralId, applicantId, applica
           <button onClick={onClose} aria-label="Close" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><X size={18} /></button>
         </div>
         <div className="px-6 py-5 max-sm:px-4 space-y-4">
-          <p className="text-sm text-gray-600 m-0">The employer can open only the documents ticked here, and only while this referral is active or hired. Untick one to stop sharing it.</p>
+          <p className="text-sm text-gray-600 m-0">The employer can open only the documents selected here, and only while this referral is active or hired. Unselect one to stop sharing it.</p>
           <DocumentPicker docs={docs} chosen={chosen} onToggle={toggle} disabled={!editable || saving} error={loadError} />
           {!editable && <p className="text-xs text-gray-400 m-0">You can view this, but only an editor can change it.</p>}
           {saveError && <p className="text-red-500 text-sm m-0">{saveError}</p>}

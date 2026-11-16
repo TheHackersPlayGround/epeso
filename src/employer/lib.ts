@@ -62,7 +62,19 @@ export function requestSummary(r: PortalRequest): string {
   return cutText(r.type === 'vacancy_update' && r.jobTitle ? `${r.jobTitle} · ${what}` : what.charAt(0).toUpperCase() + what.slice(1))
 }
 
-export const btnPrimary = 'px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2'
+// Saves the rows as an Excel file (one sheet, the keys of the first row as column headings, widths fitted to the text).
+// The Excel library is loaded only when someone clicks Export, so the employer page itself stays small.
+export async function exportToExcel(fileName: string, sheetName: string, rows: Record<string, string | number>[]) {
+  const XLSX = await import('xlsx')
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const keys = rows.length ? Object.keys(rows[0]) : []
+  ws['!cols'] = keys.map(k => ({ wch: Math.min(40, Math.max(k.length, ...rows.map(r => String(r[k] ?? '').length)) + 2) }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  XLSX.writeFile(wb, fileName)
+}
+
+export const btnPrimary ='px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2'
 export const btnGhost = 'px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50'
 export const btnSmall = 'px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-40'
 export const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'

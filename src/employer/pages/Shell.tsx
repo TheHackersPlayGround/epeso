@@ -5,6 +5,7 @@ import { Briefcase, ChevronUp, ClipboardList, LayoutDashboard, LogOut, User, Use
 import { getOverview, type Me } from '../api'
 import { useData } from '../lib'
 import ApplicantView from './ApplicantView'
+import HiredApplicantsView from './HiredApplicantsView'
 import Overview from './tabs/Overview'
 import ReferralsTab from './tabs/ReferralsTab'
 import PlacementsTab from './tabs/PlacementsTab'
@@ -36,6 +37,8 @@ const HEADINGS: Record<TabId, { title: string; hint: string }> = {
 export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [tab, setTab] = useState<TabId>('overview')
   const [viewing, setViewing] = useState<{ id: number; fromTab: TabId } | null>(null)
+  // The "who is hired for this opening" page. It stays set while an applicant is opened from it, so Back from the applicant returns here.
+  const [hiredFor, setHiredFor] = useState<{ id: number; title: string } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -79,7 +82,7 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
             const Icon = t.icon
             return (
               <button key={t.id} type="button" aria-current={active ? 'page' : undefined}
-                onClick={() => { setViewing(null); setTab(t.id); overview.reload() }}
+                onClick={() => { setViewing(null); setHiredFor(null); setTab(t.id); overview.reload() }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm whitespace-nowrap transition-colors max-lg:w-auto max-lg:px-3 ${
                   active ? 'bg-white text-brand-blue font-semibold shadow-sm' : 'text-white/90 hover:bg-white/15'
                 }`}>
@@ -97,7 +100,7 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
         <div ref={menuRef} className="relative p-3 border-t border-white/15 max-lg:absolute max-lg:top-2 max-lg:right-2 max-lg:p-0 max-lg:border-0">
           {menuOpen && (
             <div role="menu" className="absolute left-3 right-3 bottom-full mb-1 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden max-lg:left-auto max-lg:right-0 max-lg:bottom-auto max-lg:top-full max-lg:mt-2 max-lg:mb-0 max-lg:w-44">
-              <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setViewing(null); setTab('company'); overview.reload() }}
+              <button role="menuitem" type="button" onClick={() => { setMenuOpen(false); setViewing(null); setHiredFor(null); setTab('company'); overview.reload() }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <User size={16} className="text-gray-400" />Profile
               </button>
@@ -129,6 +132,9 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
       <main className="flex-1 min-w-0 min-h-0 overflow-y-auto p-6 max-sm:p-3">
         {viewing ? (
           <ApplicantView id={viewing.id} onClose={() => { setTab(viewing.fromTab); setViewing(null) }} />
+        ) : hiredFor ? (
+          <HiredApplicantsView vacancyId={hiredFor.id} title={hiredFor.title} tick={tick} onBack={() => setHiredFor(null)}
+            onView={id => setViewing({ id, fromTab: 'vacancies' })} />
         ) : (
           <>
             <div className="mb-5 max-sm:mb-3">
@@ -138,7 +144,7 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
             {tab === 'overview' && <Overview data={overview.data} error={overview.error} loading={overview.loading} onGo={setTab} />}
             {tab === 'referrals' && <ReferralsTab tick={tick} onView={id => setViewing({ id, fromTab: 'referrals' })} onChanged={overview.reload} />}
             {tab === 'placements' && <PlacementsTab tick={tick} onView={id => setViewing({ id, fromTab: 'placements' })} onChanged={overview.reload} />}
-            {tab === 'vacancies' && <VacanciesTab tick={tick} onChanged={overview.reload} />}
+            {tab === 'vacancies' && <VacanciesTab tick={tick} onViewHired={(id, title) => setHiredFor({ id, title })} onChanged={overview.reload} />}
             {tab === 'company' && <CompanyTab tick={tick} onChanged={overview.reload} />}
             {tab === 'requests' && <RequestsTab tick={tick} onChanged={overview.reload} />}
           </>

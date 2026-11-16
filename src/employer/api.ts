@@ -58,7 +58,8 @@ export interface Referral {
   status: ReferralStatus; openRequest: OpenRequest | null
 }
 export interface Placement {
-  id: number; applicantId: number; applicantName: string; jobTitle: string | null; dateHired: string | null
+  /** The job opening this person was hired into (so the Vacancies tab can list who is hired for each opening). */
+  id: number; vacancyId: number; applicantId: number; applicantName: string; jobTitle: string | null; dateHired: string | null
   status: PlacementStatus; openRequest: OpenRequest | null
 }
 export interface Vacancy {

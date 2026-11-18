@@ -1299,7 +1299,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               {formData.languages.map((lang, index) => (
                 <div key={index} className="grid grid-cols-5 border-t border-gray-300">
                   <div className="px-2 py-2 border-r border-gray-300 flex items-center gap-2">
-                    {lang.language && index < 3 ? (
+                    {index < 3 && ['ENGLISH', 'FILIPINO', 'MANDARIN'].includes(lang.language) ? (
                       <span className="flex-1 font-medium text-sm px-2 text-gray-900">{lang.language}</span>
                     ) : (
                       <input
@@ -2499,7 +2499,7 @@ export default function AddApplicantSidebar({ onSave, onClose, initialData, appl
               l.license && (
                 <div key={idx}>
                   <span className="font-semibold">{l.license}</span>
-                  {l.validUntil && <span className="text-gray-600"> · Valid until {l.validUntil}</span>}
+                  {l.validUntil && <span className="text-gray-600"> · Valid until {fmtDate(l.validUntil)}</span>}
                 </div>
               )
             ))}

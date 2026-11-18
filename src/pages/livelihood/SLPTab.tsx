@@ -19,6 +19,7 @@ import { WithdrawalBanner, WithdrawalFootnote } from '../../components/Withdrawa
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
 import slpLogo from '../../kiosk/logos/slp.png'
+import { withDateCells } from '../../utils/excelDates'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -538,14 +539,14 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
                 </div>
                 <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                   <div><span className="text-gray-400">SLP Track:</span> {confirmProject.slpTrack || '—'}</div>
-                  <div><span className="text-gray-400">Date Started:</span> {confirmProject.dateStarted || '—'}</div>
+                  <div><span className="text-gray-400">Date Started:</span> {fmtDate(confirmProject.dateStarted)}</div>
                   <div><span className="text-gray-400">Location:</span> {confirmProject.location || '—'}</div>
                   <div><span className="text-gray-400">Facilitator:</span> {confirmProject.facilitator || '—'}</div>
                   {confirmProject.assistanceAmount && (
                     <div><span className="text-gray-400">Assistance:</span> ₱{Number(confirmProject.assistanceAmount).toLocaleString()}</div>
                   )}
                   {confirmProject.dateReleased && (
-                    <div><span className="text-gray-400">Date Released:</span> {confirmProject.dateReleased}</div>
+                    <div><span className="text-gray-400">Date Released:</span> {fmtDate(confirmProject.dateReleased)}</div>
                   )}
                   {confirmProject.description && (
                     <div className="col-span-2"><span className="text-gray-400">Description:</span> {confirmProject.description}</div>
@@ -661,7 +662,7 @@ function AssignProjectModal({ beneficiary, projects, onAssign, onUnassign, onClo
                             )}
                           </div>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            SLP &bull; {project.dateStarted} &bull; {project.location}
+                            SLP &bull; {fmtDate(project.dateStarted)} &bull; {project.location}
                           </p>
                           {project.description && (
                             <p className="text-xs text-gray-400 mt-0.5 truncate">{project.description}</p>
@@ -1191,7 +1192,7 @@ export default function SLPTab() {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'SLP')
-      XLSX.writeFile(wb, 'slp_beneficiaries.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'slp_beneficiaries.xlsx')
       logSheetExport('livelihood', 'SLP beneficiaries list', ws, 2)
     } finally {
       setIsExporting(false)

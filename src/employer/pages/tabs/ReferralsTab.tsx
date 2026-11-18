@@ -2,7 +2,7 @@
 // to mark a referral Interviewed / Hired / Not Hired.
 import { useMemo, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
-import { listReferrals, submitRequest, withdrawRequest, type Referral } from '../../api'
+import { listReferrals, submitRequest, withdrawRequest, type ApplicantContext, type Referral } from '../../api'
 import { Badge, Card, EmptyState, ExportButton, Notice, Spinner, WaitingPill } from '../../components/ui'
 import { StatusRequestDialog, WithdrawDialog } from '../../components/dialogs'
 import { btnSmall, exportToExcel, fmtDate, useData, usePaged } from '../../lib'
@@ -10,7 +10,7 @@ import TablePagination from '../../../pages/employment/shared/TablePagination'
 
 const STATUSES = ['Pending', 'Interviewed', 'Hired', 'Not Hired']
 
-export default function ReferralsTab({ tick, onView, onChanged }: { tick: number; onView: (applicantId: number) => void; onChanged: () => void }) {
+export default function ReferralsTab({ tick, onView, onChanged }: { tick: number; onView: (applicantId: number, context: ApplicantContext) => void; onChanged: () => void }) {
   const { data, error, loading, reload } = useData(listReferrals, tick)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -88,7 +88,7 @@ export default function ReferralsTab({ tick, onView, onChanged }: { tick: number
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="inline-flex gap-2">
-                        <button type="button" onClick={() => onView(r.applicantId)} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
+                        <button type="button" onClick={() => onView(r.applicantId, { jobTitle: r.jobTitle, verb: 'Referred', date: r.dateReferred, status: r.status })} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
                         {canUpdate && <button type="button" onClick={() => setUpdate(r)} className={`${btnSmall} bg-brand-blue text-white hover:bg-brand-blue-dark`}>Update status</button>}
                         {r.openRequest && <button type="button" onClick={() => setWithdraw(r)} className={`${btnSmall} border border-red-200 text-red-600 hover:bg-red-50`}>Withdraw request</button>}
                       </div>

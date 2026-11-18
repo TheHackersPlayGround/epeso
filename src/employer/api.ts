@@ -81,7 +81,12 @@ export interface Company {
 export interface PortalRequest {
   id: number; type: 'referral_status' | 'placement_status' | 'company_info' | 'vacancy_new' | 'vacancy_update'; status: RequestStatus
   applicantName: string | null; jobTitle: string | null; requestedStatus: string | null; dateHired: string | null
-  changes: Record<string, string | number> | null; reviewNote: string | null; submittedAt: string | null; reviewedAt: string | null
+  /** What a referral / placement status was before the change (as it is now while pending; as it was when approved). */
+  currentStatus: string | null
+  changes: Record<string, string | number> | null
+  /** What each changed field of a company / opening request was before, by the same keys as `changes` (empty text = unknown or blank). */
+  before: Record<string, string> | null
+  reviewNote: string | null; submittedAt: string | null; reviewedAt: string | null
 }
 export interface Overview {
   companyName: string; openReferrals: number; activePlacements: number; openVacancies: number; pendingRequests: number
@@ -90,6 +95,8 @@ export interface Overview {
 /** A document the PESO chose to send to your company for this application. */
 export interface SharedDocument { id: number; label: string; type: string; fileName: string; fileSize: number; previewable: boolean }
 export interface ApplicantRecord { id: number; name: string; data: Record<string, unknown>; documents: SharedDocument[] }
+/** Which referral or placement the employer opened the profile from, so it can say "Referred for Reloader · 11/14/2026 · Hired". */
+export interface ApplicantContext { jobTitle: string | null; verb: 'Referred' | 'Hired'; date: string | null; status: string }
 
 /** The address of a shared document. Files are served by the portal after its checks; open it in a new tab (view) or with download=true. */
 export const documentUrl = (id: number, download = false, view = false) => `${API_BASE}/employer_portal/document/${id}${download ? '?download=1' : view ? '?view=1' : ''}`

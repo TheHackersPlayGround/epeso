@@ -24,6 +24,7 @@ import { downloadImportTemplate, importCdspApplicants, type ImportResult } from 
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -415,7 +416,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'CDSP Applicants')
-      XLSX.writeFile(wb, `CDSP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `CDSP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
       logSheetExport('cdsp', 'CDSP applicants list', ws, 2)
     } finally {
       setIsExporting(false)
@@ -496,7 +497,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     )}
                     <div className="mt-2">
                       <Row label="Service" value={activity.service} />
-                      <Row label="Date" value={activity.date} />
+                      <Row label="Date" value={fmtDate(activity.date)} />
                       <Row label="Location / Venue" value={activity.location} />
                       <Row label="Facilitator" value={activity.facilitator} />
                       <Row label="Participants" value={activity.participants ?? undefined} />
@@ -644,7 +645,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {/* Date and location tell apart activities that share a title */}
                       <span className="text-xs text-gray-500">
-                        {[currentActivity.service, currentActivity.date, currentActivity.location].filter(Boolean).join(' · ')}
+                        {[currentActivity.service, fmtDate(currentActivity.date), currentActivity.location].filter(Boolean).join(' · ')}
                       </span>
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-100 text-yellow-700">{currentActivity.status}</span>
                     </div>
@@ -689,7 +690,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                           <p className="text-sm font-semibold text-gray-800 mb-1">{activity.title}</p>
                           <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-gray-500">
                             {activity.service && <span>{activity.service}</span>}
-                            {activity.date && <><span>·</span><span>{activity.date}</span></>}
+                            {activity.date && <><span>·</span><span>{fmtDate(activity.date)}</span></>}
                             {activity.location && <><span>·</span><span>{activity.location}</span></>}
                             {activity.participants !== null && (
                               <><span>·</span><span className={isFull ? 'text-red-500 font-semibold' : ''}>{activity.assignedCount}/{activity.participants} slots</span></>
@@ -750,7 +751,7 @@ export default function CDSPView({ onBack }: CDSPViewProps) {
                 </div>
                 <div>
                   <Row label="Service" value={selectedActivity.service} />
-                  <Row label="Date" value={selectedActivity.date} />
+                  <Row label="Date" value={fmtDate(selectedActivity.date)} />
                   <Row label="Location / Venue" value={selectedActivity.location} />
                   <Row label="Facilitator" value={selectedActivity.facilitator} />
                   <Row label="Participants" value={selectedActivity.participants ?? undefined} />

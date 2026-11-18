@@ -9,40 +9,21 @@ import ConfirmModal from '../shared/ConfirmModal'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
-type FilterOption = { id: string; label: string; options: string[] }
-
-const BASE_FILTERS: FilterOption[] = [
-  { id: 'industry', label: 'Industry', options: [] }, // options come from the shared industry choices
-  { id: 'jobType', label: 'Job Type', options: ['Full-time', 'Part-time', 'Contract'] },
-  { id: 'status', label: 'Status', options: ['Open', 'Closed'] },
-]
-
-// The filter list, with the Industry choices filled in from the shared list (standard industries
-// plus any custom ones employers use).
-function useAvailableFilters(): FilterOption[] {
-  const { industryOptions } = useEmployment()
-  return useMemo(
-    () => BASE_FILTERS.map((f) => (f.id === 'industry' ? { ...f, options: [...industryOptions.standard, ...industryOptions.custom] } : f)),
-    [industryOptions],
-  )
-}
+// The status dropdown above the table. Industry and Job Type are table columns, found with the search box.
+const STATUS_FILTER_OPTIONS: Vacancy['status'][] = ['Open', 'Closed']
 
 type EmployerOption = { id: number; companyName: string }
 
-// ── Toolbar ──────────────────────────────────────────────────────────────────
-
-// ── Search Bar ────────────────────────────────────────────────────────────────
+// ── Toolbar: add, search, status filter, export (one row) ─────────────────────
 
 type VacanciesSearchBarProps = {
   onAdd: () => void
   searchQuery: string
-  activeFilters: string[]
-  isFilterOpen: boolean
+  statusFilter: string
   onSearchChange: (v: string) => void
-  onToggleFilter: () => void
-  onCloseFilter: () => void
-  onAddFilter: (id: string) => void
+  onStatusChange: (v: string) => void
   onExportExcel: () => void
   isExporting: boolean
 }
@@ -50,18 +31,12 @@ type VacanciesSearchBarProps = {
 function VacanciesSearchBar({
   onAdd,
   searchQuery,
-  activeFilters,
-  isFilterOpen,
+  statusFilter,
   onSearchChange,
-  onToggleFilter,
-  onCloseFilter,
-  onAddFilter,
+  onStatusChange,
   onExportExcel,
   isExporting,
 }: VacanciesSearchBarProps) {
-  const availableFilters = useAvailableFilters()
-  const unselected = availableFilters.filter((f) => !activeFilters.includes(f.id))
-
   return (
     <div className="flex flex-wrap gap-3">
       <button
@@ -78,42 +53,24 @@ function VacanciesSearchBar({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by job title, employer..."
+          placeholder="Search by job title, employer, industry, job type or status..."
           aria-label="Search vacancies"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
       </div>
 
+      {/* Status filter: always visible, like the other staff lists */}
       <div className="relative">
-        <button
-          onClick={onToggleFilter}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
+        <select
+          value={statusFilter}
+          onChange={(e) => onStatusChange(e.target.value)}
+          aria-label="Status"
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
         >
-          <Plus size={16} />
-          Filter By
-          <ChevronDown size={14} className="text-gray-500" />
-        </button>
-
-        {isFilterOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={onCloseFilter} />
-            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-              {unselected.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
-              ) : (
-                unselected.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => { onAddFilter(f.id); onCloseFilter() }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                  >
-                    {f.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
+          <option value="">All</option>
+          {STATUS_FILTER_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       <button
@@ -128,64 +85,10 @@ function VacanciesSearchBar({
   )
 }
 
-// ── Filter Badges ─────────────────────────────────────────────────────────────
-
-type VacanciesFilterBadgesProps = {
-  activeFilters: string[]
-  filterValues: Record<string, string>
-  onFilterValueChange: (id: string, value: string) => void
-  onRemoveFilter: (id: string) => void
-}
-
-function VacanciesFilterBadges({
-  activeFilters,
-  filterValues,
-  onFilterValueChange,
-  onRemoveFilter,
-}: VacanciesFilterBadgesProps) {
-  const availableFilters = useAvailableFilters()
-  if (activeFilters.length === 0) return null
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {activeFilters.map((filterId) => {
-        const filter = availableFilters.find((f) => f.id === filterId)
-        if (!filter) return null
-        return (
-          <div
-            key={filterId}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full"
-          >
-            <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
-            <select
-              value={filterValues[filterId] ?? ''}
-              onChange={(e) => onFilterValueChange(filterId, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-            >
-              <option value="">All</option>
-              {filter.options.map((o) => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => onRemoveFilter(filterId)}
-              className="text-blue-700 hover:text-blue-900 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Table ─────────────────────────────────────────────────────────────────────
 
 type VacanciesTableProps = {
   vacancies: Vacancy[]
-  activeFilters: string[]
   onView: (v: Vacancy) => void
   onEdit: (v: Vacancy) => void
   onToggleStatus: (id: number, currentStatus: Vacancy['status']) => void | Promise<void>
@@ -201,7 +104,7 @@ function StatusBadge({ status }: { status: Vacancy['status'] }) {
   )
 }
 
-function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
+function VacanciesTable({ vacancies, onView, onEdit, onToggleStatus, isFiltered, highlightId }: VacanciesTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is the button's position; pos is the menu's final placement, corrected
   // by measuring its real rendered height once mounted (see layout effect below).
@@ -260,9 +163,6 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
       closeMenu()
     }
   }
-  const showIndustry = activeFilters.includes('industry')
-  const showJobType = activeFilters.includes('jobType')
-
   return (
     <>
       <div className="overflow-x-auto">
@@ -271,10 +171,10 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
             <tr className="bg-brand-blue">
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Job Title</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Employer</th>
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Industry</th>
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Job Type</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Vacancies Count</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Status</th>
-              {showIndustry && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Industry</th>}
-              {showJobType && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Job Type</th>}
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Actions</th>
             </tr>
           </thead>
@@ -288,8 +188,8 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
                     </svg>
                     {isFiltered ? (
                       <>
-                        <p className="text-base font-medium text-gray-500">No vacancies match your filters</p>
-                        <p className="text-sm">Try adjusting your search or removing some filters.</p>
+                        <p className="text-base font-medium text-gray-500">No vacancies match your search</p>
+                        <p className="text-sm">Try a different job title, employer, industry, job type or status.</p>
                       </>
                     ) : (
                       <>
@@ -312,12 +212,12 @@ function VacanciesTable({ vacancies, activeFilters, onView, onEdit, onToggleStat
                     {v.source === 'Employer' && <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 border border-blue-200 text-blue-700 align-middle" title="Requested by the employer through the employer portal and accepted by staff">Employer request</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.employer}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.industry}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.jobType}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.vacanciesCount}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <StatusBadge status={v.status} />
                   </td>
-                  {showIndustry && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.industry}</td>}
-                  {showJobType && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.jobType}</td>}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={(e) => handleToggleMenu(e, v.id)}
@@ -930,9 +830,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
   const employers = useMemo<EmployerOption[]>(() => allEmployers.map(e => ({ id: e.id, companyName: e.companyName })), [allEmployers])
   const loading = listLoading.vacancies || listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
+  const [statusFilter, setStatusFilter] = useState('')   // '' = All
   const [showAddModal, setShowAddModal] = useState(false)
   const [viewingVacancy, setViewingVacancy] = useState<Vacancy | null>(null)
   const [editingVacancy, setEditingVacancy] = useState<Vacancy | null>(null)
@@ -944,25 +842,13 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
     isOpen: boolean; type: 'success' | 'error'; title: string; message: string
   }>({ isOpen: false, type: 'success', title: '', message: '' })
 
-  // Same error this tab always showed when its own initial fetch failed --
-  // the fetch itself now happens in the provider, which just reports it.
-  useEffect(() => {
-    if (loadFailed.vacancies || loadFailed.employers) {
-      setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load vacancies.' })
-    }
-  }, [loadFailed.vacancies, loadFailed.employers])
-
-  function handleAddFilter(id: string) {
-    setActiveFilters((prev) => [...prev, id])
-  }
-
-  function handleRemoveFilter(id: string) {
-    setActiveFilters((prev) => prev.filter((f) => f !== id))
-    setFilterValues((prev) => { const n = { ...prev }; delete n[id]; return n })
-  }
-
-  function handleFilterValueChange(id: string, value: string) {
-    setFilterValues((prev) => ({ ...prev, [id]: value }))
+  // Same error this tab always showed when its own initial fetch failed -- the fetch itself happens in the provider, which just reports it.
+  // Shown the moment the failure is reported (adjusting state while rendering, rather than in an effect, so it needs no second render).
+  const loadFailedNow = loadFailed.vacancies || loadFailed.employers
+  const [wasLoadFailed, setWasLoadFailed] = useState(false)
+  if (wasLoadFailed !== loadFailedNow) {
+    setWasLoadFailed(loadFailedNow)
+    if (loadFailedNow) setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load vacancies.' })
   }
 
   async function handleToggleStatus(id: number, currentStatus: Vacancy['status']) {
@@ -979,6 +865,26 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to update vacancy status.' })
     }
   }
+
+  // The search box looks in the job title, employer, industry, job type and status. The status is matched from its start,
+  // so "open" finds Open and "closed" finds Closed. The Status dropdown narrows the result further.
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return vacancies.filter((v) =>
+      (!q
+        || [v.jobTitle, v.employer, v.industry, v.jobType].some((t) => (t ?? '').toLowerCase().includes(q))
+        || (v.status ?? '').toLowerCase().startsWith(q))
+      && (!statusFilter || v.status === statusFilter),
+    )
+  }, [vacancies, searchQuery, statusFilter])
+
+  // The page shown never points past the last page (the list can shrink); changing the search or status goes back to page 1 (in the handlers below).
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const page = Math.min(currentPage, totalPages)
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * perPage, page * perPage),
+    [filtered, page, perPage],
+  )
 
   function buildExportRows() {
     return filtered.map(v => ({
@@ -1001,7 +907,7 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       const ws = XLSX.utils.json_to_sheet(buildExportRows())
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Vacancies')
-      XLSX.writeFile(wb, 'vacancies.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'vacancies.xlsx')
       logSheetExport('employment', 'Vacancies list', ws, 1)
     } finally {
       setIsExporting(false)
@@ -1019,38 +925,6 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
       setConfirmModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
     }
   }
-
-  const filtered = useMemo(() => {
-    let result = vacancies
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(
-        (v) =>
-          v.jobTitle.toLowerCase().includes(q) ||
-          v.employer.toLowerCase().includes(q),
-      )
-    }
-
-    for (const filterId of activeFilters) {
-      const value = filterValues[filterId]
-      if (!value) continue
-      if (filterId === 'status') result = result.filter((v) => v.status === value)
-      if (filterId === 'industry') result = result.filter((v) => v.industry === value)
-      if (filterId === 'jobType') result = result.filter((v) => v.jobType === value)
-    }
-
-    return result
-  }, [vacancies, searchQuery, activeFilters, filterValues])
-
-  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
-    [filtered, currentPage, perPage],
-  )
 
   // Jump to a vacancy from Placements' Job Reference ID link: open it, page
   // to it, and flash-highlight its row.
@@ -1083,39 +957,24 @@ export default function VacanciesTab({ focusVacancyId, onFocusHandled }: {
           <VacanciesSearchBar
             onAdd={() => setShowAddModal(true)}
             searchQuery={searchQuery}
-            activeFilters={activeFilters}
-            isFilterOpen={isFilterOpen}
-            onSearchChange={(v) => setSearchQuery(v)}
-            onToggleFilter={() => setIsFilterOpen((o) => !o)}
-            onCloseFilter={() => setIsFilterOpen(false)}
-            onAddFilter={handleAddFilter}
+            statusFilter={statusFilter}
+            onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1) }}
+            onStatusChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}
             onExportExcel={handleExportExcel}
             isExporting={isExporting}
           />
-
-          {activeFilters.length > 0 && (
-            <div className="mt-3">
-              <VacanciesFilterBadges
-                activeFilters={activeFilters}
-                filterValues={filterValues}
-                onFilterValueChange={handleFilterValueChange}
-                onRemoveFilter={handleRemoveFilter}
-              />
-            </div>
-          )}
         </div>
 
         <VacanciesTable
           vacancies={paginated}
-          activeFilters={activeFilters}
           onView={setViewingVacancy}
           onEdit={setEditingVacancy}
           onToggleStatus={handleToggleStatus}
-          isFiltered={searchQuery.trim() !== '' || activeFilters.length > 0}
+          isFiltered={searchQuery.trim() !== '' || statusFilter !== ''}
           highlightId={highlightedVacancyId}
         />
         <TablePagination
-          currentPage={currentPage}
+          currentPage={page}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
           itemsPerPage={perPage}

@@ -25,6 +25,7 @@ import SkillsTrainingProfileForm, {
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 interface SkillsTrainingViewProps {
   onBack: () => void
@@ -440,7 +441,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Skills Training')
-      XLSX.writeFile(wb, `SkillsTraining_${new Date().toISOString().split('T')[0]}.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `SkillsTraining_${new Date().toISOString().split('T')[0]}.xlsx`)
       logSheetExport('skills', 'Skills Training applicants list', ws, 2)
     } finally {
       setIsExporting(false)
@@ -738,7 +739,7 @@ export default function SkillsTrainingView({ onBack }: SkillsTrainingViewProps) 
                     </div>
                     <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2 text-xs text-gray-600">
                       {selectedTraining.location && <div className="col-span-2"><span className="text-gray-400">Location: </span>{selectedTraining.location}</div>}
-                      {selectedTraining.date && <div><span className="text-gray-400">Date: </span>{selectedTraining.date}</div>}
+                      {selectedTraining.date && <div><span className="text-gray-400">Date: </span>{fmtDate(selectedTraining.date)}</div>}
                       {selectedTraining.participants != null && <div><span className="text-gray-400">Slots: </span>{selectedTraining.assignedCount}/{selectedTraining.participants}</div>}
                       {selectedTraining.facilitator && <div className="col-span-2"><span className="text-gray-400">Facilitator: </span>{selectedTraining.facilitator}</div>}
                       {selectedTraining.description && <div className="col-span-2"><span className="text-gray-400">Description: </span>{selectedTraining.description}</div>}

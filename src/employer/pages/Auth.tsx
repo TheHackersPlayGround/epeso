@@ -204,7 +204,8 @@ export function LoginPage({ onSignedIn, notice }: { onSignedIn: (me: Me) => void
           <label htmlFor="username" className={glassLabel}>Username</label>
           <div className="relative">
             <User size={16} className={glassIcon} />
-            <input id="username" value={username} onChange={e => { setUsername(e.target.value); setError(''); setShowNotice(false) }} autoComplete="username" autoCapitalize="none" autoFocus
+            {/* No autoFocus here: on a phone it would open the keyboard at once, and the browser's list of saved usernames would pop open by itself. */}
+            <input id="username" value={username} onChange={e => { setUsername(e.target.value); setError(''); setShowNotice(false) }} autoComplete="username" autoCapitalize="none"
               placeholder="Enter your username" className={`${glassInput} pl-10`} />
           </div>
         </div>

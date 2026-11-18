@@ -331,6 +331,7 @@ export default function EditEmployerSidebar({ initialData, onSave, onClose }: Ed
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
+                <span className="block mt-1 text-xs text-gray-500">Also switches this employer's portal login on (Active) or off (Inactive).</span>
               </div>
               <div>
                 <label className="block text-gray-700 mb-2 text-xs font-semibold uppercase">Date Registered</label>

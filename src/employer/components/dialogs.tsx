@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Badge, Dialog } from './ui'
+import DatePicker from '../../components/DatePicker'
 import ConfirmModal from '../../pages/shared/ConfirmModal'
 import type { PortalRequest } from '../api'
 import { FIELD_LABELS, btnGhost, btnPrimary, fmtChangeValue, fmtDate, fmtWhen, inputCls, labelCls, requestKind, todayStr } from '../lib'
@@ -53,7 +54,7 @@ export function StatusRequestDialog({ title, subject, current, options, allowHir
       {needsDate && (
         <div>
           <label htmlFor="date-hired" className={labelCls}>Date hired</label>
-          <input id="date-hired" type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} w-auto`} />
+          <DatePicker id="date-hired" value={date} max={todayStr()} onChange={setDate} className={`${inputCls} w-auto`} />
         </div>
       )}
       <p className="text-xs text-gray-500">This is a request: the PESO checks it first, then it shows here as approved or rejected.</p>
@@ -68,11 +69,15 @@ const FIELD_ORDER = ['jobTitle', 'jobType', 'slotsTotal', 'salaryMin', 'salaryMa
 // Everything a request asked for, in full: opened from a row of My Requests.
 export function RequestDetailsDialog({ r, onClose, onWithdraw }: { r: PortalRequest; onClose: () => void; onWithdraw: () => void }) {
   const isStatus = r.type === 'referral_status' || r.type === 'placement_status'
-  const entries: [string, string][] = isStatus
-    ? [[r.type === 'placement_status' ? 'Employment status' : 'Referral status', r.requestedStatus ?? '—'], ...(r.requestedStatus === 'Hired' && r.dateHired ? [['Date hired', fmtDate(r.dateHired)] as [string, string]] : [])]
+  // One line per change: "field: what it was -> what you asked for" (a new opening has nothing before it, so it shows only the new value).
+  const entries: { label: string; before: string; value: string }[] = isStatus
+    ? [
+        { label: r.type === 'placement_status' ? 'Employment status' : 'Referral status', before: r.currentStatus ?? '', value: r.requestedStatus ?? '—' },
+        ...(r.requestedStatus === 'Hired' && r.dateHired ? [{ label: 'Date hired', before: '', value: fmtDate(r.dateHired) }] : []),
+      ]
     : Object.entries(r.changes ?? {})
         .sort(([a], [b]) => (FIELD_ORDER.indexOf(a) === -1 ? 99 : FIELD_ORDER.indexOf(a)) - (FIELD_ORDER.indexOf(b) === -1 ? 99 : FIELD_ORDER.indexOf(b)))
-        .map(([k, v]) => [FIELD_LABELS[k] ?? k, fmtChangeValue(k, v) || '—'] as [string, string])
+        .map(([k, v]) => ({ label: FIELD_LABELS[k] ?? k, before: r.before?.[k] ? fmtChangeValue(k, r.before[k]) : '', value: fmtChangeValue(k, v) || '—' }))
   const decided = r.status === 'Approved' || r.status === 'Rejected'
   return (
     <Dialog
@@ -101,14 +106,18 @@ export function RequestDetailsDialog({ r, onClose, onWithdraw }: { r: PortalRequ
       )}
       <div>
         <p className={labelCls}>What you asked for</p>
-        <dl className="m-0 mt-1 divide-y divide-gray-100 border border-gray-200 rounded-lg">
-          {entries.map(([label, value]) => (
-            <div key={label} className="flex gap-3 px-3 py-2 max-sm:flex-col max-sm:gap-0.5">
-              <dt className="w-40 shrink-0 text-xs text-gray-500 pt-0.5 max-sm:w-auto">{label}</dt>
-              <dd className="m-0 text-sm text-gray-900 whitespace-pre-line break-words min-w-0">{value}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* The same look as the PESO staff's "Change" box: "field: old -> new". The arrow is left out when nothing is known to change from. */}
+        <div className="mt-1 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+          <ul className="m-0 p-0 list-none space-y-1">
+            {entries.map(e => (
+              <li key={e.label} className="text-sm text-gray-700 break-words whitespace-pre-line">
+                <span className="text-gray-500">{e.label}:</span>{' '}
+                {e.before && e.before !== e.value && <><span>{e.before}</span> <span className="text-gray-400">→</span> </>}
+                <span className="font-medium text-gray-900">{e.value}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </Dialog>
   )

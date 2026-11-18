@@ -7,6 +7,7 @@ import type { SPESBatch, SPESSavedDocument } from '../../contexts/SPESContext'
 import { useFieldValidation, NAME_REGEX, type ValidationError } from '../../hooks/useFieldValidation'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { blockNonWholeNumberKeys, keepWholeNumber } from '../../utils/wholeNumberInput'
+import { fmtDate } from '../../utils/formatDate'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -409,8 +410,8 @@ export default function SPESMaintenanceForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {isView ? (
                 <>
-                  <ReadOnlyField label="Program Start Date" value={form.programStartDate} />
-                  <ReadOnlyField label="Program End Date" value={form.programEndDate} />
+                  <ReadOnlyField label="Program Start Date" value={fmtDate(form.programStartDate)} />
+                  <ReadOnlyField label="Program End Date" value={fmtDate(form.programEndDate)} />
                 </>
               ) : (
                 <>

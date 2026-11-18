@@ -26,6 +26,7 @@ import CLPEPForm from './CLPEPForm'
 import type { CLPEPFormData } from './CLPEPForm'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { formatProjectName } from '../../utils/projectName'
+import { fmtDate } from '../../utils/formatDate'
 
 // Each program's real id is offset so the four id sequences never collide
 // once merged into one ProgramActivity[] list below.
@@ -1038,7 +1039,7 @@ export default function LivelihoodMaintenanceForm() {
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-blue-50 text-brand-blue rounded-md text-xs font-medium">{a.service}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{a.date || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{fmtDate(a.date)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-[280px]">
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>

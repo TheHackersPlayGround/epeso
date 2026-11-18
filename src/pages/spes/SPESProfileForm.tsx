@@ -10,7 +10,7 @@ import { useProfileDraft } from '../../hooks/useFormDraft'
 import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { withDefaultReceivedBy } from '../../utils/currentUser'
 import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
 import { fullName, joinText, listText } from '../../kiosk/kioskReviewUtils'
@@ -241,7 +241,7 @@ export function ViewApplicantPanel({ applicant, onClose, hideStatus = false }: {
             <Field label="First Name" value={applicant.firstName} />
             <Field label="Middle Name" value={applicant.middleName} />
             <Field label="Sex" value={applicant.sex} />
-            <Field label="Birthdate" value={applicant.birthdate} />
+            <Field label="Birthdate" value={fmtDate(applicant.birthdate)} />
             <Field label="Age" value={applicant.age} />
             <Field label="Civil Status" value={applicant.civilStatus} />
             <Field label="Contact Number" value={applicant.contactNumber} />
@@ -278,7 +278,7 @@ export function ViewApplicantPanel({ applicant, onClose, hideStatus = false }: {
           </div>
           <Sec num="VI" title="For PESO Office Only" gray />
           <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-5">
-            <Field label="Date Applied" value={applicant.dateApplicationReceived} />
+            <Field label="Date Applied" value={fmtDate(applicant.dateApplicationReceived)} />
             <Field label="Received By" value={applicant.receivedBy} />
             <div className="col-span-2"><Field label="Remarks" value={applicant.remarks} /></div>
           </div>
@@ -483,7 +483,7 @@ export default function SPESProfileForm({ initial, mode, onSave, onClose, kiosk 
   const kioskSections = (): ReviewSection[] => {
     const f = formData
     return [
-    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName)], ['Birthdate', fmtDate(f.birthdate)], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
     { numeral: 'II', title: 'Address', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
     { numeral: 'III', title: 'Classification', text: listText(f.classification, f.classificationOther) || 'None selected' },
     { numeral: 'IV', title: 'Educational Information', rows: [['School Name', f.schoolName], ['School Type', f.schoolType], ['Grade / Year Level', f.gradeYearLevel], ['Course', f.course]] },

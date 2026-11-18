@@ -16,6 +16,9 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { logSheetExport } from '../../services/activityLogService'
 import { toOfwApiPayload } from './ofwPayload'
+import { compareByName } from '../../utils/nameSort'
+import { fmtDate } from '../../utils/formatDate'
+import { withDateCells } from '../../utils/excelDates'
 
 interface OFWViewProps {
   onBack: () => void
@@ -302,10 +305,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
     if (!sortOrder) return 0
     if (sortOrder === 'dateFiled_newest') return (b.dateFiled || '').localeCompare(a.dateFiled || '')
     if (sortOrder === 'dateFiled_oldest') return (a.dateFiled || '').localeCompare(b.dateFiled || '')
-    const parts = (n: string) => n.trim().split(/\s+/)
-    const keyA = (sortOrder.startsWith('firstName') ? parts(a.name)[0] : parts(a.name).at(-1) ?? '').toLowerCase()
-    const keyB = (sortOrder.startsWith('firstName') ? parts(b.name)[0] : parts(b.name).at(-1) ?? '').toLowerCase()
-    return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
+    return compareByName(a.name, b.name, sortOrder.startsWith('firstName') ? 'first' : 'last', sortOrder.endsWith('asc'))
   })
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / perPage))
@@ -336,7 +336,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'OFW Profiles')
-      XLSX.writeFile(wb, `OFW_Profiles_${new Date().toISOString().split('T')[0]}.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `OFW_Profiles_${new Date().toISOString().split('T')[0]}.xlsx`)
       logSheetExport('ofw', 'OFW profiles list', ws, 1)
     } finally {
       setIsExporting(false)
@@ -561,7 +561,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge status={profile.status} />
                       </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{profile.dateFiled}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(profile.dateFiled)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button
                           onClick={e => openMenu(e, profile.id)}

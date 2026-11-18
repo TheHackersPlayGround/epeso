@@ -10,7 +10,7 @@ import { useProfileDraft } from '../../hooks/useFormDraft'
 import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { emptyOFWForm } from './ofwDefaults'
 import { withDefaultReceivedBy } from '../../utils/currentUser'
 import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
@@ -248,7 +248,7 @@ export default function AddOFWRequestForm({ onClose, onSave, initial, kiosk = fa
   const kioskSections = (): ReviewSection[] => {
     const f = formData
     return [
-    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.suffix)], ['Sex', f.sex], ['Birthdate', f.birthdate], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.suffix)], ['Sex', f.sex], ['Birthdate', fmtDate(f.birthdate)], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
     { numeral: 'II', title: 'Address', text: joinText(f.address, f.barangay, f.municipality, f.province) },
     { numeral: 'III', title: 'Employment Status', text: f.employmentStatus },
     { numeral: 'IV', title: 'Type of Request', rows: [['Requests', f.typeOfRequest.join(', ') || 'None selected'], ['Desired Position', f.desiredPosition], ['Type of Skill', f.typeOfSkill], ['Agencies', (f.agencies ?? []).filter(Boolean).join(', ')], ['Inquiry', f.inquirySpecify], ['Other DOLE Program', f.otherProgramSpecify]] },

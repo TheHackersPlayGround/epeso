@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import ConfirmModal from '../../shared/ConfirmModal'
-import { Search, Plus, ChevronDown, X, MoreHorizontal, Loader2 } from 'lucide-react'
+import { Search, Plus, X, MoreHorizontal, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useEmployment, type Employer } from '../../../contexts/EmploymentContext'
 import { canManage, isAdministrator } from '../../../utils/permissions'
@@ -14,15 +14,7 @@ import EmployerPortalModal from './EmployerPortalModal'
 import TablePagination, { EF_ITEMS_PER_PAGE } from '../shared/TablePagination'
 import ImportDropZone from '../../../components/ImportDropZone'
 import { logSheetExport } from '../../../services/activityLogService'
-
-// ─── Filter options ────────────────────────────────────────────────────────────
-
-type FilterOption = { id: string; label: string; options: string[] }
-
-const STATIC_FILTERS: FilterOption[] = [
-  { id: 'businessType', label: 'Business Type', options: ['Corporation', 'Partnership', 'Sole Proprietorship', 'Cooperative'] },
-  { id: 'status', label: 'Status', options: ['Active', 'Inactive'] },
-]
+import { withDateCells } from '../../../utils/excelDates'
 
 // ─── Empty state ───────────────────────────────────────────────────────────────
 
@@ -37,8 +29,8 @@ function EmployersEmptyState({ isFiltered }: { isFiltered: boolean }) {
           </svg>
           {isFiltered ? (
             <>
-              <p className="text-base font-medium text-gray-500">No employers match your filters</p>
-              <p className="text-sm">Try adjusting your search or removing some filters.</p>
+              <p className="text-base font-medium text-gray-500">No employers match your search</p>
+              <p className="text-sm">Try a different company, contact person, industry, business type or status.</p>
             </>
           ) : (
             <>
@@ -56,7 +48,6 @@ function EmployersEmptyState({ isFiltered }: { isFiltered: boolean }) {
 
 type EmployersTableProps = {
   employers: Employer[]
-  activeFilters: string[]
   isFiltered: boolean
   onView: (e: Employer) => void
   onEdit: (e: Employer) => void
@@ -65,7 +56,7 @@ type EmployersTableProps = {
   onPortal?: (e: Employer) => void
 }
 
-function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, onDelete, onPortal }: EmployersTableProps) {
+function EmployersTable({ employers, isFiltered, onView, onEdit, onDelete, onPortal }: EmployersTableProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   // anchor is the button's position; pos is the menu's final placement, corrected
   // by measuring its real rendered height once mounted (see layout effect below).
@@ -100,10 +91,6 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
 
   const menuEmployer = employers.find(e => e.id === openMenuId) ?? null
 
-  const showIndustry = activeFilters.includes('industry')
-  const showBusinessType = activeFilters.includes('businessType')
-  const showStatus = activeFilters.includes('status')
-
   return (
     <>
       <div className="overflow-x-auto">
@@ -111,11 +98,11 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
           <thead>
             <tr className="bg-brand-blue">
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Company Name</th>
-              {showIndustry && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Industry</th>}
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Industry</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Contact Person</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Email</th>
-              {showBusinessType && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Business Type</th>}
-              {showStatus && <th className="px-4 py-3 text-left text-white whitespace-nowrap">Status</th>}
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Business Type</th>
+              <th className="px-4 py-3 text-left text-white whitespace-nowrap">Status</th>
               <th className="px-4 py-3 text-left text-white whitespace-nowrap">Actions</th>
             </tr>
           </thead>
@@ -126,19 +113,17 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
               employers.map(employer => (
                 <tr key={employer.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{employer.companyName}</td>
-                  {showIndustry && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.industryName ?? employer.industry}</td>}
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.industryName ?? employer.industry}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.contactPersonName}</td>
                   <td className="px-4 py-3 text-gray-600">{employer.email}</td>
-                  {showBusinessType && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.businessType}</td>}
-                  {showStatus && (
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        employer.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {employer.status}
-                      </span>
-                    </td>
-                  )}
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{employer.businessType}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      employer.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {employer.status}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={e => handleToggleMenu(e, employer.id)}
@@ -180,130 +165,45 @@ function EmployersTable({ employers, activeFilters, isFiltered, onView, onEdit, 
   )
 }
 
-// ─── Filter badges ─────────────────────────────────────────────────────────────
-
-type FilterBadgesProps = {
-  activeFilters: string[]
-  filterValues: Record<string, string>
-  availableFilters: FilterOption[]
-  onFilterValueChange: (id: string, value: string) => void
-  onRemoveFilter: (id: string) => void
-}
-
-function EmployersFilterBadges({ activeFilters, filterValues, availableFilters, onFilterValueChange, onRemoveFilter }: FilterBadgesProps) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {activeFilters.map(filterId => {
-        const filter = availableFilters.find(f => f.id === filterId)
-        return (
-          <div key={filterId} className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-            <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter?.label ?? filterId}:</span>
-            <select
-              value={filterValues[filterId] ?? ''}
-              onChange={e => onFilterValueChange(filterId, e.target.value)}
-              className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-              onClick={e => e.stopPropagation()}
-            >
-              <option value="">All</option>
-              {(filter?.options ?? []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <button onClick={() => onRemoveFilter(filterId)} className="text-blue-700 hover:text-blue-900 transition-colors">
-              <X size={14} />
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── Search bar ────────────────────────────────────────────────────────────────
-
-type SearchBarProps = {
-  searchQuery: string
-  activeFilters: string[]
-  availableFilters: FilterOption[]
-  isFilterDropdownOpen: boolean
-  onSearchChange: (v: string) => void
-  onToggleFilterDropdown: () => void
-  onAddFilter: (id: string) => void
-  onCloseFilterDropdown: () => void
-}
-
-function EmployersSearchBar({ searchQuery, activeFilters, availableFilters, isFilterDropdownOpen, onSearchChange, onToggleFilterDropdown, onAddFilter, onCloseFilterDropdown }: SearchBarProps) {
-  const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
-
-  return (
-    <div className="flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          placeholder="Search by company name or contact person..."
-          aria-label="Search employers"
-          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
-        />
-      </div>
-      <div className="relative">
-        <button
-          onClick={onToggleFilterDropdown}
-          aria-expanded={isFilterDropdownOpen}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
-        >
-          <Plus size={16} />
-          Filter By
-          <ChevronDown size={14} className="text-gray-500" />
-        </button>
-        {isFilterDropdownOpen && (
-          <>
-            <div className="fixed inset-0 z-10" aria-hidden="true" onClick={onCloseFilterDropdown} />
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-              {unselected.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
-              ) : (
-                unselected.map(filter => (
-                  <button key={filter.id} onClick={() => onAddFilter(filter.id)}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
-                    {filter.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Toolbar ───────────────────────────────────────────────────────────────────
+// ─── Toolbar: add, search, import, export (one row, like the Vacancies tab) ────
 
 type ToolbarProps = {
+  searchQuery: string
+  onSearchChange: (v: string) => void
   onAdd: () => void
   onImport: () => void
   onExportExcel: () => void
   isExporting: boolean
 }
 
-function EmployersToolbar({ onAdd, onImport, onExportExcel, isExporting }: ToolbarProps) {
+function EmployersToolbar({ searchQuery, onSearchChange, onAdd, onImport, onExportExcel, isExporting }: ToolbarProps) {
   return (
-    <div className="flex gap-2 max-sm:flex-wrap">
+    <div className="flex flex-wrap gap-3">
       <button onClick={onAdd} disabled={!canManage('employment')}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-md hover:bg-brand-blue-dark transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
         <Plus size={16} />
         Add Employer
       </button>
+      <div className="relative flex-1 min-w-48 max-sm:min-w-full">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search by company, contact person, industry, business type or status..."
+          aria-label="Search employers"
+          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+        />
+      </div>
       <button onClick={onImport} disabled={!canManage('employment')}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+        className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />
         </svg>
         Import
       </button>
       <button onClick={onExportExcel} disabled={isExporting}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white">
+        className="flex items-center gap-1.5 px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark transition-colors text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-blue">
         {isExporting ? (
           <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
         ) : (
@@ -455,12 +355,9 @@ type EmployersTabProps = {
 
 export default function EmployersTab({ updatesCount = 0, updatesSignature = '', onUpdatesChanged }: EmployersTabProps = {}) {
   // The list lives in EmploymentProvider, shared with and kept across the other tabs.
-  const { employers, industryOptions, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
+  const { employers, setEmployers, loading: listLoading, loadFailed, refreshEmployers, refreshVacancies, refreshReferrals, refreshPlacements } = useEmployment()
   const loading = listLoading.employers
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedEmployer, setSelectedEmployer] = useState<Employer | null>(null)
@@ -475,43 +372,30 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
   const [portalEmployer, setPortalEmployer] = useState<Employer | null>(null)
   const admin = isAdministrator()
 
-  // Industry filter: the standard industries plus any custom ones employers use (e.g. "Mining").
-  const availableFilters = useMemo<FilterOption[]>(
-    () => [
-      { id: 'industry', label: 'Industry', options: [...industryOptions.standard, ...industryOptions.custom] },
-      ...STATIC_FILTERS,
-    ],
-    [industryOptions],
-  )
-
-  // Same error this tab always showed when its own initial fetch failed --
-  // the fetch itself now happens in the provider, which just reports it.
-  useEffect(() => {
+  // Same error this tab always showed when its own initial fetch failed -- the fetch itself happens in the provider, which just reports it.
+  // Shown the moment the failure is reported (adjusting state while rendering, rather than in an effect, so it needs no second render).
+  const [wasLoadFailed, setWasLoadFailed] = useState(false)
+  if (wasLoadFailed !== loadFailed.employers) {
+    setWasLoadFailed(loadFailed.employers)
     if (loadFailed.employers) setResultModal({ isOpen: true, type: 'error', title: 'Error', message: 'Failed to load employers.' })
-  }, [loadFailed.employers])
+  }
 
+  // The search box looks in every column of the table. The status is matched from its start, so "active" finds Active but not Inactive.
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
-    return employers.filter(e => {
-      if (q && !e.companyName.toLowerCase().includes(q) && !e.contactPersonName.toLowerCase().includes(q)) return false
-      for (const filterId of activeFilters) {
-        const val = filterValues[filterId]
-        if (!val) continue
-        if (filterId === 'status' && e.status !== val) return false
-        if (filterId === 'industry' && (e.industryName ?? e.industry) !== val) return false
-        if (filterId === 'businessType' && e.businessType !== val) return false
-      }
-      return true
-    })
-  }, [employers, searchQuery, activeFilters, filterValues])
+    if (!q) return employers
+    return employers.filter(e =>
+      [e.companyName, e.contactPersonName, e.email, e.industryName ?? e.industry, e.businessType].some(v => (v ?? '').toLowerCase().includes(q))
+      || (e.status ?? '').toLowerCase().startsWith(q),
+    )
+  }, [employers, searchQuery])
 
-  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
+  // The page shown never points past the last page (the list can shrink after a search or a delete); typing in the search box goes back to page 1.
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues])
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
+  const page = Math.min(currentPage, totalPages)
   const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
-    [filtered, currentPage, perPage],
+    () => filtered.slice((page - 1) * perPage, page * perPage),
+    [filtered, page, perPage],
   )
 
   // Persist + refresh; the AddEmployerSidebar shows the success alert then closes
@@ -553,7 +437,7 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
     } catch (err: unknown) {
       // axiosClient's interceptor flattens backend errors into Error.message.
       const msg = err instanceof Error && err.message ? err.message : 'Failed to delete employer.'
-      setResultModal({ isOpen: true, type: 'error', title: 'Error', message: msg })
+      setResultModal({ isOpen: true, type: 'error', title: "Can't Delete Employer", message: msg })
     } finally {
       setDeleteConfirmId(null)
     }
@@ -574,7 +458,7 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
     setSidebarMode(null)
   }
 
-  const isFiltered = searchQuery.trim().length > 0 || activeFilters.some(f => filterValues[f])
+  const isFiltered = searchQuery.trim().length > 0
 
   if (loading) {
     return (
@@ -630,7 +514,7 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Employers')
-      XLSX.writeFile(wb, 'employers.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'employers.xlsx')
       logSheetExport('employment', 'Employers list', ws, 1)
     } finally {
       setIsExporting(false)
@@ -645,8 +529,9 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-white rounded-xl shadow-md p-3 flex gap-2" role="tablist" aria-label="Employers view">
-        {([['employers', 'Employers'], ['updates', 'Employer Updates']] as const).map(([id, label]) => (
+      <div className="bg-white rounded-xl shadow-md p-3 flex items-center flex-wrap gap-x-4 gap-y-2">
+      <div className="flex gap-2" role="tablist" aria-label="Employers view">
+        {([['employers', 'Employer List'], ['updates', 'Employer Updates']] as const).map(([id, label]) => (
           <button
             key={id} role="tab" aria-selected={view === id} onClick={() => setView(id)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2 ${view === id ? 'bg-brand-blue text-white' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -660,49 +545,26 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
           </button>
         ))}
       </div>
+      </div>
+      {/* What the Employer Updates page is for: a note on the grey page background between the two cards (shown only there). */}
+      {view === 'updates' && <div className="-my-2 px-1 text-sm text-gray-500">Changes employers asked for in their portal. Nothing changes in the system until you accept it.</div>}
 
       {view === 'updates' && <EmployerUpdatesPanel signature={updatesSignature} onChanged={handleUpdatesChanged} />}
 
       {view === 'employers' && (<>
-      <div className="bg-white rounded-xl shadow-md p-3">
-        <EmployersToolbar
-          onAdd={() => setShowAdd(true)}
-          onImport={() => setIsImportModalOpen(true)}
-          onExportExcel={handleExportExcel}
-          isExporting={isExporting}
-        />
-      </div>
-
       <div className="bg-white rounded-xl shadow-md p-4">
         <div className="mb-4">
-          <EmployersSearchBar
+          <EmployersToolbar
             searchQuery={searchQuery}
-            activeFilters={activeFilters}
-            availableFilters={availableFilters}
-            isFilterDropdownOpen={isFilterDropdownOpen}
-            onSearchChange={setSearchQuery}
-            onToggleFilterDropdown={() => setIsFilterDropdownOpen(p => !p)}
-            onAddFilter={id => { setActiveFilters(prev => [...prev, id]); setIsFilterDropdownOpen(false) }}
-            onCloseFilterDropdown={() => setIsFilterDropdownOpen(false)}
+            onSearchChange={v => { setSearchQuery(v); setCurrentPage(1) }}
+            onAdd={() => setShowAdd(true)}
+            onImport={() => setIsImportModalOpen(true)}
+            onExportExcel={handleExportExcel}
+            isExporting={isExporting}
           />
-          {activeFilters.length > 0 && (
-            <div className="mt-3">
-              <EmployersFilterBadges
-                activeFilters={activeFilters}
-                filterValues={filterValues}
-                availableFilters={availableFilters}
-                onFilterValueChange={(id, val) => setFilterValues(prev => ({ ...prev, [id]: val }))}
-                onRemoveFilter={id => {
-                  setActiveFilters(prev => prev.filter(f => f !== id))
-                  setFilterValues(prev => { const n = { ...prev }; delete n[id]; return n })
-                }}
-              />
-            </div>
-          )}
         </div>
         <EmployersTable
           employers={paginated}
-          activeFilters={activeFilters}
           isFiltered={isFiltered}
           onView={openView}
           onEdit={openEdit}
@@ -710,7 +572,7 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
           onPortal={admin ? setPortalEmployer : undefined}
         />
         <TablePagination
-          currentPage={currentPage}
+          currentPage={page}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
           itemsPerPage={perPage}
@@ -719,7 +581,7 @@ export default function EmployersTab({ updatesCount = 0, updatesSignature = '', 
       </div>
       </>)}
 
-      {portalEmployer && <EmployerPortalModal employer={portalEmployer} onClose={() => setPortalEmployer(null)} />}
+      {portalEmployer && <EmployerPortalModal employer={portalEmployer} onClose={() => setPortalEmployer(null)} onChanged={() => void refreshEmployers()} />}
       {isImportModalOpen && (
         <EmployerImportModal
           onClose={() => setIsImportModalOpen(false)}

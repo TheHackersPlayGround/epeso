@@ -2,13 +2,13 @@
 // details window on the Vacancies tab. "Currently hired" = active placements, the same people the "Hired" number counts.
 import { useMemo, useState } from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
-import { listPlacements } from '../api'
+import { listPlacements, type ApplicantContext } from '../api'
 import { Card, EmptyState, Spinner } from '../components/ui'
-import { btnGhost, btnSmall, fmtDate, useData, usePaged } from '../lib'
+import { btnBack, btnSmall, fmtDate, useData, usePaged } from '../lib'
 import TablePagination from '../../pages/employment/shared/TablePagination'
 
 export default function HiredApplicantsView({ vacancyId, title, tick, onBack, onView }: {
-  vacancyId: number; title: string; tick: number; onBack: () => void; onView: (applicantId: number) => void
+  vacancyId: number; title: string; tick: number; onBack: () => void; onView: (applicantId: number, context: ApplicantContext) => void
 }) {
   const { data, error, loading } = useData(listPlacements, tick)
   const [search, setSearch] = useState('')
@@ -29,7 +29,7 @@ export default function HiredApplicantsView({ vacancyId, title, tick, onBack, on
             People currently hired for this opening{data ? ` (${hired.length})` : ''}.
           </p>
         </div>
-        <button type="button" onClick={onBack} className={`${btnGhost} inline-flex items-center gap-2`}><ArrowLeft size={16} />Back to Vacancies</button>
+        <button type="button" onClick={onBack} className={btnBack}><ArrowLeft size={16} />Back to Vacancies</button>
       </div>
 
       <Card className="p-4">
@@ -61,7 +61,7 @@ export default function HiredApplicantsView({ vacancyId, title, tick, onBack, on
                         <td className="px-4 py-3 font-medium text-gray-800">{p.applicantName}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(p.dateHired)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button type="button" onClick={() => onView(p.applicantId)} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View applicant</button>
+                          <button type="button" onClick={() => onView(p.applicantId, { jobTitle: p.jobTitle, verb: 'Hired', date: p.dateHired, status: p.status })} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View applicant</button>
                         </td>
                       </tr>
                     ))}

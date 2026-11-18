@@ -16,7 +16,9 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { fmtDate, todayIso } from '../../utils/formatDate'
+import { compareByName } from '../../utils/nameSort'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
@@ -975,7 +977,7 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
       const ws = XLSX.utils.json_to_sheet(buildExportRows())
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Placements')
-      XLSX.writeFile(wb, 'placements.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'placements.xlsx')
       logSheetExport('employment', 'Placements list', ws, 1)
     } finally {
       setIsExporting(false)
@@ -1005,12 +1007,9 @@ export default function PlacementsTab({ onNavigateToVacancy }: {
     }
 
     if (sortOrder) {
-      result = [...result].sort((a, b) => {
-        const parts = (n: string) => n.trim().split(/\s+/)
-        const keyA = (sortOrder.startsWith('firstName') ? parts(a.applicantName)[0] : parts(a.applicantName).at(-1) ?? '').toLowerCase()
-        const keyB = (sortOrder.startsWith('firstName') ? parts(b.applicantName)[0] : parts(b.applicantName).at(-1) ?? '').toLowerCase()
-        return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
-      })
+      const by = sortOrder.startsWith('firstName') ? 'first' : 'last'
+      const ascending = sortOrder.endsWith('asc')
+      result = [...result].sort((a, b) => compareByName(a.applicantName, b.applicantName, by, ascending))
     }
 
     return result

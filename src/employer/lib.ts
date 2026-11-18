@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PortalRequest } from './api'
 import { fmtDate as systemDate, fmtDateTime } from '../utils/formatDate'   // the staff system's date format, so both sides always match
+import { withDateCells } from '../utils/excelDates'
 
 export const errText = (e: unknown, fallback = 'Something went wrong. Please try again.') => (e instanceof Error && e.message ? e.message : fallback)
 // "2026-11-14" -> "11/14/2026"
@@ -71,12 +72,14 @@ export async function exportToExcel(fileName: string, sheetName: string, rows: R
   ws['!cols'] = keys.map(k => ({ wch: Math.min(40, Math.max(k.length, ...rows.map(r => String(r[k] ?? '').length)) + 2) }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
-  XLSX.writeFile(wb, fileName)
+  XLSX.writeFile(withDateCells(wb), fileName)
 }
 
 export const btnPrimary ='px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2'
 export const btnGhost = 'px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50'
-export const btnSmall = 'px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-40'
+// The "Back to ..." button at the top of a page that opens from a list (the applicant profile, the hired-applicants page): white, with an arrow.
+export const btnBack = `${btnGhost} inline-flex items-center gap-2 bg-white`
+export const btnSmall ='px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-40'
 export const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none'
 export const labelCls = 'block text-xs uppercase tracking-wide text-gray-900 font-semibold mb-1'
 

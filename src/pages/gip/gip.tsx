@@ -26,6 +26,7 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 interface GIPViewProps {
   onBack: () => void
@@ -452,7 +453,7 @@ export default function GIPView({ onBack }: GIPViewProps) {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'GIP Applicants')
-      XLSX.writeFile(wb, `GIP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `GIP_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
       logSheetExport('gip', 'GIP applicants list', ws, 2)
     } finally {
       setIsExporting(false)

@@ -1,8 +1,9 @@
 // "Employer Updates": what employers asked for in their portal, waiting for staff. An employer never changes the
 // main data itself -- every request lands here, and only Accept applies it (the same change staff would make by hand).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ChevronDown, Loader2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Loader2, Search } from 'lucide-react'
 import ConfirmModal from '../../shared/ConfirmModal'
+import TablePagination from '../shared/TablePagination'
 import DatePicker from '../../../components/DatePicker'
 import { fmtDate, fmtDateTime } from '../../../utils/formatDate'
 import { canManage } from '../../../utils/permissions'
@@ -33,6 +34,14 @@ function summary(r: EmployerRequest): { title: string; sub: string } {
   if (r.type === 'vacancy_new') return { title: 'New opening', sub: `${r.jobTitle ?? ''} · ${r.companyName}` }
   if (r.type === 'vacancy_update') return { title: 'Opening change', sub: `${r.jobTitle ?? ''} · ${r.companyName}` }
   return { title: r.applicantName ?? 'Unknown applicant', sub: `${r.jobTitle ?? ''} · ${r.companyName}` }
+}
+
+// Everything a person might type in the search box to find a request: the applicant, job, company, who sent / decided it, and the change itself.
+function searchText(r: EmployerRequest): string {
+  const s = summary(r)
+  return [s.title, s.sub, r.companyName, r.jobTitle, r.applicantName, r.submittedBy, r.reviewedBy, r.currentStatus, r.requestedStatus,
+    ...(r.changes ?? []).flatMap(c => [c.field, c.current, c.requested])]
+    .filter(Boolean).join(' ').toLowerCase()
 }
 
 const shorten = (v: string, n = 90) => (v.length > n ? v.slice(0, n) + '…' : v)
@@ -75,15 +84,38 @@ function ChangeCell({ r }: { r: EmployerRequest }) {
   )
 }
 
+// The change in ONE short line for the table; the full "old -> new" list is in the details window (click the row).
+function changeSummary(r: EmployerRequest): string {
+  if (r.type === 'vacancy_new') {
+    const f = Object.fromEntries((r.changes ?? []).map(c => [c.field, c.requested])) as Record<string, string>
+    const openings = Number(f['Openings'])
+    return [f['Job type'], Number.isNaN(openings) || f['Openings'] === undefined ? '' : `${openings} opening${openings === 1 ? '' : 's'}`,
+      f['Minimum salary'] ? `${peso(f['Minimum salary'])} – ${peso(f['Maximum salary'] ?? '')}` : ''].filter(Boolean).join(' · ') || 'New opening'
+  }
+  if (r.type === 'company_info' || r.type === 'vacancy_update') {
+    const ch = r.changes ?? []
+    if (ch.length === 1) return `${ch[0].field}: ${ch[0].current !== '' ? `${shorten(ch[0].current, 30)} → ` : ''}${shorten(ch[0].requested, 40) || '—'}`
+    return ch.length ? `Changed ${ch.map(c => c.field.toLowerCase()).join(', ')}` : 'Change'
+  }
+  return `${r.currentStatus ? `${r.currentStatus} → ` : ''}${r.requestedStatus ?? '—'}`
+}
+
 export default function EmployerUpdatesPanel({ signature, onChanged }: { signature: string; onChanged: () => void }) {
   const canEdit = canManage('employment')
   const [status, setStatus] = useState<EmployerRequestStatus>('Pending')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
   const [rows, setRows] = useState<EmployerRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [acceptTarget, setAcceptTarget] = useState<EmployerRequest | null>(null)
   const [rejectTarget, setRejectTarget] = useState<EmployerRequest | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  // The request whose details window is open. Looked up in the loaded list each time, so the window always shows the current state
+  // (and closes by itself if the request leaves the list, for example right after it is decided).
+  const [detailId, setDetailId] = useState<number | null>(null)
+  const detail = detailId !== null ? rows.find(r => r.id === detailId) ?? null : null
 
   // Only the answer to the latest request is used (a slow, older answer must not overwrite a newer one).
   const loadSeq = useRef(0)
@@ -136,59 +168,88 @@ export default function EmployerUpdatesPanel({ signature, onChanged }: { signatu
 
   // Accept / Reject only exist for Pending requests, so the Actions column is shown only in the Pending view.
   const showActions = status === 'Pending'
-  const cols = showActions ? 5 : 4
+  const cols = showActions ? 6 : 5
+
+  // Search, then page (the same "Show N per page" controls as the other staff tables).
+  const q = search.trim().toLowerCase()
+  const filtered = q ? rows.filter(r => searchText(r).includes(q)) : rows
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paged = filtered.slice((currentPage - 1) * perPage, currentPage * perPage)
 
   return (
     <div className="bg-white rounded-xl shadow-md p-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <p className="m-0 text-sm text-gray-500">Changes employers asked for in their portal. Nothing changes in the system until you accept it.</p>
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        <div className="relative flex-1 min-w-[14rem]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+            placeholder="Search by company, applicant, job or change…" aria-label="Search employer updates"
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
+          />
+        </div>
         <div className="relative">
           <select
             value={status}
-            onChange={e => { setStatus(e.target.value as EmployerRequestStatus); setLoading(true) }}
+            onChange={e => { setStatus(e.target.value as EmployerRequestStatus); setLoading(true); setPage(1) }}
             aria-label="Status"
-            className="appearance-none pl-4 pr-10 py-2 border border-gray-200 rounded-full bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer"
+            className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer"
           >
             <option value="Pending">Pending</option>
             <option value="Approved">Approved</option>
             <option value="Rejected">Rejected</option>
             <option value="Withdrawn">Withdrawn</option>
           </select>
-          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
         </div>
       </div>
 
       {loadError && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{loadError}</div>}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left table-fixed min-w-[960px]">
+        <table className="w-full text-sm text-left table-fixed min-w-[960px]">
           {/* Fixed shares so the columns are evenly spaced; the last column no longer soaks up all the spare width. */}
           <colgroup>
-            {(showActions ? [26, 24, 17, 13, 20] : [28, 27, 18, 27]).map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+            {(showActions ? [24, 25, 15, 12, 18, 6] : [28, 29, 17, 20, 6]).map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
           </colgroup>
           <thead>
-            <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
-              <th className="px-4 py-3 font-semibold">Request</th>
-              <th className="px-4 py-3 font-semibold">Change</th>
-              <th className="px-4 py-3 font-semibold">Sent</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-              {showActions && <th className="px-4 py-3 font-semibold">Actions</th>}
+            <tr className="bg-brand-blue">
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Request</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Change</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Sent</th>
+              <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Status</th>
+              {showActions && <th className="px-4 py-3 text-left text-white font-semibold whitespace-nowrap">Actions</th>}
+              <th className="px-2 py-3"><span className="sr-only">Details</span></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr><td colSpan={cols} className="py-16 text-center text-sm text-gray-400"><Loader2 size={18} className="inline animate-spin mr-2" />Loading…</td></tr>
-            ) : rows.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={cols} className="py-16 text-center text-gray-400">
-                  <p className="m-0 text-base font-medium text-gray-500">{status === 'Pending' ? 'Nothing waiting for review' : `No ${status.toLowerCase()} requests`}</p>
-                  {status === 'Pending' && <p className="m-0 text-sm mt-1">Requests from employers appear here as soon as they are sent.</p>}
+                  {q ? (
+                    <>
+                      <p className="m-0 text-base font-medium text-gray-500">No updates match your search</p>
+                      <p className="m-0 text-sm mt-1">Try a different company, applicant or word.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="m-0 text-base font-medium text-gray-500">{status === 'Pending' ? 'Nothing waiting for review' : `No ${status.toLowerCase()} requests`}</p>
+                      {status === 'Pending' && <p className="m-0 text-sm mt-1">Requests from employers appear here as soon as they are sent.</p>}
+                    </>
+                  )}
                 </td>
               </tr>
-            ) : rows.map(r => {
+            ) : paged.map(r => {
               const s = summary(r)
               return (
-                <tr key={r.id} className="border-b border-gray-100 align-top">
+                <tr
+                  key={r.id} onClick={() => setDetailId(r.id)}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) setDetailId(r.id) }}
+                  tabIndex={0} aria-label={`Open details: ${s.title}, ${s.sub}`}
+                  className="border-b border-gray-100 align-top hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus:bg-gray-50"
+                >
                   <td className="px-4 py-3">
                     <p className="m-0 text-sm font-medium text-gray-800">{s.title}</p>
                     <p className="m-0 text-xs text-gray-500 mt-0.5">{s.sub}</p>
@@ -203,7 +264,7 @@ export default function EmployerUpdatesPanel({ signature, onChanged }: { signatu
                       </p>
                     )}
                   </td>
-                  <td className="px-4 py-3"><ChangeCell r={r} /></td>
+                  <td className="px-4 py-3 text-sm text-gray-700 break-words">{changeSummary(r)}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                     {fmtWhen(r.submittedAt)}
                     {r.submittedBy && <p className="m-0 text-xs text-gray-400 mt-0.5">by {r.submittedBy}</p>}
@@ -213,7 +274,6 @@ export default function EmployerUpdatesPanel({ signature, onChanged }: { signatu
                     {r.status !== 'Pending' && r.status !== 'Withdrawn' && (
                       <p className="m-0 text-xs text-gray-400 mt-1">{r.reviewedBy ? `by ${r.reviewedBy}` : ''}{r.reviewedAt ? ` · ${fmtWhen(r.reviewedAt)}` : ''}</p>
                     )}
-                    {r.status === 'Rejected' && r.reviewNote && <p className="m-0 text-xs text-gray-500 mt-1 max-w-[16rem]">Reason: {r.reviewNote}</p>}
                   </td>
                   {showActions && (
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -221,33 +281,114 @@ export default function EmployerUpdatesPanel({ signature, onChanged }: { signatu
                         <div className="inline-flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setAcceptTarget(r)}
+                            onClick={e => { e.stopPropagation(); setAcceptTarget(r) }}
                             disabled={!!r.conflict}
                             title={r.conflict ?? undefined}
                             className="px-3.5 py-1.5 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
                           >Accept</button>
                           <button
                             type="button"
-                            onClick={() => setRejectTarget(r)}
+                            onClick={e => { e.stopPropagation(); setRejectTarget(r) }}
                             className="px-3.5 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-medium"
                           >Reject</button>
                         </div>
                       ) : <span className="text-xs text-gray-400">View only</span>}
                     </td>
                   )}
+                  <td className="px-2 py-3 text-gray-400 align-middle"><ChevronRight size={16} aria-hidden="true" /></td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+      <TablePagination
+        currentPage={currentPage} totalItems={filtered.length} onPageChange={setPage}
+        itemsPerPage={perPage} onItemsPerPageChange={n => { setPerPage(n); setPage(1) }}
+      />
 
+      {detail && (
+        <RequestDetailDialog
+          row={detail} canEdit={canEdit} onClose={() => setDetailId(null)}
+          onAccept={() => { setDetailId(null); setAcceptTarget(detail) }}
+          onReject={() => { setDetailId(null); setRejectTarget(detail) }}
+        />
+      )}
       {acceptTarget && <AcceptDialog row={acceptTarget} onCancel={() => setAcceptTarget(null)} onConfirm={confirmAccept} />}
       {rejectTarget && <RejectDialog row={rejectTarget} onCancel={() => setRejectTarget(null)} onConfirm={confirmReject} />}
       <ConfirmModal
         isOpen={notice !== null} type={notice?.type ?? 'success'} title={notice?.title ?? ''} message={notice?.message ?? ''}
         confirmText="OK" onConfirm={() => setNotice(null)} onCancel={() => setNotice(null)}
       />
+    </div>
+  )
+}
+
+// Everything about one request: the full change, who sent it and when, the decision, and (while it is pending) Accept / Reject.
+function RequestDetailDialog({ row, canEdit, onClose, onAccept, onReject }: {
+  row: EmployerRequest; canEdit: boolean; onClose: () => void; onAccept: () => void; onReject: () => void
+}) {
+  const s = summary(row)
+  const decided = row.status !== 'Pending' && row.status !== 'Withdrawn'
+  return (
+    <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-label={`${s.title}: ${s.sub}`}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-gray-800 m-0 break-words">{s.title}</h3>
+            <p className="m-0 text-sm text-gray-500 mt-0.5 break-words">{s.sub}</p>
+          </div>
+          <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[row.status]}`}>{row.status}</span>
+        </div>
+        <div className="px-6 py-5 space-y-4 overflow-y-auto">
+          {(row.duplicates ?? []).length > 0 && (
+            <p className="m-0 text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-md px-2 py-1.5 flex items-start gap-1.5">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />Possible duplicate: {row.companyName} already has {(row.duplicates ?? []).map(d => `“${d.jobTitle}” (${d.status})`).join(', ')}
+            </p>
+          )}
+          {row.conflict && (
+            <p className="m-0 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 flex items-start gap-1.5">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />{row.conflict}
+            </p>
+          )}
+          <div>
+            <p className="m-0 mb-1 text-xs uppercase tracking-wide text-gray-900 font-semibold">Change</p>
+            <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2"><ChangeCell r={row} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+            <div>
+              <p className="m-0 mb-1 text-xs uppercase tracking-wide text-gray-900 font-semibold">Sent</p>
+              <p className="m-0 text-sm text-gray-700">{fmtWhen(row.submittedAt)}</p>
+              {row.submittedBy && <p className="m-0 text-xs text-gray-500">by {row.submittedBy}</p>}
+            </div>
+            {decided && (
+              <div>
+                <p className="m-0 mb-1 text-xs uppercase tracking-wide text-gray-900 font-semibold">{row.status}</p>
+                <p className="m-0 text-sm text-gray-700">{row.reviewedAt ? fmtWhen(row.reviewedAt) : '—'}</p>
+                {row.reviewedBy && <p className="m-0 text-xs text-gray-500">by {row.reviewedBy}</p>}
+              </div>
+            )}
+          </div>
+          {row.status === 'Rejected' && row.reviewNote && (
+            <div>
+              <p className="m-0 mb-1 text-xs uppercase tracking-wide text-gray-900 font-semibold">Reason given to the employer</p>
+              <p className="m-0 text-sm text-gray-700 break-words whitespace-pre-line">{row.reviewNote}</p>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Close</button>
+          {row.status === 'Pending' && canEdit && (
+            <>
+              <button type="button" onClick={onReject} className="px-5 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium">Reject</button>
+              <button
+                type="button" onClick={onAccept} disabled={!!row.conflict} title={row.conflict ?? undefined}
+                className="px-5 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-brand-blue"
+              >Accept</button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

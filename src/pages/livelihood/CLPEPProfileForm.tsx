@@ -11,7 +11,7 @@ import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import type { LivelihoodBeneficiary, LivelihoodSavedDocument } from '../../contexts/LivelihoodContext'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { withDefaultReceivedBy } from '../../utils/currentUser'
 import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
 import { fullName, joinText, yesNo } from '../../kiosk/kioskReviewUtils'
@@ -795,7 +795,7 @@ export default function CLPEPProfileForm({ initial, mode, onSave, onClose, onEdi
   const kioskSections = (): ReviewSection[] => {
     const f = formData
     return [
-    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex]] },
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', fmtDate(f.birthdate)], ['Sex', f.sex]] },
     { numeral: 'II', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
     { numeral: 'III', title: 'Child Labor Information', rows: [['Child Labor Status', f.childLaborStatus], ['Nature of Work', f.natureOfWork], ['Currently Working', yesNo(f.currentlyWorking)], ['Hours Worked Per Week', f.hoursWorkedPerWeek], ['School Status', f.schoolStatus], ['School Name', f.schoolName], ['Grade / Year Level', f.gradeYearLevel]] },
     { numeral: 'IV', title: 'Parent / Guardian', rows: [['Name', f.guardianName], ['Relationship', f.guardianRelationship], ['Contact Number', f.guardianContactNumber]] },

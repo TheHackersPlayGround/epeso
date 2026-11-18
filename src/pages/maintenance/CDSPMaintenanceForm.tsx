@@ -16,6 +16,7 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import { requestLeave } from '../../hooks/leaveGuard'
 import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { fmtDate } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -766,7 +767,7 @@ export default function CDSPMaintenanceForm() {
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-blue-50 text-brand-blue rounded-md text-xs font-medium">{a.service}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{a.date || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{fmtDate(a.date)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-[160px]">
                       <span className="line-clamp-1">{a.location || '—'}</span>
                     </td>

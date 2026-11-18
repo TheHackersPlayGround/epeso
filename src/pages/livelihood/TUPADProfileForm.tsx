@@ -11,7 +11,7 @@ import { useProfileDraft } from '../../hooks/useFormDraft'
 import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { withDefaultReceivedBy } from '../../utils/currentUser'
 import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
 import { fullName, joinText } from '../../kiosk/kioskReviewUtils'
@@ -478,7 +478,7 @@ export default function TUPADProfileForm({ mode, initial, onSave, onClose, onEdi
   const kioskSections = (): ReviewSection[] => {
     const f = formData
     return [
-    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber]] },
+    { numeral: 'I', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', fmtDate(f.birthdate)], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber]] },
     { numeral: 'II', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
     ]
   }

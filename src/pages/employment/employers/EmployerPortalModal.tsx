@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, Copy, Loader2, X } from 'lucide-react'
 import ConfirmModal from '../../shared/ConfirmModal'
+import { copyText } from '../../../utils/clipboard'
 import type { Employer } from '../../../contexts/EmploymentContext'
 import {
   createPortalAccount, getPortalAccount, resetPortalPassword, setPortalAccountStatus,
@@ -17,7 +18,8 @@ function suggestUsername(company: string) {
   return s.length >= 4 ? s : ''
 }
 
-export default function EmployerPortalModal({ employer, onClose }: { employer: Employer; onClose: () => void }) {
+// `onChanged` is called after the account's status changes, because that also changes the employer's status (the list must refresh).
+export default function EmployerPortalModal({ employer, onClose, onChanged }: { employer: Employer; onClose: () => void; onChanged?: () => void }) {
   const [account, setAccount] = useState<EmployerPortalAccount | null>(null)
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState(() => suggestUsername(employer.companyName))
@@ -26,6 +28,7 @@ export default function EmployerPortalModal({ employer, onClose }: { employer: E
   // The one-time password, kept only on screen.
   const [tempPassword, setTempPassword] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
 
   const load = useCallback(() => {
@@ -44,20 +47,23 @@ export default function EmployerPortalModal({ employer, onClose }: { employer: E
 
   const create = () => run(async () => {
     const r = await createPortalAccount(employer.id, username.trim())
-    setAccount(r.account); setTempPassword(r.temporaryPassword); setCopied(false)
+    setAccount(r.account); setTempPassword(r.temporaryPassword); setCopied(false); setCopyFailed(false)
   })
   const reset = () => run(async () => {
     setConfirmReset(false)
-    setTempPassword(await resetPortalPassword(employer.id)); setCopied(false)
+    setTempPassword(await resetPortalPassword(employer.id)); setCopied(false); setCopyFailed(false)
     await load()
   })
   const toggle = () => run(async () => {
     if (!account) return
     setAccount(await setPortalAccountStatus(employer.id, account.status === 'Active' ? 'Inactive' : 'Active'))
+    onChanged?.()
   })
 
+  // "Copied" is shown only when the copy really worked; if the browser refuses, say how to copy it by hand (the password is selectable on screen).
   async function copyPassword() {
-    try { await navigator.clipboard.writeText(tempPassword); setCopied(true) } catch { /* the password is on screen; they can copy it by hand */ }
+    const ok = await copyText(tempPassword)
+    setCopied(ok); setCopyFailed(!ok)
   }
 
   return (
@@ -85,6 +91,7 @@ export default function EmployerPortalModal({ employer, onClose }: { employer: E
                       {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : 'Copy'}
                     </button>
                   </div>
+                  {copyFailed && <p role="alert" className="m-0 mt-2 text-xs font-semibold text-red-700">Could not copy automatically. Click the password to select it, then press Ctrl+C.</p>}
                   <p className="m-0 mt-2 text-xs text-amber-800">Give the employer their username and this password. It can't be shown again; the employer must choose their own at first login.</p>
                 </div>
               )}
@@ -105,6 +112,7 @@ export default function EmployerPortalModal({ employer, onClose }: { employer: E
                   </div>
                   {account.mustChangePassword && <p className="m-0 text-xs text-gray-500">The employer has not set their own password yet.</p>}
                   {account.status === 'Inactive' && <p className="m-0 text-xs text-gray-500">This account can't sign in to the portal while it is inactive.</p>}
+                  <p className="m-0 text-xs text-gray-500">The account and the employer always have the same status: activating or deactivating this account also sets the employer to Active or Inactive.</p>
                   <div className="flex gap-2 pt-1">
                     <button type="button" onClick={() => setConfirmReset(true)} disabled={busy} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50">Reset password</button>
                     <button type="button" onClick={() => void toggle()} disabled={busy} className={`px-4 py-2 rounded-lg text-sm disabled:opacity-50 border ${account.status === 'Active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>

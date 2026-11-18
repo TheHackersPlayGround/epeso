@@ -1,7 +1,7 @@
 // People hired by this company. The employer can ask the PESO to mark a placement Resigned / Terminated / Completed.
 import { useMemo, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
-import { listPlacements, submitRequest, withdrawRequest, type Placement } from '../../api'
+import { listPlacements, submitRequest, withdrawRequest, type ApplicantContext, type Placement } from '../../api'
 import { Badge, Card, EmptyState, ExportButton, Notice, Spinner, WaitingPill } from '../../components/ui'
 import { StatusRequestDialog, WithdrawDialog } from '../../components/dialogs'
 import { btnSmall, exportToExcel, fmtDate, useData, usePaged } from '../../lib'
@@ -9,7 +9,7 @@ import TablePagination from '../../../pages/employment/shared/TablePagination'
 
 const STATUSES = ['Active', 'Resigned', 'Terminated', 'Completed']
 
-export default function PlacementsTab({ tick, onView, onChanged }: { tick: number; onView: (applicantId: number) => void; onChanged: () => void }) {
+export default function PlacementsTab({ tick, onView, onChanged }: { tick: number; onView: (applicantId: number, context: ApplicantContext) => void; onChanged: () => void }) {
   const { data, error, loading, reload } = useData(listPlacements, tick)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -85,7 +85,7 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="inline-flex gap-2">
-                      <button type="button" onClick={() => onView(p.applicantId)} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
+                      <button type="button" onClick={() => onView(p.applicantId, { jobTitle: p.jobTitle, verb: 'Hired', date: p.dateHired, status: p.status })} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
                       {p.status === 'Active' && !p.openRequest && <button type="button" onClick={() => setUpdate(p)} className={`${btnSmall} bg-brand-blue text-white hover:bg-brand-blue-dark`}>Update status</button>}
                       {p.openRequest && <button type="button" onClick={() => setWithdraw(p)} className={`${btnSmall} border border-red-200 text-red-600 hover:bg-red-50`}>Withdraw request</button>}
                     </div>

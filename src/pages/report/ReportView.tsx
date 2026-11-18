@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, FileText, Download, ChevronDown, Columns, BarChart2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import DatePicker from '../../components/DatePicker'
 import ExcelJS from 'exceljs'
+import { fmtDateTime } from '../../utils/formatDate'
+import { parseDateText, EXCEL_DATE_FORMAT, EXCEL_DATE_TIME_FORMAT } from '../../utils/excelDates'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { registerPdfFont, PDF_FONT_FAMILY } from './fonts/registerPdfFont'
@@ -113,7 +115,15 @@ export default function ReportView({ onBack }: ReportViewProps) {
   const [year, setYear] = useState(currentYear)
   const [fromDate, setFromDate] = useState(`${currentYear}-01-01`)
   const [toDate, setToDate] = useState(todayIso)
-  const [generatedReport, setGeneratedReport] = useState<any>(null)
+  const [generatedReport, setGeneratedReportRaw] = useState<any>(null)
+  // Every report row passes through here, so any date in the preview, Excel, PDF and Word shows as mm/dd/yyyy (the data holds yyyy-mm-dd).
+  const setGeneratedReport = (report: any) => {
+    if (report && Array.isArray(report.data)) {
+      const fix = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/.test(v) && v.length <= 25 ? fmtDateTime(v) : v)
+      report = { ...report, data: report.data.map((row: any) => (row && typeof row === 'object' ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, fix(v)])) : row)) }
+    }
+    setGeneratedReportRaw(report)
+  }
   // Whether the generated report is an Aging report (Skills Training/CDSP/GIP).
   const isGeneratedReportAging = !!generatedReport && (
     (generatedReport.category === 'skills-training' && generatedReport.skillsReportType === 'aging')
@@ -189,6 +199,11 @@ export default function ReportView({ onBack }: ReportViewProps) {
       ws.eachRow({ includeEmpty: true }, row => {
         row.eachCell({ includeEmpty: true }, cell => {
           cell.font = { ...cell.font, name: EXCEL_FONT_NAME }
+          // Dates written as text become real Excel dates shown mm/dd/yyyy.
+          if (typeof cell.value === 'string') {
+            const dt = parseDateText(cell.value)
+            if (dt) { cell.value = dt.date; cell.numFmt = dt.hasTime ? EXCEL_DATE_TIME_FORMAT : EXCEL_DATE_FORMAT }
+          }
           // Rich-text cells carry their own per-run font, which overrides
           // the cell-level font set above, so patch those runs too.
           const v = cell.value as unknown

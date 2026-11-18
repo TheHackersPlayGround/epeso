@@ -49,3 +49,11 @@ body { background: #E6E7E8; }
 
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+
+/* Printing an applicant's profile: A4 or Letter (the browser's paper choice), modest margins, no coloured backgrounds needed. */
+@media print {
+  @page { margin: 12mm; }
+  html, body, #root { background: #fff !important; }
+  /* A smaller type scale on paper, so a profile fits on one or two pages. */
+  :root { font-size: 14px; --text-xs: 9px; --text-sm: 10.5px; --text-base: 12px; --text-md: 13px; --text-lg: 15px; --text-xl: 17px; }
+}

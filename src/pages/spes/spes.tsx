@@ -23,6 +23,7 @@ import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
 import { WithdrawalBanner, WithdrawalFootnote } from '../../components/WithdrawalNotice'
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 interface SPESViewProps {
   onBack: () => void
@@ -424,7 +425,7 @@ export default function SPESView({ onBack }: SPESViewProps) {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'SPES Applicants')
-      XLSX.writeFile(wb, `SPES_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `SPES_Applicants_${new Date().toISOString().split('T')[0]}.xlsx`)
       logSheetExport('spes', 'SPES applicants list', ws, 2)
     } finally {
       setIsExporting(false)
@@ -491,8 +492,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                     <Row label="Employer / Agency" value={selectedBatch.employer} />
                     <Row label="Deployment Location" value={selectedBatch.deploymentLocation} />
                     <Row label="Program Coordinator" value={selectedBatch.coordinator} />
-                    <Row label="Program Start Date" value={selectedBatch.programStartDate} />
-                    <Row label="Program End Date" value={selectedBatch.programEndDate} />
+                    <Row label="Program Start Date" value={fmtDate(selectedBatch.programStartDate)} />
+                    <Row label="Program End Date" value={fmtDate(selectedBatch.programEndDate)} />
                     <Row label="Available Slots" value={`${selectedBatch.assignedCount}/${selectedBatch.availableSlots}`} />
                     <Row label="Funding Source" value={selectedBatch.fundingSource === 'Other' ? `Other — ${selectedBatch.fundingSourceOther}` : selectedBatch.fundingSource} />
                   </div>
@@ -563,8 +564,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                       <Row label="Employer / Agency" value={batch.employer} />
                       <Row label="Deployment Location" value={batch.deploymentLocation} />
                       <Row label="Program Coordinator" value={batch.coordinator} />
-                      <Row label="Program Start Date" value={batch.programStartDate} />
-                      <Row label="Program End Date" value={batch.programEndDate} />
+                      <Row label="Program Start Date" value={fmtDate(batch.programStartDate)} />
+                      <Row label="Program End Date" value={fmtDate(batch.programEndDate)} />
                       <Row label="Available Slots" value={`${batch.assignedCount}/${batch.availableSlots}`} />
                       <Row label="Funding Source" value={batch.fundingSource === 'Other' ? `Other — ${batch.fundingSourceOther}` : batch.fundingSource} />
                       {/* No separate history table (single batch_id link), so this
@@ -722,8 +723,8 @@ export default function SPESView({ onBack }: SPESViewProps) {
                           {(batch.programStartDate || batch.programEndDate) && (
                             <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
                               {batch.programStartDate && batch.programEndDate
-                                ? <span>{batch.programStartDate} – {batch.programEndDate}</span>
-                                : <span>{batch.programStartDate || batch.programEndDate}</span>}
+                                ? <span>{fmtDate(batch.programStartDate)} – {fmtDate(batch.programEndDate)}</span>
+                                : <span>{fmtDate(batch.programStartDate || batch.programEndDate)}</span>}
                               {batch.availableSlots && <><span>·</span><span>{batch.assignedCount}/{batch.availableSlots} slots</span></>}
                             </div>
                           )}

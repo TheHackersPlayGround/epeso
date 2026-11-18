@@ -7,6 +7,7 @@ import { Download, Search, ChevronDown, ChevronLeft, ChevronRight } from 'lucide
 import ConfirmModal from '../shared/ConfirmModal'
 import { listEmployerActivity, type EmployerActivityEntry } from '../../services/employerPortalService'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 // The log stores short codes; these are the words shown on screen.
 const ACTION_LABELS: Record<string, string> = {
@@ -76,7 +77,7 @@ export default function EmployerActivityTab({ isActive }: { isActive: boolean })
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Employer Activity')
-    XLSX.writeFile(wb, `EmployerActivity_${new Date().toISOString().split('T')[0]}.xlsx`)
+    XLSX.writeFile(withDateCells(wb), `EmployerActivity_${new Date().toISOString().split('T')[0]}.xlsx`)
     logSheetExport('security', 'Employer activity', ws, 1)
   }
 

@@ -12,6 +12,7 @@ import { useDocuments, IMAGE_TYPES } from '../../contexts/DocumentsContext'
 import * as documentsService from '../../services/documentsService'
 import ConfirmModal from '../shared/ConfirmModal'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { fmtDate } from '../../utils/formatDate'
 
 const BRAND = '#0077BE'
 const BRAND_DARK = '#0065A5'
@@ -905,7 +906,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
                       <div className="flex flex-col items-center text-center">
                         <div className="mb-3">{getFileIcon(file.type)}</div>
                         <p className="text-sm font-medium text-gray-800 mb-1 line-clamp-2 break-words w-full">{file.name}</p>
-                        <p className="text-xs text-gray-500">{file.uploadedDate} · {file.size} · {file.uploadedBy}</p>
+                        <p className="text-xs text-gray-500">{fmtDate(file.uploadedDate)} · {file.size} · {file.uploadedBy}</p>
                       </div>
                     </div>
                   ))}
@@ -918,7 +919,7 @@ export default function DocumentsView({ onBack }: DocumentsViewProps) {
                       <div className="flex-shrink-0">{getFileIcon(file.type, 32)}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-                        <p className="text-xs text-gray-500">{file.uploadedDate} · {file.size} · {file.uploadedBy}</p>
+                        <p className="text-xs text-gray-500">{fmtDate(file.uploadedDate)} · {file.size} · {file.uploadedBy}</p>
                       </div>
                       <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative" onClick={e => e.stopPropagation()}>
                         <button onClick={e => { e.stopPropagation(); setActiveMenuId(activeMenuId === file.id ? null : file.id) }}

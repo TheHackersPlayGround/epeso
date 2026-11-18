@@ -9,7 +9,7 @@ import { ATTACHMENT_ACCEPT } from '../../utils/attachments'
 import { REQUEST_TYPES, ELPOR_FORMS, EMPLOYMENT_STATUS_OPTIONS, CIVIL_STATUS_OPTIONS, ClearButton } from './AddOFWRequestForm'
 import DocumentPreviewModal from '../../components/DocumentPreviewModal'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 
 interface OFWProfileModalProps {
@@ -295,7 +295,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave, hideSt
                 <Field label="First Name" value={profile.firstName} />
                 <Field label="Middle Name" value={profile.middleName} />
                 <Field label="Sex" value={profile.sex} />
-                <Field label="Birthdate" value={profile.birthdate} />
+                <Field label="Birthdate" value={fmtDate(profile.birthdate)} />
                 <Field label="Civil Status" value={profile.civilStatus} />
                 <Field label="Contact Number" value={profile.contactNumber} />
                 <Field label="Email Address" value={profile.email} />
@@ -401,7 +401,7 @@ export default function OFWProfileModal({ profile, mode, onClose, onSave, hideSt
                   <p className="text-sm font-bold tracking-wide" style={{ color: '#0077BE' }}>FOR PESO OFFICE ONLY</p>
                 </div>
                 <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4 mb-4">
-                  <Field label="Date Filed" value={profile.dateFiled} />
+                  <Field label="Date Filed" value={fmtDate(profile.dateFiled)} />
                   <Field label="Reference No." value={profile.referenceNumber} />
                   <Field label="Received By" value={profile.receivedBy} />
                 </div>

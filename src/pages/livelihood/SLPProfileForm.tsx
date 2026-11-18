@@ -11,7 +11,7 @@ import { useProfileDraft } from '../../hooks/useFormDraft'
 import { useDuplicateCheck } from '../../hooks/useDuplicateCheck'
 import { ATTACHMENT_ACCEPT, ATTACHMENT_ACCEPT_LABEL } from '../../utils/attachments'
 import { sanitizeContactNumber, isValidContactNumber, CONTACT_NUMBER_MESSAGE } from '../../utils/contactNumber'
-import { todayIso } from '../../utils/formatDate'
+import { fmtDate, todayIso } from '../../utils/formatDate'
 import { withDefaultReceivedBy } from '../../utils/currentUser'
 import KioskReview, { type ReviewSection } from '../../kiosk/KioskReview'
 import { fullName, joinText, listText } from '../../kiosk/kioskReviewUtils'
@@ -921,7 +921,7 @@ export default function SLPProfileForm({ initial, mode, onSave, onClose, onEdit,
     const f = formData
     return [
     { numeral: 'I', title: 'SLP Information', rows: [['Participant Type', f.is4PsBeneficiary ? '4Ps' : 'Non-4Ps'], ['Eligibility Type', f.eligibilityType === 'Referral' && f.referringParty ? `Referral (${f.referringParty})` : f.eligibilityType]] },
-    { numeral: 'II', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', f.birthdate], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
+    { numeral: 'II', title: 'Personal Information', rows: [['Name', fullName(f.lastName, f.firstName, f.middleName, f.nameExtension)], ['Birthdate', fmtDate(f.birthdate)], ['Sex', f.sex], ['Civil Status', f.civilStatus], ['Contact Number', f.contactNumber], ['Email', f.email]] },
     { numeral: 'III', title: 'Address Information', text: joinText(f.streetPurok, f.barangay, f.cityMunicipality, f.province) },
     { numeral: 'IV', title: 'Sector Classification', rows: [['Sector', listText(f.sector, f.sectorOthersSpecify) || 'None selected'], ['Indigenous Group', f.sectorIpGroupSpecify], ['Disability', f.sectorDisabilitySpecify], ['Educational Attainment', f.educationalAttainment]] },
     { numeral: 'V', title: 'Assessment Summary', rows: [['Source of Income', f.sourceOfIncome], ['Total Household Monthly Income', f.totalHouseholdMonthlyIncome]] },

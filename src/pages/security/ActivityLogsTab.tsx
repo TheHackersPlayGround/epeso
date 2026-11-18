@@ -4,6 +4,7 @@ import { Download, Search, ChevronDown, ChevronLeft, ChevronRight } from 'lucide
 import ConfirmModal from '../shared/ConfirmModal'
 import { listActivityLogs } from '../../services/activityLogService'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 interface ActivityLog {
   id: number
@@ -111,7 +112,7 @@ export default function ActivityLogsTab({ isActive }: ActivityLogsTabProps) {
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Activity Logs')
-    XLSX.writeFile(wb, `ActivityLogs_${new Date().toISOString().split('T')[0]}.xlsx`)
+    XLSX.writeFile(withDateCells(wb), `ActivityLogs_${new Date().toISOString().split('T')[0]}.xlsx`)
     logSheetExport('security', 'Activity logs', ws, 1)
   }
 

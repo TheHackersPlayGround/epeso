@@ -2,7 +2,7 @@
 // every few seconds, and again when the window comes back into focus.
 import { useEffect, useRef, useState } from 'react'
 import { Briefcase, ChevronUp, ClipboardList, LayoutDashboard, LogOut, User, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
-import { getOverview, type Me } from '../api'
+import { getOverview, listReferrals, type ApplicantContext, type Me } from '../api'
 import { useData } from '../lib'
 import ApplicantView from './ApplicantView'
 import HiredApplicantsView from './HiredApplicantsView'
@@ -36,7 +36,8 @@ const HEADINGS: Record<TabId, { title: string; hint: string }> = {
 
 export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [tab, setTab] = useState<TabId>('overview')
-  const [viewing, setViewing] = useState<{ id: number; fromTab: TabId } | null>(null)
+  // The applicant being viewed: which tab it was opened from, which referral/placement (for the "Referred for ..." line), and what Back is called.
+  const [viewing, setViewing] = useState<{ id: number; fromTab: TabId; context: ApplicantContext; backLabel: string } | null>(null)
   // The "who is hired for this opening" page. It stays set while an applicant is opened from it, so Back from the applicant returns here.
   const [hiredFor, setHiredFor] = useState<{ id: number; title: string } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -60,14 +61,17 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
   }, [])
 
   const overview = useData(getOverview, tick)
+  const referrals = useData(listReferrals, tick)
+  // Badge on Referrals: every referral still Pending (the employer hasn't marked it Interviewed, Hired or Not Hired yet).
+  const pendingReferrals = (referrals.data ?? []).filter(r => r.status === 'Pending').length
   const pending = overview.data?.pendingRequests ?? 0
   const activeTab = viewing ? viewing.fromTab : tab
 
   return (
-    <div className="h-screen flex overflow-hidden bg-brand-bg max-lg:flex-col">
+    <div className="h-screen flex overflow-hidden bg-brand-bg max-lg:flex-col print:block print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar: logo and system name on top, page navigation in the middle, the account menu at the bottom.
           On narrow screens it becomes a bar across the top: logo + account menu, then the pages in a row that scrolls sideways. */}
-      <aside className="relative w-64 shrink-0 bg-brand-blue text-white shadow-lg flex flex-col max-lg:w-full">
+      <aside className="relative w-64 shrink-0 bg-brand-blue text-white shadow-lg flex flex-col max-lg:w-full print:hidden">
         <div className="px-5 pt-6 pb-5 flex flex-col items-center text-center border-b border-white/15 max-lg:flex-row max-lg:text-left max-lg:gap-3 max-lg:px-3 max-lg:py-2.5 max-lg:pr-16">
           <img src="/logo3.png" alt="PESO Logo" className="w-20 h-20 object-contain shrink-0 max-lg:w-11 max-lg:h-11" />
           <div className="min-w-0 mt-3 max-lg:mt-0">
@@ -88,6 +92,9 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
                 }`}>
                 <Icon size={18} className="shrink-0" />
                 <span className="flex-1 text-left">{t.label}</span>
+                {t.id === 'referrals' && pendingReferrals > 0 && (
+                  <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand-orange text-white text-xs font-semibold inline-flex items-center justify-center" aria-label={`${pendingReferrals} pending`}>{pendingReferrals}</span>
+                )}
                 {t.id === 'requests' && pending > 0 && (
                   <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-brand-orange text-white text-xs font-semibold inline-flex items-center justify-center" aria-label={`${pending} waiting for the PESO`}>{pending}</span>
                 )}
@@ -129,12 +136,14 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
         onConfirm={() => { setConfirmLogout(false); onLogout() }} onCancel={() => setConfirmLogout(false)}
       />
 
-      <main className="flex-1 min-w-0 min-h-0 overflow-y-auto p-6 max-sm:p-3">
+      {/* `relative` so anything positioned absolutely inside (such as the screen-reader-only text in tables) stays inside this scrolling area,
+          instead of stretching the whole window and giving a second scroll bar. */}
+      <main className="relative flex-1 min-w-0 min-h-0 overflow-y-auto p-6 max-sm:p-3 print:overflow-visible print:p-0">
         {viewing ? (
-          <ApplicantView id={viewing.id} onClose={() => { setTab(viewing.fromTab); setViewing(null) }} />
+          <ApplicantView id={viewing.id} context={viewing.context} backLabel={viewing.backLabel} onClose={() => { setTab(viewing.fromTab); setViewing(null) }} />
         ) : hiredFor ? (
           <HiredApplicantsView vacancyId={hiredFor.id} title={hiredFor.title} tick={tick} onBack={() => setHiredFor(null)}
-            onView={id => setViewing({ id, fromTab: 'vacancies' })} />
+            onView={(id, context) => setViewing({ id, fromTab: 'vacancies', context, backLabel: 'Back to hired applicants' })} />
         ) : (
           <>
             <div className="mb-5 max-sm:mb-3">
@@ -142,8 +151,8 @@ export default function Shell({ me, onLogout }: { me: Me; onLogout: () => void }
               <p className="text-sm text-gray-500 m-0 mt-1 max-w-3xl">{HEADINGS[tab].hint}</p>
             </div>
             {tab === 'overview' && <Overview data={overview.data} error={overview.error} loading={overview.loading} onGo={setTab} />}
-            {tab === 'referrals' && <ReferralsTab tick={tick} onView={id => setViewing({ id, fromTab: 'referrals' })} onChanged={overview.reload} />}
-            {tab === 'placements' && <PlacementsTab tick={tick} onView={id => setViewing({ id, fromTab: 'placements' })} onChanged={overview.reload} />}
+            {tab === 'referrals' && <ReferralsTab tick={tick} onView={(id, context) => setViewing({ id, fromTab: 'referrals', context, backLabel: 'Back to Referrals' })} onChanged={overview.reload} />}
+            {tab === 'placements' && <PlacementsTab tick={tick} onView={(id, context) => setViewing({ id, fromTab: 'placements', context, backLabel: 'Back to Placements' })} onChanged={overview.reload} />}
             {tab === 'vacancies' && <VacanciesTab tick={tick} onViewHired={(id, title) => setHiredFor({ id, title })} onChanged={overview.reload} />}
             {tab === 'company' && <CompanyTab tick={tick} onChanged={overview.reload} />}
             {tab === 'requests' && <RequestsTab tick={tick} onChanged={overview.reload} />}

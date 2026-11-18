@@ -53,6 +53,7 @@ import {
   type KioskProgramSetting, type Submission, type SubmissionDetail, type SubmissionStatus,
 } from '../../services/submissionService'
 import { isAdministrator } from '../../utils/permissions'
+import { copyText } from '../../utils/clipboard'
 
 const PROGRAM_OPTIONS = [
   { id: 'ef', label: 'Employment Facilitation' },
@@ -408,11 +409,11 @@ export default function PendingView({ onBack, onChanged, refreshSignal }: { onBa
   }
 
   async function copyUrl() {
-    try {
-      await navigator.clipboard.writeText(kioskUrl)
+    // "Copied" only when the copy really worked (see utils/clipboard.ts: it also works on plain HTTP pages); the link stays visible on screen either way.
+    if (await copyText(kioskUrl)) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-    } catch { /* clipboard blocked: the link is still shown on screen */ }
+    }
   }
 
   // ── Review / view screens (replace the list, like the Applicants tab does) ──

@@ -31,6 +31,7 @@ import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
 import dilpLogo from '../../kiosk/logos/dilp.png'
 import tupadLogo from '../../kiosk/logos/tupad.png'
+import { withDateCells } from '../../utils/excelDates'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -314,7 +315,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                 {(program === 'DILEEP (TUPAD)'
                   ? [
                       ['Title', (selectedProject as TUPADProject).title],
-                      ['Date', (selectedProject as TUPADProject).date],
+                      ['Date', fmtDate((selectedProject as TUPADProject).date)],
                       ['Location', (selectedProject as TUPADProject).location],
                       ['Description', (selectedProject as TUPADProject).description],
                     ]
@@ -444,7 +445,7 @@ function AssignProjectModal({ beneficiary, program, projects, onAssign, onUnassi
                         {tupadProject ? (
                           <>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              {[tupadProject.date, tupadProject.location].filter(Boolean).join(' • ')}
+                              {[fmtDate(tupadProject.date), tupadProject.location].filter(Boolean).join(' • ')}
                               {tupadProject.participants && ` • ${tupadProject.assignedCount}/${tupadProject.participants} participants`}
                             </p>
                             {tupadProject.description && (
@@ -870,7 +871,7 @@ function BeneficiaryList({ program, onWizardChange }: BeneficiaryListProps) {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, programLabel)
-      XLSX.writeFile(wb, `${programLabel}_beneficiaries.xlsx`)
+      XLSX.writeFile(withDateCells(wb), `${programLabel}_beneficiaries.xlsx`)
       logSheetExport('livelihood', `${programLabel} beneficiaries list`, ws, 2)
     } finally {
       setIsExporting(false)

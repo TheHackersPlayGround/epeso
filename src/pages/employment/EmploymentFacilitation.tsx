@@ -28,6 +28,7 @@ import EmploymentHistoryPanel from "./applicants/EmploymentHistoryPanel";
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn';
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService';
+import { withDateCells } from '../../utils/excelDates'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -756,7 +757,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Applicants");
-      XLSX.writeFile(wb, "applicants.xlsx");
+      XLSX.writeFile(withDateCells(wb), "applicants.xlsx");
       logSheetExport('employment', 'Applicants list', ws, 2);
     } finally {
       setIsExporting(false);

@@ -17,6 +17,7 @@ import AssignedItemModal, { type AssignedItemAction } from '../../components/Ass
 import ImportDropZone from '../../components/ImportDropZone'
 import { logSheetExport } from '../../services/activityLogService'
 import clpepLogo from '../../kiosk/logos/clpep.png'
+import { withDateCells } from '../../utils/excelDates'
 
 // ─── Import modal ──────────────────────────────────────────────────────────────
 
@@ -430,7 +431,7 @@ function AssignInterventionModal({ beneficiary, interventions, onAssign, onUnass
                     <span className="text-gray-400">Category:</span>{' '}
                     {confirmIntervention.interventionCategory === 'Other' ? (confirmIntervention.interventionCategoryOther || 'Other') : confirmIntervention.interventionCategory}
                   </div>
-                  <div><span className="text-gray-400">Date:</span> {confirmIntervention.date || '—'}</div>
+                  <div><span className="text-gray-400">Date:</span> {fmtDate(confirmIntervention.date)}</div>
                   <div><span className="text-gray-400">Location:</span> {confirmIntervention.location || '—'}</div>
                   <div><span className="text-gray-400">Implementing Officer:</span> {confirmIntervention.implementingOfficer || '—'}</div>
                   <div>
@@ -1006,7 +1007,7 @@ export default function CLPEPTab() {
       const ws = XLSX.utils.aoa_to_sheet(aoa)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'CLPEP')
-      XLSX.writeFile(wb, 'clpep_beneficiaries.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'clpep_beneficiaries.xlsx')
       logSheetExport('livelihood', 'CLPEP beneficiaries list', ws, 2)
     } finally {
       setIsExporting(false)

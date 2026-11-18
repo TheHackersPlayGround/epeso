@@ -15,6 +15,7 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import { requestLeave } from '../../hooks/leaveGuard'
 import { useAsyncAction } from '../../hooks/useAsyncAction'
 import { useRefreshOnReturn } from '../../hooks/useRefreshOnReturn'
+import { fmtDate } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ function TrainingForm({
             <div>
               <label className={labelCls}>Date</label>
               {isView ? (
-                <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">{form.date || '—'}</div>
+                <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">{fmtDate(form.date)}</div>
               ) : (
                 <DatePicker className={inputCls} value={form.date} onChange={value => onChange('date', value)} />
               )}
@@ -781,7 +782,7 @@ export default function SkillsTrainingMaintenanceForm() {
                             <span className="text-gray-400 text-sm">—</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{a.date || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{fmtDate(a.date)}</td>
                         <td className="px-6 py-4 text-sm text-gray-600 max-w-[280px]">
                           <span className="line-clamp-1">{a.location || '—'}</span>
                         </td>

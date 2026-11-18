@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'
-import { Search, Plus, ChevronDown, X, Download, MoreHorizontal, Loader2 } from 'lucide-react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { Search, ChevronDown, X, Download, MoreHorizontal, Loader2 } from 'lucide-react'
 import ConfirmModal from '../shared/ConfirmModal'
 import { useEmployment, type Referral } from '../../contexts/EmploymentContext'
 import { updateReferralStatus, deleteReferral } from '../../services/referralService'
@@ -7,18 +7,20 @@ import * as XLSX from 'xlsx'
 import TablePagination, { EF_ITEMS_PER_PAGE } from './shared/TablePagination'
 import { canManage } from '../../utils/permissions'
 import { fmtDate } from '../../utils/formatDate'
+import { compareByName } from '../../utils/nameSort'
 import SharedDocumentsDialog from './shared/SharedDocumentsDialog'
 import { logSheetExport } from '../../services/activityLogService'
+import { withDateCells } from '../../utils/excelDates'
 
 // ── Filter config ─────────────────────────────────────────────────────────────
 
-type FilterOption = { id: string; label: string; options: string[] }
 type SortOrder = 'firstName_asc' | 'firstName_desc' | 'lastName_asc' | 'lastName_desc' | ''
 
 // 'Hired' triggers placement creation rather than just updating referral status
 type ReferralStatusOption = Referral['status'] | 'Hired'
 const STATUS_OPTIONS: ReferralStatusOption[] = ['Pending', 'Interviewed', 'Not Hired', 'Hired']
-const FILTER_STATUS_OPTIONS: Referral['status'][] = ['Pending', 'Interviewed', 'Not Hired']
+// The status dropdown above the table. "Hired" is not offered: hired referrals leave this list and become placements.
+const STATUS_FILTER_OPTIONS: Referral['status'][] = ['Pending', 'Interviewed', 'Not Hired']
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
 
@@ -32,18 +34,14 @@ function ReferralStatusBadge({ status }: { status: Referral['status'] }) {
   return <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pending</span>
 }
 
-// ── Search Bar (with Export) ──────────────────────────────────────────────────
+// ── Search Bar (with Status filter, Sort and Export) ──────────────────────────
 
 type ReferralsSearchBarProps = {
   searchQuery: string
-  activeFilters: string[]
-  isFilterOpen: boolean
-  availableFilters: FilterOption[]
+  statusFilter: string
   sortOrder: SortOrder
   onSearchChange: (v: string) => void
-  onToggleFilter: () => void
-  onCloseFilter: () => void
-  onAddFilter: (id: string) => void
+  onStatusChange: (v: string) => void
   onSortChange: (v: SortOrder) => void
   onExportExcel: () => void
   isExporting: boolean
@@ -51,20 +49,14 @@ type ReferralsSearchBarProps = {
 
 function ReferralsSearchBar({
   searchQuery,
-  activeFilters,
-  isFilterOpen,
-  availableFilters,
+  statusFilter,
   sortOrder,
   onSearchChange,
-  onToggleFilter,
-  onCloseFilter,
-  onAddFilter,
+  onStatusChange,
   onSortChange,
   onExportExcel,
   isExporting,
 }: ReferralsSearchBarProps) {
-  const unselected = availableFilters.filter(f => !activeFilters.includes(f.id))
-
   return (
     <div className="flex flex-wrap gap-3">
       <div className="relative flex-1 min-w-48 max-sm:min-w-full">
@@ -77,6 +69,20 @@ function ReferralsSearchBar({
           aria-label="Search referrals"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-brand-blue placeholder:text-gray-400"
         />
+      </div>
+
+      {/* Status filter: always visible, like the employer portal's */}
+      <div className="relative">
+        <select
+          value={statusFilter}
+          onChange={e => onStatusChange(e.target.value)}
+          aria-label="Status"
+          className="appearance-none pl-4 pr-8 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:outline-none focus:border-brand-blue cursor-pointer whitespace-nowrap"
+        >
+          <option value="">All</option>
+          {STATUS_FILTER_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
       {/* Sort By */}
@@ -95,39 +101,6 @@ function ReferralsSearchBar({
         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
       </div>
 
-      {/* Filter By */}
-      <div className="relative">
-        <button
-          onClick={onToggleFilter}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors whitespace-nowrap text-sm text-gray-700"
-        >
-          <Plus size={16} />
-          Filter By
-          <ChevronDown size={14} className="text-gray-500" />
-        </button>
-
-        {isFilterOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={onCloseFilter} />
-            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-              {unselected.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-gray-400 italic">All filters applied</p>
-              ) : (
-                unselected.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => { onAddFilter(f.id); onCloseFilter() }}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                  >
-                    {f.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
       {/* Export */}
       <button
         onClick={onExportExcel}
@@ -137,61 +110,6 @@ function ReferralsSearchBar({
         {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
         {isExporting ? 'Exporting…' : 'Export'}
       </button>
-    </div>
-  )
-}
-
-// ── Filter Badges ─────────────────────────────────────────────────────────────
-
-type ReferralsFilterBadgesProps = {
-  activeFilters: string[]
-  filterValues: Record<string, string>
-  availableFilters: FilterOption[]
-  onFilterValueChange: (id: string, value: string) => void
-  onRemoveFilter: (id: string) => void
-}
-
-function ReferralsFilterBadges({
-  activeFilters,
-  filterValues,
-  availableFilters,
-  onFilterValueChange,
-  onRemoveFilter,
-}: ReferralsFilterBadgesProps) {
-  if (activeFilters.length === 0) return null
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {activeFilters.map(filterId => {
-        const filter = availableFilters.find(f => f.id === filterId)
-        if (!filter) return null
-        return (
-          <div
-            key={filterId}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full"
-          >
-            <span className="text-sm text-blue-700 font-medium whitespace-nowrap">{filter.label}:</span>
-            <select
-              value={filterValues[filterId] ?? ''}
-              onChange={e => onFilterValueChange(filterId, e.target.value)}
-              onClick={e => e.stopPropagation()}
-              className="text-sm bg-transparent border-none focus:outline-none text-blue-700 font-medium pr-1 cursor-pointer"
-            >
-              <option value="">All</option>
-              {filter.options.map(o => (
-                <option key={o} value={o}>{o}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => onRemoveFilter(filterId)}
-              aria-label={`Remove ${filter.label} filter`}
-              className="text-blue-700 hover:text-blue-900 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -432,33 +350,13 @@ export default function ReferralsTab() {
   const loading = listLoading.referrals
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<SortOrder>('')
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('')   // '' = All
   const [isExporting, setIsExporting] = useState(false)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({})
   const [updatingReferral, setUpdatingReferral] = useState<Referral | null>(null)
   const [sharingReferral, setSharingReferral] = useState<Referral | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(EF_ITEMS_PER_PAGE)
   const [resultModal, setResultModal] = useState<{ isOpen: boolean; type: 'success' | 'error'; title: string; message: string }>({ isOpen: false, type: 'success', title: '', message: '' })
-
-  // Employer is a default table column, so it is not a filter.
-  const availableFilters: FilterOption[] = useMemo(() => [
-    { id: 'status', label: 'Status', options: FILTER_STATUS_OPTIONS },
-  ], [])
-
-  function handleAddFilter(id: string) {
-    setActiveFilters(prev => [...prev, id])
-  }
-
-  function handleRemoveFilter(id: string) {
-    setActiveFilters(prev => prev.filter(f => f !== id))
-    setFilterValues(prev => { const n = { ...prev }; delete n[id]; return n })
-  }
-
-  function handleFilterValueChange(id: string, value: string) {
-    setFilterValues(prev => ({ ...prev, [id]: value }))
-  }
 
   async function handleRemoveReferral(id: number) {
     try {
@@ -508,6 +406,31 @@ export default function ReferralsTab() {
     setResultModal({ isOpen: true, type: 'success', title: note.title, message: note.text })
   }
 
+  // ── Filtering ──────────────────────────────────────────────────────────────
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const matched = referrals.filter(r =>
+      (!q || r.applicantName.toLowerCase().includes(q) || r.jobTitle.toLowerCase().includes(q) || r.employer.toLowerCase().includes(q))
+      && (!statusFilter || r.status === statusFilter),
+    )
+    if (!sortOrder) return matched
+
+    const by = sortOrder.startsWith('firstName') ? 'first' : 'last'
+    const ascending = sortOrder.endsWith('asc')
+    return [...matched].sort((a, b) => compareByName(a.applicantName, b.applicantName, by, ascending))
+  }, [referrals, searchQuery, statusFilter, sortOrder])
+
+  const isFiltered = searchQuery.trim() !== '' || statusFilter !== ''
+
+  // The page shown never points past the last page (the list can shrink); changing the search, status or sort goes back to page 1 (in the handlers below).
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const page = Math.min(currentPage, totalPages)
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * perPage, page * perPage),
+    [filtered, page, perPage],
+  )
+
   // ── Export helpers ─────────────────────────────────────────────────────────
 
   function buildExportRows() {
@@ -527,55 +450,12 @@ export default function ReferralsTab() {
       const ws = XLSX.utils.json_to_sheet(buildExportRows())
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Referrals')
-      XLSX.writeFile(wb, 'referrals.xlsx')
+      XLSX.writeFile(withDateCells(wb), 'referrals.xlsx')
       logSheetExport('employment', 'Referrals list', ws, 1)
     } finally {
       setIsExporting(false)
     }
   }
-
-  // ── Filtering ──────────────────────────────────────────────────────────────
-
-  const filtered = useMemo(() => {
-    let result = referrals
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(r =>
-        r.applicantName.toLowerCase().includes(q) ||
-        r.jobTitle.toLowerCase().includes(q) ||
-        r.employer.toLowerCase().includes(q)
-      )
-    }
-
-    for (const filterId of activeFilters) {
-      const value = filterValues[filterId]
-      if (!value) continue
-      if (filterId === 'status') result = result.filter(r => r.status === value)
-    }
-
-    if (sortOrder) {
-      result = [...result].sort((a, b) => {
-        const parts = (n: string) => n.trim().split(/\s+/)
-        const keyA = (sortOrder.startsWith('firstName') ? parts(a.applicantName)[0] : parts(a.applicantName).at(-1) ?? '').toLowerCase()
-        const keyB = (sortOrder.startsWith('firstName') ? parts(b.applicantName)[0] : parts(b.applicantName).at(-1) ?? '').toLowerCase()
-        return sortOrder.endsWith('asc') ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA)
-      })
-    }
-
-    return result
-  }, [referrals, searchQuery, activeFilters, filterValues, sortOrder])
-
-  const isFiltered = searchQuery.trim() !== '' || activeFilters.some(f => filterValues[f])
-
-  // Reset to page 1 when the filtered set changes; clamp if it shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, activeFilters, filterValues, sortOrder])
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages) }, [currentPage, totalPages])
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
-    [filtered, currentPage, perPage],
-  )
 
   if (loading) return <div className="flex items-center justify-center py-24 text-gray-400 text-sm">Loading referrals…</div>
 
@@ -585,30 +465,14 @@ export default function ReferralsTab() {
         <div className="mb-4">
           <ReferralsSearchBar
             searchQuery={searchQuery}
-            activeFilters={activeFilters}
-            isFilterOpen={isFilterOpen}
-            availableFilters={availableFilters}
+            statusFilter={statusFilter}
             sortOrder={sortOrder}
-            onSearchChange={v => setSearchQuery(v)}
-            onToggleFilter={() => setIsFilterOpen(o => !o)}
-            onCloseFilter={() => setIsFilterOpen(false)}
-            onAddFilter={handleAddFilter}
-            onSortChange={setSortOrder}
+            onSearchChange={v => { setSearchQuery(v); setCurrentPage(1) }}
+            onStatusChange={v => { setStatusFilter(v); setCurrentPage(1) }}
+            onSortChange={v => { setSortOrder(v); setCurrentPage(1) }}
             onExportExcel={handleExportExcel}
             isExporting={isExporting}
           />
-
-          {activeFilters.length > 0 && (
-            <div className="mt-3">
-              <ReferralsFilterBadges
-                activeFilters={activeFilters}
-                filterValues={filterValues}
-                availableFilters={availableFilters}
-                onFilterValueChange={handleFilterValueChange}
-                onRemoveFilter={handleRemoveFilter}
-              />
-            </div>
-          )}
         </div>
 
         <ReferralsTable
@@ -619,7 +483,7 @@ export default function ReferralsTab() {
           onRemove={handleRemoveReferral}
         />
         <TablePagination
-          currentPage={currentPage}
+          currentPage={page}
           totalItems={filtered.length}
           onPageChange={setCurrentPage}
           itemsPerPage={perPage}

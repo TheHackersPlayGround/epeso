@@ -91,14 +91,15 @@ export default function ConfirmModal({ isOpen, type, title, message, confirmText
           <button
             onClick={handleConfirm}
             disabled={busy}
-            className={`flex-1 py-2.5 rounded-lg text-base text-white font-medium transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed ${
+            className={`relative flex-1 px-3 py-2.5 rounded-lg text-base text-white font-medium whitespace-nowrap transition-colors inline-flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed ${
               type === 'success' ? 'bg-green-600 hover:bg-green-700'
               : type === 'error' ? 'bg-red-600 hover:bg-red-700'
               : confirmVariant === 'brand' ? 'bg-[#0077BE] hover:bg-[#006699]'
               : 'bg-red-600 hover:bg-red-700'
             }`}
           >
-            {busy && <Loader2 size={16} className="animate-spin" />}
+            {/* The spinner sits in the button's left padding, so showing it never moves or re-wraps the label. */}
+            {busy && <Loader2 size={16} className="animate-spin absolute left-3 top-1/2 -mt-2" />}
             {confirmText}
           </button>
           {type === 'confirm' && thirdText && onThird && (

@@ -696,8 +696,8 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
       'Other Skills (comma-separated)',
       // IX. Referred Program
       'Referred Program', 'Referred Program (Other)',
-      // Display-only from here; Import ignores anything it doesn't recognize.
-      'Age', 'Skills Summary',
+      // X. For PESO Office Only (the same headers Import reads, so an exported file can be imported back)
+      'Date Applied (MM/DD/YYYY)', 'Received By',
     ];
   }
 
@@ -739,7 +739,7 @@ export default function EmploymentFacilitation({ onBack }: EmploymentFacilitatio
         ...workExpRows,
         [...fd.otherSkills, ...fd.otherSkillsSpecify.filter(Boolean)].join(', '),
         fd.referredProgram, fd.referredProgramOther,
-        a.age, a.skills,
+        fd.dateApplicationReceived ?? '', fd.receivedBy ?? '',
       ] as (string | number)[]
     })
   }

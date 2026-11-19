@@ -329,6 +329,7 @@ export default function OFWView({ onBack }: OFWViewProps) {
         'Municipality': p.municipality,
         'Province': p.province,
         'Date Filed': p.dateFiled,
+        'Received By': p.receivedBy ?? '',
         'Employment Status': p.employmentStatus,
         'Type of Request': requestTypeText(p),
         'Status': p.status,

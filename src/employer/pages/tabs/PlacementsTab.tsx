@@ -1,9 +1,9 @@
 // People hired by this company. The employer can ask the PESO to mark a placement Resigned / Terminated / Completed.
 import { useMemo, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
-import { listPlacements, submitRequest, withdrawRequest, type ApplicantContext, type Placement } from '../../api'
+import { listPlacements, submitRequest, withdrawRequest, type ApplicantContext, type Placement, type PromotionInput } from '../../api'
 import { Badge, Card, EmptyState, ExportButton, Notice, Spinner, WaitingPill } from '../../components/ui'
-import { StatusRequestDialog, WithdrawDialog } from '../../components/dialogs'
+import { PromotionRequestDialog, StatusRequestDialog, WithdrawDialog } from '../../components/dialogs'
 import { btnSmall, exportToExcel, fmtDate, useData, usePaged } from '../../lib'
 import TablePagination from '../../../pages/employment/shared/TablePagination'
 
@@ -14,6 +14,7 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [update, setUpdate] = useState<Placement | null>(null)
+  const [promote, setPromote] = useState<Placement | null>(null)
   const [withdraw, setWithdraw] = useState<Placement | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null)
 
@@ -22,11 +23,18 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
     return (data ?? []).filter(r => (status === 'all' || r.status === status) && (!q || r.applicantName.toLowerCase().includes(q) || (r.jobTitle ?? '').toLowerCase().includes(q)))
   }, [data, search, status])
   const pg = usePaged(rows, `${search}|${status}`)
+  // After a promotion the position now differs from the one the person was hired into: show both.
+  const promotedFrom = (p: Placement) => (p.hiredAs && p.jobTitle && p.hiredAs.trim().toLowerCase() !== p.jobTitle.trim().toLowerCase() ? p.hiredAs : null)
 
   async function send(p: Placement, newStatus: string) {
     await submitRequest({ type: 'placement_status', placementId: p.id, payload: { status: newStatus } })
     setUpdate(null); reload(); onChanged()
     setNotice({ type: 'success', title: 'Request sent', message: 'The PESO will review your request. You can follow it under My Requests.' })
+  }
+  async function sendPromotion(p: Placement, input: PromotionInput) {
+    await submitRequest({ type: 'placement_promotion', placementId: p.id, payload: input })
+    setPromote(null); reload(); onChanged()
+    setNotice({ type: 'success', title: 'Request sent', message: 'The PESO will review your promotion request. You can follow it under My Requests.' })
   }
   async function doWithdraw(p: Placement) {
     if (!p.openRequest) return
@@ -52,7 +60,7 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
         </div>
         {/* Exports what the table shows: the current search and status, every page. */}
         <ExportButton disabled={rows.length === 0} onExport={() => exportToExcel('placements.xlsx', 'Placements', rows.map(p => ({
-          Employee: p.applicantName, Position: p.jobTitle ?? '', 'Date hired': p.dateHired ? fmtDate(p.dateHired) : '', Status: p.status,
+          Employee: p.applicantName, Position: p.jobTitle ?? '', 'Hired as': p.hiredAs ?? '', 'Date hired': p.dateHired ? fmtDate(p.dateHired) : '', Status: p.status,
         })))} />
       </div>
 
@@ -75,18 +83,22 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
               {pg.paged.map(p => (
                 <tr key={p.id} className="border-b border-gray-100 align-middle hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{p.applicantName}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{p.jobTitle ?? '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {p.jobTitle ?? '—'}
+                    {promotedFrom(p) && <div className="text-xs text-gray-400 mt-0.5">Hired as {promotedFrom(p)}</div>}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtDate(p.dateHired)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge value={p.status} />
-                      {p.openRequest && <WaitingPill text={`Requested: ${p.openRequest.requestedStatus}`} title="Waiting for the PESO to decide" />}
+                      {p.openRequest && <WaitingPill text={p.openRequest.type === 'placement_promotion' ? 'Promotion requested' : `Requested: ${p.openRequest.requestedStatus}`} title="Waiting for the PESO to decide" />}
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="inline-flex gap-2">
-                      <button type="button" onClick={() => onView(p.applicantId, { jobTitle: p.jobTitle, verb: 'Hired', date: p.dateHired, status: p.status })} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
+                      <button type="button" onClick={() => onView(p.applicantId, { jobTitle: p.jobTitle, verb: 'Hired', date: p.dateHired, status: p.status, hiredAs: promotedFrom(p) })} className={`${btnSmall} border border-gray-300 text-gray-700 hover:bg-gray-50`}>View details</button>
                       {p.status === 'Active' && !p.openRequest && <button type="button" onClick={() => setUpdate(p)} className={`${btnSmall} bg-brand-blue text-white hover:bg-brand-blue-dark`}>Update status</button>}
+                      {p.status === 'Active' && !p.openRequest && <button type="button" onClick={() => setPromote(p)} className={`${btnSmall} border border-brand-blue text-brand-blue hover:bg-blue-50`}>Record promotion</button>}
                       {p.openRequest && <button type="button" onClick={() => setWithdraw(p)} className={`${btnSmall} border border-red-200 text-red-600 hover:bg-red-50`}>Withdraw request</button>}
                     </div>
                   </td>
@@ -104,6 +116,13 @@ export default function PlacementsTab({ tick, onView, onChanged }: { tick: numbe
           options={['Resigned', 'Terminated', 'Completed']}
           onSubmit={s => send(update, s)}
           onClose={() => setUpdate(null)}
+        />
+      )}
+      {promote && (
+        <PromotionRequestDialog
+          subject={promote.applicantName} currentTitle={promote.jobTitle ?? ''} dateHired={promote.dateHired}
+          onSubmit={input => sendPromotion(promote, input)}
+          onClose={() => setPromote(null)}
         />
       )}
       {withdraw && <WithdrawDialog what={withdraw.applicantName} onConfirm={() => doWithdraw(withdraw)} onClose={() => setWithdraw(null)} />}

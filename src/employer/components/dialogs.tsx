@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { Badge, Dialog } from './ui'
 import DatePicker from '../../components/DatePicker'
 import ConfirmModal from '../../pages/shared/ConfirmModal'
-import type { PortalRequest } from '../api'
+import type { PortalRequest, PromotionInput } from '../api'
 import { FIELD_LABELS, btnGhost, btnPrimary, fmtChangeValue, fmtDate, fmtWhen, inputCls, labelCls, requestKind, todayStr } from '../lib'
 
 // Ask the PESO to change a referral's or a placement's status. Nothing changes until the PESO accepts.
@@ -63,12 +63,79 @@ export function StatusRequestDialog({ title, subject, current, options, allowHir
   )
 }
 
+// Ask the PESO to record a promotion for someone hired. Nothing changes until the PESO accepts.
+export function PromotionRequestDialog({ subject, currentTitle, dateHired, onSubmit, onClose }: {
+  subject: string
+  currentTitle: string
+  dateHired: string | null
+  onSubmit: (input: PromotionInput) => Promise<void>
+  onClose: () => void
+}) {
+  const [date, setDate] = useState(todayStr())
+  const [title, setTitle] = useState('')
+  const [min, setMin] = useState('')
+  const [max, setMax] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const hired = dateHired ? dateHired.slice(0, 10) : undefined
+
+  async function submit() {
+    setError('')
+    if (!date) { setError('Enter the promotion date.'); return }
+    if (hired && date < hired) { setError('The promotion date cannot be before the date hired.'); return }
+    if (title.trim().length < 2) { setError('Enter the new job title.'); return }
+    if (min.trim() !== '' && max.trim() !== '' && Number(min.replace(/,/g, '')) > Number(max.replace(/,/g, ''))) { setError('The minimum salary cannot be higher than the maximum salary.'); return }
+    setBusy(true)
+    try { await onSubmit({ promotionDate: date, newJobTitle: title.trim(), newSalaryMin: min.trim(), newSalaryMax: max.trim(), remarks: remarks.trim() }) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not send your request.'); setBusy(false) }
+  }
+
+  return (
+    <Dialog
+      title="Record promotion" onClose={onClose} busy={busy}
+      footer={<>
+        <button type="button" onClick={onClose} disabled={busy} className={btnGhost}>Cancel</button>
+        <button type="button" onClick={() => void submit()} disabled={busy || !date || !title.trim()} className={btnPrimary}>
+          {busy && <Loader2 size={15} className="animate-spin" />}Send to the PESO
+        </button>
+      </>}
+    >
+      <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">{subject}</span><br />Current job title: <span className="font-medium">{currentTitle || '—'}</span></p>
+      <div>
+        <label htmlFor="promo-date" className={labelCls}>Promotion date <span className="text-red-500">*</span></label>
+        <DatePicker id="promo-date" value={date} min={hired} max={todayStr()} onChange={setDate} className={`${inputCls} w-auto`} />
+      </div>
+      <div>
+        <label htmlFor="promo-title" className={labelCls}>New job title <span className="text-red-500">*</span></label>
+        <input id="promo-title" value={title} onChange={e => { setTitle(e.target.value); setError('') }} maxLength={255} placeholder="e.g. Head Cook" className={inputCls} />
+      </div>
+      <div>
+        <p className={labelCls}>New salary range <span className="font-normal normal-case text-gray-500">(optional)</span></p>
+        <div className="flex items-center gap-2">
+          <input aria-label="Minimum salary" value={min} onChange={e => { setMin(e.target.value); setError('') }} inputMode="decimal" placeholder="Min (e.g. 18,000)" className={inputCls} />
+          <span className="text-gray-400">–</span>
+          <input aria-label="Maximum salary" value={max} onChange={e => { setMax(e.target.value); setError('') }} inputMode="decimal" placeholder="Max (e.g. 22,000)" className={inputCls} />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="promo-remarks" className={labelCls}>Remarks <span className="font-normal normal-case text-gray-500">(optional)</span></label>
+        <textarea id="promo-remarks" value={remarks} onChange={e => setRemarks(e.target.value)} maxLength={500} rows={2} placeholder="Optional notes" className={inputCls} />
+      </div>
+      <p className="text-xs text-gray-500">This is a request: the PESO checks it first, then it shows under My Requests as approved or rejected.</p>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+    </Dialog>
+  )
+}
+
 // The order the fields of an opening are listed in.
-const FIELD_ORDER = ['jobTitle', 'jobType', 'slotsTotal', 'salaryMin', 'salaryMax', 'requirements', 'description', 'status']
+const FIELD_ORDER = ['jobTitle', 'jobType', 'slotsTotal', 'salaryMin', 'salaryMax', 'requirements', 'description', 'status',
+  'promotionDate', 'newJobTitle', 'newSalaryMin', 'newSalaryMax', 'remarks']
 
 // Everything a request asked for, in full: opened from a row of My Requests.
 export function RequestDetailsDialog({ r, onClose, onWithdraw }: { r: PortalRequest; onClose: () => void; onWithdraw: () => void }) {
   const isStatus = r.type === 'referral_status' || r.type === 'placement_status'
+  const aboutPerson = isStatus || r.type === 'placement_promotion'   // the request is about one person (shows the applicant and position)
   // One line per change: "field: what it was -> what you asked for" (a new opening has nothing before it, so it shows only the new value).
   const entries: { label: string; before: string; value: string }[] = isStatus
     ? [
@@ -91,8 +158,8 @@ export function RequestDetailsDialog({ r, onClose, onWithdraw }: { r: PortalRequ
     >
       <dl className="space-y-3">
         {/* Who or what it is about, as labelled fields (a new opening and company details have nothing extra to say here). */}
-        {isStatus && r.applicantName && <div><dt className={labelCls}>Applicant</dt><dd className="m-0 text-sm text-gray-800 break-words">{r.applicantName}</dd></div>}
-        {isStatus && r.jobTitle && <div><dt className={labelCls}>Position</dt><dd className="m-0 text-sm text-gray-800 break-words">{r.jobTitle}</dd></div>}
+        {aboutPerson && r.applicantName && <div><dt className={labelCls}>Applicant</dt><dd className="m-0 text-sm text-gray-800 break-words">{r.applicantName}</dd></div>}
+        {aboutPerson && r.jobTitle && <div><dt className={labelCls}>Position</dt><dd className="m-0 text-sm text-gray-800 break-words">{r.jobTitle}</dd></div>}
         {r.type === 'vacancy_update' && r.jobTitle && <div><dt className={labelCls}>Opening</dt><dd className="m-0 text-sm text-gray-800 break-words">{r.jobTitle}</dd></div>}
         <div><dt className={labelCls}>Sent</dt><dd className="m-0 text-sm text-gray-800">{fmtWhen(r.submittedAt)}</dd></div>
         {decided && r.reviewedAt && <div><dt className={labelCls}>{r.status === 'Approved' ? 'Approved' : 'Rejected'}</dt><dd className="m-0 text-sm text-gray-800">{fmtWhen(r.reviewedAt)} by the PESO</dd></div>}

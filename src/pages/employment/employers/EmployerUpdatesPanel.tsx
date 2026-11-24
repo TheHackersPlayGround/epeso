@@ -48,6 +48,10 @@ const shorten = (v: string, n = 90) => (v.length > n ? v.slice(0, n) + '…' : v
 
 const peso = (v: string) => (v !== '' && !Number.isNaN(Number(v)) ? `₱${Number(v).toLocaleString('en-PH', { maximumFractionDigits: 2 })}` : v)
 
+// A promotion request's values for people: the date like the rest of the system, the salaries with the peso sign.
+const promotionValue = (field: string, v: string) =>
+  field === 'Promotion date' ? fmtDate(v) : field === 'New minimum salary' || field === 'New maximum salary' ? peso(v) : v
+
 function ChangeCell({ r }: { r: EmployerRequest }) {
   // A new opening is shown compactly (the job title is already in the Request column): 3 short lines instead of one line per field.
   if (r.type === 'vacancy_new') {
@@ -63,14 +67,15 @@ function ChangeCell({ r }: { r: EmployerRequest }) {
       </div>
     )
   }
-  if (r.type === 'company_info' || r.type === 'vacancy_update') {
+  if (r.type === 'company_info' || r.type === 'vacancy_update' || r.type === 'placement_promotion') {
+    const show = (field: string, v: string) => (r.type === 'placement_promotion' ? promotionValue(field, v) : v)
     return (
       <ul className="m-0 p-0 list-none space-y-1 max-w-md">
         {(r.changes ?? []).map(c => (
           <li key={c.field} className="text-sm text-gray-700 break-words">
             <span className="text-gray-500">{c.field}:</span>{' '}
             {c.current !== '' && <><span title={c.current}>{shorten(c.current) || '—'}</span> <span className="text-gray-400">→</span> </>}
-            <span className="font-medium text-gray-900" title={c.requested}>{shorten(c.requested) || '—'}</span>
+            <span className="font-medium text-gray-900" title={c.requested}>{shorten(show(c.field, c.requested)) || '—'}</span>
           </li>
         ))}
       </ul>
@@ -91,6 +96,10 @@ function changeSummary(r: EmployerRequest): string {
     const openings = Number(f['Openings'])
     return [f['Job type'], Number.isNaN(openings) || f['Openings'] === undefined ? '' : `${openings} opening${openings === 1 ? '' : 's'}`,
       f['Minimum salary'] ? `${peso(f['Minimum salary'])} – ${peso(f['Maximum salary'] ?? '')}` : ''].filter(Boolean).join(' · ') || 'New opening'
+  }
+  if (r.type === 'placement_promotion') {
+    const t = (r.changes ?? []).find(c => c.field === 'New job title')
+    return t ? `Promotion: ${t.current ? `${shorten(t.current, 30)} → ` : ''}${shorten(t.requested, 40)}` : 'Promotion'
   }
   if (r.type === 'company_info' || r.type === 'vacancy_update') {
     const ch = r.changes ?? []
@@ -421,7 +430,7 @@ function AcceptDialog({ row, onCancel, onConfirm }: { row: EmployerRequest; onCa
               <p className="m-0 text-xs text-gray-500 mt-1">The employer proposed this date. You can change it. Accepting creates the placement.</p>
             </div>
           )}
-          {!isHire && <p className="m-0 text-xs text-gray-500">{row.type === 'vacancy_new' ? 'Accepting creates this opening now. It is marked as requested by the employer.' : 'Accepting applies this change in the system now.'}</p>}
+          {!isHire && <p className="m-0 text-xs text-gray-500">{row.type === 'vacancy_new' ? 'Accepting creates this opening now. It is marked as requested by the employer.' : row.type === 'placement_promotion' ? 'Accepting records this promotion on the placement now (the same as Placements → Record Promotion).' : 'Accepting applies this change in the system now.'}</p>}
         </div>
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button type="button" onClick={onCancel} disabled={saving} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50">Cancel</button>

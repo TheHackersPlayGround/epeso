@@ -159,7 +159,12 @@ function ApplicantDetails({ rec, context, backLabel, onClose }: { rec: Applicant
           {about && <p className="m-0 mt-1 text-sm font-medium text-gray-700">{about}</p>}
           {context && (
             <p className="m-0 mt-1 text-sm text-gray-500 flex items-center gap-2 flex-wrap">
-              <span>{context.verb} for <b className="text-gray-700">{context.jobTitle ?? 'a job opening'}</b>{context.date ? ` · ${fmtDate(context.date)}` : ''}</span>
+              <span>
+                {context.hiredAs
+                  ? <>Hired as <b className="text-gray-700">{context.hiredAs}</b> · now <b className="text-gray-700">{context.jobTitle}</b></>
+                  : <>{context.verb} for <b className="text-gray-700">{context.jobTitle ?? 'a job opening'}</b></>}
+                {context.date ? ` · ${fmtDate(context.date)}` : ''}
+              </span>
               <Badge value={context.status} />
             </p>
           )}

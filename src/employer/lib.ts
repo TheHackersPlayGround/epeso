@@ -19,17 +19,21 @@ export const FIELD_LABELS: Record<string, string> = {
   emailAddress: 'Email', buildingNo: 'Building no.', street: 'Street',
   jobTitle: 'Job title', jobType: 'Job type', description: 'Description', requirements: 'Requirements',
   salaryMin: 'Minimum salary', salaryMax: 'Maximum salary', slotsTotal: 'Openings', status: 'Status',
+  promotionDate: 'Promotion date', newJobTitle: 'New job title', newSalaryMin: 'New minimum salary', newSalaryMax: 'New maximum salary', remarks: 'Remarks',
 }
 
 // A requested value, written for people (salaries with the peso sign and thousands).
 export const fmtChangeValue = (key: string, v: string | number) =>
-  (key === 'salaryMin' || key === 'salaryMax') && !Number.isNaN(Number(v)) ? `₱${Number(v).toLocaleString('en-PH', { maximumFractionDigits: 2 })}` : String(v)
+  (key === 'salaryMin' || key === 'salaryMax' || key === 'newSalaryMin' || key === 'newSalaryMax') && !Number.isNaN(Number(v)) ? `₱${Number(v).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`
+    : key === 'promotionDate' ? fmtDate(String(v))
+    : String(v)
 
 // What a request is about, in one line.
 export const requestTitle = (r: PortalRequest) =>
   r.type === 'company_info' ? 'Company details'
     : r.type === 'vacancy_new' ? 'New opening'
     : r.type === 'vacancy_update' ? 'Opening change'
+    : r.type === 'placement_promotion' ? 'Promotion'
     : r.applicantName ?? 'Applicant'
 
 const cutText = (v: string, max = 64) => (v.length > max ? v.slice(0, max) + '…' : v)
@@ -38,19 +42,21 @@ const cutText = (v: string, max = 64) => (v.length > max ? v.slice(0, max) + '�
 export const requestKind = (r: PortalRequest) =>
   r.type === 'referral_status' ? 'Referral'
     : r.type === 'placement_status' ? 'Placement'
+    : r.type === 'placement_promotion' ? 'Promotion'
     : r.type === 'vacancy_new' ? 'New opening'
     : r.type === 'vacancy_update' ? 'Opening change'
     : 'Company details'
 
 // Who or what it is about, for the second (small) line: the applicant and the position, or the job title.
 export const requestSubject = (r: PortalRequest) =>
-  r.type === 'referral_status' || r.type === 'placement_status' ? [r.applicantName, r.jobTitle].filter(Boolean).join(' · ')
+  r.type === 'referral_status' || r.type === 'placement_status' || r.type === 'placement_promotion' ? [r.applicantName, r.jobTitle].filter(Boolean).join(' · ')
     : r.type === 'company_info' ? '' : (r.jobTitle ?? '')
 
 // One short line saying what the request was about (the full details are in My Requests).
 export function requestSummary(r: PortalRequest): string {
   const c = (r.changes ?? {}) as Record<string, string | number>
   if (r.type === 'referral_status' || r.type === 'placement_status') return `${r.type === 'placement_status' ? 'Employment' : 'Referral'} marked ${r.requestedStatus ?? '—'}`
+  if (r.type === 'placement_promotion') return cutText(`Promoted to ${c.newJobTitle ?? '—'}`)
   if (r.type === 'vacancy_new') {
     const n = c.slotsTotal !== undefined ? Number(c.slotsTotal) : NaN
     const parts = [r.jobTitle ?? c.jobTitle, Number.isNaN(n) ? '' : `${n} opening${n === 1 ? '' : 's'}`,

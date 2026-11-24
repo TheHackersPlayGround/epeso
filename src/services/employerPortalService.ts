@@ -61,7 +61,7 @@ export async function listEmployerActivity(): Promise<EmployerActivityEntry[]> {
 
 // ── Employer Updates (what employers asked for) ──────────────────────────────
 
-export type EmployerRequestType = 'referral_status' | 'placement_status' | 'company_info' | 'vacancy_new' | 'vacancy_update'
+export type EmployerRequestType = 'referral_status' | 'placement_status' | 'placement_promotion' | 'company_info' | 'vacancy_new' | 'vacancy_update'
 export type EmployerRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn'
 
 export interface EmployerRequest {

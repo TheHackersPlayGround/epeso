@@ -1,5 +1,5 @@
 // Sign-in, and the first-login "choose your own password" page.
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, User } from 'lucide-react'
 import { ApiError, changePassword, login, logout, type Me } from '../api'
 import { errText } from '../lib'
@@ -184,14 +184,28 @@ export function LoginPage({ onSignedIn, notice }: { onSignedIn: (me: Me) => void
   const [busy, setBusy] = useState(false)
   const [forgot, setForgot] = useState(false)
   const [showNotice, setShowNotice] = useState(true)   // the notice from the app (e.g. "could not reach the portal") goes away once they act
+  // After too many wrong passwords the server locks sign-in for a while and says for how long; count it down here.
+  const [lockUntil, setLockUntil] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const locked = lockUntil !== null && now < lockUntil
+  const secondsLeft = locked ? Math.ceil((lockUntil - now) / 1000) : 0
+  useEffect(() => {
+    if (!locked) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [locked])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (busy) return
+    if (busy || locked) return
     setShowNotice(false)
     if (!username.trim() || !password) { setError('Please enter your username and password.'); return }
     setBusy(true); setError('')
-    try { onSignedIn(await login(username.trim(), password)) } catch (err) { setError(errText(err)); setBusy(false) }
+    try { onSignedIn(await login(username.trim(), password)) } catch (err) {
+      if (err instanceof ApiError && err.retryAfter) { setNow(Date.now()); setLockUntil(Date.now() + err.retryAfter * 1000); setError('') }
+      else setError(errText(err))
+      setBusy(false)
+    }
   }
 
   if (forgot) return <ForgotPassword onBack={() => { setForgot(false); setError(''); setPassword('') }} />
@@ -217,7 +231,12 @@ export function LoginPage({ onSignedIn, notice }: { onSignedIn: (me: Me) => void
           </div>
         </div>
         {error && <p role="alert" className={glassError}>{error}</p>}
-        <button type="submit" disabled={busy} className={`${glassPrimary} w-full`} style={glassPrimaryStyle}>
+        {locked && (
+          <p className={glassError}>
+            Too many sign-in attempts. Please try again in <strong className="tabular-nums">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</strong>.
+          </p>
+        )}
+        <button type="submit" disabled={busy || locked} className={`${glassPrimary} w-full`} style={glassPrimaryStyle}>
           {busy && <Loader2 size={16} className="animate-spin" />}{busy ? 'Signing in…' : 'Sign in'}
         </button>
         <p className="text-xs text-gray-500 text-center m-0 pt-1">Need an account? Please contact the PESO.</p>

@@ -21,7 +21,7 @@ function Tile({ label, value, hint, icon: Icon, onClick }: { label: string; valu
 }
 
 const TYPE_ICON: Record<PortalRequest['type'], LucideIcon> = {
-  referral_status: UserPlus, placement_status: UserCheck, vacancy_new: Briefcase, vacancy_update: Briefcase, company_info: Building2,
+  referral_status: UserPlus, placement_status: UserCheck, placement_promotion: UserCheck, vacancy_new: Briefcase, vacancy_update: Briefcase, company_info: Building2,
 }
 // The coloured strip on the left of a decision: the result at a glance.
 const STRIP: Record<string, string> = { Approved: 'border-l-green-500', Rejected: 'border-l-red-400', Withdrawn: 'border-l-gray-300' }
